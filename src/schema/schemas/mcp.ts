@@ -15,7 +15,7 @@ export type GatewayTargetType = z.infer<typeof GatewayTargetTypeSchema>;
 // Gateway Authorization Schemas
 // ============================================================================
 
-export const GatewayAuthorizerTypeSchema = z.enum(['NONE', 'CUSTOM_JWT']);
+export const GatewayAuthorizerTypeSchema = z.enum(['NONE', 'AWS_IAM', 'CUSTOM_JWT']);
 export type GatewayAuthorizerType = z.infer<typeof GatewayAuthorizerTypeSchema>;
 
 /** OIDC well-known configuration endpoint suffix (per OpenID Connect Discovery 1.0 spec) */
@@ -44,6 +44,7 @@ export const CustomJwtAuthorizerConfigSchema = z.object({
   allowedAudience: z.array(z.string().min(1)),
   /** List of allowed client IDs */
   allowedClients: z.array(z.string().min(1)).min(1),
+  allowedScopes: z.array(z.string().min(1)).optional(),
 });
 
 export type CustomJwtAuthorizerConfig = z.infer<typeof CustomJwtAuthorizerConfigSchema>;
@@ -56,6 +57,19 @@ export const GatewayAuthorizerConfigSchema = z.object({
 });
 
 export type GatewayAuthorizerConfig = z.infer<typeof GatewayAuthorizerConfigSchema>;
+
+export const OutboundAuthTypeSchema = z.enum(['OAUTH', 'API_KEY', 'NONE']);
+export type OutboundAuthType = z.infer<typeof OutboundAuthTypeSchema>;
+
+export const OutboundAuthSchema = z
+  .object({
+    type: OutboundAuthTypeSchema.default('NONE'),
+    credentialName: z.string().min(1).optional(),
+    scopes: z.array(z.string()).optional(),
+  })
+  .strict();
+
+export type OutboundAuth = z.infer<typeof OutboundAuthSchema>;
 
 export const McpImplLanguageSchema = z.enum(['TypeScript', 'Python']);
 export type McpImplementationLanguage = z.infer<typeof McpImplLanguageSchema>;
@@ -262,10 +276,38 @@ export const AgentCoreGatewayTargetSchema = z
   .object({
     name: z.string().min(1),
     targetType: GatewayTargetTypeSchema,
-    toolDefinitions: z.array(ToolDefinitionSchema).min(1),
+    /** Tool definitions. Required for Lambda targets. Optional for MCP Server (discovered via tools/list). */
+    toolDefinitions: z.array(ToolDefinitionSchema).optional(),
+    /** Compute configuration. Required for Lambda/Runtime scaffold targets. */
     compute: ToolComputeConfigSchema.optional(),
+    /** MCP Server endpoint URL. Required for external MCP Server targets. */
+    endpoint: z.string().url().optional(),
+    /** Outbound auth configuration for the target. */
+    outboundAuth: OutboundAuthSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    data => {
+      // External MCP Server: needs endpoint, no compute
+      if (data.targetType === 'mcpServer' && !data.compute && !data.endpoint) {
+        return false;
+      }
+      // Lambda target: needs compute and tool definitions
+      if (data.targetType === 'lambda') {
+        if (!data.compute) return false;
+        if (!data.toolDefinitions || data.toolDefinitions.length === 0) return false;
+      }
+      // Outbound auth with credential needs a credential name
+      if (data.outboundAuth && data.outboundAuth.type !== 'NONE' && !data.outboundAuth.credentialName) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        'Invalid target configuration. MCP Server targets need an endpoint or compute. Lambda targets need compute and tool definitions. OAuth/API_KEY auth needs a credential name.',
+    }
+  );
 
 export type AgentCoreGatewayTarget = z.infer<typeof AgentCoreGatewayTargetSchema>;
 
