@@ -14,7 +14,9 @@ import {
   formatError,
   getAllCredentials,
   hasOwnedIdentityApiProviders,
+  hasOwnedIdentityOAuthProviders,
   setupApiKeyProviders,
+  setupOAuth2Providers,
   synthesizeCdk,
   validateProject,
 } from '../../operations/deploy';
@@ -65,6 +67,8 @@ export interface PreflightResult {
   missingCredentials: MissingCredential[];
   /** KMS key ARN used for identity token vault encryption */
   identityKmsKeyArn?: string;
+  /** OAuth credential ARNs from pre-deploy setup */
+  oauthCredentials: Record<string, { credentialProviderArn: string; clientSecretArn?: string; callbackUrl?: string }>;
   startPreflight: () => Promise<void>;
   confirmTeardown: () => void;
   cancelTeardown: () => void;
@@ -119,6 +123,9 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
   const [runtimeCredentials, setRuntimeCredentials] = useState<SecureCredentials | null>(null);
   const [skipIdentitySetup, setSkipIdentitySetup] = useState(false);
   const [identityKmsKeyArn, setIdentityKmsKeyArn] = useState<string | undefined>(undefined);
+  const [oauthCredentials, setOauthCredentials] = useState<
+    Record<string, { credentialProviderArn: string; clientSecretArn?: string; callbackUrl?: string }>
+  >({});
   const [teardownConfirmed, setTeardownConfirmed] = useState(false);
 
   // Guard against concurrent runs (React StrictMode, re-renders, etc.)
@@ -559,6 +566,62 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
         logger.endStep('success');
         setSteps(prev => prev.map((s, i) => (i === prev.length - 1 ? { ...s, status: 'success' } : s)));
 
+        // Set up OAuth credential providers if needed
+        if (hasOwnedIdentityOAuthProviders(context.projectSpec)) {
+          setSteps(prev => [...prev, { label: 'Set up OAuth providers', status: 'running' }]);
+          logger.startStep('Set up OAuth providers');
+
+          const oauthResult = await setupOAuth2Providers({
+            projectSpec: context.projectSpec,
+            configBaseDir,
+            region: target.region,
+            runtimeCredentials: runtimeCredentials ?? undefined,
+          });
+
+          for (const result of oauthResult.results) {
+            if (result.status === 'created') {
+              logger.log(`Created OAuth provider: ${result.providerName}`);
+            } else if (result.status === 'updated') {
+              logger.log(`Updated OAuth provider: ${result.providerName}`);
+            } else if (result.status === 'skipped') {
+              logger.log(`Skipped ${result.providerName}: ${result.error}`);
+            } else if (result.status === 'error') {
+              logger.log(`Error for ${result.providerName}: ${result.error}`);
+            }
+          }
+
+          if (oauthResult.hasErrors) {
+            logger.endStep('error', 'Some OAuth providers failed to set up');
+            setSteps(prev =>
+              prev.map((s, i) =>
+                i === prev.length - 1 ? { ...s, status: 'error', error: 'Some OAuth providers failed' } : s
+              )
+            );
+            setPhase('error');
+            isRunningRef.current = false;
+            return;
+          }
+
+          // Collect credential ARNs for deployed state
+          const creds: Record<
+            string,
+            { credentialProviderArn: string; clientSecretArn?: string; callbackUrl?: string }
+          > = {};
+          for (const result of oauthResult.results) {
+            if (result.credentialProviderArn) {
+              creds[result.providerName] = {
+                credentialProviderArn: result.credentialProviderArn,
+                clientSecretArn: result.clientSecretArn,
+                callbackUrl: result.callbackUrl,
+              };
+            }
+          }
+          setOauthCredentials(creds);
+
+          logger.endStep('success');
+          setSteps(prev => prev.map((s, i) => (i === prev.length - 1 ? { ...s, status: 'success' } : s)));
+        }
+
         // Clear runtime credentials
         setRuntimeCredentials(null);
 
@@ -643,6 +706,7 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
     hasCredentialsError,
     missingCredentials,
     identityKmsKeyArn,
+    oauthCredentials,
     startPreflight,
     confirmTeardown,
     cancelTeardown,
