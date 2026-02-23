@@ -29,41 +29,19 @@ export interface OAuth2ProviderParams {
 }
 
 /**
- * Extract credential provider ARN from API response, handling field name inconsistency.
- * The API may return the ARN as `credentialProviderArn` or `oAuth2CredentialProviderArn`.
- */
-/**
- * Extract credential provider ARN from API response, handling field name inconsistency.
- * The API may return the ARN as `credentialProviderArn` or `oAuth2CredentialProviderArn`.
- *
- * Note: This casts to Record<string, unknown> to handle the inconsistency. The typed SDK
- * response only declares `credentialProviderArn`, but older API versions may return
- * `oAuth2CredentialProviderArn`. Remove the fallback once the API stabilizes.
- */
-function extractArn(response: Record<string, unknown>): string | undefined {
-  return (
-    (response.credentialProviderArn as string | undefined) ??
-    (response.oAuth2CredentialProviderArn as string | undefined)
-  );
-}
-
-/**
  * Extract result fields from an OAuth2 API response.
+ * All Create/Get/Update responses share the same shape.
  */
-function extractResult(response: Record<string, unknown>): OAuth2ProviderResult | undefined {
-  const credentialProviderArn = extractArn(response);
-  if (!credentialProviderArn) return undefined;
-
-  const clientSecretArnRaw = response.clientSecretArn;
-  const clientSecretArn =
-    clientSecretArnRaw && typeof clientSecretArnRaw === 'object' && 'secretArn' in clientSecretArnRaw
-      ? (clientSecretArnRaw as { secretArn?: string }).secretArn
-      : undefined;
-
+function extractResult(response: {
+  credentialProviderArn?: string;
+  clientSecretArn?: { secretArn?: string };
+  callbackUrl?: string;
+}): OAuth2ProviderResult | undefined {
+  if (!response.credentialProviderArn) return undefined;
   return {
-    credentialProviderArn,
-    clientSecretArn,
-    callbackUrl: typeof response.callbackUrl === 'string' ? response.callbackUrl : undefined,
+    credentialProviderArn: response.credentialProviderArn,
+    clientSecretArn: response.clientSecretArn?.secretArn,
+    callbackUrl: response.callbackUrl,
   };
 }
 
@@ -87,9 +65,10 @@ export async function oAuth2ProviderExists(
 
 /**
  * Build the OAuth2 provider config for Create/Update commands.
- * Always uses customOauth2ProviderConfig regardless of vendor — the vendor field
- * controls server-side behavior (token endpoints, scopes), but the config shape
- * is the same for all vendors in the current API.
+ * Always uses customOauth2ProviderConfig — the vendor field controls server-side
+ * behavior (token endpoints, scopes), but the config shape is the same for all
+ * vendors in the current API. Vendor-specific config paths (e.g. googleOauth2ProviderConfig)
+ * would be needed if we add vendor selection in a future phase.
  */
 function buildOAuth2Config(params: OAuth2ProviderParams) {
   return {
@@ -117,7 +96,7 @@ export async function createOAuth2Provider(
 ): Promise<{ success: boolean; result?: OAuth2ProviderResult; error?: string }> {
   try {
     const response = await client.send(new CreateOauth2CredentialProviderCommand(buildOAuth2Config(params)));
-    const result = extractResult(response as unknown as Record<string, unknown>);
+    const result = extractResult(response);
     if (!result) {
       return { success: false, error: 'No credential provider ARN in response' };
     }
@@ -147,7 +126,7 @@ export async function getOAuth2Provider(
 ): Promise<{ success: boolean; result?: OAuth2ProviderResult; error?: string }> {
   try {
     const response = await client.send(new GetOauth2CredentialProviderCommand({ name }));
-    const result = extractResult(response as unknown as Record<string, unknown>);
+    const result = extractResult(response);
     if (!result) {
       return { success: false, error: 'No credential provider ARN in response' };
     }
@@ -169,7 +148,7 @@ export async function updateOAuth2Provider(
 ): Promise<{ success: boolean; result?: OAuth2ProviderResult; error?: string }> {
   try {
     const response = await client.send(new UpdateOauth2CredentialProviderCommand(buildOAuth2Config(params)));
-    const result = extractResult(response as unknown as Record<string, unknown>);
+    const result = extractResult(response);
     if (!result) {
       return { success: false, error: 'No credential provider ARN in response' };
     }
