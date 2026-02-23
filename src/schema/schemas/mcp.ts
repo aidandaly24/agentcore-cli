@@ -286,28 +286,35 @@ export const AgentCoreGatewayTargetSchema = z
     outboundAuth: OutboundAuthSchema.optional(),
   })
   .strict()
-  .refine(
-    data => {
-      // External MCP Server: needs endpoint, no compute
-      if (data.targetType === 'mcpServer' && !data.compute && !data.endpoint) {
-        return false;
-      }
-      // Lambda target: needs compute and tool definitions
-      if (data.targetType === 'lambda') {
-        if (!data.compute) return false;
-        if (!data.toolDefinitions || data.toolDefinitions.length === 0) return false;
-      }
-      // Outbound auth with credential needs a credential name
-      if (data.outboundAuth && data.outboundAuth.type !== 'NONE' && !data.outboundAuth.credentialName) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message:
-        'Invalid target configuration. MCP Server targets need an endpoint or compute. Lambda targets need compute and tool definitions. OAuth/API_KEY auth needs a credential name.',
+  .superRefine((data, ctx) => {
+    if (data.targetType === 'mcpServer' && !data.compute && !data.endpoint) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'MCP Server targets require either an endpoint URL or compute configuration.',
+      });
     }
-  );
+    if (data.targetType === 'lambda' && !data.compute) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Lambda targets require compute configuration.',
+        path: ['compute'],
+      });
+    }
+    if (data.targetType === 'lambda' && (!data.toolDefinitions || data.toolDefinitions.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Lambda targets require at least one tool definition.',
+        path: ['toolDefinitions'],
+      });
+    }
+    if (data.outboundAuth && data.outboundAuth.type !== 'NONE' && !data.outboundAuth.credentialName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${data.outboundAuth.type} outbound auth requires a credentialName.`,
+        path: ['outboundAuth', 'credentialName'],
+      });
+    }
+  });
 
 export type AgentCoreGatewayTarget = z.infer<typeof AgentCoreGatewayTargetSchema>;
 

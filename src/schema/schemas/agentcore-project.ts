@@ -96,7 +96,7 @@ export const OAuthCredentialSchema = z.object({
   /** OIDC discovery URL for the OAuth provider */
   discoveryUrl: z.string().url(),
   /** Scopes this credential provider supports */
-  scopes: z.array(z.string()).default([]),
+  scopes: z.array(z.string()).optional(),
   /** Credential provider vendor type */
   vendor: z.string().default('CustomOauth2'),
   /** Whether this credential was auto-created by the CLI (e.g., for CUSTOM_JWT inbound auth) */
