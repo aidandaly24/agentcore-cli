@@ -104,11 +104,9 @@ export async function createOAuth2Provider(
   } catch (error) {
     const errorName = (error as { name?: string }).name;
     if (errorName === 'ConflictException' || errorName === 'ResourceAlreadyExistsException') {
-      // Unlike API key providers, OAuth needs the ARN back for deployed-state.json.
-      // This only triggers in a race condition (another process created between exists-check
-      // and create). The caller already routes to update for known-existing providers, so
-      // falling back to GET here is safe — the next deploy will update with fresh credentials.
-      return getOAuth2Provider(client, params.name);
+      // Race condition: another process created the provider between our exists-check and
+      // create call. Fall back to update so the user's credentials are always applied.
+      return updateOAuth2Provider(client, params);
     }
     return {
       success: false,
