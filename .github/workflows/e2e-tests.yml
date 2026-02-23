@@ -6,7 +6,7 @@ on:
         description: 'AWS region for deployment'
         default: 'us-east-1'
   pull_request_target:
-    branches: [main]
+    branches: [main, feat/gateway-integration]
 
 permissions:
   id-token: write # OIDC — lets GitHub assume an AWS IAM role via short-lived token (no stored keys)

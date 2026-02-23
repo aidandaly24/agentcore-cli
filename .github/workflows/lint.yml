@@ -2,9 +2,9 @@ name: Quality and Safety Checks
 
 on:
   push:
-    branches: ['main']
+    branches: ['main', 'feat/gateway-integration']
   pull_request:
-    branches: ['main']
+    branches: ['main', 'feat/gateway-integration']
 
 permissions:
   contents: read
