@@ -32,6 +32,14 @@ export interface OAuth2ProviderParams {
  * Extract credential provider ARN from API response, handling field name inconsistency.
  * The API may return the ARN as `credentialProviderArn` or `oAuth2CredentialProviderArn`.
  */
+/**
+ * Extract credential provider ARN from API response, handling field name inconsistency.
+ * The API may return the ARN as `credentialProviderArn` or `oAuth2CredentialProviderArn`.
+ *
+ * Note: This casts to Record<string, unknown> to handle the inconsistency. The typed SDK
+ * response only declares `credentialProviderArn`, but older API versions may return
+ * `oAuth2CredentialProviderArn`. Remove the fallback once the API stabilizes.
+ */
 function extractArn(response: Record<string, unknown>): string | undefined {
   return (
     (response.credentialProviderArn as string | undefined) ??
@@ -77,6 +85,12 @@ export async function oAuth2ProviderExists(
   }
 }
 
+/**
+ * Build the OAuth2 provider config for Create/Update commands.
+ * Always uses customOauth2ProviderConfig regardless of vendor — the vendor field
+ * controls server-side behavior (token endpoints, scopes), but the config shape
+ * is the same for all vendors in the current API.
+ */
 function buildOAuth2Config(params: OAuth2ProviderParams) {
   return {
     name: params.name,
@@ -111,7 +125,10 @@ export async function createOAuth2Provider(
   } catch (error) {
     const errorName = (error as { name?: string }).name;
     if (errorName === 'ConflictException' || errorName === 'ResourceAlreadyExistsException') {
-      // Unlike API key providers, OAuth needs the ARN back for deployed-state.json
+      // Unlike API key providers, OAuth needs the ARN back for deployed-state.json.
+      // This only triggers in a race condition (another process created between exists-check
+      // and create). The caller already routes to update for known-existing providers, so
+      // falling back to GET here is safe — the next deploy will update with fresh credentials.
       return getOAuth2Provider(client, params.name);
     }
     return {
