@@ -2,11 +2,11 @@ name: CodeQL
 
 on:
   push:
-    branches: ['main']
+    branches: ['main', 'feat/gateway-integration']
   pull_request:
-    branches: ['main']
+    branches: ['main', 'feat/gateway-integration']
   pull_request_target:
-    branches: ['main']
+    branches: ['main', 'feat/gateway-integration']
 
 # Cancel in-progress runs when a new commit is pushed
 concurrency:
