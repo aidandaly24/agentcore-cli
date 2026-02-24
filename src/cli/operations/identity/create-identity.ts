@@ -34,7 +34,7 @@ export interface CredentialStrategy {
  * Compute the default env var name for a credential.
  */
 export function computeDefaultCredentialEnvVarName(credentialName: string): string {
-  return `AGENTCORE_CREDENTIAL_${credentialName.toUpperCase()}`;
+  return `AGENTCORE_CREDENTIAL_${credentialName.toUpperCase().replace(/-/g, '_')}`;
 }
 
 /**
