@@ -189,13 +189,8 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     return { valid: false, error: '--name is required' };
   }
 
-  if (
-    options.type &&
-    options.type !== 'mcpServer' &&
-    options.type !== 'mcpServerScaffold' &&
-    options.type !== 'lambda'
-  ) {
-    return { valid: false, error: 'Invalid type. Valid options: mcpServer, mcpServerScaffold, lambda' };
+  if (options.type && options.type !== 'mcpServer' && options.type !== 'lambda') {
+    return { valid: false, error: 'Invalid type. Valid options: mcpServer, lambda' };
   }
 
   if (options.source && options.source !== 'existing-endpoint' && options.source !== 'create-new') {
