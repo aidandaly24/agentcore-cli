@@ -111,4 +111,4 @@ async def fetch_post(post_id: int) -> str:
 
 
 # Create ASGI app from FastMCP server and wrap with Mangum for Lambda
-handler = Mangum(mcp.sse_app(), lifespan="off")
+lambda_handler = Mangum(mcp.sse_app(), lifespan="off")
