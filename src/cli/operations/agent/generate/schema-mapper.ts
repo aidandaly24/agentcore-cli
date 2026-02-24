@@ -208,7 +208,7 @@ export async function mapGenerateConfigToRenderConfig(
   identityProviders: IdentityProviderRenderConfig[]
 ): Promise<AgentRenderConfig> {
   const gatewayProviders = await mapMcpGatewaysToGatewayProviders();
-  
+
   return {
     name: config.projectName,
     sdkFramework: config.sdk,
