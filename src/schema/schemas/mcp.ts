@@ -8,7 +8,13 @@ import { z } from 'zod';
 // MCP-Specific Schemas
 // ============================================================================
 
-export const GatewayTargetTypeSchema = z.enum(['lambda', 'mcpServer', 'openApiSchema', 'smithyModel']);
+export const GatewayTargetTypeSchema = z.enum([
+  'lambda',
+  'mcpServer',
+  'mcpServerScaffold',
+  'openApiSchema',
+  'smithyModel',
+]);
 export type GatewayTargetType = z.infer<typeof GatewayTargetTypeSchema>;
 
 // ============================================================================
@@ -305,6 +311,13 @@ export const AgentCoreGatewayTargetSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Lambda targets require at least one tool definition.',
         path: ['toolDefinitions'],
+      });
+    }
+    if (data.targetType === 'mcpServerScaffold' && !data.compute) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Scaffolded MCP Server targets require compute configuration.',
+        path: ['compute'],
       });
     }
     if (data.outboundAuth && data.outboundAuth.type !== 'NONE' && !data.outboundAuth.credentialName) {

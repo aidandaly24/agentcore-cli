@@ -13,7 +13,8 @@ function getSteps(source?: 'existing-endpoint' | 'create-new'): AddGatewayTarget
   if (source === 'existing-endpoint') {
     return ['name', 'source', 'endpoint', 'gateway', 'confirm'];
   }
-  return ['name', 'source', 'language', 'gateway', 'host', 'confirm'];
+  // Phase 1: Lambda is the only compute host, so skip host selection
+  return ['name', 'source', 'language', 'gateway', 'confirm'];
 }
 
 function deriveToolDefinition(name: string): ToolDefinition {
@@ -91,13 +92,8 @@ export function useAddGatewayTargetWizard(existingGateways: string[] = []) {
 
   const setGateway = useCallback((gateway: string) => {
     setConfig(c => {
-      const isExternal = c.source === 'existing-endpoint';
       const isSkipped = gateway === SKIP_FOR_NOW;
-      if (isExternal || isSkipped) {
-        setStep('confirm');
-      } else {
-        setStep('host');
-      }
+      setStep('confirm');
       return { ...c, gateway: isSkipped ? undefined : gateway };
     });
   }, []);

@@ -14,7 +14,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 describe('GatewayTargetTypeSchema', () => {
-  it.each(['lambda', 'mcpServer', 'openApiSchema', 'smithyModel'])('accepts "%s"', type => {
+  it.each(['lambda', 'mcpServer', 'mcpServerScaffold', 'openApiSchema', 'smithyModel'])('accepts "%s"', type => {
     expect(GatewayTargetTypeSchema.safeParse(type).success).toBe(true);
   });
 
@@ -491,6 +491,27 @@ describe('AgentCoreGatewayTargetSchema with outbound auth', () => {
       },
     });
     expect(result.success).toBe(false);
+  });
+
+  it('mcpServerScaffold target without compute fails', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'myTarget',
+      targetType: 'mcpServerScaffold',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('mcpServerScaffold target with compute passes', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'myTarget',
+      targetType: 'mcpServerScaffold',
+      compute: {
+        host: 'Lambda',
+        implementation: { language: 'Python', path: 'app/mcp/myTarget', handler: 'handler.handler' },
+        pythonVersion: 'PYTHON_3_12',
+      },
+    });
+    expect(result.success).toBe(true);
   });
 });
 

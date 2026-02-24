@@ -345,7 +345,7 @@ export async function createToolFromWizard(config: AddGatewayTargetConfig): Prom
   // Create a single target with all tool definitions
   const target: AgentCoreGatewayTarget = {
     name: config.name,
-    targetType: config.host === 'AgentCoreRuntime' ? 'mcpServer' : 'lambda',
+    targetType: config.host === 'AgentCoreRuntime' ? 'mcpServer' : 'mcpServerScaffold',
     toolDefinitions: toolDefs,
     compute:
       config.host === 'Lambda'

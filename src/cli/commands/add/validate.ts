@@ -189,8 +189,13 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     return { valid: false, error: '--name is required' };
   }
 
-  if (options.type && options.type !== 'mcpServer' && options.type !== 'lambda') {
-    return { valid: false, error: 'Invalid type. Valid options: mcpServer, lambda' };
+  if (
+    options.type &&
+    options.type !== 'mcpServer' &&
+    options.type !== 'mcpServerScaffold' &&
+    options.type !== 'lambda'
+  ) {
+    return { valid: false, error: 'Invalid type. Valid options: mcpServer, mcpServerScaffold, lambda' };
   }
 
   if (options.source && options.source !== 'existing-endpoint' && options.source !== 'create-new') {
@@ -198,6 +203,9 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
   }
 
   if (options.source === 'existing-endpoint') {
+    if (options.host) {
+      return { valid: false, error: '--host is not applicable for existing endpoint targets' };
+    }
     if (!options.endpoint) {
       return { valid: false, error: '--endpoint is required when source is existing-endpoint' };
     }
@@ -216,6 +224,15 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     options.gateway ??= undefined;
 
     return { valid: true };
+  }
+
+  // Default source to create-new when not specified (scaffold flow)
+  options.source ??= 'create-new';
+  // Default host to Lambda for scaffolded targets
+  options.host ??= 'Lambda';
+
+  if (options.host !== 'Lambda') {
+    return { valid: false, error: 'Only Lambda is supported as compute host for scaffolded targets' };
   }
 
   if (!options.language) {

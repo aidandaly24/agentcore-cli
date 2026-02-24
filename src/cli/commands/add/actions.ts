@@ -23,7 +23,11 @@ import {
   createCredential,
   resolveCredentialStrategy,
 } from '../../operations/identity/create-identity';
-import { createGatewayFromWizard, createToolFromWizard } from '../../operations/mcp/create-mcp';
+import {
+  createExternalGatewayTarget,
+  createGatewayFromWizard,
+  createToolFromWizard,
+} from '../../operations/mcp/create-mcp';
 import { createMemory } from '../../operations/memory/create-memory';
 import { createRenderer } from '../../templates';
 import type { MemoryOption } from '../../tui/screens/generate/types';
@@ -342,6 +346,10 @@ export async function handleAddGatewayTarget(
     }
 
     const config = buildGatewayTargetConfig(options);
+    if (config.source === 'existing-endpoint') {
+      const result = await createExternalGatewayTarget(config);
+      return { success: true, toolName: result.toolName };
+    }
     const result = await createToolFromWizard(config);
     return { success: true, toolName: result.toolName, sourcePath: result.projectPath };
   } catch (err) {
