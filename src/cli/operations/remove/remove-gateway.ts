@@ -58,6 +58,8 @@ function computeRemovedGatewayMcpSpec(mcpSpec: AgentCoreMcpSpec, gatewayName: st
   return {
     ...mcpSpec,
     agentCoreGateways: mcpSpec.agentCoreGateways.filter(g => g.name !== gatewayName),
+    // Preserve gateway's targets as unassigned so the user doesn't lose them.
+    // Only add the field if there are targets to preserve or unassignedTargets already exists.
     ...(targetsToPreserve.length > 0 || mcpSpec.unassignedTargets
       ? { unassignedTargets: [...(mcpSpec.unassignedTargets ?? []), ...targetsToPreserve] }
       : {}),
