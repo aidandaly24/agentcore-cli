@@ -1,12 +1,5 @@
 import { ToolNameSchema } from '../../../../schema';
-import {
-  ConfirmReview,
-  Panel,
-  Screen,
-  StepIndicator,
-  TextInput,
-  WizardSelect,
-} from '../../components';
+import { ConfirmReview, Panel, Screen, StepIndicator, TextInput, WizardSelect } from '../../components';
 import type { SelectableItem } from '../../components';
 import { HELP_TEXT } from '../../constants';
 import { useListNavigation } from '../../hooks';

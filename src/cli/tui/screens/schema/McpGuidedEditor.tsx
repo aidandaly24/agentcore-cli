@@ -78,7 +78,7 @@ export function McpGuidedEditor(props: McpGuidedEditorProps) {
   );
 }
 
-  // Gateways view is the only view mode
+// Gateways view is the only view mode
 type ScreenMode = 'list' | 'confirm-exit' | 'edit-item' | 'edit-field' | 'edit-targets' | 'edit-target-field';
 
 function McpEditorBody(props: {
