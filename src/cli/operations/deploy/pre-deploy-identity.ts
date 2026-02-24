@@ -192,7 +192,7 @@ async function setupApiKeyCredentialProvider(
 /**
  * Check if the project has any API key credentials that need setup.
  */
-export function hasOwnedIdentityApiProviders(projectSpec: AgentCoreProjectSpec): boolean {
+export function hasIdentityApiProviders(projectSpec: AgentCoreProjectSpec): boolean {
   return projectSpec.credentials.some(c => c.type === 'ApiKeyCredentialProvider');
 }
 
@@ -306,7 +306,7 @@ export async function setupOAuth2Providers(options: SetupOAuth2ProvidersOptions)
 /**
  * Check if the project has any OAuth credentials that need setup.
  */
-export function hasOwnedIdentityOAuthProviders(projectSpec: AgentCoreProjectSpec): boolean {
+export function hasIdentityOAuthProviders(projectSpec: AgentCoreProjectSpec): boolean {
   return projectSpec.credentials.some(c => c.type === 'OAuthCredentialProvider');
 }
 

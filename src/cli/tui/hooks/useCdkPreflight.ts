@@ -13,8 +13,8 @@ import {
   checkStackDeployability,
   formatError,
   getAllCredentials,
-  hasOwnedIdentityApiProviders,
-  hasOwnedIdentityOAuthProviders,
+  hasIdentityApiProviders,
+  hasIdentityOAuthProviders,
   setupApiKeyProviders,
   setupOAuth2Providers,
   synthesizeCdk,
@@ -424,7 +424,7 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
 
         // Check if API key providers need setup - always prompt user for credential source
         // Skip this check if skipIdentityCheck is true (e.g., plan command only synthesizes)
-        const needsApiKeySetup = !skipIdentityCheck && hasOwnedIdentityApiProviders(preflightContext.projectSpec);
+        const needsApiKeySetup = !skipIdentityCheck && hasIdentityApiProviders(preflightContext.projectSpec);
         if (needsApiKeySetup) {
           // Get all credentials for the prompt (not just missing ones)
           const allCredentials = getAllCredentials(preflightContext.projectSpec);
@@ -567,7 +567,7 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
         setSteps(prev => prev.map((s, i) => (i === prev.length - 1 ? { ...s, status: 'success' } : s)));
 
         // Set up OAuth credential providers if needed
-        if (hasOwnedIdentityOAuthProviders(context.projectSpec)) {
+        if (hasIdentityOAuthProviders(context.projectSpec)) {
           setSteps(prev => [...prev, { label: 'Set up OAuth providers', status: 'running' }]);
           logger.startStep('Set up OAuth providers');
 
