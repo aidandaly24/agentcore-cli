@@ -1,6 +1,6 @@
 import { SKIP_FOR_NOW } from '../../../tui/screens/mcp/types.js';
-import type { AddGatewayTargetConfig } from '../../../tui/screens/mcp/types.js';
-import { createExternalGatewayTarget } from '../create-mcp.js';
+import type { AddGatewayConfig, AddGatewayTargetConfig } from '../../../tui/screens/mcp/types.js';
+import { createExternalGatewayTarget, createGatewayFromWizard, getUnassignedTargets } from '../create-mcp.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { mockReadMcpSpec, mockWriteMcpSpec, mockConfigExists, mockReadProjectSpec } = vi.hoisted(() => ({
@@ -131,9 +131,6 @@ describe('createExternalGatewayTarget', () => {
     expect(target.outboundAuth).toEqual({ type: 'API_KEY', credentialName: 'my-cred' });
   });
 });
-
-import { createGatewayFromWizard, getUnassignedTargets } from '../create-mcp.js';
-import type { AddGatewayConfig } from '../../../tui/screens/mcp/types.js';
 
 describe('getUnassignedTargets', () => {
   afterEach(() => vi.clearAllMocks());
