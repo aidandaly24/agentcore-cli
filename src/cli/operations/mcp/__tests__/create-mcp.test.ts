@@ -131,3 +131,78 @@ describe('createExternalGatewayTarget', () => {
     expect(target.outboundAuth).toEqual({ type: 'API_KEY', credentialName: 'my-cred' });
   });
 });
+
+import { createGatewayFromWizard, getUnassignedTargets } from '../create-mcp.js';
+import type { AddGatewayConfig } from '../../../tui/screens/mcp/types.js';
+
+describe('getUnassignedTargets', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it('returns unassigned targets from mcp spec', async () => {
+    mockConfigExists.mockReturnValue(true);
+    mockReadMcpSpec.mockResolvedValue({
+      agentCoreGateways: [],
+      unassignedTargets: [{ name: 't1' }, { name: 't2' }],
+    });
+
+    const result = await getUnassignedTargets();
+    expect(result).toHaveLength(2);
+    expect(result[0]!.name).toBe('t1');
+  });
+
+  it('returns empty array when no mcp config exists', async () => {
+    mockConfigExists.mockReturnValue(false);
+    expect(await getUnassignedTargets()).toEqual([]);
+  });
+
+  it('returns empty array when unassignedTargets field is missing', async () => {
+    mockConfigExists.mockReturnValue(true);
+    mockReadMcpSpec.mockResolvedValue({ agentCoreGateways: [] });
+    expect(await getUnassignedTargets()).toEqual([]);
+  });
+});
+
+describe('createGatewayFromWizard with selectedTargets', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  function makeGatewayConfig(overrides: Partial<AddGatewayConfig> = {}): AddGatewayConfig {
+    return {
+      name: 'new-gateway',
+      authorizerType: 'AWS_IAM',
+      ...overrides,
+    } as AddGatewayConfig;
+  }
+
+  it('moves selected targets to new gateway and removes from unassigned', async () => {
+    mockConfigExists.mockReturnValue(true);
+    mockReadMcpSpec.mockResolvedValue({
+      agentCoreGateways: [],
+      unassignedTargets: [
+        { name: 'target-a', targetType: 'mcpServer' },
+        { name: 'target-b', targetType: 'mcpServer' },
+        { name: 'target-c', targetType: 'mcpServer' },
+      ],
+    });
+
+    await createGatewayFromWizard(makeGatewayConfig({ selectedTargets: ['target-a', 'target-c'] }));
+
+    const written = mockWriteMcpSpec.mock.calls[0]![0];
+    const gateway = written.agentCoreGateways.find((g: { name: string }) => g.name === 'new-gateway');
+    expect(gateway.targets).toHaveLength(2);
+    expect(gateway.targets[0]!.name).toBe('target-a');
+    expect(gateway.targets[1]!.name).toBe('target-c');
+    expect(written.unassignedTargets).toHaveLength(1);
+    expect(written.unassignedTargets[0]!.name).toBe('target-b');
+  });
+
+  it('creates gateway with empty targets when no selectedTargets', async () => {
+    mockConfigExists.mockReturnValue(true);
+    mockReadMcpSpec.mockResolvedValue({ agentCoreGateways: [] });
+
+    await createGatewayFromWizard(makeGatewayConfig());
+
+    const written = mockWriteMcpSpec.mock.calls[0]![0];
+    const gateway = written.agentCoreGateways.find((g: { name: string }) => g.name === 'new-gateway');
+    expect(gateway.targets).toHaveLength(0);
+  });
+});
