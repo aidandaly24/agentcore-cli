@@ -147,8 +147,8 @@ describe('createCredential OAuth', () => {
       clientSecret: 'csec',
     });
 
-    expect(mockSetEnvVar).toHaveBeenCalledWith('AGENTCORE_CREDENTIAL_MY-OAUTH_CLIENT_ID', 'cid');
-    expect(mockSetEnvVar).toHaveBeenCalledWith('AGENTCORE_CREDENTIAL_MY-OAUTH_CLIENT_SECRET', 'csec');
+    expect(mockSetEnvVar).toHaveBeenCalledWith('AGENTCORE_CREDENTIAL_MY_OAUTH_CLIENT_ID', 'cid');
+    expect(mockSetEnvVar).toHaveBeenCalledWith('AGENTCORE_CREDENTIAL_MY_OAUTH_CLIENT_SECRET', 'csec');
   });
 
   it('uppercases name in env var keys', async () => {
