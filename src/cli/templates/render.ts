@@ -9,7 +9,7 @@ Handlebars.registerHelper('includes', (array: unknown[], value: unknown) => {
   return array.includes(value);
 });
 Handlebars.registerHelper('snakeCase', (str: string) => {
-  return str.replace(/[- ]/g, '_').toLowerCase();
+  return str.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
 });
 
 /**
