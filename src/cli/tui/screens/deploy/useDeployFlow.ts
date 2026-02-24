@@ -178,8 +178,8 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
           {} as Record<string, unknown>
         ) ?? {};
       gateways = parseGatewayOutputs(outputs, gatewaySpecs);
-    } catch {
-      // No mcp.json or no gateways — skip
+    } catch (error) {
+      logger.log(`Failed to read gateway configuration: ${getErrorMessage(error)}`, 'warn');
     }
 
     // Expose outputs to UI
