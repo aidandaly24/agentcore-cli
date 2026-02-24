@@ -5,7 +5,7 @@ from agents.mcp import MCPServerStreamableHttp
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+{{#if (includes gatewayAuthTypes "AWS_IAM")}}
 import boto3
 import httpx
 from botocore.auth import SigV4Auth
@@ -36,23 +36,21 @@ class SigV4HTTPXAuth(httpx.Auth):
 {{/if}}
 
 
-def get_streamable_http_mcp_client() -> MCPServerStreamableHttp | None:
-    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
-    if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
-        return None
-
-    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
-    http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
-    return MCPServerStreamableHttp(
-        name="{{gatewayProviders.[0].name}}", params={"url": url, "http_client": http_client}
-    )
-    {{else}}
-    return MCPServerStreamableHttp(
-        name="{{gatewayProviders.[0].name}}", params={"url": url}
-    )
-    {{/if}}
+def get_all_gateway_mcp_servers() -> list[MCPServerStreamableHttp]:
+    """Returns MCP servers for all configured gateways."""
+    servers = []
+    {{#each gatewayProviders}}
+    url = os.environ.get("{{envVarName}}")
+    if url:
+        {{#if (eq authType "AWS_IAM")}}
+        servers.append(MCPServerStreamableHttp(name="{{name}}", params={"url": url, "http_client": httpx.AsyncClient(auth=SigV4HTTPXAuth())}))
+        {{else}}
+        servers.append(MCPServerStreamableHttp(name="{{name}}", params={"url": url}))
+        {{/if}}
+    else:
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
+    {{/each}}
+    return servers
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"

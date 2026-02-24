@@ -221,5 +221,6 @@ export async function mapGenerateConfigToRenderConfig(
     memoryProviders: mapMemoryOptionToMemoryProviders(config.memory, config.projectName),
     identityProviders,
     gatewayProviders,
+    gatewayAuthTypes: [...new Set(gatewayProviders.map(g => g.authType))],
   };
 }

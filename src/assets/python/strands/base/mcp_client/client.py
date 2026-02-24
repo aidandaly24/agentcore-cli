@@ -6,7 +6,7 @@ from strands.tools.mcp.mcp_client import MCPClient
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+{{#if (includes gatewayAuthTypes "AWS_IAM")}}
 import boto3
 import httpx
 from botocore.auth import SigV4Auth
@@ -36,20 +36,30 @@ class SigV4HTTPXAuth(httpx.Auth):
         yield request
 {{/if}}
 
-
-def get_streamable_http_mcp_client() -> MCPClient | None:
-    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
+{{#each gatewayProviders}}
+def get_{{snakeCase name}}_mcp_client() -> MCPClient | None:
+    """Returns an MCP Client connected to the {{name}} gateway."""
+    url = os.environ.get("{{envVarName}}")
     if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
         return None
-
-    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+    {{#if (eq authType "AWS_IAM")}}
     http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
     return MCPClient(lambda: streamablehttp_client(url, http_client=http_client))
     {{else}}
     return MCPClient(lambda: streamablehttp_client(url))
     {{/if}}
+
+{{/each}}
+def get_all_gateway_mcp_clients() -> list[MCPClient]:
+    """Returns MCP clients for all configured gateways."""
+    clients = []
+    {{#each gatewayProviders}}
+    client = get_{{snakeCase name}}_mcp_client()
+    if client:
+        clients.append(client)
+    {{/each}}
+    return clients
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"

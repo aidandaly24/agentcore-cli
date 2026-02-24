@@ -10,46 +10,18 @@ from autogen_ext.tools.mcp import (
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
-import boto3
-import httpx
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-
-
-class SigV4HTTPXAuth(httpx.Auth):
-    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
-
-    def __init__(self):
-        session = boto3.Session()
-        credentials = session.get_credentials().get_frozen_credentials()
-        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
-        self.signer = SigV4Auth(credentials, "lambda", region)
-
-    def auth_flow(self, request):
-        headers = dict(request.headers)
-        headers.pop("connection", None)
-        aws_request = AWSRequest(
-            method=request.method,
-            url=str(request.url),
-            data=request.content,
-            headers=headers,
-        )
-        self.signer.add_auth(aws_request)
-        request.headers.update(dict(aws_request.headers))
-        yield request
-{{/if}}
-
-
-async def get_streamable_http_mcp_tools() -> List[StreamableHttpMcpToolAdapter]:
-    """Returns MCP Tools from the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
-    if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
-        return []
-
-    server_params = StreamableHttpServerParams(url=url)
-    return await mcp_server_tools(server_params)
+async def get_all_gateway_mcp_tools() -> List[StreamableHttpMcpToolAdapter]:
+    """Returns MCP Tools from all configured gateways."""
+    tools = []
+    {{#each gatewayProviders}}
+    url = os.environ.get("{{envVarName}}")
+    if url:
+        server_params = StreamableHttpServerParams(url=url)
+        tools.extend(await mcp_server_tools(server_params))
+    else:
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
+    {{/each}}
+    return tools
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"

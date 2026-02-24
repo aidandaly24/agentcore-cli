@@ -988,46 +988,18 @@ from autogen_ext.tools.mcp import (
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
-import boto3
-import httpx
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-
-
-class SigV4HTTPXAuth(httpx.Auth):
-    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
-
-    def __init__(self):
-        session = boto3.Session()
-        credentials = session.get_credentials().get_frozen_credentials()
-        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
-        self.signer = SigV4Auth(credentials, "lambda", region)
-
-    def auth_flow(self, request):
-        headers = dict(request.headers)
-        headers.pop("connection", None)
-        aws_request = AWSRequest(
-            method=request.method,
-            url=str(request.url),
-            data=request.content,
-            headers=headers,
-        )
-        self.signer.add_auth(aws_request)
-        request.headers.update(dict(aws_request.headers))
-        yield request
-{{/if}}
-
-
-async def get_streamable_http_mcp_tools() -> List[StreamableHttpMcpToolAdapter]:
-    """Returns MCP Tools from the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
-    if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
-        return []
-
-    server_params = StreamableHttpServerParams(url=url)
-    return await mcp_server_tools(server_params)
+async def get_all_gateway_mcp_tools() -> List[StreamableHttpMcpToolAdapter]:
+    """Returns MCP Tools from all configured gateways."""
+    tools = []
+    {{#each gatewayProviders}}
+    url = os.environ.get("{{envVarName}}")
+    if url:
+        server_params = StreamableHttpServerParams(url=url)
+        tools.extend(await mcp_server_tools(server_params))
+    else:
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
+    {{/each}}
+    return tools
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
@@ -1747,47 +1719,17 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnecti
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
-import boto3
-import httpx
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-
-
-class SigV4HTTPXAuth(httpx.Auth):
-    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
-
-    def __init__(self):
-        session = boto3.Session()
-        credentials = session.get_credentials().get_frozen_credentials()
-        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
-        self.signer = SigV4Auth(credentials, "lambda", region)
-
-    def auth_flow(self, request):
-        headers = dict(request.headers)
-        headers.pop("connection", None)
-        aws_request = AWSRequest(
-            method=request.method,
-            url=str(request.url),
-            data=request.content,
-            headers=headers,
-        )
-        self.signer.add_auth(aws_request)
-        request.headers.update(dict(aws_request.headers))
-        yield request
-{{/if}}
-
-
-def get_streamable_http_mcp_client() -> MCPToolset | None:
-    """Returns an MCP Toolset connected to the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
-    if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
-        return None
-
-    return MCPToolset(
-        connection_params=StreamableHTTPConnectionParams(url=url)
-    )
+def get_all_gateway_mcp_toolsets() -> list[MCPToolset]:
+    """Returns MCP Toolsets for all configured gateways."""
+    toolsets = []
+    {{#each gatewayProviders}}
+    url = os.environ.get("{{envVarName}}")
+    if url:
+        toolsets.append(MCPToolset(connection_params=StreamableHTTPConnectionParams(url=url)))
+    else:
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
+    {{/each}}
+    return toolsets
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
@@ -2040,7 +1982,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+{{#if (includes gatewayAuthTypes "AWS_IAM")}}
 import boto3
 import httpx
 from botocore.auth import SigV4Auth
@@ -2071,34 +2013,23 @@ class SigV4HTTPXAuth(httpx.Auth):
 {{/if}}
 
 
-def get_streamable_http_mcp_client() -> MultiServerMCPClient | None:
-    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
-    if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+def get_all_gateway_mcp_client() -> MultiServerMCPClient | None:
+    """Returns an MCP Client connected to all configured gateways."""
+    servers = {}
+    {{#each gatewayProviders}}
+    url = os.environ.get("{{envVarName}}")
+    if url:
+        {{#if (eq authType "AWS_IAM")}}
+        servers["{{name}}"] = {"transport": "streamable_http", "url": url, "http_client": httpx.AsyncClient(auth=SigV4HTTPXAuth())}
+        {{else}}
+        servers["{{name}}"] = {"transport": "streamable_http", "url": url}
+        {{/if}}
+    else:
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
+    {{/each}}
+    if not servers:
         return None
-
-    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
-    http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
-    return MultiServerMCPClient(
-        {
-            "{{gatewayProviders.[0].name}}": {
-                "transport": "streamable_http",
-                "url": url,
-                "http_client": http_client,
-            }
-        }
-    )
-    {{else}}
-    return MultiServerMCPClient(
-        {
-            "{{gatewayProviders.[0].name}}": {
-                "transport": "streamable_http",
-                "url": url,
-            }
-        }
-    )
-    {{/if}}
+    return MultiServerMCPClient(servers)
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
@@ -2469,7 +2400,7 @@ from agents.mcp import MCPServerStreamableHttp
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+{{#if (includes gatewayAuthTypes "AWS_IAM")}}
 import boto3
 import httpx
 from botocore.auth import SigV4Auth
@@ -2500,23 +2431,21 @@ class SigV4HTTPXAuth(httpx.Auth):
 {{/if}}
 
 
-def get_streamable_http_mcp_client() -> MCPServerStreamableHttp | None:
-    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
-    if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
-        return None
-
-    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
-    http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
-    return MCPServerStreamableHttp(
-        name="{{gatewayProviders.[0].name}}", params={"url": url, "http_client": http_client}
-    )
-    {{else}}
-    return MCPServerStreamableHttp(
-        name="{{gatewayProviders.[0].name}}", params={"url": url}
-    )
-    {{/if}}
+def get_all_gateway_mcp_servers() -> list[MCPServerStreamableHttp]:
+    """Returns MCP servers for all configured gateways."""
+    servers = []
+    {{#each gatewayProviders}}
+    url = os.environ.get("{{envVarName}}")
+    if url:
+        {{#if (eq authType "AWS_IAM")}}
+        servers.append(MCPServerStreamableHttp(name="{{name}}", params={"url": url, "http_client": httpx.AsyncClient(auth=SigV4HTTPXAuth())}))
+        {{else}}
+        servers.append(MCPServerStreamableHttp(name="{{name}}", params={"url": url}))
+        {{/if}}
+    else:
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
+    {{/each}}
+    return servers
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
@@ -2793,7 +2722,7 @@ from strands.tools.mcp.mcp_client import MCPClient
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
-{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+{{#if (includes gatewayAuthTypes "AWS_IAM")}}
 import boto3
 import httpx
 from botocore.auth import SigV4Auth
@@ -2823,20 +2752,30 @@ class SigV4HTTPXAuth(httpx.Auth):
         yield request
 {{/if}}
 
-
-def get_streamable_http_mcp_client() -> MCPClient | None:
-    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
-    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
+{{#each gatewayProviders}}
+def get_{{snakeCase name}}_mcp_client() -> MCPClient | None:
+    """Returns an MCP Client connected to the {{name}} gateway."""
+    url = os.environ.get("{{envVarName}}")
     if not url:
-        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+        logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
         return None
-
-    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+    {{#if (eq authType "AWS_IAM")}}
     http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
     return MCPClient(lambda: streamablehttp_client(url, http_client=http_client))
     {{else}}
     return MCPClient(lambda: streamablehttp_client(url))
     {{/if}}
+
+{{/each}}
+def get_all_gateway_mcp_clients() -> list[MCPClient]:
+    """Returns MCP clients for all configured gateways."""
+    clients = []
+    {{#each gatewayProviders}}
+    client = get_{{snakeCase name}}_mcp_client()
+    if client:
+        clients.append(client)
+    {{/each}}
+    return clients
 {{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"

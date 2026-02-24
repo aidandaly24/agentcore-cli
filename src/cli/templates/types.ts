@@ -47,4 +47,6 @@ export interface AgentRenderConfig {
   identityProviders: IdentityProviderRenderConfig[];
   /** Gateway providers for template rendering */
   gatewayProviders: GatewayProviderRenderConfig[];
+  /** Unique auth types across all gateways (for conditional imports) */
+  gatewayAuthTypes: string[];
 }
