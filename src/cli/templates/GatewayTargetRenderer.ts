@@ -79,7 +79,7 @@ export async function renderGatewayTargetTemplate(
   }
 
   // Select template based on compute host
-  const templateSubdir = host === 'Lambda' ? 'python-lambda' : 'python';
+  const templateSubdir = host === 'Lambda' ? 'python-fastmcp-lambda' : 'python';
   const templateDir = getTemplatePath('mcp', templateSubdir);
 
   await copyAndRenderDir(templateDir, outputDir, { Name: toolName });
