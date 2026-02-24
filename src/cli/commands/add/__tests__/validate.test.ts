@@ -422,6 +422,47 @@ describe('validate', () => {
       expect(result.valid).toBe(false);
       expect(result.error).toContain('--credential-name is required');
     });
+
+    // Source and host defaults
+    it('defaults source to create-new when not specified', async () => {
+      const options: AddGatewayTargetOptions = { name: 'test-tool', language: 'Python' };
+      const result = await validateAddGatewayTargetOptions(options);
+      expect(result.valid).toBe(true);
+      expect(options.source).toBe('create-new');
+    });
+
+    it('defaults host to Lambda when not specified', async () => {
+      const options: AddGatewayTargetOptions = { name: 'test-tool', language: 'Python' };
+      const result = await validateAddGatewayTargetOptions(options);
+      expect(result.valid).toBe(true);
+      expect(options.host).toBe('Lambda');
+    });
+
+    // Lambda-only enforcement
+    it('rejects AgentCoreRuntime host for create-new', async () => {
+      const options: AddGatewayTargetOptions = {
+        name: 'test-tool',
+        language: 'Python',
+        source: 'create-new',
+        host: 'AgentCoreRuntime',
+      };
+      const result = await validateAddGatewayTargetOptions(options);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Only Lambda is supported as compute host for scaffolded targets');
+    });
+
+    // Host rejected for existing-endpoint
+    it('rejects --host with existing-endpoint', async () => {
+      const options: AddGatewayTargetOptions = {
+        name: 'test-tool',
+        source: 'existing-endpoint',
+        endpoint: 'https://example.com/mcp',
+        host: 'Lambda',
+      };
+      const result = await validateAddGatewayTargetOptions(options);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('--host is not applicable for existing endpoint targets');
+    });
   });
 
   describe('validateAddMemoryOptions', () => {
