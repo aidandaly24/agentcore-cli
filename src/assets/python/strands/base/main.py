@@ -22,6 +22,10 @@ def add_numbers(a: int, b: int) -> int:
     return a+b
 tools.append(add_numbers)
 
+# Add MCP client to tools if available
+if mcp_client:
+    tools.append(mcp_client)
+
 
 {{#if hasMemory}}
 def agent_factory():
@@ -36,7 +40,7 @@ def agent_factory():
                 system_prompt="""
                     You are a helpful assistant. Use tools when appropriate.
                 """,
-                tools=tools+[mcp_client]
+                tools=tools
             )
         return cache[key]
     return get_or_create_agent
@@ -52,7 +56,7 @@ def get_or_create_agent():
             system_prompt="""
                 You are a helpful assistant. Use tools when appropriate.
             """,
-            tools=tools+[mcp_client]
+            tools=tools
         )
     return _agent
 {{/if}}

@@ -37,7 +37,9 @@ async def invoke(payload, context):
     mcp_client = get_streamable_http_mcp_client()
 
     # Load MCP Tools
-    mcp_tools = await mcp_client.get_tools()
+    mcp_tools = []
+    if mcp_client:
+        mcp_tools = await mcp_client.get_tools()
 
     # Define the agent using create_react_agent
     graph = create_react_agent(get_or_create_model(), tools=mcp_tools + tools)

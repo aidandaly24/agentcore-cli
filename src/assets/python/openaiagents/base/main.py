@@ -30,12 +30,22 @@ def add_numbers(a: int, b: int) -> int:
 async def main(query):
     ensure_credentials_loaded()
     try:
-        async with mcp_server as server:
-            active_servers = [server] if server else []
+        if mcp_server:
+            async with mcp_server as server:
+                active_servers = [server]
+                agent = Agent(
+                    name="{{ name }}",
+                    model="gpt-4.1",
+                    mcp_servers=active_servers,
+                    tools=[add_numbers]
+                )
+                result = await Runner.run(agent, query)
+                return result
+        else:
             agent = Agent(
                 name="{{ name }}",
                 model="gpt-4.1",
-                mcp_servers=active_servers,
+                mcp_servers=[],
                 tools=[add_numbers]
             )
             result = await Runner.run(agent, query)

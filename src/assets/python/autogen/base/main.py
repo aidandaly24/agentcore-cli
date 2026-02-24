@@ -29,6 +29,8 @@ async def invoke(payload, context):
 
     # Get MCP Tools
     mcp_tools = await get_streamable_http_mcp_tools()
+    if mcp_tools is None:
+        mcp_tools = []
 
     # Define an AssistantAgent with the model and tools
     agent = AssistantAgent(

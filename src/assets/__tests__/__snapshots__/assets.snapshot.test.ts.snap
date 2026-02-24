@@ -944,6 +944,8 @@ async def invoke(payload, context):
 
     # Get MCP Tools
     mcp_tools = await get_streamable_http_mcp_tools()
+    if mcp_tools is None:
+        mcp_tools = []
 
     # Define an AssistantAgent with the model and tools
     agent = AssistantAgent(
@@ -974,24 +976,69 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/au
 `;
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/autogen/base/mcp_client/client.py should match snapshot 1`] = `
-"from typing import List
+"import os
+import logging
+from typing import List
 from autogen_ext.tools.mcp import (
     StreamableHttpMcpToolAdapter,
     StreamableHttpServerParams,
     mcp_server_tools,
 )
 
+logger = logging.getLogger(__name__)
+
+{{#if hasGateway}}
+{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+import boto3
+import httpx
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+
+
+class SigV4HTTPXAuth(httpx.Auth):
+    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
+
+    def __init__(self):
+        session = boto3.Session()
+        credentials = session.get_credentials().get_frozen_credentials()
+        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
+        self.signer = SigV4Auth(credentials, "lambda", region)
+
+    def auth_flow(self, request):
+        headers = dict(request.headers)
+        headers.pop("connection", None)
+        aws_request = AWSRequest(
+            method=request.method,
+            url=str(request.url),
+            data=request.content,
+            headers=headers,
+        )
+        self.signer.add_auth(aws_request)
+        request.headers.update(dict(aws_request.headers))
+        yield request
+{{/if}}
+
+
+async def get_streamable_http_mcp_tools() -> List[StreamableHttpMcpToolAdapter]:
+    """Returns MCP Tools from the {{gatewayProviders.[0].name}} gateway."""
+    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
+    if not url:
+        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+        return []
+
+    server_params = StreamableHttpServerParams(url=url)
+    return await mcp_server_tools(server_params)
+{{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
 
 
 async def get_streamable_http_mcp_tools() -> List[StreamableHttpMcpToolAdapter]:
-    """
-    Returns MCP Tools compatible with AutoGen.
-    """
+    """Returns MCP Tools compatible with AutoGen."""
     # to use an MCP server that supports bearer authentication, add headers={"Authorization": f"Bearer {access_token}"}
     server_params = StreamableHttpServerParams(url=EXAMPLE_MCP_ENDPOINT)
     return await mcp_server_tools(server_params)
+{{/if}}
 "
 `;
 
@@ -1616,7 +1663,8 @@ def add_numbers(a: int, b: int) -> int:
 
 
 # Get MCP Toolset
-mcp_toolset = [get_streamable_http_mcp_client()]
+mcp_client = get_streamable_http_mcp_client()
+mcp_toolset = [mcp_client] if mcp_client else []
 
 _credentials_loaded = False
 
@@ -1691,21 +1739,67 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/go
 `;
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/googleadk/base/mcp_client/client.py should match snapshot 1`] = `
-"from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+"import os
+import logging
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 
+logger = logging.getLogger(__name__)
+
+{{#if hasGateway}}
+{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+import boto3
+import httpx
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+
+
+class SigV4HTTPXAuth(httpx.Auth):
+    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
+
+    def __init__(self):
+        session = boto3.Session()
+        credentials = session.get_credentials().get_frozen_credentials()
+        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
+        self.signer = SigV4Auth(credentials, "lambda", region)
+
+    def auth_flow(self, request):
+        headers = dict(request.headers)
+        headers.pop("connection", None)
+        aws_request = AWSRequest(
+            method=request.method,
+            url=str(request.url),
+            data=request.content,
+            headers=headers,
+        )
+        self.signer.add_auth(aws_request)
+        request.headers.update(dict(aws_request.headers))
+        yield request
+{{/if}}
+
+
+def get_streamable_http_mcp_client() -> MCPToolset | None:
+    """Returns an MCP Toolset connected to the {{gatewayProviders.[0].name}} gateway."""
+    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
+    if not url:
+        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+        return None
+
+    return MCPToolset(
+        connection_params=StreamableHTTPConnectionParams(url=url)
+    )
+{{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
 
 
 def get_streamable_http_mcp_client() -> MCPToolset:
-    """
-    Returns an MCP Toolset compatible with Google ADK.
-    """
+    """Returns an MCP Toolset compatible with Google ADK."""
     # to use an MCP server that supports bearer authentication, add headers={"Authorization": f"Bearer {access_token}"}
     return MCPToolset(
         connection_params=StreamableHTTPConnectionParams(url=EXAMPLE_MCP_ENDPOINT)
     )
+{{/if}}
 "
 `;
 
@@ -1911,7 +2005,9 @@ async def invoke(payload, context):
     mcp_client = get_streamable_http_mcp_client()
 
     # Load MCP Tools
-    mcp_tools = await mcp_client.get_tools()
+    mcp_tools = []
+    if mcp_client:
+        mcp_tools = await mcp_client.get_tools()
 
     # Define the agent using create_react_agent
     graph = create_react_agent(get_or_create_model(), tools=mcp_tools + tools)
@@ -1937,16 +2033,79 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/la
 `;
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/langchain_langgraph/base/mcp_client/client.py should match snapshot 1`] = `
-"from langchain_mcp_adapters.client import MultiServerMCPClient
+"import os
+import logging
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
+logger = logging.getLogger(__name__)
+
+{{#if hasGateway}}
+{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+import boto3
+import httpx
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+
+
+class SigV4HTTPXAuth(httpx.Auth):
+    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
+
+    def __init__(self):
+        session = boto3.Session()
+        credentials = session.get_credentials().get_frozen_credentials()
+        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
+        self.signer = SigV4Auth(credentials, "lambda", region)
+
+    def auth_flow(self, request):
+        headers = dict(request.headers)
+        headers.pop("connection", None)
+        aws_request = AWSRequest(
+            method=request.method,
+            url=str(request.url),
+            data=request.content,
+            headers=headers,
+        )
+        self.signer.add_auth(aws_request)
+        request.headers.update(dict(aws_request.headers))
+        yield request
+{{/if}}
+
+
+def get_streamable_http_mcp_client() -> MultiServerMCPClient | None:
+    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
+    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
+    if not url:
+        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+        return None
+
+    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+    http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
+    return MultiServerMCPClient(
+        {
+            "{{gatewayProviders.[0].name}}": {
+                "transport": "streamable_http",
+                "url": url,
+                "http_client": http_client,
+            }
+        }
+    )
+    {{else}}
+    return MultiServerMCPClient(
+        {
+            "{{gatewayProviders.[0].name}}": {
+                "transport": "streamable_http",
+                "url": url,
+            }
+        }
+    )
+    {{/if}}
+{{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
 
 
 def get_streamable_http_mcp_client() -> MultiServerMCPClient:
-    """
-    Returns an MCP Client compatible with LangChain/LangGraph.
-    """
+    """Returns an MCP Client compatible with LangChain/LangGraph."""
     # to use an MCP server that supports bearer authentication, add headers={"Authorization": f"Bearer {access_token}"}
     return MultiServerMCPClient(
         {
@@ -1956,6 +2115,7 @@ def get_streamable_http_mcp_client() -> MultiServerMCPClient:
             }
         }
     )
+{{/if}}
 "
 `;
 
@@ -2252,12 +2412,22 @@ def add_numbers(a: int, b: int) -> int:
 async def main(query):
     ensure_credentials_loaded()
     try:
-        async with mcp_server as server:
-            active_servers = [server] if server else []
+        if mcp_server:
+            async with mcp_server as server:
+                active_servers = [server]
+                agent = Agent(
+                    name="{{ name }}",
+                    model="gpt-4.1",
+                    mcp_servers=active_servers,
+                    tools=[add_numbers]
+                )
+                result = await Runner.run(agent, query)
+                return result
+        else:
             agent = Agent(
                 name="{{ name }}",
                 model="gpt-4.1",
-                mcp_servers=active_servers,
+                mcp_servers=[],
                 tools=[add_numbers]
             )
             result = await Runner.run(agent, query)
@@ -2292,20 +2462,73 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/op
 `;
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/openaiagents/base/mcp_client/client.py should match snapshot 1`] = `
-"from agents.mcp import MCPServerStreamableHttp
+"import os
+import logging
+from agents.mcp import MCPServerStreamableHttp
 
+logger = logging.getLogger(__name__)
+
+{{#if hasGateway}}
+{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+import boto3
+import httpx
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+
+
+class SigV4HTTPXAuth(httpx.Auth):
+    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
+
+    def __init__(self):
+        session = boto3.Session()
+        credentials = session.get_credentials().get_frozen_credentials()
+        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
+        self.signer = SigV4Auth(credentials, "lambda", region)
+
+    def auth_flow(self, request):
+        headers = dict(request.headers)
+        headers.pop("connection", None)
+        aws_request = AWSRequest(
+            method=request.method,
+            url=str(request.url),
+            data=request.content,
+            headers=headers,
+        )
+        self.signer.add_auth(aws_request)
+        request.headers.update(dict(aws_request.headers))
+        yield request
+{{/if}}
+
+
+def get_streamable_http_mcp_client() -> MCPServerStreamableHttp | None:
+    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
+    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
+    if not url:
+        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+        return None
+
+    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+    http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
+    return MCPServerStreamableHttp(
+        name="{{gatewayProviders.[0].name}}", params={"url": url, "http_client": http_client}
+    )
+    {{else}}
+    return MCPServerStreamableHttp(
+        name="{{gatewayProviders.[0].name}}", params={"url": url}
+    )
+    {{/if}}
+{{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
 
 
 def get_streamable_http_mcp_client() -> MCPServerStreamableHttp:
-    """
-    Returns an MCP Client compatible with OpenAI Agents SDK.
-    """
+    """Returns an MCP Client compatible with OpenAI Agents SDK."""
     # to use an MCP server that supports bearer authentication, add headers={"Authorization": f"Bearer {access_token}"}
     return MCPServerStreamableHttp(
         name="AgentCore Gateway MCP", params={"url": EXAMPLE_MCP_ENDPOINT}
     )
+{{/if}}
 "
 `;
 
@@ -2490,6 +2713,10 @@ def add_numbers(a: int, b: int) -> int:
     return a+b
 tools.append(add_numbers)
 
+# Add MCP client to tools if available
+if mcp_client:
+    tools.append(mcp_client)
+
 
 {{#if hasMemory}}
 def agent_factory():
@@ -2504,7 +2731,7 @@ def agent_factory():
                 system_prompt="""
                     You are a helpful assistant. Use tools when appropriate.
                 """,
-                tools=tools+[mcp_client]
+                tools=tools
             )
         return cache[key]
     return get_or_create_agent
@@ -2520,7 +2747,7 @@ def get_or_create_agent():
             system_prompt="""
                 You are a helpful assistant. Use tools when appropriate.
             """,
-            tools=tools+[mcp_client]
+            tools=tools
         )
     return _agent
 {{/if}}
@@ -2558,18 +2785,68 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/st
 `;
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/strands/base/mcp_client/client.py should match snapshot 1`] = `
-"from mcp.client.streamable_http import streamablehttp_client
+"import os
+import logging
+from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
+logger = logging.getLogger(__name__)
+
+{{#if hasGateway}}
+{{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+import boto3
+import httpx
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+
+
+class SigV4HTTPXAuth(httpx.Auth):
+    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
+
+    def __init__(self):
+        session = boto3.Session()
+        credentials = session.get_credentials().get_frozen_credentials()
+        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
+        self.signer = SigV4Auth(credentials, "lambda", region)
+
+    def auth_flow(self, request):
+        headers = dict(request.headers)
+        headers.pop("connection", None)
+        aws_request = AWSRequest(
+            method=request.method,
+            url=str(request.url),
+            data=request.content,
+            headers=headers,
+        )
+        self.signer.add_auth(aws_request)
+        request.headers.update(dict(aws_request.headers))
+        yield request
+{{/if}}
+
+
+def get_streamable_http_mcp_client() -> MCPClient | None:
+    """Returns an MCP Client connected to the {{gatewayProviders.[0].name}} gateway."""
+    url = os.environ.get("{{gatewayProviders.[0].envVarName}}")
+    if not url:
+        logger.warning("{{gatewayProviders.[0].envVarName}} not set — gateway tools unavailable")
+        return None
+
+    {{#if (eq gatewayProviders.[0].authType "AWS_IAM")}}
+    http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
+    return MCPClient(lambda: streamablehttp_client(url, http_client=http_client))
+    {{else}}
+    return MCPClient(lambda: streamablehttp_client(url))
+    {{/if}}
+{{else}}
 # ExaAI provides information about code through web searches, crawling and code context searches through their platform. Requires no authentication
 EXAMPLE_MCP_ENDPOINT = "https://mcp.exa.ai/mcp"
 
 def get_streamable_http_mcp_client() -> MCPClient:
-    """
-    Returns an MCP Client compatible with Strands
-    """
+    """Returns an MCP Client compatible with Strands"""
     # to use an MCP server that supports bearer authentication, add headers={"Authorization": f"Bearer {access_token}"}
-    return MCPClient(lambda: streamablehttp_client(EXAMPLE_MCP_ENDPOINT))"
+    return MCPClient(lambda: streamablehttp_client(EXAMPLE_MCP_ENDPOINT))
+{{/if}}
+"
 `;
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/strands/base/model/__init__.py should match snapshot 1`] = `

@@ -23,7 +23,8 @@ def add_numbers(a: int, b: int) -> int:
 
 
 # Get MCP Toolset
-mcp_toolset = [get_streamable_http_mcp_client()]
+mcp_client = get_streamable_http_mcp_client()
+mcp_toolset = [mcp_client] if mcp_client else []
 
 _credentials_loaded = False
 
