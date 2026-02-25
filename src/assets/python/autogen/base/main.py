@@ -3,11 +3,7 @@ from autogen_agentchat.agents import AssistantAgent
 from autogen_core.tools import FunctionTool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
-from mcp_client.client import get_all_gateway_mcp_tools
-{{else}}
 from mcp_client.client import get_streamable_http_mcp_tools
-{{/if}}
 
 app = BedrockAgentCoreApp()
 log = app.logger
@@ -32,13 +28,7 @@ async def invoke(payload, context):
     log.info("Invoking Agent.....")
 
     # Get MCP Tools
-    {{#if hasGateway}}
-    mcp_tools = await get_all_gateway_mcp_tools()
-    {{else}}
     mcp_tools = await get_streamable_http_mcp_tools()
-    {{/if}}
-    if mcp_tools is None:
-        mcp_tools = []
 
     # Define an AssistantAgent with the model and tools
     agent = AssistantAgent(

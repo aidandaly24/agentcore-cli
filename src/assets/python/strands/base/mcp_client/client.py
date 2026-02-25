@@ -7,33 +7,7 @@ logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
 {{#if (includes gatewayAuthTypes "AWS_IAM")}}
-import boto3
-import httpx
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-
-
-class SigV4HTTPXAuth(httpx.Auth):
-    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
-
-    def __init__(self):
-        session = boto3.Session()
-        credentials = session.get_credentials().get_frozen_credentials()
-        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
-        self.signer = SigV4Auth(credentials, "lambda", region)
-
-    def auth_flow(self, request):
-        headers = dict(request.headers)
-        headers.pop("connection", None)
-        aws_request = AWSRequest(
-            method=request.method,
-            url=str(request.url),
-            data=request.content,
-            headers=headers,
-        )
-        self.signer.add_auth(aws_request)
-        request.headers.update(dict(aws_request.headers))
-        yield request
+from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
 {{/if}}
 
 {{#each gatewayProviders}}
@@ -44,8 +18,7 @@ def get_{{snakeCase name}}_mcp_client() -> MCPClient | None:
         logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
         return None
     {{#if (eq authType "AWS_IAM")}}
-    http_client = httpx.AsyncClient(auth=SigV4HTTPXAuth())
-    return MCPClient(lambda: streamablehttp_client(url, http_client=http_client))
+    return MCPClient(lambda: aws_iam_streamablehttp_client(url, aws_service="bedrock-agentcore"))
     {{else}}
     return MCPClient(lambda: streamablehttp_client(url))
     {{/if}}

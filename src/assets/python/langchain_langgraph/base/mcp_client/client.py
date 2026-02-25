@@ -6,35 +6,8 @@ logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
 {{#if (includes gatewayAuthTypes "AWS_IAM")}}
-import boto3
-import httpx
-from botocore.auth import SigV4Auth
-from botocore.awsrequest import AWSRequest
-
-
-class SigV4HTTPXAuth(httpx.Auth):
-    """Signs HTTP requests with AWS SigV4 for Lambda function URL authentication."""
-
-    def __init__(self):
-        session = boto3.Session()
-        credentials = session.get_credentials().get_frozen_credentials()
-        region = session.region_name or os.environ.get("AWS_REGION", "us-east-1")
-        self.signer = SigV4Auth(credentials, "lambda", region)
-
-    def auth_flow(self, request):
-        headers = dict(request.headers)
-        headers.pop("connection", None)
-        aws_request = AWSRequest(
-            method=request.method,
-            url=str(request.url),
-            data=request.content,
-            headers=headers,
-        )
-        self.signer.add_auth(aws_request)
-        request.headers.update(dict(aws_request.headers))
-        yield request
+from mcp_proxy_for_aws.sigv4_helper import SigV4HTTPXAuth, create_aws_session
 {{/if}}
-
 
 def get_all_gateway_mcp_client() -> MultiServerMCPClient | None:
     """Returns an MCP Client connected to all configured gateways."""
@@ -43,7 +16,9 @@ def get_all_gateway_mcp_client() -> MultiServerMCPClient | None:
     url = os.environ.get("{{envVarName}}")
     if url:
         {{#if (eq authType "AWS_IAM")}}
-        servers["{{name}}"] = {"transport": "streamable_http", "url": url, "http_client": httpx.AsyncClient(auth=SigV4HTTPXAuth())}
+        session = create_aws_session()
+        auth = SigV4HTTPXAuth(session.get_credentials(), "bedrock-agentcore", session.region_name)
+        servers["{{name}}"] = {"transport": "streamable_http", "url": url, "auth": auth}
         {{else}}
         servers["{{name}}"] = {"transport": "streamable_http", "url": url}
         {{/if}}

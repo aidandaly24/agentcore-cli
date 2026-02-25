@@ -6,13 +6,27 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnecti
 logger = logging.getLogger(__name__)
 
 {{#if hasGateway}}
+{{#if (includes gatewayAuthTypes "AWS_IAM")}}
+import httpx
+from mcp_proxy_for_aws.sigv4_helper import SigV4HTTPXAuth, create_aws_session
+{{/if}}
+
 def get_all_gateway_mcp_toolsets() -> list[MCPToolset]:
     """Returns MCP Toolsets for all configured gateways."""
     toolsets = []
     {{#each gatewayProviders}}
     url = os.environ.get("{{envVarName}}")
     if url:
+        {{#if (eq authType "AWS_IAM")}}
+        session = create_aws_session()
+        auth = SigV4HTTPXAuth(session.get_credentials(), "bedrock-agentcore", session.region_name)
+        toolsets.append(MCPToolset(connection_params=StreamableHTTPConnectionParams(
+            url=url,
+            httpx_client_factory=lambda **kwargs: httpx.AsyncClient(auth=auth, **kwargs)
+        )))
+        {{else}}
         toolsets.append(MCPToolset(connection_params=StreamableHTTPConnectionParams(url=url)))
+        {{/if}}
     else:
         logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
     {{/each}}
