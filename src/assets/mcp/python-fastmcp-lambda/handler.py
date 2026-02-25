@@ -2,7 +2,7 @@
 FastMCP Server for AWS Lambda with Function URL.
 
 This template shows:
-- FastMCP server running on Lambda via Mangum ASGI adapter
+- FastMCP server running on Lambda via Lambda Web Adapter + uvicorn
 - HTTP tool patterns with proper error handling
 - Retry logic and response validation
 
@@ -13,13 +13,12 @@ import logging
 from typing import Any
 
 import httpx
-from mangum import Mangum
 from mcp.server.fastmcp import FastMCP
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("{{ Name }}")
+mcp = FastMCP("{{ Name }}", stateless_http=True, host="0.0.0.0")
 
 HTTP_TIMEOUT = 10.0
 MAX_RETRIES = 2
@@ -108,7 +107,3 @@ async def fetch_post(post_id: int) -> str:
         f"Title: {data['title']}\n\n"
         f"{data['body']}"
     )
-
-
-# Create ASGI app from FastMCP server and wrap with Mangum for Lambda
-lambda_handler = Mangum(mcp.http_app(), lifespan="off")

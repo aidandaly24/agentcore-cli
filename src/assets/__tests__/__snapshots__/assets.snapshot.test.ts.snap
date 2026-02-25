@@ -398,6 +398,8 @@ exports[`Assets Directory Snapshots > File listing > should match the expected f
   "mcp/python-fastmcp-lambda/README.md",
   "mcp/python-fastmcp-lambda/handler.py",
   "mcp/python-fastmcp-lambda/pyproject.toml",
+  "mcp/python-fastmcp-lambda/run.sh",
+  "mcp/python-fastmcp-lambda/server.py",
   "mcp/python-lambda/README.md",
   "mcp/python-lambda/handler.py",
   "mcp/python-lambda/pyproject.toml",
@@ -670,7 +672,7 @@ exports[`Assets Directory Snapshots > MCP assets > mcp/mcp/python-fastmcp-lambda
 FastMCP Server for AWS Lambda with Function URL.
 
 This template shows:
-- FastMCP server running on Lambda via Mangum ASGI adapter
+- FastMCP server running on Lambda via Lambda Web Adapter + uvicorn
 - HTTP tool patterns with proper error handling
 - Retry logic and response validation
 
@@ -681,13 +683,12 @@ import logging
 from typing import Any
 
 import httpx
-from mangum import Mangum
 from mcp.server.fastmcp import FastMCP
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("{{ Name }}")
+mcp = FastMCP("{{ Name }}", stateless_http=True, host="0.0.0.0")
 
 HTTP_TIMEOUT = 10.0
 MAX_RETRIES = 2
@@ -776,10 +777,6 @@ async def fetch_post(post_id: int) -> str:
         f"Title: {data['title']}\\n\\n"
         f"{data['body']}"
     )
-
-
-# Create ASGI app from FastMCP server and wrap with Mangum for Lambda
-lambda_handler = Mangum(mcp.http_app(), lifespan="off")
 "
 `;
 
@@ -789,19 +786,35 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "{{ Name }}"
+name = "{{ name }}"
 version = "0.1.0"
 description = "FastMCP Server on AWS Lambda"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli] >= 1.2.0",
+    "mcp[cli] >= 1.18.0",
     "httpx >= 0.27.0",
-    "mangum >= 0.19.0",
+    "fastapi >= 0.115.0",
+    "uvicorn >= 0.34.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
+"
+`;
+
+exports[`Assets Directory Snapshots > MCP assets > mcp/mcp/python-fastmcp-lambda/run.sh should match snapshot 1`] = `
+"#!/bin/bash
+exec python -m uvicorn --port=$PORT server:app
+"
+`;
+
+exports[`Assets Directory Snapshots > MCP assets > mcp/mcp/python-fastmcp-lambda/server.py should match snapshot 1`] = `
+"from fastapi import FastAPI
+from handler import mcp
+
+app = FastAPI(lifespan=lambda app: mcp.session_manager.run())
+app.mount("/", mcp.streamable_http_app())
 "
 `;
 
