@@ -192,7 +192,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     if (Object.keys(deployedCredentials).length > 0) {
       const existingPreSynthState = await configIO.readDeployedState().catch(() => ({targets: {}} as DeployedState));
       const targetState = existingPreSynthState.targets?.[target.name] ?? { resources: {} };
-      if (!targetState.resources) targetState.resources = {};
+      targetState.resources ??= {};
       targetState.resources.credentials = deployedCredentials;
       if (identityKmsKeyArn) targetState.resources.identityKmsKeyArn = identityKmsKeyArn;
       await configIO.writeDeployedState({

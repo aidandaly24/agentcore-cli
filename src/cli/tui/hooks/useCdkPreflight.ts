@@ -1,4 +1,5 @@
 import { ConfigIO, SecureCredentials } from '../../../lib';
+import type { DeployedState } from '../../../schema';
 import { AwsCredentialsError, validateAwsCredentials } from '../../aws/account';
 import { type CdkToolkitWrapper, type SwitchableIoHost, createSwitchableIoHost } from '../../cdk/toolkit-lib';
 import { getErrorMessage, isExpiredTokenError, isNoCredentialsError } from '../../errors';
@@ -640,9 +641,9 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
         if (Object.keys(deployedCredentials).length > 0) {
           const configIO = new ConfigIO();
           const target = context.awsTargets[0];
-          const existingState = await configIO.readDeployedState().catch(() => ({ targets: {} } as any));
+          const existingState = await configIO.readDeployedState().catch(() => ({ targets: {} } as DeployedState));
           const targetState = existingState.targets?.[target!.name] ?? { resources: {} };
-          if (!targetState.resources) targetState.resources = {};
+          targetState.resources ??= {};
           targetState.resources.credentials = deployedCredentials;
           if (identityResult.kmsKeyArn) targetState.resources.identityKmsKeyArn = identityResult.kmsKeyArn;
           await configIO.writeDeployedState({
@@ -659,7 +660,7 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
         logger.startStep('Synthesize CloudFormation');
         try {
           const synthResult = await synthesizeCdk(context.cdkProject, {
-            ioHost: switchableIoHost!.ioHost,
+            ioHost: switchableIoHost.ioHost,
             previousWrapper: wrapperRef.current,
           });
           wrapperRef.current = synthResult.toolkitWrapper;
@@ -680,7 +681,7 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
         const bootstrapCheck = await checkBootstrapNeeded(context.awsTargets);
         if (bootstrapCheck.needsBootstrap && bootstrapCheck.target) {
           setBootstrapContext({
-            toolkitWrapper: wrapperRef.current!,
+            toolkitWrapper: wrapperRef.current,
             target: bootstrapCheck.target,
           });
           setPhase('bootstrap-confirm');
