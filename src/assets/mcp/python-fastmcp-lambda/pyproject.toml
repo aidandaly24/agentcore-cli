@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "{{ name }}"
+name = "{{ Name }}"
 version = "0.1.0"
 description = "FastMCP Server on AWS Lambda"
 readme = "README.md"
