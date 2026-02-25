@@ -18,7 +18,7 @@ def get_{{snakeCase name}}_mcp_client() -> MCPClient | None:
         logger.warning("{{envVarName}} not set — {{name}} gateway tools unavailable")
         return None
     {{#if (eq authType "AWS_IAM")}}
-    return MCPClient(lambda: aws_iam_streamablehttp_client(url, aws_service="bedrock-agentcore"))
+    return MCPClient(lambda: aws_iam_streamablehttp_client(url, aws_service="bedrock-agentcore", aws_region=os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION"))))
     {{else}}
     return MCPClient(lambda: streamablehttp_client(url))
     {{/if}}
