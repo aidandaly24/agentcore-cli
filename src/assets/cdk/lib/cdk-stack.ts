@@ -16,6 +16,10 @@ export interface AgentCoreStackProps extends StackProps {
    * The MCP specification containing gateways and servers.
    */
   mcpSpec?: AgentCoreMcpSpec;
+  /**
+   * Credential provider ARNs from deployed state, keyed by credential name.
+   */
+  credentials?: Record<string, { credentialProviderArn: string; clientSecretArn?: string }>;
 }
 
 /**
@@ -31,7 +35,7 @@ export class AgentCoreStack extends Stack {
   constructor(scope: Construct, id: string, props: AgentCoreStackProps) {
     super(scope, id, props);
 
-    const { spec, mcpSpec } = props;
+    const { spec, mcpSpec, credentials } = props;
 
     // Create AgentCoreApplication with all agents
     this.application = new AgentCoreApplication(this, 'Application', {
@@ -44,6 +48,7 @@ export class AgentCoreStack extends Stack {
         projectName: spec.name,
         mcpSpec,
         agentCoreApplication: this.application,
+        credentials,
       });
     }
 
