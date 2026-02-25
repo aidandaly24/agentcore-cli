@@ -313,30 +313,6 @@ export async function createToolFromWizard(config: AddGatewayTargetConfig): Prom
     ToolDefinitionSchema.parse(toolDef);
   }
 
-  // Behind gateway
-  if (!config.gateway) {
-    throw new Error('Gateway name is required for tools behind a gateway.');
-  }
-
-  const gateway = mcpSpec.agentCoreGateways.find(g => g.name === config.gateway);
-  if (!gateway) {
-    throw new Error(`Gateway "${config.gateway}" not found.`);
-  }
-
-  // Check for duplicate target name
-  if (gateway.targets.some(t => t.name === config.name)) {
-    throw new Error(`Target "${config.name}" already exists in gateway "${gateway.name}".`);
-  }
-
-  // Check for duplicate tool names
-  for (const toolDef of toolDefs) {
-    for (const existingTarget of gateway.targets) {
-      if ((existingTarget.toolDefinitions ?? []).some(t => t.name === toolDef.name)) {
-        throw new Error(`Tool "${toolDef.name}" already exists in gateway "${gateway.name}".`);
-      }
-    }
-  }
-
   // 'Other' language requires container config - not supported for gateway tools yet
   if (config.language === 'Other') {
     throw new Error('Language "Other" is not yet supported for gateway tools. Use Python or TypeScript.');
@@ -379,9 +355,32 @@ export async function createToolFromWizard(config: AddGatewayTargetConfig): Prom
     ...(config.outboundAuth && { outboundAuth: config.outboundAuth }),
   };
 
-  gateway.targets.push(target);
+  // Assign to gateway or store as unassigned
+  if (!config.gateway) {
+    mcpSpec.unassignedTargets ??= [];
+    if (mcpSpec.unassignedTargets.some((t: AgentCoreGatewayTarget) => t.name === config.name)) {
+      throw new Error(`Unassigned target "${config.name}" already exists.`);
+    }
+    mcpSpec.unassignedTargets.push(target);
+  } else {
+    const gateway = mcpSpec.agentCoreGateways.find(g => g.name === config.gateway);
+    if (!gateway) {
+      throw new Error(`Gateway "${config.gateway}" not found.`);
+    }
+    if (gateway.targets.some(t => t.name === config.name)) {
+      throw new Error(`Target "${config.name}" already exists in gateway "${gateway.name}".`);
+    }
+    for (const toolDef of toolDefs) {
+      for (const existingTarget of gateway.targets) {
+        if ((existingTarget.toolDefinitions ?? []).some(t => t.name === toolDef.name)) {
+          throw new Error(`Tool "${toolDef.name}" already exists in gateway "${gateway.name}".`);
+        }
+      }
+    }
+    gateway.targets.push(target);
+  }
 
-  // Write mcp.json for gateway case
+  // Write mcp.json
   await configIO.writeMcpSpec(mcpSpec);
 
   // Update mcp-defs.json with all tool definitions

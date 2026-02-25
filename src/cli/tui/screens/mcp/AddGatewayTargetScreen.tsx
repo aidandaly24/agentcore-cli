@@ -13,7 +13,6 @@ import {
   TARGET_LANGUAGE_OPTIONS,
 } from './types';
 import { useAddGatewayTargetWizard } from './useAddGatewayTargetWizard';
-import { Box, Text } from 'ink';
 import React, { useMemo } from 'react';
 
 interface AddGatewayTargetScreenProps {
@@ -60,7 +59,6 @@ export function AddGatewayTargetScreen({
   const isHostStep = wizard.step === 'host';
   const isTextStep = wizard.step === 'name' || wizard.step === 'endpoint';
   const isConfirmStep = wizard.step === 'confirm';
-  const noGatewaysAvailable = isGatewayStep && existingGateways.length === 0;
 
   const sourceNav = useListNavigation({
     items: sourceItems,
@@ -80,7 +78,7 @@ export function AddGatewayTargetScreen({
     items: gatewayItems,
     onSelect: item => wizard.setGateway(item.id),
     onExit: () => wizard.goBack(),
-    isActive: isGatewayStep && !noGatewaysAvailable,
+    isActive: isGatewayStep,
   });
 
   const hostNav = useListNavigation({
@@ -121,7 +119,7 @@ export function AddGatewayTargetScreen({
           <WizardSelect title="Select language" items={languageItems} selectedIndex={languageNav.selectedIndex} />
         )}
 
-        {isGatewayStep && !noGatewaysAvailable && (
+        {isGatewayStep && (
           <WizardSelect
             title="Select gateway"
             description="Which gateway will route to this tool?"
@@ -129,8 +127,6 @@ export function AddGatewayTargetScreen({
             selectedIndex={gatewayNav.selectedIndex}
           />
         )}
-
-        {noGatewaysAvailable && <NoGatewaysMessage />}
 
         {isHostStep && (
           <WizardSelect
@@ -189,17 +185,5 @@ export function AddGatewayTargetScreen({
         )}
       </Panel>
     </Screen>
-  );
-}
-
-function NoGatewaysMessage() {
-  return (
-    <Box flexDirection="column">
-      <Text color="yellow">No gateways found</Text>
-      <Text dimColor>Add a gateway first, then attach tools to it.</Text>
-      <Box marginTop={1}>
-        <Text dimColor>Esc back</Text>
-      </Box>
-    </Box>
   );
 }
