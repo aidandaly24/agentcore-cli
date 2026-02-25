@@ -3,7 +3,6 @@ import { AgentCoreStack } from '../lib/cdk-stack';
 import { ConfigIO, type AwsDeploymentTarget } from '@aws/agentcore-cdk';
 import { App, type Environment } from 'aws-cdk-lib';
 import * as path from 'path';
-import * as fs from 'fs';
 
 function toEnvironment(target: AwsDeploymentTarget): Environment {
   return {
@@ -26,11 +25,8 @@ async function main() {
 
   // Read MCP configuration if it exists
   let mcpSpec;
-  let mcpDeployedState;
   try {
     mcpSpec = await configIO.readMcpSpec();
-    const deployedState = JSON.parse(fs.readFileSync(path.join(configRoot, '.cli', 'deployed-state.json'), 'utf8'));
-    mcpDeployedState = deployedState?.mcp;
   } catch {
     // MCP config is optional
   }
@@ -48,7 +44,6 @@ async function main() {
     new AgentCoreStack(app, stackName, {
       spec,
       mcpSpec,
-      mcpDeployedState,
       env,
       description: `AgentCore stack for ${spec.name} deployed to ${target.name} (${target.region})`,
       tags: {
