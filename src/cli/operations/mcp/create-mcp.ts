@@ -1,4 +1,4 @@
-import { ConfigIO, requireConfigRoot } from '../../../lib';
+import { ConfigIO, requireConfigRoot, setEnvVar } from '../../../lib';
 import type {
   AgentCoreCliMcpDefs,
   AgentCoreGateway,
@@ -11,6 +11,7 @@ import { AgentCoreCliMcpDefsSchema, ToolDefinitionSchema } from '../../../schema
 import { getTemplateToolDefinitions, renderGatewayTargetTemplate } from '../../templates/GatewayTargetRenderer';
 import type { AddGatewayConfig, AddGatewayTargetConfig } from '../../tui/screens/mcp/types';
 import { DEFAULT_HANDLER, DEFAULT_NODE_VERSION, DEFAULT_PYTHON_VERSION } from '../../tui/screens/mcp/types';
+import { computeDefaultCredentialEnvVarName } from '../identity/create-identity';
 import { existsSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -71,6 +72,7 @@ function buildAuthorizerConfiguration(config: AddGatewayConfig): AgentCoreGatewa
       discoveryUrl: config.jwtConfig.discoveryUrl,
       allowedAudience: config.jwtConfig.allowedAudience,
       allowedClients: config.jwtConfig.allowedClients,
+      ...(config.jwtConfig.allowedScopes?.length && { allowedScopes: config.jwtConfig.allowedScopes }),
     },
   };
 }
@@ -200,6 +202,28 @@ export async function createGatewayFromWizard(config: AddGatewayConfig): Promise
   }
 
   await configIO.writeMcpSpec(mcpSpec);
+
+  // Auto-create managed credential if agent OAuth credentials provided
+  if (config.jwtConfig?.agentClientId && config.jwtConfig?.agentClientSecret) {
+    const credName = `${config.name}-agent-oauth`;
+    const project = await configIO.readProjectSpec();
+    
+    const credential = {
+      type: 'OAuthCredentialProvider' as const,
+      name: credName,
+      discoveryUrl: config.jwtConfig.discoveryUrl,
+      vendor: 'CustomOauth2',
+      managed: true,
+      usage: 'inbound' as const,
+    };
+    
+    project.credentials.push(credential);
+    await configIO.writeProjectSpec(project);
+    
+    const envBase = computeDefaultCredentialEnvVarName(credName);
+    await setEnvVar(`${envBase}_CLIENT_ID`, config.jwtConfig.agentClientId);
+    await setEnvVar(`${envBase}_CLIENT_SECRET`, config.jwtConfig.agentClientSecret);
+  }
 
   return { name: config.name };
 }
