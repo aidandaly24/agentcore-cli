@@ -22,8 +22,6 @@ interface AddGatewayTargetFlowProps {
   onDeploy?: () => void;
 }
 
-
-
 export function AddGatewayTargetFlow({
   isInteractive = true,
   onExit,
