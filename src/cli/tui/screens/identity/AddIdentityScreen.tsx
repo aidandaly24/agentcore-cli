@@ -105,10 +105,13 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames }:
             customValidation={value => {
               try {
                 new URL(value);
-                return true;
               } catch {
                 return 'Must be a valid URL';
               }
+              if (!value.endsWith('/.well-known/openid-configuration')) {
+                return "URL must end with '/.well-known/openid-configuration'";
+              }
+              return true;
             }}
           />
         )}
