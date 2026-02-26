@@ -320,11 +320,9 @@ function JwtConfigInput({
         {subStep === 4 && (
           <SecretInput
             prompt="Agent OAuth Client ID (for Bearer token auth)"
-            placeholder="press Enter to skip"
             onSubmit={onAgentClientId}
             onCancel={onCancel}
             revealChars={4}
-            allowEmpty
           />
         )}
         {subStep === 5 && (
