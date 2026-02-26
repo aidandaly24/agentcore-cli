@@ -50,7 +50,7 @@ export function AddGatewayTargetFlow({
         toolName: config.name,
         projectPath: '',
         loading: true,
-        loadingMessage: 'Creating MCP tool...',
+        loadingMessage: 'Creating gateway target...',
       });
 
       if (config.source === 'existing-endpoint') {
@@ -92,7 +92,7 @@ export function AddGatewayTargetFlow({
     return (
       <AddSuccessScreen
         isInteractive={isInteractive}
-        message={`Added MCP tool: ${flow.toolName}`}
+        message={`Added gateway target: ${flow.toolName}`}
         detail={`Project created at ${flow.projectPath}`}
         loading={flow.loading}
         loadingMessage={flow.loadingMessage}
@@ -108,7 +108,7 @@ export function AddGatewayTargetFlow({
   // Error
   return (
     <ErrorPrompt
-      message="Failed to add MCP tool"
+      message="Failed to add gateway target"
       detail={flow.message}
       onBack={() => {
         resetCreate();
