@@ -10,8 +10,8 @@ import httpx
 from mcp_proxy_for_aws.sigv4_helper import SigV4HTTPXAuth, create_aws_session
 {{/if}}
 {{#if (includes gatewayAuthTypes "CUSTOM_JWT")}}
-import httpx as _httpx
-import time as _time
+{{#unless (includes gatewayAuthTypes "AWS_IAM")}}import httpx
+{{/unless}}import time as _time
 {{/if}}
 
 {{#each gatewayProviders}}
@@ -28,7 +28,7 @@ def _get_bearer_token_{{snakeCase name}}():
     if not client_id or not client_secret:
         logger.warning("Agent OAuth credentials not set — {{name}} CUSTOM_JWT auth unavailable")
         return None
-    with _httpx.Client() as c:
+    with httpx.Client() as c:
         disc = c.get("{{discoveryUrl}}")
         token_ep = disc.json()["token_endpoint"]
         resp = c.post(token_ep, data={
