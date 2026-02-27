@@ -14,10 +14,11 @@ interface AddIdentityScreenProps {
   onComplete: (config: AddIdentityConfig) => void;
   onExit: () => void;
   existingIdentityNames: string[];
+  initialType?: CredentialType;
 }
 
-export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames }: AddIdentityScreenProps) {
-  const wizard = useAddIdentityWizard();
+export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, initialType }: AddIdentityScreenProps) {
+  const wizard = useAddIdentityWizard(initialType);
 
   const typeItems: SelectableItem[] = useMemo(
     () => IDENTITY_TYPE_OPTIONS.map(opt => ({ id: opt.id, title: opt.title, description: opt.description })),
@@ -99,7 +100,7 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames }:
           <TextInput
             key="discoveryUrl"
             prompt="Discovery URL (OIDC well-known endpoint)"
-            initialValue="https://"
+            placeholder="https://example.com/.well-known/openid-configuration"
             onSubmit={wizard.setDiscoveryUrl}
             onCancel={() => wizard.goBack()}
             customValidation={value => {
@@ -158,7 +159,10 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames }:
                     { label: 'Type', value: 'OAuth' },
                     { label: 'Name', value: wizard.config.name },
                     { label: 'Discovery URL', value: wizard.config.discoveryUrl ?? '' },
-                    { label: 'Client ID', value: wizard.config.clientId ? '****' + wizard.config.clientId.slice(-4) : '' },
+                    {
+                      label: 'Client ID',
+                      value: wizard.config.clientId ? '****' + wizard.config.clientId.slice(-4) : '',
+                    },
                     ...(wizard.config.scopes ? [{ label: 'Scopes', value: wizard.config.scopes }] : []),
                   ]
                 : [

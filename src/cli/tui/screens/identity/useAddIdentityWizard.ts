@@ -2,26 +2,29 @@ import type { CredentialType } from '../../../../schema';
 import type { AddIdentityConfig, AddIdentityStep } from './types';
 import { useCallback, useMemo, useState } from 'react';
 
-function getSteps(identityType: CredentialType): AddIdentityStep[] {
-  if (identityType === 'OAuthCredentialProvider') {
-    return ['type', 'name', 'discoveryUrl', 'clientId', 'clientSecret', 'scopes', 'confirm'];
-  }
-  return ['type', 'name', 'apiKey', 'confirm'];
+function getSteps(identityType: CredentialType, skipTypeStep: boolean): AddIdentityStep[] {
+  const steps: AddIdentityStep[] =
+    identityType === 'OAuthCredentialProvider'
+      ? ['type', 'name', 'discoveryUrl', 'clientId', 'clientSecret', 'scopes', 'confirm']
+      : ['type', 'name', 'apiKey', 'confirm'];
+
+  return skipTypeStep ? steps.filter(s => s !== 'type') : steps;
 }
 
-function getDefaultConfig(): AddIdentityConfig {
+function getDefaultConfig(initialType?: CredentialType): AddIdentityConfig {
   return {
-    identityType: 'ApiKeyCredentialProvider',
+    identityType: initialType ?? 'ApiKeyCredentialProvider',
     name: '',
     apiKey: '',
   };
 }
 
-export function useAddIdentityWizard() {
-  const [config, setConfig] = useState<AddIdentityConfig>(getDefaultConfig);
-  const [step, setStep] = useState<AddIdentityStep>('type');
+export function useAddIdentityWizard(initialType?: CredentialType) {
+  const hasInitialType = initialType !== undefined;
+  const [config, setConfig] = useState<AddIdentityConfig>(() => getDefaultConfig(initialType));
+  const [step, setStep] = useState<AddIdentityStep>(hasInitialType ? 'name' : 'type');
 
-  const steps = useMemo(() => getSteps(config.identityType), [config.identityType]);
+  const steps = useMemo(() => getSteps(config.identityType, hasInitialType), [config.identityType, hasInitialType]);
   const currentIndex = steps.indexOf(step);
 
   const goBack = useCallback(() => {
@@ -31,12 +34,12 @@ export function useAddIdentityWizard() {
 
   const advanceFrom = useCallback(
     (currentStep: AddIdentityStep) => {
-      const currentSteps = getSteps(config.identityType);
+      const currentSteps = getSteps(config.identityType, hasInitialType);
       const idx = currentSteps.indexOf(currentStep);
       const next = currentSteps[idx + 1];
       if (next) setStep(next);
     },
-    [config.identityType]
+    [config.identityType, hasInitialType]
   );
 
   const setIdentityType = useCallback((identityType: CredentialType) => {
@@ -101,9 +104,9 @@ export function useAddIdentityWizard() {
   );
 
   const reset = useCallback(() => {
-    setConfig(getDefaultConfig());
-    setStep('type');
-  }, []);
+    setConfig(getDefaultConfig(initialType));
+    setStep(hasInitialType ? 'name' : 'type');
+  }, [initialType, hasInitialType]);
 
   return {
     config,
