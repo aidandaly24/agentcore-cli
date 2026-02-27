@@ -104,9 +104,18 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
   };
 
   const handleJwtAgentClientSecret = (clientSecret: string) => {
-    const audienceList = jwtAudience.split(',').map(s => s.trim()).filter(Boolean);
-    const clientsList = jwtClients.split(',').map(s => s.trim()).filter(Boolean);
-    const scopesList = jwtScopes.split(',').map(s => s.trim()).filter(Boolean);
+    const audienceList = jwtAudience
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const clientsList = jwtClients
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const scopesList = jwtScopes
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
 
     wizard.setJwtConfig({
       discoveryUrl: jwtDiscoveryUrl,
@@ -267,12 +276,14 @@ function JwtConfigInput({
   return (
     <Box flexDirection="column">
       <Text bold>Configure Custom JWT Authorizer</Text>
-      <Text dimColor>Step {subStep + 1} of {totalSteps}</Text>
+      <Text dimColor>
+        Step {subStep + 1} of {totalSteps}
+      </Text>
       <Box marginTop={1}>
         {subStep === 0 && (
           <TextInput
-            prompt={`Discovery URL (e.g., https://cognito-idp.us-east-1.amazonaws.com/us-east-1_ABC123${OIDC_WELL_KNOWN_SUFFIX})`}
-            initialValue="https://"
+            prompt="Discovery URL"
+            placeholder="https://example.com/.well-known/openid-configuration"
             onSubmit={onDiscoveryUrl}
             onCancel={onCancel}
             customValidation={value => {
