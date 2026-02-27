@@ -1,4 +1,4 @@
-import { ConfigIO, requireConfigRoot, setEnvVar } from '../../../lib';
+import { ConfigIO, requireConfigRoot } from '../../../lib';
 import type {
   AgentCoreCliMcpDefs,
   AgentCoreGateway,
@@ -11,7 +11,7 @@ import { AgentCoreCliMcpDefsSchema, ToolDefinitionSchema } from '../../../schema
 import { getTemplateToolDefinitions, renderGatewayTargetTemplate } from '../../templates/GatewayTargetRenderer';
 import type { AddGatewayConfig, AddGatewayTargetConfig } from '../../tui/screens/mcp/types';
 import { DEFAULT_HANDLER, DEFAULT_NODE_VERSION, DEFAULT_PYTHON_VERSION } from '../../tui/screens/mcp/types';
-import { computeDefaultCredentialEnvVarName } from '../identity/create-identity';
+import { createCredential } from '../identity/create-identity';
 import { existsSync } from 'fs';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -206,23 +206,15 @@ export async function createGatewayFromWizard(config: AddGatewayConfig): Promise
   // Auto-create managed credential if agent OAuth credentials provided
   if (config.jwtConfig?.agentClientId && config.jwtConfig?.agentClientSecret) {
     const credName = `${config.name}-agent-oauth`;
-    const project = await configIO.readProjectSpec();
-    
-    const credential = {
-      type: 'OAuthCredentialProvider' as const,
+    await createCredential({
+      type: 'OAuthCredentialProvider',
       name: credName,
       discoveryUrl: config.jwtConfig.discoveryUrl,
+      clientId: config.jwtConfig.agentClientId,
+      clientSecret: config.jwtConfig.agentClientSecret,
       vendor: 'CustomOauth2',
       managed: true,
-      usage: 'inbound' as const,
-    };
-    
-    project.credentials.push(credential);
-    await configIO.writeProjectSpec(project);
-    
-    const envBase = computeDefaultCredentialEnvVarName(credName);
-    await setEnvVar(`${envBase}_CLIENT_ID`, config.jwtConfig.agentClientId);
-    await setEnvVar(`${envBase}_CLIENT_SECRET`, config.jwtConfig.agentClientSecret);
+    });
   }
 
   return { name: config.name };

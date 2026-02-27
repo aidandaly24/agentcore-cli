@@ -144,8 +144,10 @@ describe('removeCredential', () => {
     const result = await removeCredential('gw-agent-oauth');
 
     expect(result.ok).toBe(false);
-    expect(result.error).toContain('auto-created');
-    expect(result.error).toContain('--force');
+    if (!result.ok) {
+      expect(result.error).toContain('auto-created');
+      expect(result.error).toContain('--force');
+    }
   });
 
   it('allows removal of managed credential with force', async () => {
