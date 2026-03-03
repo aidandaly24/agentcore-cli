@@ -112,6 +112,11 @@ export async function handleRemoveAll(_options: RemoveAllOptions): Promise<Remov
       credentials: [],
     });
 
+    // Reset mcp.json gateways so a subsequent deploy can tear down gateway resources
+    if (configIO.configExists('mcp')) {
+      await configIO.writeMcpSpec({ agentCoreGateways: [] });
+    }
+
     // Preserve aws-targets.json and deployed-state.json so that
     // a subsequent `agentcore deploy` can tear down existing stacks.
 
