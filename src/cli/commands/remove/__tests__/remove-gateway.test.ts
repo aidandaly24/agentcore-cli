@@ -108,6 +108,8 @@ describe('remove gateway command', () => {
           'https://example.com/mcp',
           '--gateway',
           gatewayName,
+          '--type',
+          'mcp-server',
           '--json',
         ],
         projectDir
