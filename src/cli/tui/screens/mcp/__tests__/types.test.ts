@@ -1,4 +1,4 @@
-import { AUTHORIZER_TYPE_OPTIONS, SKIP_FOR_NOW, SOURCE_OPTIONS } from '../types.js';
+import { AUTHORIZER_TYPE_OPTIONS, SKIP_FOR_NOW, TARGET_TYPE_OPTIONS } from '../types.js';
 import { describe, expect, it } from 'vitest';
 
 describe('MCP types constants', () => {
@@ -10,11 +10,8 @@ describe('MCP types constants', () => {
     expect(SKIP_FOR_NOW).toBe('skip-for-now');
   });
 
-  it('SOURCE_OPTIONS has entries for existing-endpoint and create-new', () => {
-    const existingEndpoint = SOURCE_OPTIONS.find((opt: { id: string }) => opt.id === 'existing-endpoint');
-    const createNew = SOURCE_OPTIONS.find((opt: { id: string }) => opt.id === 'create-new');
-
-    expect(existingEndpoint).toBeDefined();
-    expect(createNew).toBeDefined();
+  it('TARGET_TYPE_OPTIONS has mcpServer entry', () => {
+    const mcpServer = TARGET_TYPE_OPTIONS.find((opt: { id: string }) => opt.id === 'mcpServer');
+    expect(mcpServer).toBeDefined();
   });
 });

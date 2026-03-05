@@ -60,7 +60,7 @@ const validGatewayOptionsJwt: AddGatewayOptions = {
 
 const validGatewayTargetOptions: AddGatewayTargetOptions = {
   name: 'test-tool',
-  source: 'existing-endpoint',
+  type: 'mcp-server',
   endpoint: 'https://example.com/mcp',
   gateway: 'my-gateway',
 };
@@ -326,7 +326,7 @@ describe('validate', () => {
 
     it('returns error when no gateways exist', async () => {
       mockReadMcpSpec.mockResolvedValue({ agentCoreGateways: [] });
-      const result = await validateAddGatewayTargetOptions(validGatewayTargetOptions);
+      const result = await validateAddGatewayTargetOptions({ ...validGatewayTargetOptions });
       expect(result.valid).toBe(false);
       expect(result.error).toContain('No gateways found');
       expect(result.error).toContain('agentcore add gateway');
@@ -334,7 +334,7 @@ describe('validate', () => {
 
     it('returns error when specified gateway does not exist', async () => {
       mockReadMcpSpec.mockResolvedValue({ agentCoreGateways: [{ name: 'other-gateway' }] });
-      const result = await validateAddGatewayTargetOptions(validGatewayTargetOptions);
+      const result = await validateAddGatewayTargetOptions({ ...validGatewayTargetOptions });
       expect(result.valid).toBe(false);
       expect(result.error).toContain('Gateway "my-gateway" not found');
       expect(result.error).toContain('other-gateway');
@@ -345,22 +345,21 @@ describe('validate', () => {
       const result = await validateAddGatewayTargetOptions({ ...validGatewayTargetOptions });
       expect(result.valid).toBe(true);
     });
-    // AC20: existing-endpoint source validation
-    it('rejects create-new source', async () => {
+    // AC20: type validation
+    it('returns error when --type is missing', async () => {
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
-        source: 'create-new' as any,
         gateway: 'my-gateway',
       };
       const result = await validateAddGatewayTargetOptions(options);
       expect(result.valid).toBe(false);
-      expect(result.error).toBe("Only 'existing-endpoint' source is currently supported");
+      expect(result.error).toContain('--type is required');
     });
 
-    it('passes for valid existing-endpoint with https', async () => {
+    it('accepts --type mcp-server', async () => {
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
-        source: 'existing-endpoint',
+        type: 'mcp-server',
         endpoint: 'https://example.com/mcp',
         gateway: 'my-gateway',
       };
@@ -369,10 +368,32 @@ describe('validate', () => {
       expect(options.language).toBe('Other');
     });
 
-    it('passes for valid existing-endpoint with http', async () => {
+    it('returns error for invalid --type', async () => {
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
-        source: 'existing-endpoint',
+        type: 'invalid',
+        gateway: 'my-gateway',
+      };
+      const result = await validateAddGatewayTargetOptions(options);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Invalid type');
+    });
+
+    it('passes for mcp-server with https endpoint', async () => {
+      const options: AddGatewayTargetOptions = {
+        name: 'test-tool',
+        type: 'mcp-server',
+        endpoint: 'https://example.com/mcp',
+        gateway: 'my-gateway',
+      };
+      const result = await validateAddGatewayTargetOptions(options);
+      expect(result.valid).toBe(true);
+    });
+
+    it('passes for mcp-server with http endpoint', async () => {
+      const options: AddGatewayTargetOptions = {
+        name: 'test-tool',
+        type: 'mcp-server',
         endpoint: 'http://localhost:3000/mcp',
         gateway: 'my-gateway',
       };
@@ -380,21 +401,21 @@ describe('validate', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('returns error for existing-endpoint without endpoint', async () => {
+    it('returns error for mcp-server without endpoint', async () => {
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
-        source: 'existing-endpoint',
+        type: 'mcp-server',
         gateway: 'my-gateway',
       };
       const result = await validateAddGatewayTargetOptions(options);
       expect(result.valid).toBe(false);
-      expect(result.error).toBe('--endpoint is required when source is existing-endpoint');
+      expect(result.error).toContain('--endpoint is required');
     });
 
-    it('returns error for existing-endpoint with non-http(s) URL', async () => {
+    it('returns error for mcp-server with non-http(s) URL', async () => {
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
-        source: 'existing-endpoint',
+        type: 'mcp-server',
         endpoint: 'ftp://example.com/mcp',
         gateway: 'my-gateway',
       };
@@ -403,10 +424,10 @@ describe('validate', () => {
       expect(result.error).toBe('Endpoint must use http:// or https:// protocol');
     });
 
-    it('returns error for existing-endpoint with invalid URL', async () => {
+    it('returns error for mcp-server with invalid URL', async () => {
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
-        source: 'existing-endpoint',
+        type: 'mcp-server',
         endpoint: 'not-a-url',
         gateway: 'my-gateway',
       };
@@ -423,6 +444,7 @@ describe('validate', () => {
 
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
+        type: 'mcp-server',
         endpoint: 'https://example.com/mcp',
         gateway: 'my-gateway',
         outboundAuthType: 'API_KEY',
@@ -440,6 +462,7 @@ describe('validate', () => {
 
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
+        type: 'mcp-server',
         endpoint: 'https://example.com/mcp',
         gateway: 'my-gateway',
         outboundAuthType: 'API_KEY',
@@ -457,6 +480,7 @@ describe('validate', () => {
 
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
+        type: 'mcp-server',
         endpoint: 'https://example.com/mcp',
         gateway: 'my-gateway',
         outboundAuthType: 'API_KEY',
@@ -531,17 +555,17 @@ describe('validate', () => {
       expect(result.error).toBe('--oauth-discovery-url must be a valid URL');
     });
 
-    it('rejects --host with existing-endpoint', async () => {
+    it('rejects --host with mcp-server type', async () => {
       const options: AddGatewayTargetOptions = {
         name: 'test-tool',
-        source: 'existing-endpoint',
+        type: 'mcp-server',
         endpoint: 'https://example.com/mcp',
         host: 'Lambda',
         gateway: 'my-gateway',
       };
       const result = await validateAddGatewayTargetOptions(options);
       expect(result.valid).toBe(false);
-      expect(result.error).toBe('--host is not applicable for existing endpoint targets');
+      expect(result.error).toBe('--host is not applicable for MCP server targets');
     });
   });
 

@@ -42,6 +42,8 @@ describe('integration: add and remove gateway with external MCP server', () => {
           'gateway-target',
           '--name',
           targetName,
+          '--type',
+          'mcp-server',
           '--endpoint',
           'https://mcp.exa.ai/mcp',
           '--gateway',

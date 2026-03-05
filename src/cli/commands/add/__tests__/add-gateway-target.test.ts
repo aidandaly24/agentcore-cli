@@ -44,7 +44,7 @@ describe('add gateway-target command', () => {
 
     it('requires endpoint', async () => {
       const result = await runCLI(
-        ['add', 'gateway-target', '--name', 'noendpoint', '--gateway', gatewayName, '--json'],
+        ['add', 'gateway-target', '--name', 'noendpoint', '--type', 'mcp-server', '--gateway', gatewayName, '--json'],
         projectDir
       );
       expect(result.exitCode).toBe(1);
@@ -63,6 +63,8 @@ describe('add gateway-target command', () => {
           'gateway-target',
           '--name',
           targetName,
+          '--type',
+          'mcp-server',
           '--endpoint',
           'https://mcp.exa.ai/mcp',
           '--gateway',
