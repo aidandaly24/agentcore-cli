@@ -1,4 +1,10 @@
-import type { GatewayAuthorizerType, NodeRuntime, PythonRuntime, ToolDefinition } from '../../../../schema';
+import type {
+  GatewayAuthorizerType,
+  GatewayTargetType,
+  NodeRuntime,
+  PythonRuntime,
+  ToolDefinition,
+} from '../../../../schema';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Gateway Flow Types
@@ -48,7 +54,7 @@ export type ComputeHost = 'Lambda' | 'AgentCoreRuntime';
  */
 export type AddGatewayTargetStep =
   | 'name'
-  | 'source'
+  | 'target-type'
   | 'endpoint'
   | 'language'
   | 'gateway'
@@ -63,8 +69,8 @@ export interface AddGatewayTargetConfig {
   description: string;
   sourcePath: string;
   language: TargetLanguage;
-  /** Source type for external endpoints */
-  source?: 'existing-endpoint' | 'create-new';
+  /** Target type selected by user */
+  targetType?: GatewayTargetType;
   /** External endpoint URL */
   endpoint?: string;
   /** Gateway name */
@@ -83,7 +89,7 @@ export interface AddGatewayTargetConfig {
 
 export const MCP_TOOL_STEP_LABELS: Record<AddGatewayTargetStep, string> = {
   name: 'Name',
-  source: 'Source',
+  'target-type': 'Target Type',
   endpoint: 'Endpoint',
   language: 'Language',
   gateway: 'Gateway',
@@ -104,9 +110,8 @@ export const AUTHORIZER_TYPE_OPTIONS = [
 
 export const SKIP_FOR_NOW = 'skip-for-now' as const;
 
-export const SOURCE_OPTIONS = [
-  { id: 'existing-endpoint', title: 'Existing endpoint', description: 'Connect to an existing MCP server' },
-  { id: 'create-new', title: 'Create new', description: 'Scaffold a new MCP server' },
+export const TARGET_TYPE_OPTIONS = [
+  { id: 'mcpServer', title: 'MCP Server endpoint', description: 'Connect to an existing MCP-compatible server' },
 ] as const;
 
 export const TARGET_LANGUAGE_OPTIONS = [

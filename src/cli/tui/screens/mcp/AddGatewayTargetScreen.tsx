@@ -1,3 +1,4 @@
+import type { GatewayTargetType } from '../../../../schema';
 import { ToolNameSchema } from '../../../../schema';
 import { ConfirmReview, Panel, Screen, StepIndicator, TextInput, WizardSelect } from '../../components';
 import type { SelectableItem } from '../../components';
@@ -5,7 +6,7 @@ import { HELP_TEXT } from '../../constants';
 import { useListNavigation } from '../../hooks';
 import { generateUniqueName } from '../../utils';
 import type { AddGatewayTargetConfig } from './types';
-import { MCP_TOOL_STEP_LABELS, OUTBOUND_AUTH_OPTIONS } from './types';
+import { MCP_TOOL_STEP_LABELS, OUTBOUND_AUTH_OPTIONS, TARGET_TYPE_OPTIONS } from './types';
 import { useAddGatewayTargetWizard } from './useAddGatewayTargetWizard';
 import { Box, Text } from 'ink';
 import React, { useMemo, useState } from 'react';
@@ -51,11 +52,24 @@ export function AddGatewayTargetScreen({
     return items;
   }, [existingOAuthCredentialNames]);
 
+  const targetTypeItems: SelectableItem[] = useMemo(
+    () => TARGET_TYPE_OPTIONS.map(o => ({ id: o.id, title: o.title, description: o.description })),
+    []
+  );
+
   const isGatewayStep = wizard.step === 'gateway';
   const isOutboundAuthStep = wizard.step === 'outbound-auth';
+  const isTargetTypeStep = wizard.step === 'target-type';
   const isTextStep = wizard.step === 'name' || wizard.step === 'endpoint';
   const isConfirmStep = wizard.step === 'confirm';
   const noGatewaysAvailable = isGatewayStep && existingGateways.length === 0;
+
+  const targetTypeNav = useListNavigation({
+    items: targetTypeItems,
+    onSelect: item => wizard.setTargetType(item.id as GatewayTargetType),
+    onExit: () => wizard.goBack(),
+    isActive: isTargetTypeStep,
+  });
 
   const gatewayNav = useListNavigation({
     items: gatewayItems,
@@ -117,6 +131,15 @@ export function AddGatewayTargetScreen({
   return (
     <Screen title="Add Gateway Target" onExit={onExit} helpText={helpText} headerContent={headerContent}>
       <Panel>
+        {isTargetTypeStep && (
+          <WizardSelect
+            title="Select target type"
+            description="What kind of target will this gateway route to?"
+            items={targetTypeItems}
+            selectedIndex={targetTypeNav.selectedIndex}
+          />
+        )}
+
         {isGatewayStep && !noGatewaysAvailable && (
           <WizardSelect
             title="Select gateway"
@@ -179,6 +202,13 @@ export function AddGatewayTargetScreen({
           <ConfirmReview
             fields={[
               { label: 'Name', value: wizard.config.name },
+              {
+                label: 'Target Type',
+                value:
+                  TARGET_TYPE_OPTIONS.find(o => o.id === wizard.config.targetType)?.title ??
+                  wizard.config.targetType ??
+                  '',
+              },
               ...(wizard.config.endpoint ? [{ label: 'Endpoint', value: wizard.config.endpoint }] : []),
               { label: 'Gateway', value: wizard.config.gateway ?? '' },
               ...(wizard.config.outboundAuth

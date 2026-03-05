@@ -63,7 +63,7 @@ export function AddGatewayTargetFlow({
         loadingMessage: 'Creating gateway target...',
       });
 
-      if (config.source === 'existing-endpoint') {
+      if (config.targetType === 'mcpServer') {
         void gatewayTargetPrimitive
           .createExternalGatewayTarget(config)
           .then((result: { toolName: string; projectPath: string }) => {

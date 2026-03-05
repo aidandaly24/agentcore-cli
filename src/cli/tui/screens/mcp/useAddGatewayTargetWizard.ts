@@ -1,15 +1,7 @@
 import { APP_DIR, MCP_APP_SUBDIR } from '../../../../lib';
-import type { ToolDefinition } from '../../../../schema';
+import type { GatewayTargetType, ToolDefinition } from '../../../../schema';
 import type { AddGatewayTargetConfig, AddGatewayTargetStep } from './types';
 import { useCallback, useMemo, useState } from 'react';
-
-/**
- * Steps for adding a gateway target (existing endpoint only).
- * name → endpoint → gateway → outbound-auth → confirm
- */
-function getSteps(): AddGatewayTargetStep[] {
-  return ['name', 'endpoint', 'gateway', 'outbound-auth', 'confirm'];
-}
 
 function deriveToolDefinition(name: string): ToolDefinition {
   return {
@@ -24,7 +16,6 @@ function getDefaultConfig(): AddGatewayTargetConfig {
     name: '',
     description: '',
     sourcePath: '',
-    source: 'existing-endpoint',
     language: 'Python',
     host: 'Lambda',
     toolDefinition: deriveToolDefinition(''),
@@ -35,15 +26,27 @@ export function useAddGatewayTargetWizard(existingGateways: string[] = []) {
   const [config, setConfig] = useState<AddGatewayTargetConfig>(getDefaultConfig);
   const [step, setStep] = useState<AddGatewayTargetStep>('name');
 
-  const steps = useMemo(() => getSteps(), []);
+  // Dynamic steps — recomputes when targetType changes
+  const steps = useMemo<AddGatewayTargetStep[]>(() => {
+    const baseSteps: AddGatewayTargetStep[] = ['name', 'target-type'];
+    if (config.targetType) {
+      switch (config.targetType) {
+        case 'mcpServer':
+        default:
+          baseSteps.push('endpoint', 'gateway', 'outbound-auth');
+          break;
+      }
+      baseSteps.push('confirm');
+    }
+    return baseSteps;
+  }, [config.targetType]);
+
   const currentIndex = steps.indexOf(step);
 
   const goBack = useCallback(() => {
-    const currentSteps = getSteps();
-    const idx = currentSteps.indexOf(step);
-    const prevStep = currentSteps[idx - 1];
+    const prevStep = steps[currentIndex - 1];
     if (prevStep) setStep(prevStep);
-  }, [step]);
+  }, [currentIndex, steps]);
 
   const setName = useCallback((name: string) => {
     setConfig(c => ({
@@ -53,6 +56,11 @@ export function useAddGatewayTargetWizard(existingGateways: string[] = []) {
       sourcePath: `${APP_DIR}/${MCP_APP_SUBDIR}/${name}`,
       toolDefinition: deriveToolDefinition(name),
     }));
+    setStep('target-type');
+  }, []);
+
+  const setTargetType = useCallback((targetType: GatewayTargetType) => {
+    setConfig(c => ({ ...c, targetType }));
     setStep('endpoint');
   }, []);
 
@@ -93,6 +101,7 @@ export function useAddGatewayTargetWizard(existingGateways: string[] = []) {
     existingGateways,
     goBack,
     setName,
+    setTargetType,
     setEndpoint,
     setGateway,
     setOutboundAuth,
