@@ -236,8 +236,7 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
       .description('Add a gateway target to the project')
       .option('--name <name>', 'Target name')
       .option('--description <desc>', 'Target description')
-      .option('--type <type>', 'Target type: mcpServer or lambda')
-      .option('--source <source>', 'Source: existing-endpoint or create-new')
+      .option('--type <type>', 'Target type (required): mcp-server')
       .option('--endpoint <url>', 'MCP server endpoint URL')
       .option('--language <lang>', 'Language: Python, TypeScript, Other')
       .option('--gateway <name>', 'Gateway name')
@@ -274,14 +273,15 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
             none: 'NONE',
           };
 
-          // Handle existing-endpoint targets differently (no code generation)
-          if (cliOptions.source === 'existing-endpoint' && cliOptions.endpoint) {
+          // Handle MCP server targets (existing endpoint, no code generation)
+          if (cliOptions.type === 'mcpServer' && cliOptions.endpoint) {
             const config: AddGatewayTargetConfig = {
               name: cliOptions.name!,
               description: cliOptions.description ?? `Tool for ${cliOptions.name!}`,
               sourcePath: '',
               language: cliOptions.language ?? 'Other',
               host: 'AgentCoreRuntime',
+              targetType: 'mcpServer',
               toolDefinition: {
                 name: cliOptions.name!,
                 description: cliOptions.description ?? `Tool for ${cliOptions.name!}`,
@@ -289,7 +289,6 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
               },
               gateway: cliOptions.gateway,
               endpoint: cliOptions.endpoint,
-              source: 'existing-endpoint',
               ...(cliOptions.outboundAuthType
                 ? {
                     outboundAuth: {
@@ -422,7 +421,7 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
 
     const target: AgentCoreGatewayTarget = {
       name: config.name,
-      targetType: 'mcpServer',
+      targetType: config.targetType ?? 'mcpServer',
       endpoint: config.endpoint,
       toolDefinitions: [config.toolDefinition],
       ...(config.outboundAuth && { outboundAuth: config.outboundAuth }),

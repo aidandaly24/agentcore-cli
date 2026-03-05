@@ -219,13 +219,16 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     return { valid: false, error: '--name is required' };
   }
 
-  if (options.type && options.type !== 'mcpServer' && options.type !== 'lambda') {
-    return { valid: false, error: 'Invalid type. Valid options: mcpServer, lambda' };
+  if (!options.type) {
+    return { valid: false, error: '--type is required. Valid options: mcp-server' };
   }
 
-  if (options.source && options.source !== 'existing-endpoint') {
-    return { valid: false, error: "Only 'existing-endpoint' source is currently supported" };
+  const typeMap: Record<string, string> = { 'mcp-server': 'mcpServer' };
+  const mappedType = typeMap[options.type];
+  if (!mappedType) {
+    return { valid: false, error: `Invalid type: ${options.type}. Valid options: mcp-server` };
   }
+  options.type = mappedType;
 
   // Gateway is required — a gateway target must be attached to a gateway
   if (!options.gateway) {
@@ -260,10 +263,7 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     };
   }
 
-  // Default to existing-endpoint (only supported source for now)
-  options.source ??= 'existing-endpoint';
-
-  // Validate outbound auth configuration (applies to all source types)
+  // Validate outbound auth configuration
   if (options.outboundAuthType && options.outboundAuthType !== 'NONE') {
     const hasInlineOAuth = !!(options.oauthClientId ?? options.oauthClientSecret ?? options.oauthDiscoveryUrl);
 
@@ -309,12 +309,12 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     }
   }
 
-  if (options.source === 'existing-endpoint') {
+  if (mappedType === 'mcpServer') {
     if (options.host) {
-      return { valid: false, error: '--host is not applicable for existing endpoint targets' };
+      return { valid: false, error: '--host is not applicable for MCP server targets' };
     }
     if (!options.endpoint) {
-      return { valid: false, error: '--endpoint is required when source is existing-endpoint' };
+      return { valid: false, error: '--endpoint is required for mcp-server type' };
     }
 
     try {

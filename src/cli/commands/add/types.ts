@@ -49,7 +49,6 @@ export interface AddGatewayTargetOptions {
   name?: string;
   description?: string;
   type?: string;
-  source?: string;
   endpoint?: string;
   language?: 'Python' | 'TypeScript' | 'Other';
   gateway?: string;
