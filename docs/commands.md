@@ -198,14 +198,14 @@ agentcore add
 # External MCP server endpoint
 agentcore add gateway-target \
   --name WeatherTools \
-  --source existing-endpoint \
+  --type mcp-server \
   --endpoint https://mcp.example.com/mcp \
   --gateway MyGateway
 
 # External endpoint with OAuth outbound auth
 agentcore add gateway-target \
   --name SecureTools \
-  --source existing-endpoint \
+  --type mcp-server \
   --endpoint https://api.example.com/mcp \
   --gateway MyGateway \
   --outbound-auth oauth \
@@ -218,7 +218,7 @@ agentcore add gateway-target \
 | -------------------------------- | ----------------------------------------------- |
 | `--name <name>`                  | Target name                                     |
 | `--description <desc>`           | Target description                              |
-| `--source <source>`              | `existing-endpoint`                             |
+| `--type <type>`                  | Target type (required): `mcp-server`            |
 | `--endpoint <url>`               | MCP server endpoint URL                         |
 | `--gateway <name>`               | Gateway to attach target to                     |
 | `--outbound-auth <type>`         | `oauth`, `api-key`, or `none`                   |
@@ -382,7 +382,7 @@ agentcore deploy -y
 agentcore add gateway --name MyGateway
 agentcore add gateway-target \
   --name WeatherTools \
-  --source existing-endpoint \
+  --type mcp-server \
   --endpoint https://mcp.example.com/mcp \
   --gateway MyGateway
 agentcore deploy -y

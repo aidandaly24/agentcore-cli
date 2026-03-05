@@ -142,7 +142,7 @@ populated by `agentcore deploy`. If you haven't deployed yet, no gateway env var
 ```bash
 # 1. Add a gateway and target
 agentcore add gateway --name my-gateway
-agentcore add gateway-target --name my-tools --source existing-endpoint \
+agentcore add gateway-target --name my-tools --type mcp-server \
   --endpoint https://mcp.example.com/mcp --gateway my-gateway
 
 # 2. Deploy to create the gateway

@@ -18,7 +18,7 @@ agentcore add gateway --name my-gateway
 
 # 3. Add a target (external MCP server)
 agentcore add gateway-target \
-  --source existing-endpoint \
+  --type mcp-server \
   --name weather-tools \
   --endpoint https://mcp.example.com/mcp \
   --gateway my-gateway
@@ -39,7 +39,7 @@ requests to.
 
 ```bash
 agentcore add gateway-target \
-  --source existing-endpoint \
+  --type mcp-server \
   --name my-tools \
   --endpoint https://mcp.example.com/mcp \
   --gateway my-gateway
@@ -87,7 +87,7 @@ Controls how the gateway authenticates with upstream MCP servers. Configured per
 
 ```bash
 agentcore add gateway-target \
-  --source existing-endpoint \
+  --type mcp-server \
   --name secure-tools \
   --endpoint https://api.example.com/mcp \
   --gateway my-gateway \
@@ -108,7 +108,7 @@ agentcore add identity \
   --client-secret my-secret
 
 agentcore add gateway-target \
-  --source existing-endpoint \
+  --type mcp-server \
   --name secure-tools \
   --endpoint https://api.example.com/mcp \
   --gateway my-gateway \
@@ -129,7 +129,7 @@ include gateway client code with the correct authentication for your framework.
 # 1. Add gateway and targets
 agentcore add gateway --name my-gateway
 agentcore add gateway-target \
-  --source existing-endpoint \
+  --type mcp-server \
   --name my-tools \
   --endpoint https://mcp.example.com/mcp \
   --gateway my-gateway
