@@ -112,7 +112,7 @@ export type ExternallyManagedState = z.infer<typeof ExternallyManagedStateSchema
 // ============================================================================
 
 export const CredentialDeployedStateSchema = z.object({
-  credentialProviderArn: z.string(),
+  credentialProviderArn: z.string().min(1),
   clientSecretArn: z.string().optional(),
   callbackUrl: z.string().optional(),
 });
