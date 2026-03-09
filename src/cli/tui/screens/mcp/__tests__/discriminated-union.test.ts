@@ -1,6 +1,7 @@
 import type {
   AddGatewayTargetConfig,
   ApiGatewayTargetConfig,
+  LambdaFunctionArnTargetConfig,
   McpServerTargetConfig,
   SchemaBasedTargetConfig,
 } from '../types.js';
@@ -147,9 +148,81 @@ describe('AddGatewayTargetConfig discriminated union', () => {
       if (c.targetType === 'mcpServer') return `mcp:${c.endpoint}`;
       if (c.targetType === 'openApiSchema' || c.targetType === 'smithyModel') return `schema:${c.name}`;
       if (c.targetType === 'apiGateway') return `apigw:${c.restApiId}/${c.stage}`;
+      if (c.targetType === 'lambdaFunctionArn') return `lambda:${c.lambdaArn}`;
       return `unknown:${c.name}`;
     });
 
     expect(results).toEqual(['mcp:https://e.com', 'apigw:id/prod', 'schema:openapi']);
+  });
+
+  it('narrows to LambdaFunctionArnTargetConfig when targetType is lambdaFunctionArn', () => {
+    const config: AddGatewayTargetConfig = {
+      targetType: 'lambdaFunctionArn',
+      name: 'my-lambda',
+      gateway: 'my-gateway',
+      lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-fn',
+      toolSchemaFile: 'tools/schema.json',
+    };
+
+    if (config.targetType === 'lambdaFunctionArn') {
+      expect(config.lambdaArn).toBe('arn:aws:lambda:us-east-1:123456789012:function:my-fn');
+      expect(config.toolSchemaFile).toBe('tools/schema.json');
+      expect(config.gateway).toBe('my-gateway');
+    }
+  });
+
+  it('LambdaFunctionArnTargetConfig requires all fields', () => {
+    const config: LambdaFunctionArnTargetConfig = {
+      targetType: 'lambdaFunctionArn',
+      name: 'test',
+      gateway: 'gw',
+      lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:fn',
+      toolSchemaFile: 'schema.json',
+    };
+    expect(config.targetType).toBe('lambdaFunctionArn');
+  });
+
+  it('three-way dispatch handles all target types', () => {
+    const configs: AddGatewayTargetConfig[] = [
+      {
+        targetType: 'mcpServer',
+        name: 'mcp',
+        description: 'd',
+        endpoint: 'https://e.com',
+        gateway: 'gw',
+        toolDefinition: { name: 'mcp', description: 'd', inputSchema: { type: 'object' } },
+      },
+      {
+        targetType: 'apiGateway',
+        name: 'apigw',
+        gateway: 'gw',
+        restApiId: 'id',
+        stage: 'prod',
+      },
+      {
+        targetType: 'lambdaFunctionArn',
+        name: 'lambda',
+        gateway: 'gw',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:fn',
+        toolSchemaFile: 'schema.json',
+      },
+    ];
+
+    const results = configs.map(c => {
+      switch (c.targetType) {
+        case 'mcpServer':
+          return `mcp:${c.endpoint}`;
+        case 'apiGateway':
+          return `apigw:${c.restApiId}/${c.stage}`;
+        case 'lambdaFunctionArn':
+          return `lambda:${c.lambdaArn}`;
+      }
+    });
+
+    expect(results).toEqual([
+      'mcp:https://e.com',
+      'apigw:id/prod',
+      'lambda:arn:aws:lambda:us-east-1:123456789012:function:fn',
+    ]);
   });
 });

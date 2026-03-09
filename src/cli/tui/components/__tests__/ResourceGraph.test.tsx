@@ -356,4 +356,21 @@ describe('getTargetDisplayText', () => {
     const target = { name: 'my-api', targetType: 'apiGateway' } as any;
     expect(getTargetDisplayText(target)).toBe('my-api');
   });
+
+  it('returns Lambda ARN for lambdaFunctionArn target', () => {
+    const target = {
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789:function:my-fn',
+        toolSchemaFile: './tools.json',
+      },
+    } as any;
+    expect(getTargetDisplayText(target)).toBe('arn:aws:lambda:us-east-1:123456789:function:my-fn');
+  });
+
+  it('returns name as fallback for lambdaFunctionArn without config', () => {
+    const target = { name: 'my-lambda', targetType: 'lambdaFunctionArn' } as any;
+    expect(getTargetDisplayText(target)).toBe('my-lambda');
+  });
 });

@@ -77,6 +77,8 @@ export function AddGatewayTargetScreen({
   const isStageStep = wizard.step === 'stage';
   const isToolFiltersStep = wizard.step === 'tool-filters';
   const isSchemaSourceStep = wizard.step === 'schema-source';
+  const isLambdaArnStep = wizard.step === 'lambda-arn';
+  const isToolSchemaStep = wizard.step === 'tool-schema';
   const isConfirmStep = wizard.step === 'confirm';
   const isAuthStep = isOutboundAuthStep || isApiGatewayAuthStep;
   const noGatewaysAvailable = isGatewayStep && existingGateways.length === 0;
@@ -236,6 +238,14 @@ export function AddGatewayTargetScreen({
           schemaSource: c.schemaSource!,
           outboundAuth: c.outboundAuth as SchemaBasedTargetConfig['outboundAuth'],
         });
+      } else if (c.targetType === 'lambdaFunctionArn') {
+        onComplete({
+          targetType: 'lambdaFunctionArn',
+          name: c.name,
+          gateway: c.gateway!,
+          lambdaArn: c.lambdaArn!,
+          toolSchemaFile: c.toolSchemaFile!,
+        });
       } else {
         onComplete({
           targetType: 'mcpServer',
@@ -258,7 +268,7 @@ export function AddGatewayTargetScreen({
   // ── Render ──
   const helpText = isConfirmStep
     ? HELP_TEXT.CONFIRM_CANCEL
-    : isTextStep || isRestApiIdStep || isStageStep || isToolFiltersStep || isSchemaSourceStep
+    : isTextStep || isRestApiIdStep || isStageStep || isToolFiltersStep || isSchemaSourceStep || isLambdaArnStep || isToolSchemaStep
       ? HELP_TEXT.TEXT_INPUT
       : HELP_TEXT.NAVIGATE_SELECT;
 
@@ -442,6 +452,28 @@ export function AddGatewayTargetScreen({
           />
         )}
 
+        {isLambdaArnStep && (
+          <TextInput
+            prompt="Lambda function ARN"
+            placeholder="arn:aws:lambda:us-east-1:123456789012:function:my-function"
+            onSubmit={wizard.setLambdaArn}
+            onCancel={() => wizard.goBack()}
+          />
+        )}
+
+        {isToolSchemaStep && (
+          <TextInput
+            prompt="Tool schema file path"
+            placeholder="e.g. ./tools.json"
+            onSubmit={wizard.setToolSchemaFile}
+            onCancel={() => wizard.goBack()}
+            customValidation={(value: string) => {
+              if (!value) return 'Path is required';
+              return true;
+            }}
+          />
+        )}
+
         {isConfirmStep && (
           <ConfirmReview
             fields={[
@@ -464,6 +496,12 @@ export function AddGatewayTargetScreen({
                     },
                   ]
                 : []),
+              ...(wizard.config.targetType === 'lambdaFunctionArn'
+                ? [
+                    { label: 'Lambda ARN', value: wizard.config.lambdaArn ?? '' },
+                    { label: 'Tool Schema File', value: wizard.config.toolSchemaFile ?? '' },
+                  ]
+                : []),
               ...(wizard.config.targetType === 'mcpServer' && wizard.config.endpoint
                 ? [{ label: 'Endpoint', value: wizard.config.endpoint }]
                 : []),
@@ -479,7 +517,7 @@ export function AddGatewayTargetScreen({
                   ]
                 : []),
               { label: 'Gateway', value: wizard.config.gateway ?? '' },
-              ...(wizard.config.outboundAuth
+              ...(wizard.config.targetType !== 'lambdaFunctionArn' && wizard.config.outboundAuth
                 ? [
                     { label: 'Auth Type', value: wizard.config.outboundAuth.type },
                     { label: 'Credential', value: wizard.config.outboundAuth.credentialName ?? 'None' },

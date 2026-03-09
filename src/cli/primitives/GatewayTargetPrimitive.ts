@@ -17,6 +17,7 @@ import { getTemplateToolDefinitions, renderGatewayTargetTemplate } from '../temp
 import type {
   ApiGatewayTargetConfig,
   GatewayTargetWizardState,
+  LambdaFunctionArnTargetConfig,
   McpServerTargetConfig,
   SchemaBasedTargetConfig,
 } from '../tui/screens/mcp/types';
@@ -242,7 +243,7 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
       .description('Add a gateway target to the project')
       .option('--name <name>', 'Target name')
       .option('--description <desc>', 'Target description')
-      .option('--type <type>', 'Target type (required): mcp-server, api-gateway')
+      .option('--type <type>', 'Target type (required): mcp-server, api-gateway, lambda-function-arn')
       .option('--endpoint <url>', 'MCP server endpoint URL')
       .option('--language <lang>', 'Language: Python, TypeScript, Other')
       .option('--gateway <name>', 'Gateway name')
@@ -262,6 +263,8 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
         'Path to schema file (relative to project root) or S3 URI (for open-api-schema / smithy-model)'
       )
       .option('--schema-s3-account <id>', 'S3 bucket owner account ID (for cross-account access)')
+      .option('--lambda-arn <arn>', 'Lambda function ARN (required for lambda-function-arn type)')
+      .option('--tool-schema-file <path>', 'Path to tool schema JSON file (required for lambda-function-arn type)')
       .option('--json', 'Output as JSON')
       .action(async (rawOptions: Record<string, string | boolean | undefined>) => {
         // Commander camelCases --outbound-auth to outboundAuth, but our types use outboundAuthType
@@ -360,6 +363,25 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
                 : {}),
             };
             const result = await this.createSchemaBasedGatewayTarget(config);
+            const output = { success: true, toolName: result.toolName };
+            if (cliOptions.json) {
+              console.log(JSON.stringify(output));
+            } else {
+              console.log(`Added gateway target '${result.toolName}'`);
+            }
+            process.exit(0);
+          }
+
+          // Handle Lambda Function ARN targets (no code generation)
+          if (cliOptions.type === 'lambdaFunctionArn') {
+            const config = {
+              targetType: 'lambdaFunctionArn' as const,
+              name: cliOptions.name!,
+              gateway: cliOptions.gateway!,
+              lambdaArn: cliOptions.lambdaArn!,
+              toolSchemaFile: cliOptions.toolSchemaFile!,
+            };
+            const result = await this.createLambdaFunctionArnTarget(config);
             const output = { success: true, toolName: result.toolName };
             if (cliOptions.json) {
               console.log(JSON.stringify(output));
@@ -601,6 +623,43 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
       targetType: config.targetType,
       schemaSource: config.schemaSource,
       ...(config.outboundAuth && { outboundAuth: config.outboundAuth }),
+    };
+
+    gateway.targets.push(target);
+    await this.configIO.writeMcpSpec(mcpSpec);
+
+    return { toolName: config.name };
+  }
+
+  /**
+   * Create a Lambda Function ARN target that connects to an existing Lambda function.
+   * Unlike `add()` which scaffolds new code, this registers an existing Lambda function ARN.
+   */
+  async createLambdaFunctionArnTarget(config: LambdaFunctionArnTargetConfig): Promise<{ toolName: string }> {
+    const mcpSpec: AgentCoreMcpSpec = this.configIO.configExists('mcp')
+      ? await this.configIO.readMcpSpec()
+      : { agentCoreGateways: [] };
+
+    const gateway = mcpSpec.agentCoreGateways.find(g => g.name === config.gateway);
+    if (!gateway) {
+      throw new Error(`Gateway "${config.gateway}" not found.`);
+    }
+
+    if (!gateway.targets) {
+      gateway.targets = [];
+    }
+
+    if (gateway.targets.some(t => t.name === config.name)) {
+      throw new Error(`Target "${config.name}" already exists in gateway "${gateway.name}".`);
+    }
+
+    const target: AgentCoreGatewayTarget = {
+      name: config.name,
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: config.lambdaArn,
+        toolSchemaFile: config.toolSchemaFile,
+      },
     };
 
     gateway.targets.push(target);

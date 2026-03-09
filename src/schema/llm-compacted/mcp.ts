@@ -26,11 +26,38 @@ interface AgentCoreGateway {
 }
 
 interface AgentCoreGatewayTarget {
+  name: string;
   targetType: GatewayTargetType;
-  toolDefinition: ToolDefinition;
-  compute?: ToolComputeConfig; // Omit for external/abstract tools
+  toolDefinitions?: ToolDefinition[];
+  compute?: ToolComputeConfig;
+  endpoint?: string; // URL - required for external MCP Server targets
+  outboundAuth?: OutboundAuth;
+  apiGateway?: ApiGatewayConfig;
   /** Schema source for openApiSchema / smithyModel targets. */
   schemaSource?: { inline: { path: string } } | { s3: { uri: string; bucketOwnerAccountId?: string } };
+  lambdaFunctionArn?: LambdaFunctionArnConfig;
+}
+
+interface OutboundAuth {
+  type: 'OAUTH' | 'API_KEY' | 'NONE';
+  credentialName?: string;
+  scopes?: string[];
+}
+
+interface ApiGatewayConfig {
+  restApiId: string;
+  stage: string;
+  apiGatewayToolConfiguration: {
+    toolFilters: { filterPath: string; methods: ApiGatewayHttpMethod[] }[];
+    toolOverrides?: { name: string; path: string; method: ApiGatewayHttpMethod; description?: string }[];
+  };
+}
+
+type ApiGatewayHttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
+
+interface LambdaFunctionArnConfig {
+  lambdaArn: string;
+  toolSchemaFile: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,7 +171,7 @@ interface IamPolicyDocument {
 // ENUMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-type GatewayTargetType = 'lambda' | 'mcpServer' | 'openApiSchema' | 'smithyModel' | 'apiGateway';
+type GatewayTargetType = 'lambda' | 'mcpServer' | 'openApiSchema' | 'smithyModel' | 'apiGateway' | 'lambdaFunctionArn';
 type PythonRuntime = 'PYTHON_3_10' | 'PYTHON_3_11' | 'PYTHON_3_12' | 'PYTHON_3_13';
 type NodeRuntime = 'NODE_18' | 'NODE_20' | 'NODE_22';
 type NetworkMode = 'PUBLIC' | 'PRIVATE';

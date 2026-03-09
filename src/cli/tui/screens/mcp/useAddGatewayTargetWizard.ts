@@ -44,6 +44,9 @@ export function useAddGatewayTargetWizard(
         case 'smithyModel':
           baseSteps.push('schema-source', 'gateway');
           break;
+        case 'lambdaFunctionArn':
+          baseSteps.push('lambda-arn', 'tool-schema', 'gateway');
+          break;
         case 'mcpServer':
         default:
           baseSteps.push('endpoint', 'gateway', 'outbound-auth');
@@ -95,6 +98,9 @@ export function useAddGatewayTargetWizard(
       case 'openApiSchema':
       case 'smithyModel':
         setStep('schema-source');
+        break;
+      case 'lambdaFunctionArn':
+        setStep('lambda-arn');
         break;
       case 'mcpServer':
       default:
@@ -178,6 +184,22 @@ export function useAddGatewayTargetWizard(
     [goToNextStep]
   );
 
+  const setLambdaArn = useCallback(
+    (lambdaArn: string) => {
+      setConfig(c => ({ ...c, lambdaArn }));
+      goToNextStep();
+    },
+    [goToNextStep]
+  );
+
+  const setToolSchemaFile = useCallback(
+    (toolSchemaFile: string) => {
+      setConfig(c => ({ ...c, toolSchemaFile }));
+      goToNextStep();
+    },
+    [goToNextStep]
+  );
+
   return {
     config,
     step,
@@ -195,6 +217,8 @@ export function useAddGatewayTargetWizard(
     setStage,
     setToolFilters,
     setApiGatewayAuth,
+    setLambdaArn,
+    setToolSchemaFile,
     reset,
   };
 }

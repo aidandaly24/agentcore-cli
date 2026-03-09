@@ -11,6 +11,7 @@ export type {
   McpServerTargetConfig,
   ApiGatewayTargetConfig,
   SchemaBasedTargetConfig,
+  LambdaFunctionArnTargetConfig,
   GatewayTargetWizardState,
   AddGatewayTargetStep,
   ComputeHost,

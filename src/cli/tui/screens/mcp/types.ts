@@ -68,6 +68,8 @@ export type AddGatewayTargetStep =
   | 'tool-filters'
   | 'api-gateway-auth'
   | 'schema-source'
+  | 'lambda-arn'
+  | 'tool-schema'
   | 'confirm';
 
 export type TargetLanguage = 'Python' | 'TypeScript' | 'Other';
@@ -96,6 +98,8 @@ export interface GatewayTargetWizardState {
   toolFilters?: { filterPath: string; methods: ApiGatewayHttpMethod[] }[];
   /** Schema source for openApiSchema / smithyModel targets */
   schemaSource?: SchemaSource;
+  lambdaArn?: string;
+  toolSchemaFile?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,7 +146,19 @@ export interface SchemaBasedTargetConfig {
   };
 }
 
-export type AddGatewayTargetConfig = McpServerTargetConfig | ApiGatewayTargetConfig | SchemaBasedTargetConfig;
+export interface LambdaFunctionArnTargetConfig {
+  targetType: 'lambdaFunctionArn';
+  name: string;
+  gateway: string;
+  lambdaArn: string;
+  toolSchemaFile: string;
+}
+
+export type AddGatewayTargetConfig =
+  | McpServerTargetConfig
+  | ApiGatewayTargetConfig
+  | SchemaBasedTargetConfig
+  | LambdaFunctionArnTargetConfig;
 
 export const MCP_TOOL_STEP_LABELS: Record<AddGatewayTargetStep, string> = {
   name: 'Name',
@@ -157,6 +173,8 @@ export const MCP_TOOL_STEP_LABELS: Record<AddGatewayTargetStep, string> = {
   'tool-filters': 'Tool Filters',
   'api-gateway-auth': 'Authorization',
   'schema-source': 'Schema Source',
+  'lambda-arn': 'Lambda ARN',
+  'tool-schema': 'Tool Schema File',
   confirm: 'Confirm',
 };
 
@@ -181,6 +199,11 @@ export const TARGET_TYPE_OPTIONS = [
   },
   { id: 'openApiSchema', title: 'OpenAPI Schema', description: 'Auto-derive tools from an OpenAPI JSON spec' },
   { id: 'smithyModel', title: 'Smithy Model', description: 'Auto-derive tools from a Smithy JSON model' },
+  {
+    id: 'lambdaFunctionArn',
+    title: 'Lambda function',
+    description: 'Connect to an existing AWS Lambda function',
+  },
 ] as const;
 
 export const TARGET_LANGUAGE_OPTIONS = [

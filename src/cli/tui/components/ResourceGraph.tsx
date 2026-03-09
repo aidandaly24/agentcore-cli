@@ -102,6 +102,7 @@ export function getTargetDisplayText(target: AgentCoreGatewayTarget): string {
   if (target.targetType === 'mcpServer' && target.endpoint) return target.endpoint;
   if (target.targetType === 'apiGateway' && target.apiGateway)
     return `${target.apiGateway.restApiId}/${target.apiGateway.stage}`;
+  if (target.targetType === 'lambdaFunctionArn' && target.lambdaFunctionArn) return target.lambdaFunctionArn.lambdaArn;
   return target.name;
 }
 
@@ -257,6 +258,7 @@ export function ResourceGraph({ project, mcp, agentName, resourceStatuses }: Res
                       {'    '}
                       <Text color="cyan">{ICONS.tool}</Text> {displayText}
                       {(target.targetType === 'apiGateway' ||
+                        target.targetType === 'lambdaFunctionArn' ||
                         (target.targetType === 'mcpServer' && target.endpoint)) && (
                         <Text color="gray"> [{target.targetType}]</Text>
                       )}
