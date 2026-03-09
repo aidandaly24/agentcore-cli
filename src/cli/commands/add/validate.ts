@@ -327,13 +327,12 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     if (!options.toolSchemaFile) {
       return { valid: false, error: '--tool-schema-file is required for lambda-function-arn type' };
     }
-    if (isAbsolute(options.toolSchemaFile)) {
-      return { valid: false, error: '--tool-schema-file must be a relative path' };
-    }
 
     const configRoot = findConfigRoot();
     const projectRoot = configRoot ? dirname(configRoot) : process.cwd();
-    const resolvedPath = join(projectRoot, options.toolSchemaFile);
+    const resolvedPath = isAbsolute(options.toolSchemaFile)
+      ? options.toolSchemaFile
+      : join(projectRoot, options.toolSchemaFile);
 
     if (!existsSync(resolvedPath)) {
       return { valid: false, error: `Tool schema file not found: ${options.toolSchemaFile}` };

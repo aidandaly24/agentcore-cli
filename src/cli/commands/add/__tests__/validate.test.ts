@@ -696,16 +696,37 @@ describe('validate', () => {
       expect(result.error).toContain('--tool-schema-file is required');
     });
 
-    it('rejects lambda-function-arn with absolute path', async () => {
+    it('accepts lambda-function-arn with absolute path', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify([{ name: 'tool1', description: 'desc' }]));
       const result = await validateAddGatewayTargetOptions({
         name: 'my-lambda',
         type: 'lambda-function-arn',
         lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
-        toolSchemaFile: '/absolute/path.json',
+        toolSchemaFile: '/absolute/path/tools.json',
         gateway: 'my-gateway',
       });
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('relative path');
+      expect(result.valid).toBe(true);
+      // Verify the absolute path was used as-is, not joined with project root
+      expect(vi.mocked(existsSync)).toHaveBeenCalledWith('/absolute/path/tools.json');
+      expect(vi.mocked(readFileSync)).toHaveBeenCalledWith('/absolute/path/tools.json', 'utf-8');
+    });
+
+    it('accepts lambda-function-arn with relative path resolved from project root', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify([{ name: 'tool1', description: 'desc' }]));
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(true);
+      // Verify relative path was resolved from project root (dirname of configRoot)
+      const calledPath = vi.mocked(existsSync).mock.calls.find(c => String(c[0]).includes('tools.json'));
+      expect(calledPath).toBeDefined();
+      expect(String(calledPath![0])).not.toBe('./tools.json'); // Should be resolved, not raw
     });
 
     it('rejects lambda-function-arn when file not found', async () => {
