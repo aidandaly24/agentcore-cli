@@ -762,7 +762,7 @@ describe('AgentCoreGatewayTargetSchema with lambdaFunctionArn', () => {
     expect(result.success).toBe(false);
   });
 
-  it('accepts lambdaFunctionArn with outboundAuth type NONE', () => {
+  it('rejects lambdaFunctionArn with outboundAuth type NONE', () => {
     const result = AgentCoreGatewayTargetSchema.safeParse({
       name: 'my-lambda',
       targetType: 'lambdaFunctionArn',
@@ -772,7 +772,7 @@ describe('AgentCoreGatewayTargetSchema with lambdaFunctionArn', () => {
       },
       outboundAuth: { type: 'NONE' },
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
   it('rejects lambdaFunctionArn with toolDefinitions', () => {

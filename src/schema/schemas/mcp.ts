@@ -499,7 +499,7 @@ export const AgentCoreGatewayTargetSchema = z
           path: ['apiGateway'],
         });
       }
-      if (data.outboundAuth && data.outboundAuth.type !== 'NONE') {
+      if (data.outboundAuth) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'outboundAuth is not applicable for lambdaFunctionArn target type',
