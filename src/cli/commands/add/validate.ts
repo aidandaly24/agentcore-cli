@@ -327,6 +327,36 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     if (!options.toolSchemaFile) {
       return { valid: false, error: '--tool-schema-file is required for lambda-function-arn type' };
     }
+    if (options.endpoint) {
+      return { valid: false, error: '--endpoint is not applicable for lambda-function-arn type' };
+    }
+    if (options.host) {
+      return { valid: false, error: '--host is not applicable for lambda-function-arn type' };
+    }
+    if (options.language && options.language !== 'Other') {
+      return { valid: false, error: '--language is not applicable for lambda-function-arn type' };
+    }
+    if (options.restApiId) {
+      return { valid: false, error: '--rest-api-id is not applicable for lambda-function-arn type' };
+    }
+    if (options.stage) {
+      return { valid: false, error: '--stage is not applicable for lambda-function-arn type' };
+    }
+    if (options.toolFilterPath) {
+      return { valid: false, error: '--tool-filter-path is not applicable for lambda-function-arn type' };
+    }
+    if (options.toolFilterMethods) {
+      return { valid: false, error: '--tool-filter-methods is not applicable for lambda-function-arn type' };
+    }
+    if (options.outboundAuthType) {
+      return { valid: false, error: '--outbound-auth is not applicable for lambda-function-arn type' };
+    }
+    if (options.credentialName) {
+      return { valid: false, error: '--credential-name is not applicable for lambda-function-arn type' };
+    }
+    if (options.oauthClientId || options.oauthClientSecret || options.oauthDiscoveryUrl || options.oauthScopes) {
+      return { valid: false, error: 'OAuth options are not applicable for lambda-function-arn type' };
+    }
 
     const configRoot = findConfigRoot();
     const projectRoot = configRoot ? dirname(configRoot) : process.cwd();
@@ -361,36 +391,6 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
       }
     }
 
-    if (options.endpoint) {
-      return { valid: false, error: '--endpoint is not applicable for lambda-function-arn type' };
-    }
-    if (options.host) {
-      return { valid: false, error: '--host is not applicable for lambda-function-arn type' };
-    }
-    if (options.language && options.language !== 'Other') {
-      return { valid: false, error: '--language is not applicable for lambda-function-arn type' };
-    }
-    if (options.restApiId) {
-      return { valid: false, error: '--rest-api-id is not applicable for lambda-function-arn type' };
-    }
-    if (options.stage) {
-      return { valid: false, error: '--stage is not applicable for lambda-function-arn type' };
-    }
-    if (options.toolFilterPath) {
-      return { valid: false, error: '--tool-filter-path is not applicable for lambda-function-arn type' };
-    }
-    if (options.toolFilterMethods) {
-      return { valid: false, error: '--tool-filter-methods is not applicable for lambda-function-arn type' };
-    }
-    if (options.outboundAuthType) {
-      return { valid: false, error: '--outbound-auth is not applicable for lambda-function-arn type' };
-    }
-    if (options.credentialName) {
-      return { valid: false, error: '--credential-name is not applicable for lambda-function-arn type' };
-    }
-    if (options.oauthClientId || options.oauthClientSecret || options.oauthDiscoveryUrl || options.oauthScopes) {
-      return { valid: false, error: 'OAuth options are not applicable for lambda-function-arn type' };
-    }
     options.language = 'Other';
     return { valid: true };
   }

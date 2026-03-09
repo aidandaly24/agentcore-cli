@@ -762,6 +762,19 @@ describe('AgentCoreGatewayTargetSchema with lambdaFunctionArn', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts lambdaFunctionArn with outboundAuth type NONE', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+      outboundAuth: { type: 'NONE' },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects lambdaFunctionArn with toolDefinitions', () => {
     const result = AgentCoreGatewayTargetSchema.safeParse({
       name: 'my-lambda',

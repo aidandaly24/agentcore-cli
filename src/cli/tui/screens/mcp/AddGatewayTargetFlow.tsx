@@ -103,7 +103,7 @@ export function AddGatewayTargetFlow({
           setFlow({ name: 'error', message: err instanceof Error ? err.message : 'Unknown error' });
         });
     } else {
-      setFlow({ name: 'error', message: `Unsupported target type: ${String(config.targetType)}` });
+      setFlow({ name: 'error', message: `Unsupported target type: ${(config as { targetType: string }).targetType}` });
     }
   }, []);
 
