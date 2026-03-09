@@ -17,8 +17,8 @@ import type {
   AddIdentityOptions,
   AddMemoryOptions,
 } from './types';
-import { existsSync } from 'fs';
-import { dirname, extname, join, resolve } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import { dirname, extname, isAbsolute, join, resolve } from 'path';
 
 export interface ValidationResult {
   valid: boolean;
@@ -225,7 +225,8 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
   if (!options.type) {
     return {
       valid: false,
-      error: '--type is required. Valid options: mcp-server, api-gateway, open-api-schema, smithy-model',
+      error:
+        '--type is required. Valid options: mcp-server, api-gateway, open-api-schema, smithy-model, lambda-function-arn',
     };
   }
 
@@ -234,12 +235,13 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     'api-gateway': 'apiGateway',
     'open-api-schema': 'openApiSchema',
     'smithy-model': 'smithyModel',
+    'lambda-function-arn': 'lambdaFunctionArn',
   };
   const mappedType = typeMap[options.type];
   if (!mappedType) {
     return {
       valid: false,
-      error: `Invalid type: ${options.type}. Valid options: mcp-server, api-gateway, open-api-schema, smithy-model`,
+      error: `Invalid type: ${options.type}. Valid options: mcp-server, api-gateway, open-api-schema, smithy-model, lambda-function-arn`,
     };
   }
   options.type = mappedType;
@@ -306,6 +308,89 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     }
     if (options.oauthClientId || options.oauthClientSecret || options.oauthDiscoveryUrl || options.oauthScopes) {
       return { valid: false, error: 'OAuth options are not applicable for api-gateway type' };
+    }
+    if (options.lambdaArn) {
+      return { valid: false, error: '--lambda-arn is not applicable for api-gateway type' };
+    }
+    if (options.toolSchemaFile) {
+      return { valid: false, error: '--tool-schema-file is not applicable for api-gateway type' };
+    }
+    options.language = 'Other';
+    return { valid: true };
+  }
+
+  // Lambda Function ARN targets: validate early and return
+  if (mappedType === 'lambdaFunctionArn') {
+    if (!options.lambdaArn) {
+      return { valid: false, error: '--lambda-arn is required for lambda-function-arn type' };
+    }
+    if (!options.toolSchemaFile) {
+      return { valid: false, error: '--tool-schema-file is required for lambda-function-arn type' };
+    }
+    if (isAbsolute(options.toolSchemaFile)) {
+      return { valid: false, error: '--tool-schema-file must be a relative path' };
+    }
+
+    const configRoot = findConfigRoot();
+    const projectRoot = configRoot ? dirname(configRoot) : process.cwd();
+    const resolvedPath = join(projectRoot, options.toolSchemaFile);
+
+    if (!existsSync(resolvedPath)) {
+      return { valid: false, error: `Tool schema file not found: ${options.toolSchemaFile}` };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(resolvedPath, 'utf-8'));
+    } catch {
+      return { valid: false, error: `Tool schema file is not valid JSON: ${options.toolSchemaFile}` };
+    }
+
+    if (!Array.isArray(parsed)) {
+      return { valid: false, error: 'Tool schema file must contain a JSON array' };
+    }
+    if (parsed.length === 0) {
+      return { valid: false, error: 'Tool schema file must contain at least one tool definition' };
+    }
+    for (const [i, entry] of parsed.entries()) {
+      const item = entry as Record<string, unknown>;
+      if (typeof item.name !== 'string' || !item.name) {
+        return { valid: false, error: `Tool schema entry ${i} is missing a valid "name" field` };
+      }
+      if (typeof item.description !== 'string' || !item.description) {
+        return { valid: false, error: `Tool schema entry ${i} is missing a valid "description" field` };
+      }
+    }
+
+    if (options.endpoint) {
+      return { valid: false, error: '--endpoint is not applicable for lambda-function-arn type' };
+    }
+    if (options.host) {
+      return { valid: false, error: '--host is not applicable for lambda-function-arn type' };
+    }
+    if (options.language && options.language !== 'Other') {
+      return { valid: false, error: '--language is not applicable for lambda-function-arn type' };
+    }
+    if (options.restApiId) {
+      return { valid: false, error: '--rest-api-id is not applicable for lambda-function-arn type' };
+    }
+    if (options.stage) {
+      return { valid: false, error: '--stage is not applicable for lambda-function-arn type' };
+    }
+    if (options.toolFilterPath) {
+      return { valid: false, error: '--tool-filter-path is not applicable for lambda-function-arn type' };
+    }
+    if (options.toolFilterMethods) {
+      return { valid: false, error: '--tool-filter-methods is not applicable for lambda-function-arn type' };
+    }
+    if (options.outboundAuthType) {
+      return { valid: false, error: '--outbound-auth is not applicable for lambda-function-arn type' };
+    }
+    if (options.credentialName) {
+      return { valid: false, error: '--credential-name is not applicable for lambda-function-arn type' };
+    }
+    if (options.oauthClientId || options.oauthClientSecret || options.oauthDiscoveryUrl || options.oauthScopes) {
+      return { valid: false, error: 'OAuth options are not applicable for lambda-function-arn type' };
     }
     options.language = 'Other';
     return { valid: true };
@@ -434,6 +519,13 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
       }
     } catch {
       return { valid: false, error: 'Endpoint must be a valid URL (e.g. https://example.com/mcp)' };
+    }
+
+    if (options.lambdaArn) {
+      return { valid: false, error: '--lambda-arn is not applicable for mcp-server type' };
+    }
+    if (options.toolSchemaFile) {
+      return { valid: false, error: '--tool-schema-file is not applicable for mcp-server type' };
     }
 
     // Populate defaults for fields skipped by external endpoint flow

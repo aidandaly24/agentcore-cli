@@ -8,7 +8,14 @@ import { z } from 'zod';
 // MCP-Specific Schemas
 // ============================================================================
 
-export const GatewayTargetTypeSchema = z.enum(['lambda', 'mcpServer', 'openApiSchema', 'smithyModel', 'apiGateway']);
+export const GatewayTargetTypeSchema = z.enum([
+  'lambda',
+  'mcpServer',
+  'openApiSchema',
+  'smithyModel',
+  'apiGateway',
+  'lambdaFunctionArn',
+]);
 export type GatewayTargetType = z.infer<typeof GatewayTargetTypeSchema>;
 
 // ============================================================================
@@ -91,6 +98,7 @@ export const TARGET_TYPE_AUTH_CONFIG: Record<
   apiGateway: { authRequired: false, validAuthTypes: ['API_KEY', 'NONE'], iamRoleFallback: true },
   mcpServer: { authRequired: false, validAuthTypes: ['OAUTH', 'NONE'], iamRoleFallback: false },
   lambda: { authRequired: false, validAuthTypes: ['OAUTH', 'NONE'], iamRoleFallback: false },
+  lambdaFunctionArn: { authRequired: false, validAuthTypes: [], iamRoleFallback: true },
 };
 
 // ============================================================================
@@ -131,6 +139,14 @@ export const ApiGatewayConfigSchema = z
   })
   .strict();
 export type ApiGatewayConfig = z.infer<typeof ApiGatewayConfigSchema>;
+
+export const LambdaFunctionArnConfigSchema = z
+  .object({
+    lambdaArn: z.string().min(1).max(170),
+    toolSchemaFile: z.string().min(1),
+  })
+  .strict();
+export type LambdaFunctionArnConfig = z.infer<typeof LambdaFunctionArnConfigSchema>;
 
 export const McpImplLanguageSchema = z.enum(['TypeScript', 'Python']);
 export type McpImplementationLanguage = z.infer<typeof McpImplLanguageSchema>;
@@ -375,6 +391,8 @@ export const AgentCoreGatewayTargetSchema = z
     apiGateway: ApiGatewayConfigSchema.optional(),
     /** Schema source for openApiSchema / smithyModel targets. */
     schemaSource: SchemaSourceSchema.optional(),
+    /** Lambda Function ARN configuration. Required for lambdaFunctionArn target type. */
+    lambdaFunctionArn: LambdaFunctionArnConfigSchema.optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -405,6 +423,13 @@ export const AgentCoreGatewayTargetSchema = z
           code: z.ZodIssueCode.custom,
           message: 'toolDefinitions is not applicable for apiGateway target type (tools are auto-discovered)',
           path: ['toolDefinitions'],
+        });
+      }
+      if (data.lambdaFunctionArn) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'lambdaFunctionArn is not applicable for apiGateway target type',
+          path: ['lambdaFunctionArn'],
         });
       }
     }
@@ -445,11 +470,72 @@ export const AgentCoreGatewayTargetSchema = z
         });
       }
     }
-    if (data.targetType === 'mcpServer' && !data.compute && !data.endpoint) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'MCP Server targets require either an endpoint URL or compute configuration.',
-      });
+    if (data.targetType === 'lambdaFunctionArn') {
+      if (!data.lambdaFunctionArn) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'lambdaFunctionArn config is required for lambdaFunctionArn target type',
+          path: ['lambdaFunctionArn'],
+        });
+      }
+      if (data.compute) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'compute is not applicable for lambdaFunctionArn target type',
+          path: ['compute'],
+        });
+      }
+      if (data.endpoint) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'endpoint is not applicable for lambdaFunctionArn target type',
+          path: ['endpoint'],
+        });
+      }
+      if (data.apiGateway) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'apiGateway is not applicable for lambdaFunctionArn target type',
+          path: ['apiGateway'],
+        });
+      }
+      if (data.outboundAuth && data.outboundAuth.type !== 'NONE') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'outboundAuth is not applicable for lambdaFunctionArn target type',
+          path: ['outboundAuth'],
+        });
+      }
+      if (data.toolDefinitions && data.toolDefinitions.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'toolDefinitions is not applicable for lambdaFunctionArn target type (tools are defined via toolSchemaFile)',
+          path: ['toolDefinitions'],
+        });
+      }
+    }
+    if (data.targetType === 'mcpServer') {
+      if (!data.compute && !data.endpoint) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'MCP Server targets require either an endpoint URL or compute configuration.',
+        });
+      }
+      if (data.apiGateway) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'apiGateway is not applicable for mcpServer target type',
+          path: ['apiGateway'],
+        });
+      }
+      if (data.lambdaFunctionArn) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'lambdaFunctionArn is not applicable for mcpServer target type',
+          path: ['lambdaFunctionArn'],
+        });
+      }
     }
     if (data.targetType === 'lambda' && !data.compute) {
       ctx.addIssue({

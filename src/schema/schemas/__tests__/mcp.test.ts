@@ -7,6 +7,7 @@ import {
   CustomJwtAuthorizerConfigSchema,
   GatewayAuthorizerTypeSchema,
   GatewayTargetTypeSchema,
+  LambdaFunctionArnConfigSchema,
   McpImplLanguageSchema,
   RuntimeConfigSchema,
   SchemaSourceSchema,
@@ -16,9 +17,12 @@ import {
 import { describe, expect, it } from 'vitest';
 
 describe('GatewayTargetTypeSchema', () => {
-  it.each(['lambda', 'mcpServer', 'openApiSchema', 'smithyModel', 'apiGateway'])('accepts "%s"', type => {
-    expect(GatewayTargetTypeSchema.safeParse(type).success).toBe(true);
-  });
+  it.each(['lambda', 'mcpServer', 'openApiSchema', 'smithyModel', 'apiGateway', 'lambdaFunctionArn'])(
+    'accepts "%s"',
+    type => {
+      expect(GatewayTargetTypeSchema.safeParse(type).success).toBe(true);
+    }
+  );
 
   it('rejects invalid type', () => {
     expect(GatewayTargetTypeSchema.safeParse('http').success).toBe(false);
@@ -631,6 +635,163 @@ describe('AgentCoreGatewayTargetSchema with openApiSchema/smithyModel', () => {
       outboundAuth: { type: 'OAUTH', credentialName: 'my-cred' },
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('LambdaFunctionArnConfigSchema', () => {
+  it('accepts valid config', () => {
+    const result = LambdaFunctionArnConfigSchema.safeParse({
+      lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+      toolSchemaFile: './tools.json',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects missing lambdaArn', () => {
+    const result = LambdaFunctionArnConfigSchema.safeParse({
+      toolSchemaFile: './tools.json',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing toolSchemaFile', () => {
+    const result = LambdaFunctionArnConfigSchema.safeParse({
+      lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty lambdaArn', () => {
+    const result = LambdaFunctionArnConfigSchema.safeParse({
+      lambdaArn: '',
+      toolSchemaFile: './tools.json',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects extra fields (strict)', () => {
+    const result = LambdaFunctionArnConfigSchema.safeParse({
+      lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+      toolSchemaFile: './tools.json',
+      extraField: 'not allowed',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('AgentCoreGatewayTargetSchema with lambdaFunctionArn', () => {
+  it('accepts valid lambdaFunctionArn target', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects missing lambdaFunctionArn config', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects lambdaFunctionArn with compute', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+      compute: {
+        host: 'Lambda',
+        implementation: { language: 'Python', path: 'x', handler: 'x' },
+        pythonVersion: 'PYTHON_3_12',
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects lambdaFunctionArn with endpoint', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+      endpoint: 'https://example.com',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects lambdaFunctionArn with apiGateway config', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+      apiGateway: {
+        restApiId: 'abc123',
+        stage: 'prod',
+        apiGatewayToolConfiguration: {
+          toolFilters: [{ filterPath: '/*', methods: ['GET'] }],
+        },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects lambdaFunctionArn with outboundAuth', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+      outboundAuth: { type: 'OAUTH' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects lambdaFunctionArn with toolDefinitions', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-lambda',
+      targetType: 'lambdaFunctionArn',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+      toolDefinitions: [{ name: 'myTool', description: 'A tool', inputSchema: { type: 'object' as const } }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects apiGateway target with lambdaFunctionArn config', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'my-api',
+      targetType: 'apiGateway',
+      lambdaFunctionArn: {
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+      },
+      apiGateway: {
+        restApiId: 'abc123',
+        stage: 'prod',
+        apiGatewayToolConfiguration: {
+          toolFilters: [{ filterPath: '/*', methods: ['GET'] }],
+        },
+      },
+    });
+    expect(result.success).toBe(false);
   });
 });
 

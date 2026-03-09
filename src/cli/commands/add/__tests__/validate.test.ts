@@ -12,6 +12,7 @@ import {
   validateAddIdentityOptions,
   validateAddMemoryOptions,
 } from '../validate.js';
+import { existsSync, readFileSync } from 'fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockReadProjectSpec = vi.fn();
@@ -24,7 +25,13 @@ vi.mock('../../../../lib/index.js', () => ({
     configExists = mockConfigExists;
     readMcpSpec = mockReadMcpSpec;
   },
+  findConfigRoot: vi.fn().mockReturnValue('/mock/project/agentcore'),
 }));
+
+vi.mock('fs', async importOriginal => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, existsSync: vi.fn().mockReturnValue(true), readFileSync: vi.fn().mockReturnValue('[]') };
+});
 
 // Helper: valid base options for each type
 const validAgentOptionsByo: AddAgentOptions = {
@@ -651,6 +658,153 @@ describe('validate', () => {
       });
       expect(result.valid).toBe(false);
       expect(result.error).toContain('--credential-name is required');
+    });
+
+    // Lambda Function ARN target validation
+    it('accepts valid lambda-function-arn options', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('[{"name":"tool1","description":"desc"}]');
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejects lambda-function-arn without --lambda-arn', async () => {
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('--lambda-arn is required');
+    });
+
+    it('rejects lambda-function-arn without --tool-schema-file', async () => {
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('--tool-schema-file is required');
+    });
+
+    it('rejects lambda-function-arn with absolute path', async () => {
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: '/absolute/path.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('relative path');
+    });
+
+    it('rejects lambda-function-arn when file not found', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('not found');
+    });
+
+    it('rejects lambda-function-arn with invalid JSON', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('not json');
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('not valid JSON');
+    });
+
+    it('rejects lambda-function-arn with non-array JSON', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('{}');
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('JSON array');
+    });
+
+    it('rejects lambda-function-arn with empty array', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('[]');
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('at least one tool definition');
+    });
+
+    it('rejects lambda-function-arn with missing name in element', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('[{"description":"d"}]');
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('missing a valid "name"');
+    });
+
+    it('rejects --endpoint for lambda-function-arn type', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('[{"name":"tool1","description":"desc"}]');
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+        endpoint: 'https://example.com',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('not applicable');
+    });
+
+    it('rejects --outbound-auth for lambda-function-arn type', async () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readFileSync).mockReturnValue('[{"name":"tool1","description":"desc"}]');
+      const result = await validateAddGatewayTargetOptions({
+        name: 'my-lambda',
+        type: 'lambda-function-arn',
+        lambdaArn: 'arn:aws:lambda:us-east-1:123456789012:function:my-func',
+        toolSchemaFile: './tools.json',
+        gateway: 'my-gateway',
+        outboundAuthType: 'NONE',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('not applicable');
     });
 
     it('rejects --host with mcp-server type', async () => {

@@ -61,6 +61,8 @@ export interface AddGatewayTargetOptions {
   oauthScopes?: string;
   restApiId?: string;
   stage?: string;
+  lambdaArn?: string;
+  toolSchemaFile?: string;
   toolFilterPath?: string;
   toolFilterMethods?: string;
   schema?: string;
