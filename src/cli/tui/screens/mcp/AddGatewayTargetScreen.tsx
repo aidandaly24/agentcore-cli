@@ -268,7 +268,13 @@ export function AddGatewayTargetScreen({
   // ── Render ──
   const helpText = isConfirmStep
     ? HELP_TEXT.CONFIRM_CANCEL
-    : isTextStep || isRestApiIdStep || isStageStep || isToolFiltersStep || isSchemaSourceStep || isLambdaArnStep || isToolSchemaStep
+    : isTextStep ||
+        isRestApiIdStep ||
+        isStageStep ||
+        isToolFiltersStep ||
+        isSchemaSourceStep ||
+        isLambdaArnStep ||
+        isToolSchemaStep
       ? HELP_TEXT.TEXT_INPUT
       : HELP_TEXT.NAVIGATE_SELECT;
 
