@@ -188,21 +188,21 @@ agentcore add gateway \
 
 ### add gateway-target
 
-Add a gateway target to the project. Targets are backend tools exposed through a gateway as an external MCP server
-endpoint.
+Add a gateway target to the project. Targets are backend tools exposed through a gateway. Supports five target types:
+`mcp-server`, `api-gateway`, `open-api-schema`, `smithy-model`, and `lambda-function-arn`.
 
 ```bash
 # Interactive mode (select 'Gateway Target' from the menu)
 agentcore add
 
-# External MCP server endpoint
+# MCP Server endpoint
 agentcore add gateway-target \
   --name WeatherTools \
   --type mcp-server \
   --endpoint https://mcp.example.com/mcp \
   --gateway MyGateway
 
-# External endpoint with OAuth outbound auth
+# MCP Server with OAuth outbound auth
 agentcore add gateway-target \
   --name SecureTools \
   --type mcp-server \
@@ -212,22 +212,70 @@ agentcore add gateway-target \
   --oauth-client-id my-client \
   --oauth-client-secret my-secret \
   --oauth-discovery-url https://auth.example.com/.well-known/openid-configuration
+
+# API Gateway REST API
+agentcore add gateway-target \
+  --name PetStore \
+  --type api-gateway \
+  --rest-api-id abc123 \
+  --stage prod \
+  --tool-filter-path '/pets/*' \
+  --tool-filter-methods GET,POST \
+  --gateway MyGateway
+
+# OpenAPI Schema (auto-derive tools from spec)
+agentcore add gateway-target \
+  --name PetStoreAPI \
+  --type open-api-schema \
+  --schema specs/petstore.json \
+  --gateway MyGateway \
+  --outbound-auth oauth \
+  --credential-name MyOAuth
+
+# Smithy Model (auto-derive tools from model)
+agentcore add gateway-target \
+  --name MyService \
+  --type smithy-model \
+  --schema models/service.json \
+  --gateway MyGateway
+
+# Lambda Function ARN
+agentcore add gateway-target \
+  --name MyLambdaTools \
+  --type lambda-function-arn \
+  --lambda-arn arn:aws:lambda:us-east-1:123456789012:function:my-func \
+  --tool-schema-file tools.json \
+  --gateway MyGateway
 ```
 
-| Flag                             | Description                                     |
-| -------------------------------- | ----------------------------------------------- |
-| `--name <name>`                  | Target name                                     |
-| `--description <desc>`           | Target description                              |
-| `--type <type>`                  | Target type (required): `mcp-server`            |
-| `--endpoint <url>`               | MCP server endpoint URL                         |
-| `--gateway <name>`               | Gateway to attach target to                     |
-| `--outbound-auth <type>`         | `oauth`, `api-key`, or `none`                   |
-| `--credential-name <name>`       | Existing credential name for outbound auth      |
-| `--oauth-client-id <id>`         | OAuth client ID (creates credential inline)     |
-| `--oauth-client-secret <secret>` | OAuth client secret (creates credential inline) |
-| `--oauth-discovery-url <url>`    | OAuth discovery URL (creates credential inline) |
-| `--oauth-scopes <scopes>`        | OAuth scopes, comma-separated                   |
-| `--json`                         | JSON output                                     |
+| Flag                              | Description                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `--name <name>`                   | Target name                                                                                                   |
+| `--description <desc>`            | Target description                                                                                            |
+| `--type <type>`                   | Target type (required): `mcp-server`, `api-gateway`, `open-api-schema`, `smithy-model`, `lambda-function-arn` |
+| `--endpoint <url>`                | MCP server endpoint URL (mcp-server)                                                                          |
+| `--language <lang>`               | Implementation language: Python, TypeScript, Other (mcp-server)                                               |
+| `--host <host>`                   | Compute host: Lambda or AgentCoreRuntime (mcp-server)                                                         |
+| `--gateway <name>`                | Gateway to attach target to                                                                                   |
+| `--outbound-auth <type>`          | `oauth`, `api-key`, or `none` (varies by target type)                                                         |
+| `--credential-name <name>`        | Existing credential name for outbound auth                                                                    |
+| `--oauth-client-id <id>`          | OAuth client ID (creates credential inline)                                                                   |
+| `--oauth-client-secret <secret>`  | OAuth client secret (creates credential inline)                                                               |
+| `--oauth-discovery-url <url>`     | OAuth discovery URL (creates credential inline)                                                               |
+| `--oauth-scopes <scopes>`         | OAuth scopes, comma-separated                                                                                 |
+| `--rest-api-id <id>`              | API Gateway REST API ID (api-gateway)                                                                         |
+| `--stage <stage>`                 | API Gateway stage name (api-gateway)                                                                          |
+| `--tool-filter-path <path>`       | Filter API paths, supports wildcards (api-gateway)                                                            |
+| `--tool-filter-methods <methods>` | Comma-separated HTTP methods to expose (api-gateway)                                                          |
+| `--schema <path>`                 | Path to schema file, relative to project root (open-api-schema, smithy-model)                                 |
+| `--schema-s3-account <account>`   | AWS account for S3-hosted schema (open-api-schema, smithy-model)                                              |
+| `--lambda-arn <arn>`              | Lambda function ARN (lambda-function-arn)                                                                     |
+| `--tool-schema-file <path>`       | Tool schema file, relative to project root or absolute path (lambda-function-arn)                             |
+| `--json`                          | JSON output                                                                                                   |
+
+> **Note**: `smithy-model` and `lambda-function-arn` use IAM role auth and do not support `--outbound-auth`.
+> `open-api-schema` requires `--outbound-auth` (`oauth` or `api-key`). `api-gateway` supports `api-key` or `none`.
+> `mcp-server` supports `oauth` or `none`.
 
 ### add identity
 

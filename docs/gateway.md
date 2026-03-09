@@ -34,8 +34,13 @@ The generated agent code includes gateway client setup, authentication, and envi
 
 ## Gateway Targets
 
-A gateway target is a backend tool exposed through a gateway — an external MCP server endpoint that the gateway proxies
-requests to.
+A gateway target is a backend tool source exposed through a gateway. The gateway proxies requests to the target and
+handles tool discovery and authentication. There are five target types.
+
+### MCP Server (`mcp-server`)
+
+Connect to an external MCP server endpoint, or deploy a managed MCP server on Lambda/AgentCoreRuntime
+(Python/TypeScript).
 
 ```bash
 agentcore add gateway-target \
@@ -44,6 +49,72 @@ agentcore add gateway-target \
   --endpoint https://mcp.example.com/mcp \
   --gateway my-gateway
 ```
+
+Supports outbound auth: `oauth`, `api-key`, or `none`.
+
+### API Gateway REST API (`api-gateway`)
+
+Connect to an existing Amazon API Gateway REST API. The gateway auto-discovers tools from API routes.
+
+```bash
+agentcore add gateway-target \
+  --type api-gateway \
+  --name PetStore \
+  --rest-api-id abc123 \
+  --stage prod \
+  --tool-filter-path '/pets/*' \
+  --tool-filter-methods GET,POST \
+  --gateway my-gateway
+```
+
+Supports outbound auth: `api-key` or `none`. OAuth is not supported for API Gateway targets.
+
+### OpenAPI Schema (`open-api-schema`)
+
+Auto-derive tools from an OpenAPI JSON specification file.
+
+```bash
+agentcore add gateway-target \
+  --type open-api-schema \
+  --name PetStoreAPI \
+  --schema specs/petstore.json \
+  --gateway my-gateway \
+  --outbound-auth oauth \
+  --credential-name MyOAuth
+```
+
+Outbound auth is required (`oauth` or `api-key`). Schema path is relative to project root.
+
+### Smithy Model (`smithy-model`)
+
+Auto-derive tools from a Smithy JSON model file.
+
+```bash
+agentcore add gateway-target \
+  --type smithy-model \
+  --name MyService \
+  --schema models/service.json \
+  --gateway my-gateway
+```
+
+Uses IAM role auth — no outbound auth needed. Schema path is relative to project root.
+
+### Lambda Function ARN (`lambda-function-arn`)
+
+Connect to an existing AWS Lambda function by ARN. Tools are defined via a JSON schema file rather than code
+scaffolding.
+
+```bash
+agentcore add gateway-target \
+  --type lambda-function-arn \
+  --name MyLambdaTools \
+  --lambda-arn arn:aws:lambda:us-east-1:123456789012:function:my-func \
+  --tool-schema-file tools.json \
+  --gateway my-gateway
+```
+
+Uses IAM role auth exclusively — no outbound auth is allowed. The tool schema file path is relative to project root (or
+an absolute path) and is uploaded to S3 during deployment.
 
 ## Authentication
 
@@ -75,13 +146,14 @@ credential that your agent uses to obtain Bearer tokens at runtime.
 
 ### Outbound Authentication
 
-Controls how the gateway authenticates with upstream MCP servers. Configured per target.
+Controls how the gateway authenticates with upstream targets. Configured per target.
 
-| Type      | Description                    |
-| --------- | ------------------------------ |
-| `none`    | No outbound authentication     |
-| `oauth`   | OAuth2 client credentials flow |
-| `api-key` | API key passed to upstream     |
+| Type      | Description                    | Supported Target Types                        |
+| --------- | ------------------------------ | --------------------------------------------- |
+| `none`    | No outbound authentication     | mcp-server, api-gateway                       |
+| `oauth`   | OAuth2 client credentials flow | mcp-server, open-api-schema                   |
+| `api-key` | API key passed to upstream     | api-gateway, open-api-schema                  |
+| IAM role  | Automatic IAM role auth        | smithy-model, lambda-function-arn (exclusive) |
 
 #### OAuth Outbound Auth
 

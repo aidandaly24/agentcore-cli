@@ -243,7 +243,10 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
       .description('Add a gateway target to the project')
       .option('--name <name>', 'Target name')
       .option('--description <desc>', 'Target description')
-      .option('--type <type>', 'Target type (required): mcp-server, api-gateway, lambda-function-arn')
+      .option(
+        '--type <type>',
+        'Target type (required): mcp-server, api-gateway, open-api-schema, smithy-model, lambda-function-arn'
+      )
       .option('--endpoint <url>', 'MCP server endpoint URL')
       .option('--language <lang>', 'Language: Python, TypeScript, Other')
       .option('--gateway <name>', 'Gateway name')
