@@ -6,29 +6,18 @@
  * Purpose: MCP gateways, tool definitions, and compute configurations
  */
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // ROOT SCHEMA: AgentCoreMcpSpec
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 interface AgentCoreMcpSpec {
   agentCoreGateways: AgentCoreGateway[];
   mcpRuntimeTools?: AgentCoreMcpRuntimeTool[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GATEWAY OBSERVABILITY
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface GatewayObservability {
-  /** Enable CloudWatch observability (logs + traces) post-deploy. @default true */
-  enabled?: boolean; // default true
-  /** Exception verbosity level. @default 'NONE' */
-  exceptionLevel?: 'NONE' | 'DEBUG'; // default 'NONE'
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // GATEWAY
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 interface AgentCoreGateway {
   name: string; // @regex ^([0-9a-zA-Z][-]?){1,100}$ @max 100
@@ -36,8 +25,8 @@ interface AgentCoreGateway {
   targets: AgentCoreGatewayTarget[];
   /** Enable semantic search for tool discovery. @default true */
   enableSemanticSearch?: boolean; // default true
-  /** Observability settings for the gateway. @default { enabled: true, exceptionLevel: 'NONE' } */
-  observability?: GatewayObservability; // default { enabled: true, exceptionLevel: 'NONE' }
+  /** Exception verbosity level. @default 'NONE' */
+  exceptionLevel?: 'NONE' | 'DEBUG'; // default 'NONE'
 }
 
 interface AgentCoreGatewayTarget {
@@ -75,9 +64,9 @@ interface LambdaFunctionArnConfig {
   toolSchemaFile: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // MCP RUNTIME TOOL
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 /**
  * AgentCore MCP Runtime tool servers.
@@ -104,9 +93,9 @@ interface McpRuntimeBinding {
   envVarName: string; // @regex ^[A-Za-z_][A-Za-z0-9_]*$ @max 255 - env var for runtime ARN
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // TOOL DEFINITION
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 interface ToolDefinition {
   name: string; // @regex ^([0-9a-zA-Z][-]?){1,100}$ @max 100
@@ -125,9 +114,9 @@ interface SchemaDefinition {
 
 type SchemaPrimitiveType = 'string' | 'number' | 'object' | 'array' | 'boolean' | 'integer';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // COMPUTE CONFIGURATION (discriminated union on 'host')
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 type ToolComputeConfig = LambdaComputeConfig | AgentCoreRuntimeComputeConfig;
 
@@ -148,9 +137,9 @@ interface AgentCoreRuntimeComputeConfig {
   iamPolicy?: IamPolicyDocument;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // TOOL IMPLEMENTATION BINDING
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 interface ToolImplementationBinding {
   language: 'TypeScript' | 'Python';
@@ -158,9 +147,9 @@ interface ToolImplementationBinding {
   handler: string; // @min 1 - function name
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // RUNTIME CONFIGURATION
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 interface RuntimeConfig {
   artifact: 'CodeZip';
@@ -172,9 +161,9 @@ interface RuntimeConfig {
   description?: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // IAM POLICY
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 interface IamPolicyDocument {
   Version: string;
@@ -182,9 +171,9 @@ interface IamPolicyDocument {
   [key: string]: unknown; // Additional IAM fields allowed
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // ENUMS
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 
 type GatewayTargetType = 'lambda' | 'mcpServer' | 'openApiSchema' | 'smithyModel' | 'apiGateway' | 'lambdaFunctionArn';
 type PythonRuntime = 'PYTHON_3_10' | 'PYTHON_3_11' | 'PYTHON_3_12' | 'PYTHON_3_13';

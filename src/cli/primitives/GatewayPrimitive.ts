@@ -27,7 +27,6 @@ export interface AddGatewayOptions {
   agentClientSecret?: string;
   agents?: string;
   enableSemanticSearch?: boolean;
-  enableObservability?: boolean;
   exceptionLevel?: string;
 }
 
@@ -160,7 +159,6 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
       .option('--agent-client-secret <secret>', 'Agent OAuth client secret')
       .option('--agents <agents>', 'Comma-separated agent names')
       .option('--no-semantic-search', 'Disable semantic search for tool discovery')
-      .option('--no-observability', 'Disable CloudWatch observability for the gateway')
       .option('--exception-level <level>', 'Exception verbosity level', 'NONE')
       .option('--json', 'Output as JSON')
       .action(async (rawOptions: Record<string, string | boolean | undefined>) => {
@@ -193,7 +191,6 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
             agentClientSecret: cliOptions.agentClientSecret,
             agents: cliOptions.agents,
             enableSemanticSearch: cliOptions.semanticSearch !== false,
-            enableObservability: cliOptions.observability !== false,
             exceptionLevel: cliOptions.exceptionLevel,
           });
 
@@ -292,7 +289,6 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
       authorizerType: options.authorizerType,
       jwtConfig: undefined,
       enableSemanticSearch: options.enableSemanticSearch ?? true,
-      enableObservability: options.enableObservability ?? true,
       exceptionLevel: options.exceptionLevel === 'DEBUG' ? 'DEBUG' : 'NONE',
     };
 
@@ -361,7 +357,7 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
       authorizerType: config.authorizerType,
       authorizerConfiguration: this.buildAuthorizerConfiguration(config),
       enableSemanticSearch: config.enableSemanticSearch,
-      observability: { enabled: config.enableObservability, exceptionLevel: config.exceptionLevel },
+      exceptionLevel: config.exceptionLevel,
     };
 
     mcpSpec.agentCoreGateways.push(gateway);

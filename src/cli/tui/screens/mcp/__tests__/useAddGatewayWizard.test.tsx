@@ -13,7 +13,6 @@ function Harness() {
   const wizard = useAddGatewayWizard();
   return (
     <Text>
-      enableObservability:{String(wizard.config.enableObservability)}
       exceptionLevel:{wizard.config.exceptionLevel}
       enableSemanticSearch:{String(wizard.config.enableSemanticSearch)}
       step:{wizard.step}
@@ -26,11 +25,7 @@ function Harness() {
 // ---------------------------------------------------------------------------
 
 interface HarnessHandle {
-  setAdvancedConfig: (opts: {
-    enableSemanticSearch: boolean;
-    enableObservability: boolean;
-    exceptionLevel: GatewayExceptionLevel;
-  }) => void;
+  setAdvancedConfig: (opts: { enableSemanticSearch: boolean; exceptionLevel: GatewayExceptionLevel }) => void;
   setName: (name: string) => void;
   setAuthorizerType: (type: 'NONE' | 'AWS_IAM' | 'CUSTOM_JWT') => void;
 }
@@ -44,7 +39,6 @@ const ImperativeHarness = React.forwardRef<HarnessHandle>((_, ref) => {
   }));
   return (
     <Text>
-      enableObservability:{String(wizard.config.enableObservability)}
       exceptionLevel:{wizard.config.exceptionLevel}
       enableSemanticSearch:{String(wizard.config.enableSemanticSearch)}
       step:{wizard.step}
@@ -58,10 +52,9 @@ ImperativeHarness.displayName = 'ImperativeHarness';
 // ---------------------------------------------------------------------------
 
 describe('useAddGatewayWizard', () => {
-  describe('observability defaults', () => {
-    it('default config has observability enabled and exceptionLevel NONE', () => {
+  describe('defaults', () => {
+    it('default config has exceptionLevel NONE', () => {
       const { lastFrame } = render(<Harness />);
-      expect(lastFrame()).toContain('enableObservability:true');
       expect(lastFrame()).toContain('exceptionLevel:NONE');
     });
 
@@ -77,22 +70,6 @@ describe('useAddGatewayWizard', () => {
   });
 
   describe('setAdvancedConfig', () => {
-    it('setAdvancedConfig disables observability', () => {
-      const ref = React.createRef<HarnessHandle>();
-      const { lastFrame } = render(<ImperativeHarness ref={ref} />);
-
-      act(() => {
-        ref.current!.setAdvancedConfig({
-          enableSemanticSearch: true,
-          enableObservability: false,
-          exceptionLevel: 'NONE',
-        });
-      });
-
-      expect(lastFrame()).toContain('enableObservability:false');
-      expect(lastFrame()).toContain('exceptionLevel:NONE');
-    });
-
     it('setAdvancedConfig sets exception level to DEBUG', () => {
       const ref = React.createRef<HarnessHandle>();
       const { lastFrame } = render(<ImperativeHarness ref={ref} />);
@@ -100,12 +77,10 @@ describe('useAddGatewayWizard', () => {
       act(() => {
         ref.current!.setAdvancedConfig({
           enableSemanticSearch: true,
-          enableObservability: true,
           exceptionLevel: 'DEBUG',
         });
       });
 
-      expect(lastFrame()).toContain('enableObservability:true');
       expect(lastFrame()).toContain('exceptionLevel:DEBUG');
     });
 
@@ -116,12 +91,10 @@ describe('useAddGatewayWizard', () => {
       act(() => {
         ref.current!.setAdvancedConfig({
           enableSemanticSearch: false,
-          enableObservability: false,
           exceptionLevel: 'NONE',
         });
       });
 
-      expect(lastFrame()).toContain('enableObservability:false');
       expect(lastFrame()).toContain('enableSemanticSearch:false');
       expect(lastFrame()).toContain('exceptionLevel:NONE');
     });
@@ -136,7 +109,6 @@ describe('useAddGatewayWizard', () => {
       act(() => {
         ref.current!.setAdvancedConfig({
           enableSemanticSearch: true,
-          enableObservability: true,
           exceptionLevel: 'NONE',
         });
       });

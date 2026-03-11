@@ -5,7 +5,7 @@ export interface TransactionSearchSetupOptions {
   region: string;
   accountId: string;
   agentNames: string[];
-  hasGatewayObservability?: boolean;
+  hasGateways?: boolean;
 }
 
 export interface TransactionSearchSetupResult {
@@ -20,14 +20,14 @@ export interface TransactionSearchSetupResult {
  *
  * Can be disabled via ~/.agentcore/config.json: { "disableTransactionSearch": true }
  *
- * This is a non-blocking best-effort operation — failures do not fail the deploy.
+ * This is a non-blocking best-effort operation -- failures do not fail the deploy.
  */
 export async function setupTransactionSearch(
   options: TransactionSearchSetupOptions
 ): Promise<TransactionSearchSetupResult> {
   const { region, accountId, agentNames } = options;
 
-  if (agentNames.length === 0 && !options.hasGatewayObservability) {
+  if (agentNames.length === 0 && !options.hasGateways) {
     return { success: true };
   }
 

@@ -79,15 +79,15 @@ export const OutboundAuthSchema = z
 export type OutboundAuth = z.infer<typeof OutboundAuthSchema>;
 
 // ============================================================================
-// Target Type → Auth Rules (single source of truth)
+// Target Type -> Auth Rules (single source of truth)
 // ============================================================================
 
 /**
  * Outbound authentication rules per gateway target type.
  *
- * - `authRequired` — target cannot be created without outbound auth
- * - `validAuthTypes` — allowed OutboundAuthType values (empty = no outbound auth applicable)
- * - `iamRoleFallback` — CDK passes GATEWAY_IAM_ROLE when no auth configured
+ * - `authRequired` -- target cannot be created without outbound auth
+ * - `validAuthTypes` -- allowed OutboundAuthType values (empty = no outbound auth applicable)
+ * - `iamRoleFallback` -- CDK passes GATEWAY_IAM_ROLE when no auth configured
  */
 export const TARGET_TYPE_AUTH_CONFIG: Record<
   GatewayTargetType,
@@ -587,26 +587,11 @@ export const AgentCoreGatewayTargetSchema = z
 export type AgentCoreGatewayTarget = z.infer<typeof AgentCoreGatewayTargetSchema>;
 
 // ============================================================================
-// Gateway Observability
+// Gateway Exception Level
 // ============================================================================
 
 export const GatewayExceptionLevelSchema = z.enum(['NONE', 'DEBUG']);
 export type GatewayExceptionLevel = z.infer<typeof GatewayExceptionLevelSchema>;
-
-/**
- * Observability configuration for gateways.
- * - enabled: controls whether X-Ray Transaction Search is configured post-deploy.
- * - exceptionLevel: 'DEBUG' returns verbose error details to callers (not recommended for production).
- */
-export const GatewayObservabilitySchema = z
-  .object({
-    /** Whether to enable CloudWatch observability (logs + traces) post-deploy. Defaults to true. */
-    enabled: z.boolean().default(true),
-    /** Exception verbosity level. 'DEBUG' returns verbose errors to callers. Defaults to 'NONE'. */
-    exceptionLevel: GatewayExceptionLevelSchema.default('NONE'),
-  })
-  .strict();
-export type GatewayObservability = z.infer<typeof GatewayObservabilitySchema>;
 
 // ============================================================================
 // Gateway
@@ -627,8 +612,8 @@ export const AgentCoreGatewaySchema = z
     authorizerConfiguration: GatewayAuthorizerConfigSchema.optional(),
     /** Whether to enable semantic search for tool discovery. Defaults to true. */
     enableSemanticSearch: z.boolean().default(true),
-    /** Observability settings for the gateway. Defaults to { enabled: true, exceptionLevel: 'NONE' }. */
-    observability: GatewayObservabilitySchema.default({ enabled: true, exceptionLevel: 'NONE' }),
+    /** Exception verbosity level. 'NONE' = generic errors (default), 'DEBUG' = verbose errors. */
+    exceptionLevel: GatewayExceptionLevelSchema.default('NONE'),
   })
   .strict()
   .refine(

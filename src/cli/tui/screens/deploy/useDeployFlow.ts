@@ -312,7 +312,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
         try {
           await cdkToolkitWrapper.diff();
         } catch {
-          // Diff failure is non-fatal — deploy will proceed
+          // Diff failure is non-fatal -- deploy will proceed
         } finally {
           switchableIoHost?.setVerbose(false);
           switchableIoHost?.setOnRawMessage(null);
@@ -380,21 +380,21 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
           const agentNames = context?.projectSpec.agents?.map((a: { name: string }) => a.name) ?? [];
           const targetRegion = context?.awsTargets[0]?.region;
           const targetAccount = context?.awsTargets[0]?.account;
-          let hasGatewayObservability = false;
+          let hasGateways = false;
           try {
             const tsConfigIO = new ConfigIO();
             const mcpSpec = await tsConfigIO.readMcpSpec();
-            hasGatewayObservability = mcpSpec?.agentCoreGateways?.some(g => g.observability?.enabled === true) ?? false;
+            hasGateways = (mcpSpec?.agentCoreGateways?.length ?? 0) > 0;
           } catch {
-            // No mcp.json or invalid — no gateway observability
+            // No mcp.json or invalid -- no gateways
           }
-          if ((agentNames.length > 0 || hasGatewayObservability) && targetRegion && targetAccount) {
+          if ((agentNames.length > 0 || hasGateways) && targetRegion && targetAccount) {
             try {
               const tsResult = await setupTransactionSearch({
                 region: targetRegion,
                 accountId: targetAccount,
                 agentNames,
-                hasGatewayObservability,
+                hasGateways,
               });
               if (tsResult.error) {
                 logger.log(`Transaction search setup warning: ${tsResult.error}`, 'warn');

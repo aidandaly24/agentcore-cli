@@ -19,7 +19,6 @@ import {
   AUTHORIZER_TYPE_OPTIONS,
   EXCEPTION_LEVEL_ITEM_ID,
   GATEWAY_STEP_LABELS,
-  OBSERVABILITY_ITEM_ID,
   SEMANTIC_SEARCH_ITEM_ID,
 } from './types';
 import { useAddGatewayWizard } from './useAddGatewayWizard';
@@ -33,7 +32,7 @@ interface AddGatewayScreenProps {
   unassignedTargets: string[];
 }
 
-const INITIAL_ADVANCED_SELECTED = [SEMANTIC_SEARCH_ITEM_ID, OBSERVABILITY_ITEM_ID];
+const INITIAL_ADVANCED_SELECTED = [SEMANTIC_SEARCH_ITEM_ID];
 
 export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassignedTargets }: AddGatewayScreenProps) {
   const wizard = useAddGatewayWizard(unassignedTargets.length);
@@ -59,7 +58,6 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
   const advancedConfigItems: SelectableItem[] = useMemo(
     () => [
       { id: SEMANTIC_SEARCH_ITEM_ID, title: 'Semantic Search' },
-      { id: OBSERVABILITY_ITEM_ID, title: 'Observability' },
       { id: EXCEPTION_LEVEL_ITEM_ID, title: 'Debug Exception Level' },
     ],
     []
@@ -95,7 +93,6 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
     onConfirm: selectedIds =>
       wizard.setAdvancedConfig({
         enableSemanticSearch: selectedIds.includes(SEMANTIC_SEARCH_ITEM_ID),
-        enableObservability: selectedIds.includes(OBSERVABILITY_ITEM_ID),
         exceptionLevel: selectedIds.includes(EXCEPTION_LEVEL_ITEM_ID) ? 'DEBUG' : 'NONE',
       }),
     onExit: () => wizard.goBack(),
@@ -205,7 +202,7 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
             />
             {authorizerItems[authorizerNav.selectedIndex]?.id === 'NONE' && (
               <Box marginTop={1}>
-                <Text color="yellow">⚠️ Warning: Gateway will be publicly accessible without authorization</Text>
+                <Text color="yellow">Warning: Gateway will be publicly accessible without authorization</Text>
               </Box>
             )}
           </Box>
@@ -248,7 +245,7 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
                 return (
                   <Box key={item.id}>
                     <Text wrap="truncate">
-                      <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? '❯' : ' '} </Text>
+                      <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? '>' : ' '} </Text>
                       <Text color={isChecked ? 'green' : undefined}>{checkbox} </Text>
                       <Text color={isCursor ? 'cyan' : undefined}>{item.title}</Text>
                     </Text>
@@ -287,7 +284,6 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
                     : '(none)',
               },
               { label: 'Semantic Search', value: wizard.config.enableSemanticSearch ? 'Enabled' : 'Disabled' },
-              { label: 'Observability', value: wizard.config.enableObservability ? 'Enabled' : 'Disabled' },
               { label: 'Exception Level', value: wizard.config.exceptionLevel === 'DEBUG' ? 'Debug' : 'None' },
             ]}
           />

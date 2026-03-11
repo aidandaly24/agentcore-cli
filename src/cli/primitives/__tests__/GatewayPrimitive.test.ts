@@ -39,59 +39,26 @@ describe('GatewayPrimitive', () => {
     primitive = new GatewayPrimitive();
   });
 
-  describe('observability', () => {
-    it('defaults to observability enabled with exceptionLevel NONE', async () => {
+  describe('exceptionLevel', () => {
+    it('defaults to exceptionLevel NONE', async () => {
       await primitive.add({ name: 'test-gw', authorizerType: 'NONE' });
 
       const gw = getWrittenGateway();
-      expect(gw.observability).toEqual({ enabled: true, exceptionLevel: 'NONE' });
-    });
-
-    it('enableObservability false disables observability', async () => {
-      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', enableObservability: false });
-
-      const gw = getWrittenGateway();
-      expect(gw.observability.enabled).toBe(false);
+      expect(gw.exceptionLevel).toBe('NONE');
     });
 
     it('exceptionLevel DEBUG passes through', async () => {
       await primitive.add({ name: 'test-gw', authorizerType: 'NONE', exceptionLevel: 'DEBUG' });
 
       const gw = getWrittenGateway();
-      expect(gw.observability.exceptionLevel).toBe('DEBUG');
-    });
-
-    it('enableObservability false with DEBUG combines correctly', async () => {
-      await primitive.add({
-        name: 'test-gw',
-        authorizerType: 'NONE',
-        enableObservability: false,
-        exceptionLevel: 'DEBUG',
-      });
-
-      const gw = getWrittenGateway();
-      expect(gw.observability).toEqual({ enabled: false, exceptionLevel: 'DEBUG' });
+      expect(gw.exceptionLevel).toBe('DEBUG');
     });
 
     it('invalid exceptionLevel falls back to NONE', async () => {
       await primitive.add({ name: 'test-gw', authorizerType: 'NONE', exceptionLevel: 'VERBOSE' });
 
       const gw = getWrittenGateway();
-      expect(gw.observability.exceptionLevel).toBe('NONE');
-    });
-
-    it('undefined enableObservability defaults to enabled true', async () => {
-      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', enableObservability: undefined });
-
-      const gw = getWrittenGateway();
-      expect(gw.observability.enabled).toBe(true);
-    });
-
-    it('enableObservability true means observability enabled', async () => {
-      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', enableObservability: true });
-
-      const gw = getWrittenGateway();
-      expect(gw.observability.enabled).toBe(true);
+      expect(gw.exceptionLevel).toBe('NONE');
     });
   });
 });

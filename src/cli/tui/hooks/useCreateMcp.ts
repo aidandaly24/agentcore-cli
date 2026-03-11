@@ -29,7 +29,6 @@ export function useCreateGateway() {
         agentClientId: config.jwtConfig?.agentClientId,
         agentClientSecret: config.jwtConfig?.agentClientSecret,
         enableSemanticSearch: config.enableSemanticSearch,
-        enableObservability: config.enableObservability,
         exceptionLevel: config.exceptionLevel,
       });
       if (!addResult.success) {

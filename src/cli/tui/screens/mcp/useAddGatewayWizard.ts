@@ -10,7 +10,6 @@ function getDefaultConfig(): AddGatewayConfig {
     jwtConfig: undefined,
     selectedTargets: [],
     enableSemanticSearch: true,
-    enableObservability: true,
     exceptionLevel: 'NONE',
   };
 }
@@ -100,11 +99,10 @@ export function useAddGatewayWizard(unassignedTargetsCount = 0) {
   }, []);
 
   const setAdvancedConfig = useCallback(
-    (opts: { enableSemanticSearch: boolean; enableObservability: boolean; exceptionLevel: GatewayExceptionLevel }) => {
+    (opts: { enableSemanticSearch: boolean; exceptionLevel: GatewayExceptionLevel }) => {
       setConfig(c => ({
         ...c,
         enableSemanticSearch: opts.enableSemanticSearch,
-        enableObservability: opts.enableObservability,
         exceptionLevel: opts.exceptionLevel,
       }));
       setStep('confirm');
