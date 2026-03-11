@@ -16,6 +16,17 @@ interface AgentCoreMcpSpec {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GATEWAY OBSERVABILITY
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface GatewayObservability {
+  /** Enable CloudWatch observability (logs + traces) post-deploy. @default true */
+  enabled?: boolean; // default true
+  /** Exception verbosity level. @default 'NONE' */
+  exceptionLevel?: 'NONE' | 'DEBUG'; // default 'NONE'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GATEWAY
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -25,6 +36,8 @@ interface AgentCoreGateway {
   targets: AgentCoreGatewayTarget[];
   /** Enable semantic search for tool discovery. @default true */
   enableSemanticSearch?: boolean; // default true
+  /** Observability settings for the gateway. @default { enabled: true, exceptionLevel: 'NONE' } */
+  observability?: GatewayObservability; // default { enabled: true, exceptionLevel: 'NONE' }
 }
 
 interface AgentCoreGatewayTarget {

@@ -6,6 +6,8 @@ import {
   ApiGatewayConfigSchema,
   CustomJwtAuthorizerConfigSchema,
   GatewayAuthorizerTypeSchema,
+  GatewayExceptionLevelSchema,
+  GatewayObservabilitySchema,
   GatewayTargetTypeSchema,
   LambdaFunctionArnConfigSchema,
   McpImplLanguageSchema,
@@ -305,6 +307,53 @@ describe('AgentCoreGatewayTargetSchema', () => {
   });
 });
 
+describe('GatewayExceptionLevelSchema', () => {
+  it('accepts NONE', () => {
+    expect(GatewayExceptionLevelSchema.safeParse('NONE').success).toBe(true);
+  });
+
+  it('accepts DEBUG', () => {
+    expect(GatewayExceptionLevelSchema.safeParse('DEBUG').success).toBe(true);
+  });
+
+  it('rejects invalid level', () => {
+    expect(GatewayExceptionLevelSchema.safeParse('VERBOSE').success).toBe(false);
+  });
+});
+
+describe('GatewayObservabilitySchema', () => {
+  it('applies defaults when empty object provided', () => {
+    const result = GatewayObservabilitySchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.enabled).toBe(true);
+      expect(result.data.exceptionLevel).toBe('NONE');
+    }
+  });
+
+  it('accepts explicit values', () => {
+    const result = GatewayObservabilitySchema.safeParse({ enabled: false, exceptionLevel: 'DEBUG' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.enabled).toBe(false);
+      expect(result.data.exceptionLevel).toBe('DEBUG');
+    }
+  });
+
+  it('applies default exceptionLevel when only enabled provided', () => {
+    const result = GatewayObservabilitySchema.safeParse({ enabled: false });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.enabled).toBe(false);
+      expect(result.data.exceptionLevel).toBe('NONE');
+    }
+  });
+
+  it('rejects invalid exceptionLevel', () => {
+    expect(GatewayObservabilitySchema.safeParse({ exceptionLevel: 'VERBOSE' }).success).toBe(false);
+  });
+});
+
 describe('AgentCoreGatewaySchema', () => {
   const validToolDef = {
     name: 'myTool',
@@ -402,6 +451,44 @@ describe('AgentCoreGatewaySchema', () => {
     const result = AgentCoreGatewaySchema.safeParse({
       ...validGateway,
       enableSemanticSearch: 'yes',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('defaults observability when omitted', () => {
+    const result = AgentCoreGatewaySchema.safeParse(validGateway);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.observability).toEqual({ enabled: true, exceptionLevel: 'NONE' });
+    }
+  });
+
+  it('accepts explicit observability values', () => {
+    const result = AgentCoreGatewaySchema.safeParse({
+      ...validGateway,
+      observability: { enabled: false, exceptionLevel: 'DEBUG' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.observability).toEqual({ enabled: false, exceptionLevel: 'DEBUG' });
+    }
+  });
+
+  it('applies observability defaults for partial object', () => {
+    const result = AgentCoreGatewaySchema.safeParse({
+      ...validGateway,
+      observability: { enabled: false },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.observability).toEqual({ enabled: false, exceptionLevel: 'NONE' });
+    }
+  });
+
+  it('rejects invalid observability exceptionLevel', () => {
+    const result = AgentCoreGatewaySchema.safeParse({
+      ...validGateway,
+      observability: { exceptionLevel: 'VERBOSE' },
     });
     expect(result.success).toBe(false);
   });

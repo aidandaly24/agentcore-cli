@@ -353,6 +353,7 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
       authorizerType: config.authorizerType,
       authorizerConfiguration: this.buildAuthorizerConfiguration(config),
       enableSemanticSearch: config.enableSemanticSearch,
+      observability: { enabled: true, exceptionLevel: 'NONE' },
     };
 
     mcpSpec.agentCoreGateways.push(gateway);
