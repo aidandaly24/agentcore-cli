@@ -47,8 +47,8 @@ describe('GatewayPrimitive', () => {
       expect(gw.observability).toEqual({ enabled: true, exceptionLevel: 'NONE' });
     });
 
-    it('noObservability disables observability', async () => {
-      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', noObservability: true });
+    it('enableObservability false disables observability', async () => {
+      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', enableObservability: false });
 
       const gw = getWrittenGateway();
       expect(gw.observability.enabled).toBe(false);
@@ -61,11 +61,11 @@ describe('GatewayPrimitive', () => {
       expect(gw.observability.exceptionLevel).toBe('DEBUG');
     });
 
-    it('noObservability with DEBUG combines correctly', async () => {
+    it('enableObservability false with DEBUG combines correctly', async () => {
       await primitive.add({
         name: 'test-gw',
         authorizerType: 'NONE',
-        noObservability: true,
+        enableObservability: false,
         exceptionLevel: 'DEBUG',
       });
 
@@ -80,15 +80,15 @@ describe('GatewayPrimitive', () => {
       expect(gw.observability.exceptionLevel).toBe('NONE');
     });
 
-    it('undefined noObservability defaults to enabled true', async () => {
-      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', noObservability: undefined });
+    it('undefined enableObservability defaults to enabled true', async () => {
+      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', enableObservability: undefined });
 
       const gw = getWrittenGateway();
       expect(gw.observability.enabled).toBe(true);
     });
 
-    it('noObservability false means observability enabled', async () => {
-      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', noObservability: false });
+    it('enableObservability true means observability enabled', async () => {
+      await primitive.add({ name: 'test-gw', authorizerType: 'NONE', enableObservability: true });
 
       const gw = getWrittenGateway();
       expect(gw.observability.enabled).toBe(true);
