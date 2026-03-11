@@ -202,7 +202,7 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
             />
             {authorizerItems[authorizerNav.selectedIndex]?.id === 'NONE' && (
               <Box marginTop={1}>
-                <Text color="yellow">Warning: Gateway will be publicly accessible without authorization</Text>
+                <Text color="yellow">⚠️ Warning: Gateway will be publicly accessible without authorization</Text>
               </Box>
             )}
           </Box>
@@ -245,7 +245,7 @@ export function AddGatewayScreen({ onComplete, onExit, existingGateways, unassig
                 return (
                   <Box key={item.id}>
                     <Text wrap="truncate">
-                      <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? '>' : ' '} </Text>
+                      <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? '❯' : ' '} </Text>
                       <Text color={isChecked ? 'green' : undefined}>{checkbox} </Text>
                       <Text color={isCursor ? 'cyan' : undefined}>{item.title}</Text>
                     </Text>

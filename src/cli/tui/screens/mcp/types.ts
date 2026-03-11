@@ -10,9 +10,9 @@ import type {
 } from '../../../../schema';
 import { TARGET_TYPE_AUTH_CONFIG } from '../../../../schema';
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Gateway Flow Types
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type AddGatewayStep = 'name' | 'authorizer' | 'jwt-config' | 'include-targets' | 'advanced-config' | 'confirm';
 
@@ -53,9 +53,9 @@ export const GATEWAY_STEP_LABELS: Record<AddGatewayStep, string> = {
   confirm: 'Confirm',
 };
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Gateway Target Flow Types
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type ComputeHost = 'Lambda' | 'AgentCoreRuntime';
 
@@ -87,7 +87,7 @@ export type AddGatewayTargetStep =
 export type TargetLanguage = 'Python' | 'TypeScript' | 'Other';
 
 /**
- * Wizard-internal state -- all fields optional, built incrementally as the user
+ * Wizard-internal state — all fields optional, built incrementally as the user
  * progresses through wizard steps. Not used outside the wizard/screen boundary.
  */
 export interface GatewayTargetWizardState {
@@ -114,10 +114,10 @@ export interface GatewayTargetWizardState {
   toolSchemaFile?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Discriminated union -- fully-formed configs passed downstream of the wizard.
+// ─────────────────────────────────────────────────────────────────────────────
+// Discriminated union — fully-formed configs passed downstream of the wizard.
 // Each variant has required fields for its target type.
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 export interface McpServerTargetConfig {
   targetType: 'mcpServer';
@@ -190,14 +190,14 @@ export const MCP_TOOL_STEP_LABELS: Record<AddGatewayTargetStep, string> = {
   confirm: 'Confirm',
 };
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // UI Option Constants
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const AUTHORIZER_TYPE_OPTIONS = [
   { id: 'AWS_IAM', title: 'AWS IAM', description: 'AWS Identity and Access Management authorization' },
   { id: 'CUSTOM_JWT', title: 'Custom JWT', description: 'JWT-based authorization via OIDC provider' },
-  { id: 'NONE', title: 'None', description: 'No authorization required -- gateway is publicly accessible' },
+  { id: 'NONE', title: 'None', description: 'No authorization required — gateway is publicly accessible' },
 ] as const;
 
 export const SKIP_FOR_NOW = 'skip-for-now' as const;
@@ -269,9 +269,9 @@ export const NODE_VERSION_OPTIONS = [
   { id: 'NODE_18', title: 'Node.js 18', description: '' },
 ] as const;
 
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 // Defaults
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const DEFAULT_PYTHON_VERSION: PythonRuntime = 'PYTHON_3_13';
 export const DEFAULT_NODE_VERSION: NodeRuntime = 'NODE_20';

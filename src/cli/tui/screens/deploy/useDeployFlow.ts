@@ -312,7 +312,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
         try {
           await cdkToolkitWrapper.diff();
         } catch {
-          // Diff failure is non-fatal -- deploy will proceed
+          // Diff failure is non-fatal — deploy will proceed
         } finally {
           switchableIoHost?.setVerbose(false);
           switchableIoHost?.setOnRawMessage(null);

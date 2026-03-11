@@ -20,7 +20,7 @@ export interface TransactionSearchSetupResult {
  *
  * Can be disabled via ~/.agentcore/config.json: { "disableTransactionSearch": true }
  *
- * This is a non-blocking best-effort operation -- failures do not fail the deploy.
+ * This is a non-blocking best-effort operation — failures do not fail the deploy.
  */
 export async function setupTransactionSearch(
   options: TransactionSearchSetupOptions

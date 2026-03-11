@@ -79,15 +79,15 @@ export const OutboundAuthSchema = z
 export type OutboundAuth = z.infer<typeof OutboundAuthSchema>;
 
 // ============================================================================
-// Target Type -> Auth Rules (single source of truth)
+// Target Type → Auth Rules (single source of truth)
 // ============================================================================
 
 /**
  * Outbound authentication rules per gateway target type.
  *
- * - `authRequired` -- target cannot be created without outbound auth
- * - `validAuthTypes` -- allowed OutboundAuthType values (empty = no outbound auth applicable)
- * - `iamRoleFallback` -- CDK passes GATEWAY_IAM_ROLE when no auth configured
+ * - `authRequired` — target cannot be created without outbound auth
+ * - `validAuthTypes` — allowed OutboundAuthType values (empty = no outbound auth applicable)
+ * - `iamRoleFallback` — CDK passes GATEWAY_IAM_ROLE when no auth configured
  */
 export const TARGET_TYPE_AUTH_CONFIG: Record<
   GatewayTargetType,
