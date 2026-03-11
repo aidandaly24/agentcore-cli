@@ -36,6 +36,8 @@ export interface AddGatewayOptions {
   agentClientSecret?: string;
   agents?: string;
   semanticSearch?: boolean;
+  observability?: boolean;
+  exceptionLevel?: string;
   json?: boolean;
 }
 
