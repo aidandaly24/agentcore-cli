@@ -419,9 +419,15 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     // Post-deploy: Enable CloudWatch Transaction Search (non-blocking, silent)
     const nextSteps = agentNames.length > 0 ? [...AGENT_NEXT_STEPS] : [...MEMORY_ONLY_NEXT_STEPS];
     const notes: string[] = [];
-    if (agentNames.length > 0) {
+    const hasGatewayObservability = mcpSpec?.agentCoreGateways?.some(g => g.observability?.enabled === true) ?? false;
+    if (agentNames.length > 0 || hasGatewayObservability) {
       try {
-        const tsResult = await setupTransactionSearch({ region: target.region, accountId: target.account, agentNames });
+        const tsResult = await setupTransactionSearch({
+          region: target.region,
+          accountId: target.account,
+          agentNames,
+          hasGatewayObservability,
+        });
         if (tsResult.error) {
           logger.log(`Transaction search setup warning: ${tsResult.error}`, 'warn');
         } else {

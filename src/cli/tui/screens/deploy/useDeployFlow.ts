@@ -380,12 +380,21 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
           const agentNames = context?.projectSpec.agents?.map((a: { name: string }) => a.name) ?? [];
           const targetRegion = context?.awsTargets[0]?.region;
           const targetAccount = context?.awsTargets[0]?.account;
-          if (agentNames.length > 0 && targetRegion && targetAccount) {
+          let hasGatewayObservability = false;
+          try {
+            const tsConfigIO = new ConfigIO();
+            const mcpSpec = await tsConfigIO.readMcpSpec();
+            hasGatewayObservability = mcpSpec?.agentCoreGateways?.some(g => g.observability?.enabled === true) ?? false;
+          } catch {
+            // No mcp.json or invalid — no gateway observability
+          }
+          if ((agentNames.length > 0 || hasGatewayObservability) && targetRegion && targetAccount) {
             try {
               const tsResult = await setupTransactionSearch({
                 region: targetRegion,
                 accountId: targetAccount,
                 agentNames,
+                hasGatewayObservability,
               });
               if (tsResult.error) {
                 logger.log(`Transaction search setup warning: ${tsResult.error}`, 'warn');
