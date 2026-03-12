@@ -30,7 +30,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "agentcore": "dist/cli/index.mjs"
+    "agentcore": "dist/cli/index.mjs",
+    "agent-tui-harness": "dist/mcp-harness/index.mjs"
   },
   "exports": {
     ".": {
@@ -64,7 +65,8 @@
     "test:integ": "vitest run --project integ",
     "test:unit": "vitest run --project unit --coverage",
     "test:e2e": "vitest run --project e2e",
-    "test:update-snapshots": "vitest run --project unit --update"
+    "test:update-snapshots": "vitest run --project unit --update",
+    "test:tui": "npm run build && vitest run --project tui"
   },
   "dependencies": {
     "@aws-cdk/toolkit-lib": "^1.16.0",
@@ -96,6 +98,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@secretlint/secretlint-rule-preset-recommend": "^11.3.0",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/node": "^25.0.3",
@@ -103,6 +106,7 @@
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "@vitest/coverage-v8": "^4.0.18",
+    "@xterm/headless": "^6.0.0",
     "aws-cdk-lib": "^2.240.0",
     "constructs": "^10.4.4",
     "esbuild": "^0.27.2",
@@ -117,12 +121,16 @@
     "husky": "^9.1.7",
     "ink-testing-library": "^4.0.0",
     "lint-staged": "^16.2.7",
+    "node-pty": "^1.1.0",
     "prettier": "^3.7.4",
     "secretlint": "^11.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5",
     "typescript-eslint": "^8.50.1",
     "vitest": "^4.0.18"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
   },
   "overridesComments": {
     "minimatch": "GHSA-7r86-cg39-jmmj, GHSA-23c5-xmqv-rm74: minimatch 10.0.0-10.2.2 has ReDoS vulnerabilities. Multiple transitive deps (eslint, typescript-eslint, eslint-plugin-import, eslint-plugin-react, prettier-plugin-sort-imports, aws-cdk-lib) pin older versions. Remove this override once upstream packages update their minimatch dependency to >=10.2.3.",

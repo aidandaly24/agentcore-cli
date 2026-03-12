@@ -60,3 +60,37 @@ await esbuild.build({
 fs.chmodSync('./dist/cli/index.mjs', '755');
 
 console.log('CLI build complete: dist/cli/index.mjs');
+
+// MCP harness build — only run if the entry point source exists.
+// The source file is created separately; skip gracefully until then.
+const mcpEntryPoint = './src/mcp-harness/index.ts';
+
+if (fs.existsSync(mcpEntryPoint)) {
+  await esbuild.build({
+    entryPoints: [mcpEntryPoint],
+    outfile: './dist/mcp-harness/index.mjs',
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    minify: true,
+    banner: {
+      js: [
+        '#!/usr/bin/env node',
+        `import { createRequire } from 'module'; const require = createRequire(import.meta.url);`,
+      ].join('\n'),
+    },
+    // node-pty is a native C++ addon and cannot be bundled.
+    // @xterm/headless is CJS-only (no ESM exports map) — esbuild's CJS-to-ESM
+    // conversion mangles its default export at runtime, so let Node handle it.
+    // fsevents is macOS-only optional native module.
+    external: ['fsevents', 'node-pty', '@xterm/headless'],
+    plugins: [textLoaderPlugin],
+  });
+
+  // Make executable
+  fs.chmodSync('./dist/mcp-harness/index.mjs', '755');
+
+  console.log('MCP harness build complete: dist/mcp-harness/index.mjs');
+} else {
+  console.log(`MCP harness build skipped: entry point ${mcpEntryPoint} does not exist yet`);
+}
