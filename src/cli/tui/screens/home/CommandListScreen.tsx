@@ -1,4 +1,5 @@
 import { buildLogo, useLayout } from '../../context';
+import { HELP_EXAMPLES } from '../../copy';
 import type { CommandMeta } from '../../utils/commands';
 import { Box, Text, useApp } from 'ink';
 import React, { useEffect } from 'react';
@@ -55,6 +56,22 @@ export function CommandListScreen({ commands }: CommandListScreenProps) {
           </Box>
         );
       })}
+      <Text> </Text>
+      <Text bold color="yellow">
+        Examples:
+      </Text>
+      {HELP_EXAMPLES.map(example => (
+        <Box key={example.command} flexDirection="column">
+          <Box>
+            <Text> $ </Text>
+            <Text color="green">{example.command}</Text>
+          </Box>
+          <Box>
+            <Text>   </Text>
+            <Text dimColor>{example.description}</Text>
+          </Box>
+        </Box>
+      ))}
       <Text> </Text>
       <Text dimColor>Run agentcore [command] --help for command-specific help</Text>
       <Text dimColor>Run agentcore (no args) for interactive mode</Text>
