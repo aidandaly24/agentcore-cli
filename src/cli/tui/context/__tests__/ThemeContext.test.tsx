@@ -1,9 +1,10 @@
-import { DARK_PALETTE, LIGHT_PALETTE, detectSystemColorScheme, getColorPalette, resolveThemeMode } from '../../theme.js';
-import { ThemeProvider, useTheme } from '../ThemeContext.js';
 import { Text } from 'ink';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { DARK_PALETTE, LIGHT_PALETTE, detectSystemColorScheme, getColorPalette, resolveThemeMode } from '../../theme.js';
+import { ThemeProvider, useTheme } from '../ThemeContext.js';
 
 // Test component that displays theme information
 function ThemeDisplay() {
