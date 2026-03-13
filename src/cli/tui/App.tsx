@@ -1,6 +1,6 @@
 import { getWorkingDirectory } from '../../lib';
 import { createProgram } from '../cli';
-import { LayoutProvider } from './context';
+import { LayoutProvider, ThemeProvider } from './context';
 import { MissingProjectMessage, WrongDirectoryMessage, getProjectRootMismatch, projectExists } from './guards';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { AddFlow } from './screens/add/AddFlow';
@@ -196,8 +196,10 @@ function AppContent() {
 
 export function App() {
   return (
-    <LayoutProvider>
-      <AppContent />
-    </LayoutProvider>
+    <ThemeProvider>
+      <LayoutProvider>
+        <AppContent />
+      </LayoutProvider>
+    </ThemeProvider>
   );
 }
