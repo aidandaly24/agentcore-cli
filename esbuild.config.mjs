@@ -63,7 +63,7 @@ console.log('CLI build complete: dist/cli/index.mjs');
 
 // MCP harness build — only run if the entry point source exists.
 // The source file is created separately; skip gracefully until then.
-const mcpEntryPoint = './src/mcp-harness/index.ts';
+const mcpEntryPoint = './src/tui-harness/mcp/index.ts';
 
 if (fs.existsSync(mcpEntryPoint)) {
   await esbuild.build({

@@ -16,8 +16,8 @@
  * McpServer.registerTool(). This module owns the runtime dispatch logic that
  * maps tool calls to TuiSession methods.
  */
-import { LaunchError, TuiSession, WaitForTimeoutError, closeAll } from '../test-utils/tui-harness/index.js';
-import type { SpecialKey } from '../test-utils/tui-harness/index.js';
+import { LaunchError, TuiSession, WaitForTimeoutError, closeAll } from '../index.js';
+import type { SpecialKey } from '../index.js';
 import { LAUNCH_DEFAULTS, SPECIAL_KEY_ENUM, TOOL_NAMES } from './tools.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';

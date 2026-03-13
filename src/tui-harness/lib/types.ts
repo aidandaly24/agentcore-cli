@@ -102,46 +102,58 @@ export interface SessionInfo {
 // ---------------------------------------------------------------------------
 
 /**
+ * All special key names recognized by the TUI harness, as a compile-time
+ * constant array. This is the single source of truth for the key list.
+ *
+ * The {@link SpecialKey} type is derived from this array, and `key-map.ts`
+ * uses `satisfies Record<SpecialKey, string>` to guarantee exhaustive
+ * coverage at compile time.
+ */
+export const SPECIAL_KEY_VALUES = [
+  'enter',
+  'tab',
+  'escape',
+  'backspace',
+  'delete',
+  'space',
+  'up',
+  'down',
+  'left',
+  'right',
+  'home',
+  'end',
+  'pageup',
+  'pagedown',
+  'ctrl+c',
+  'ctrl+d',
+  'ctrl+q',
+  'ctrl+g',
+  'ctrl+a',
+  'ctrl+e',
+  'ctrl+w',
+  'ctrl+u',
+  'ctrl+k',
+  'f1',
+  'f2',
+  'f3',
+  'f4',
+  'f5',
+  'f6',
+  'f7',
+  'f8',
+  'f9',
+  'f10',
+  'f11',
+  'f12',
+] as const;
+
+/**
  * Union of all special key names recognized by the harness input methods.
  *
- * Includes navigation keys, modifier combos (ctrl+key), and function keys.
+ * Derived from {@link SPECIAL_KEY_VALUES} so the array and the type are
+ * always in sync.
  */
-export type SpecialKey =
-  | 'enter'
-  | 'tab'
-  | 'escape'
-  | 'backspace'
-  | 'delete'
-  | 'space'
-  | 'up'
-  | 'down'
-  | 'left'
-  | 'right'
-  | 'home'
-  | 'end'
-  | 'pageup'
-  | 'pagedown'
-  | 'ctrl+c'
-  | 'ctrl+d'
-  | 'ctrl+q'
-  | 'ctrl+g'
-  | 'ctrl+a'
-  | 'ctrl+e'
-  | 'ctrl+w'
-  | 'ctrl+u'
-  | 'ctrl+k'
-  | 'f1'
-  | 'f2'
-  | 'f3'
-  | 'f4'
-  | 'f5'
-  | 'f6'
-  | 'f7'
-  | 'f8'
-  | 'f9'
-  | 'f10'
-  | 'f11'
-  | 'f12';
+export type SpecialKey = (typeof SPECIAL_KEY_VALUES)[number];
 
 // ---------------------------------------------------------------------------
 // Error Classes

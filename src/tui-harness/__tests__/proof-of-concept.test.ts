@@ -42,7 +42,7 @@
  * not standalone executables and will cause "posix_spawnp failed". Use full
  * paths like `/bin/echo` instead.
  */
-import { createMinimalProjectDir } from '../../../../integ-tests/tui/helpers.js';
+import { createMinimalProjectDir } from '../helpers.js';
 import xtermHeadless from '@xterm/headless';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
