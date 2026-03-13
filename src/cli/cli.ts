@@ -95,7 +95,7 @@ export function createProgram(): Command {
   program
     .name('agentcore')
     .description(COMMAND_DESCRIPTIONS.program)
-    .version(PACKAGE_VERSION)
+    .version(PACKAGE_VERSION, '-V, --version', 'Output the current version')
     .showHelpAfterError()
     .showSuggestionAfterError();
 
