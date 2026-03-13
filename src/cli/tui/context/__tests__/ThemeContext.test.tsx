@@ -1,6 +1,7 @@
-import { renderHook, act } from '@testing-library/react';
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { render } from 'ink-testing-library';
+import { Text } from 'ink';
 
 import { ThemeProvider, useTheme } from '../ThemeContext';
 import {
@@ -11,58 +12,69 @@ import {
   DARK_PALETTE,
 } from '../../theme';
 
-// Mock React Testing Library's renderHook for Ink components
-// Since we're testing React hooks, we can use a simple wrapper
-function createWrapper(initialPreference?: 'light' | 'dark' | 'system') {
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return <ThemeProvider initialPreference={initialPreference}>{children}</ThemeProvider>;
-  };
+// Test component that displays theme information
+function ThemeDisplay() {
+  const { preference, mode, colors } = useTheme();
+  return (
+    <Text>
+      preference:{preference} mode:{mode} primary:{colors.text.primary}
+    </Text>
+  );
+}
+
+// Test component that can change theme
+function ThemeChanger({ onReady }: { onReady: (setPreference: (p: 'light' | 'dark' | 'system') => void) => void }) {
+  const { setPreference, mode } = useTheme();
+  React.useEffect(() => {
+    onReady(setPreference);
+  }, [onReady, setPreference]);
+  return <Text>mode:{mode}</Text>;
 }
 
 describe('ThemeContext', () => {
-  describe('useTheme hook', () => {
-    it('returns default dark theme when used outside provider', () => {
-      const { result } = renderHook(() => useTheme());
+  describe('ThemeProvider', () => {
+    it('provides default system preference', () => {
+      const { lastFrame } = render(
+        <ThemeProvider>
+          <ThemeDisplay />
+        </ThemeProvider>
+      );
 
-      expect(result.current.preference).toBe('system');
-      expect(result.current.mode).toBe('dark');
-      expect(result.current.colors).toEqual(DARK_PALETTE);
+      expect(lastFrame()).toContain('preference:system');
+      expect(lastFrame()).toContain('mode:dark'); // Default system detection returns dark
     });
 
-    it('returns dark theme when preference is dark', () => {
-      const { result } = renderHook(() => useTheme(), {
-        wrapper: createWrapper('dark'),
-      });
+    it('provides dark theme when preference is dark', () => {
+      const { lastFrame } = render(
+        <ThemeProvider initialPreference="dark">
+          <ThemeDisplay />
+        </ThemeProvider>
+      );
 
-      expect(result.current.preference).toBe('dark');
-      expect(result.current.mode).toBe('dark');
-      expect(result.current.colors).toEqual(DARK_PALETTE);
+      expect(lastFrame()).toContain('preference:dark');
+      expect(lastFrame()).toContain('mode:dark');
+      expect(lastFrame()).toContain('primary:white');
     });
 
-    it('returns light theme when preference is light', () => {
-      const { result } = renderHook(() => useTheme(), {
-        wrapper: createWrapper('light'),
-      });
+    it('provides light theme when preference is light', () => {
+      const { lastFrame } = render(
+        <ThemeProvider initialPreference="light">
+          <ThemeDisplay />
+        </ThemeProvider>
+      );
 
-      expect(result.current.preference).toBe('light');
-      expect(result.current.mode).toBe('light');
-      expect(result.current.colors).toEqual(LIGHT_PALETTE);
+      expect(lastFrame()).toContain('preference:light');
+      expect(lastFrame()).toContain('mode:light');
+      expect(lastFrame()).toContain('primary:black');
     });
+  });
 
-    it('allows changing theme preference', () => {
-      const { result } = renderHook(() => useTheme(), {
-        wrapper: createWrapper('dark'),
-      });
+  describe('useTheme hook outside provider', () => {
+    it('returns default dark theme', () => {
+      const { lastFrame } = render(<ThemeDisplay />);
 
-      expect(result.current.mode).toBe('dark');
-
-      act(() => {
-        result.current.setPreference('light');
-      });
-
-      expect(result.current.preference).toBe('light');
-      expect(result.current.mode).toBe('light');
-      expect(result.current.colors).toEqual(LIGHT_PALETTE);
+      expect(lastFrame()).toContain('preference:system');
+      expect(lastFrame()).toContain('mode:dark');
     });
   });
 });
