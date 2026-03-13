@@ -1,3 +1,5 @@
+import React, { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+
 import {
   type ColorPalette,
   type ThemeMode,
@@ -5,7 +7,6 @@ import {
   getColorPalette,
   resolveThemeMode,
 } from '../theme.js';
-import React, { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 /**
  * Theme context value interface.
@@ -57,6 +58,7 @@ const ThemeContext = createContext<ThemeContextValue>(defaultThemeContext);
  * }
  * ```
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme(): ThemeContextValue {
   return useContext(ThemeContext);
 }
