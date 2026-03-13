@@ -190,3 +190,23 @@ describe('mapGenerateConfigToRenderConfig', () => {
     expect(result.memoryProviders[0]!.strategies).toEqual(['SEMANTIC', 'USER_PREFERENCE', 'SUMMARIZATION']);
   });
 });
+
+describe('gateway credential provider name mapping', () => {
+  it('uses the correct credential name suffix (-oauth) matching GatewayPrimitive creation', async () => {
+    // Regression test: credential is created as `${gatewayName}-oauth` by GatewayPrimitive,
+    // so the lookup in mapGatewaysToGatewayProviders must use the same suffix.
+    // Previously used '-agent-oauth' which caused provider_name="" in generated code.
+    //
+    // We verify this by checking the source code directly since ConfigIO requires
+    // a full build environment to import.
+
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const schemaMapperPath = path.resolve(import.meta.dirname ?? __dirname, '../schema-mapper.ts');
+    const source = fs.readFileSync(schemaMapperPath, 'utf-8');
+
+    // The credential lookup must use `${gateway.name}-oauth` (not `-agent-oauth`)
+    expect(source).toContain('`${gateway.name}-oauth`');
+    expect(source).not.toContain('-agent-oauth');
+  });
+});

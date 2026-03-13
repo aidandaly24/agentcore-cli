@@ -199,7 +199,7 @@ async function mapGatewaysToGatewayProviders(): Promise<GatewayProviderRenderCon
 
       if (gateway.authorizerType === 'CUSTOM_JWT' && gateway.authorizerConfiguration?.customJwtAuthorizer) {
         const jwtConfig = gateway.authorizerConfiguration.customJwtAuthorizer;
-        const credName = `${gateway.name}-agent-oauth`;
+        const credName = `${gateway.name}-oauth`;
         const credential = project.credentials.find(c => c.name === credName);
 
         if (credential) {
