@@ -1,3 +1,4 @@
+import { computeManagedOAuthCredentialName } from '../../../../primitives/credential-utils.js';
 import type { GenerateConfig } from '../../../../tui/screens/generate/types.js';
 import {
   mapGenerateConfigToAgent,
@@ -192,21 +193,11 @@ describe('mapGenerateConfigToRenderConfig', () => {
 });
 
 describe('gateway credential provider name mapping', () => {
-  it('uses the correct credential name suffix (-oauth) matching GatewayPrimitive creation', async () => {
-    // Regression test: credential is created as `${gatewayName}-oauth` by GatewayPrimitive,
-    // so the lookup in mapGatewaysToGatewayProviders must use the same suffix.
-    // Previously used '-agent-oauth' which caused provider_name="" in generated code.
-    //
-    // We verify this by checking the source code directly since ConfigIO requires
-    // a full build environment to import.
-
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const schemaMapperPath = path.resolve(import.meta.dirname ?? __dirname, '../schema-mapper.ts');
-    const source = fs.readFileSync(schemaMapperPath, 'utf-8');
-
-    // The credential lookup must use `${gateway.name}-oauth` (not `-agent-oauth`)
-    expect(source).toContain('`${gateway.name}-oauth`');
-    expect(source).not.toContain('-agent-oauth');
+  it('computeManagedOAuthCredentialName produces the correct suffix', () => {
+    // Regression test: the managed credential name must use '-oauth' suffix.
+    // GatewayPrimitive creates it, schema-mapper looks it up, AddGatewayScreen displays it.
+    // All three now use computeManagedOAuthCredentialName to stay in sync.
+    expect(computeManagedOAuthCredentialName('my-gateway')).toBe('my-gateway-oauth');
+    expect(computeManagedOAuthCredentialName('test')).toBe('test-oauth');
   });
 });
