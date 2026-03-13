@@ -14,6 +14,42 @@ AgentCore projects use JSON configuration files in the `agentcore/` directory.
 
 ---
 
+## Environment Variables
+
+### CLI Theme Configuration
+
+The CLI supports both light and dark mode themes. By default, the CLI attempts to detect your system's color scheme
+preference.
+
+| Variable          | Values                    | Description                                |
+| ----------------- | ------------------------- | ------------------------------------------ |
+| `AGENTCORE_THEME` | `light`, `dark`, `system` | Set the CLI color theme (default: `system`) |
+
+**Examples:**
+
+```bash
+# Force dark mode
+export AGENTCORE_THEME=dark
+
+# Force light mode
+export AGENTCORE_THEME=light
+
+# Auto-detect from system (default)
+export AGENTCORE_THEME=system
+```
+
+**System Detection:**
+
+When `AGENTCORE_THEME` is set to `system` (or not set), the CLI attempts to detect your terminal's color scheme using:
+
+- `COLORFGBG` environment variable (common in many terminals)
+- `APPLE_INTERFACE_STYLE` on macOS
+- `TERMINAL_LIGHT_MODE` custom indicator
+
+If no indicators are found, the CLI defaults to dark mode (most common for terminal users).
+
+---
+
 ## agentcore.json
 
 Main project configuration using a **flat resource model**. Agents, memories, and credentials are top-level arrays.
