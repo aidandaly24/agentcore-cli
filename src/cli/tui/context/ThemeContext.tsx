@@ -1,12 +1,11 @@
-import React, { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-
 import {
   type ColorPalette,
   type ThemeMode,
   type ThemePreference,
   getColorPalette,
   resolveThemeMode,
-} from '../theme';
+} from '../theme.js';
+import React, { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 /**
  * Theme context value interface.
