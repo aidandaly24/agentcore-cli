@@ -108,6 +108,7 @@ export function mapModelProviderToCredentials(modelProvider: ModelProvider, proj
  */
 export function mapGenerateConfigToAgent(config: GenerateConfig): AgentEnvSpec {
   const codeLocation = `${APP_DIR}/${config.projectName}/`;
+  const networkMode = config.networkMode ?? DEFAULT_NETWORK_MODE;
 
   return {
     type: 'AgentCoreRuntime',
@@ -116,7 +117,15 @@ export function mapGenerateConfigToAgent(config: GenerateConfig): AgentEnvSpec {
     entrypoint: DEFAULT_PYTHON_ENTRYPOINT as FilePath,
     codeLocation: codeLocation as DirectoryPath,
     runtimeVersion: DEFAULT_PYTHON_VERSION,
-    networkMode: DEFAULT_NETWORK_MODE,
+    networkMode,
+    ...(networkMode === 'VPC' &&
+      config.subnets &&
+      config.securityGroups && {
+        networkConfig: {
+          subnets: config.subnets,
+          securityGroups: config.securityGroups,
+        },
+      }),
     modelProvider: config.modelProvider,
   };
 }
@@ -242,6 +251,7 @@ export async function mapGenerateConfigToRenderConfig(
     hasMemory: config.memory !== 'none',
     hasIdentity: identityProviders.length > 0,
     hasGateway: gatewayProviders.length > 0,
+    isVpc: config.networkMode === 'VPC',
     buildType: config.buildType,
     memoryProviders: mapMemoryOptionToMemoryProviders(config.memory, config.projectName),
     identityProviders,
