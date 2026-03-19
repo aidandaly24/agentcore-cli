@@ -99,50 +99,44 @@ describe('exit-codes', () => {
 
     describe('commander invalid argument errors → EXIT_INVALID_ARGS (2)', () => {
       it('returns 2 for commander.invalidArgument code', () => {
-        const err = new Error('invalid argument');
-        (err as Record<string, unknown>).code = 'commander.invalidArgument';
+        const err = Object.assign(new Error('invalid argument'), { code: 'commander.invalidArgument' });
         expect(getExitCode(err)).toBe(ExitCode.INVALID_ARGS);
       });
 
       it('returns 2 for commander.missingArgument code', () => {
-        const err = new Error('missing argument');
-        (err as Record<string, unknown>).code = 'commander.missingArgument';
+        const err = Object.assign(new Error('missing argument'), { code: 'commander.missingArgument' });
         expect(getExitCode(err)).toBe(ExitCode.INVALID_ARGS);
       });
 
       it('returns 2 for commander.missingMandatoryOptionValue code', () => {
-        const err = new Error('missing option value');
-        (err as Record<string, unknown>).code = 'commander.missingMandatoryOptionValue';
+        const err = Object.assign(new Error('missing option value'), {
+          code: 'commander.missingMandatoryOptionValue',
+        });
         expect(getExitCode(err)).toBe(ExitCode.INVALID_ARGS);
       });
 
       it('returns 2 for commander.optionMissingArgument code', () => {
-        const err = new Error('option missing argument');
-        (err as Record<string, unknown>).code = 'commander.optionMissingArgument';
+        const err = Object.assign(new Error('option missing argument'), {
+          code: 'commander.optionMissingArgument',
+        });
         expect(getExitCode(err)).toBe(ExitCode.INVALID_ARGS);
       });
     });
 
     describe('deploy failed errors → EXIT_DEPLOY_FAILED (6)', () => {
       it('returns 6 for stack in progress errors', () => {
-        const states = [
-          'UPDATE_IN_PROGRESS',
-          'CREATE_IN_PROGRESS',
-          'DELETE_IN_PROGRESS',
-          'ROLLBACK_IN_PROGRESS',
-        ];
+        const states = ['UPDATE_IN_PROGRESS', 'CREATE_IN_PROGRESS', 'DELETE_IN_PROGRESS', 'ROLLBACK_IN_PROGRESS'];
         for (const state of states) {
-          expect(
-            getExitCode(new Error(`Stack is in ${state} state`)),
-            `Should return 6 for state: ${state}`
-          ).toBe(ExitCode.DEPLOY_FAILED);
+          expect(getExitCode(new Error(`Stack is in ${state} state`)), `Should return 6 for state: ${state}`).toBe(
+            ExitCode.DEPLOY_FAILED
+          );
         }
       });
 
       it('returns 6 for stack cannot be updated errors', () => {
-        expect(
-          getExitCode(new Error('Stack is in UPDATE_ROLLBACK_IN_PROGRESS state and cannot be updated'))
-        ).toBe(ExitCode.DEPLOY_FAILED);
+        expect(getExitCode(new Error('Stack is in UPDATE_ROLLBACK_IN_PROGRESS state and cannot be updated'))).toBe(
+          ExitCode.DEPLOY_FAILED
+        );
       });
 
       it('returns 6 for stack currently being updated', () => {
@@ -152,9 +146,7 @@ describe('exit-codes', () => {
       it('returns 6 for changeset in progress errors', () => {
         expect(
           getExitCode(
-            new Error(
-              'InvalidChangeSetStatusException: An operation on this ChangeSet is currently in progress.'
-            )
+            new Error('InvalidChangeSetStatusException: An operation on this ChangeSet is currently in progress.')
           )
         ).toBe(ExitCode.DEPLOY_FAILED);
       });
@@ -206,19 +198,16 @@ describe('exit-codes', () => {
 
     describe('priority ordering', () => {
       it('access denied takes priority over message-based matching', () => {
-        // An error that could match both access denied and agent not found
         const err = { name: 'AccessDeniedException', message: 'Agent not found' };
         expect(getExitCode(err)).toBe(ExitCode.ACCESS_DENIED);
       });
 
       it('expired token takes priority over agent not found message matching', () => {
-        // An error that could match both expired token and agent not found
         const err = { name: 'ExpiredToken', message: 'Agent not found' };
         expect(getExitCode(err)).toBe(ExitCode.AUTH_EXPIRED);
       });
 
       it('access denied takes priority over expired token', () => {
-        // AccessDenied should NOT be classified as expired token
         expect(getExitCode({ name: 'AccessDeniedException' })).toBe(ExitCode.ACCESS_DENIED);
         expect(getExitCode({ name: 'AccessDenied' })).toBe(ExitCode.ACCESS_DENIED);
       });
