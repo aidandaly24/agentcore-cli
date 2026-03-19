@@ -93,7 +93,7 @@ function isCommanderInvalidArgError(err: unknown): boolean {
     return false;
   }
 
-  const error = err as { code?: string; exitCode?: number; constructor?: { name?: string } };
+  const error = err as { code?: string; exitCode?: number };
 
   // Commander.js sets code property for specific error types
   if (
@@ -106,9 +106,10 @@ function isCommanderInvalidArgError(err: unknown): boolean {
   }
 
   // Commander.js sets exitCode to 2 for argument validation errors
+  // combined with a Commander-specific constructor name
   if (error.exitCode === 2) {
-    const constructorName = error.constructor?.name;
-    if (constructorName === 'CommanderError' || constructorName === 'InvalidArgumentError') {
+    const ctorName = (err as { constructor?: { name?: string } }).constructor?.name;
+    if (ctorName === 'CommanderError' || ctorName === 'InvalidArgumentError') {
       return true;
     }
   }
