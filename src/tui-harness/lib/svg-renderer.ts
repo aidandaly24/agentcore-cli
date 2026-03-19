@@ -423,11 +423,12 @@ export function renderTerminalToSvg(terminal: Terminal, options?: SvgRenderOptio
     if (!hasVisibleText) continue;
 
     const textY = y + textBaseline;
-    svgParts.push(`<text y="${textY}" class="fg">`);
+    const tspanParts: string[] = [];
 
     for (const span of spans) {
       const x = span.startCol * charWidth;
-      const attrs: string[] = [`x="${x}"`];
+      const spanWidth = span.colWidth * charWidth;
+      const attrs: string[] = [`x="${x}"`, `textLength="${spanWidth}"`, 'lengthAdjust="spacing"'];
 
       if (span.style.fg !== null) {
         attrs.push(`fill="${span.style.fg}"`);
@@ -443,10 +444,12 @@ export function renderTerminalToSvg(terminal: Terminal, options?: SvgRenderOptio
         attrs.push(`class="${classes.join(' ')}"`);
       }
 
-      svgParts.push(`<tspan ${attrs.join(' ')}>${escapeXml(span.text)}</tspan>`);
+      tspanParts.push(`<tspan ${attrs.join(' ')}>${escapeXml(span.text)}</tspan>`);
     }
 
-    svgParts.push('</text>');
+    // Concatenate tspans inline — newlines between tspans would render as
+    // visible line breaks under white-space:pre / xml:space="preserve".
+    svgParts.push(`<text y="${textY}" xml:space="preserve" class="fg">${tspanParts.join('')}</text>`);
   }
 
   svgParts.push('</g>');

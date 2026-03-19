@@ -108,4 +108,21 @@ describe('SVG renderer', () => {
 
     expect(svg).toContain('My Terminal');
   });
+
+  it('preserves whitespace and uses textLength for precise character positioning', async () => {
+    terminal = new Terminal({ cols: 80, rows: 24, allowProposedApi: true });
+    terminal.write('test');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const svg = renderTerminalToSvg(terminal);
+
+    // Both CSS white-space:pre and xml:space="preserve" prevent whitespace collapse
+    expect(svg).toContain('white-space: pre');
+    expect(svg).toContain('xml:space="preserve"');
+    // Must use textLength + lengthAdjust for font-independent character grid alignment
+    expect(svg).toContain('textLength=');
+    expect(svg).toContain('lengthAdjust="spacing"');
+    // Tspans must be inline within <text> — no newlines that white-space:pre would render
+    expect(svg).not.toMatch(/<text[^>]*>\n/);
+  });
 });
