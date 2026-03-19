@@ -93,35 +93,27 @@ function isCommanderInvalidArgError(err: unknown): boolean {
     return false;
   }
 
-  const error = err as Record<string, unknown>;
+  const code = (err as { code?: string }).code;
 
   // Commander.js sets code property for specific error types
   if (
-    error.code === 'commander.invalidArgument' ||
-    error.code === 'commander.missingArgument' ||
-    error.code === 'commander.missingMandatoryOptionValue' ||
-    error.code === 'commander.optionMissingArgument'
+    code === 'commander.invalidArgument' ||
+    code === 'commander.missingArgument' ||
+    code === 'commander.missingMandatoryOptionValue' ||
+    code === 'commander.optionMissingArgument'
   ) {
     return true;
   }
 
   // Commander.js sets exitCode to 2 for argument validation errors
-  if (error.exitCode === 2 && isCommanderError(error)) {
-    return true;
+  const exitCode = (err as { exitCode?: number }).exitCode;
+  if (exitCode === 2) {
+    const constructorName = err.constructor?.name;
+    if (constructorName === 'CommanderError' || constructorName === 'InvalidArgumentError') {
+      return true;
+    }
   }
 
-  return false;
-}
-
-/**
- * Checks if an error originates from Commander.js by inspecting the
- * constructor name. This avoids importing Commander directly.
- */
-function isCommanderError(err: Record<string, unknown>): boolean {
-  if (err.constructor && typeof err.constructor === 'function') {
-    const name = err.constructor.name;
-    return name === 'CommanderError' || name === 'InvalidArgumentError';
-  }
   return false;
 }
 
