@@ -43,3 +43,12 @@ export const COMMAND_DESCRIPTIONS = {
   update: 'Check for and install CLI updates',
   validate: 'Validate agentcore/ config files.',
 } as const;
+
+/**
+ * Example commands shown in --help output.
+ */
+export const HELP_EXAMPLES = [
+  { command: 'agentcore create', description: 'Create a new project with guided setup' },
+  { command: 'agentcore dev', description: 'Start local development server' },
+  { command: 'agentcore deploy --target default', description: 'Deploy to AWS using default target' },
+] as const;
