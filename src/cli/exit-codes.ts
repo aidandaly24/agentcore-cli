@@ -93,22 +93,21 @@ function isCommanderInvalidArgError(err: unknown): boolean {
     return false;
   }
 
-  const code = (err as { code?: string }).code;
+  const error = err as { code?: string; exitCode?: number; constructor?: { name?: string } };
 
   // Commander.js sets code property for specific error types
   if (
-    code === 'commander.invalidArgument' ||
-    code === 'commander.missingArgument' ||
-    code === 'commander.missingMandatoryOptionValue' ||
-    code === 'commander.optionMissingArgument'
+    error.code === 'commander.invalidArgument' ||
+    error.code === 'commander.missingArgument' ||
+    error.code === 'commander.missingMandatoryOptionValue' ||
+    error.code === 'commander.optionMissingArgument'
   ) {
     return true;
   }
 
   // Commander.js sets exitCode to 2 for argument validation errors
-  const exitCode = (err as { exitCode?: number }).exitCode;
-  if (exitCode === 2) {
-    const constructorName = err.constructor?.name;
+  if (error.exitCode === 2) {
+    const constructorName = error.constructor?.name;
     if (constructorName === 'CommanderError' || constructorName === 'InvalidArgumentError') {
       return true;
     }
