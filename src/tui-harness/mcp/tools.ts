@@ -41,6 +41,7 @@ export const TOOL_NAMES = {
   SCREENSHOT: 'tui_screenshot',
   CLOSE: 'tui_close',
   LIST_SESSIONS: 'tui_list_sessions',
+  ACTION: 'tui_action',
 } as const;
 
 // ---------------------------------------------------------------------------

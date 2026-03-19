@@ -1,11 +1,12 @@
 /**
  * MCP server for the TUI harness.
  *
- * Creates and configures an MCP Server instance that exposes seven tools for
+ * Creates and configures an MCP Server instance that exposes eight tools for
  * interacting with TUI applications through headless pseudo-terminals:
  *
  *   tui_launch        - Spawn a TUI process in a PTY
  *   tui_send_keys     - Send keystrokes (text or special keys)
+ *   tui_action        - Composite: send keys, wait for pattern, read screen
  *   tui_read_screen   - Read the current terminal screen
  *   tui_wait_for      - Wait for a pattern to appear on screen
  *   tui_screenshot    - Capture a bordered, numbered screenshot (text or SVG)
@@ -153,20 +154,122 @@ async function handleSendKeys(args: { sessionId: string; keys?: string; specialK
   if (!keys && !specialKey) {
     return errorResponse('Either keys or specialKey must be provided.');
   }
+  if (keys && specialKey) {
+    return errorResponse('Provide either keys or specialKey, not both.');
+  }
 
   try {
-    let screen;
+    let result;
     if (keys !== undefined) {
-      screen = await session.sendKeys(keys, waitMs);
+      result = await session.sendKeys(keys, waitMs);
+    } else {
+      result = await session.sendSpecialKey(specialKey!, waitMs);
     }
-    if (specialKey !== undefined) {
-      screen = await session.sendSpecialKey(specialKey, waitMs);
-    }
-    return jsonResponse({ screen });
+    return jsonResponse({ screen: result.screen, settled: result.settled });
   } catch (err) {
     return errorResponse(
       `Failed to send keys to session ${sessionId}: ${err instanceof Error ? err.message : String(err)}`
     );
+  }
+}
+
+/**
+ * Handle the `tui_action` tool call.
+ *
+ * Composite tool that combines send keys, wait for pattern, and read screen
+ * in a single round-trip. At least one of keys, specialKey, or pattern must
+ * be provided.
+ */
+async function handleAction(args: {
+  sessionId: string;
+  keys?: string;
+  specialKey?: SpecialKey;
+  waitMs?: number;
+  pattern?: string;
+  timeoutMs?: number;
+  isRegex?: boolean;
+  numbered?: boolean;
+  includeScrollback?: boolean;
+}) {
+  const { sessionId } = args;
+  const session = getSession(sessionId);
+  if (!session) {
+    return errorResponse(`Session not found: ${sessionId}`);
+  }
+
+  const { keys, specialKey, waitMs, pattern, timeoutMs, isRegex, numbered, includeScrollback } = args;
+
+  // Must provide at least one actionable parameter.
+  if (!keys && !specialKey && !pattern) {
+    return errorResponse('At least one of keys, specialKey, or pattern must be provided.');
+  }
+
+  // keys and specialKey are mutually exclusive.
+  if (keys && specialKey) {
+    return errorResponse('Provide either keys or specialKey, not both.');
+  }
+
+  try {
+    let settled: boolean | undefined;
+
+    // Step 1: Send keys (if provided).
+    if (keys !== undefined) {
+      const result = await session.sendKeys(keys, waitMs);
+      settled = result.settled;
+    } else if (specialKey !== undefined) {
+      const result = await session.sendSpecialKey(specialKey, waitMs);
+      settled = result.settled;
+    }
+
+    // Step 2: Wait for pattern (if provided).
+    let found: boolean | undefined;
+    let elapsed: number | undefined;
+
+    if (pattern !== undefined) {
+      let resolvedPattern: string | RegExp;
+      if (isRegex) {
+        try {
+          resolvedPattern = new RegExp(pattern);
+        } catch (err) {
+          return errorResponse(
+            `Invalid regex pattern "${pattern}": ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      } else {
+        resolvedPattern = pattern;
+      }
+
+      const start = Date.now();
+      try {
+        await session.waitFor(resolvedPattern, timeoutMs);
+        found = true;
+        elapsed = Date.now() - start;
+      } catch (err) {
+        if (err instanceof WaitForTimeoutError) {
+          found = false;
+          elapsed = err.elapsed;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // Step 3: Read final screen state.
+    const screen = session.readScreen({ numbered, includeScrollback });
+
+    // Build response with only the relevant fields.
+    const response: Record<string, unknown> = { screen };
+    if (settled !== undefined) {
+      response.settled = settled;
+    }
+    if (found !== undefined) {
+      response.found = found;
+      response.elapsed = elapsed;
+    }
+
+    return jsonResponse(response);
+  } catch (err) {
+    return errorResponse(`Action failed on session ${sessionId}: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -385,6 +488,7 @@ export function createServer(): McpServer {
   server.registerTool(
     TOOL_NAMES.LAUNCH,
     {
+      title: 'Launch TUI',
       description:
         'Launch a TUI application in a pseudo-terminal. Returns session ID and initial screen state. ' +
         'Defaults to launching AgentCore CLI if no command is specified.',
@@ -405,6 +509,9 @@ export function createServer(): McpServer {
           .optional()
           .describe('Additional environment variables merged with the default environment.'),
       },
+      annotations: {
+        openWorldHint: true,
+      },
     },
     async args => {
       return await handleLaunch(args);
@@ -415,6 +522,7 @@ export function createServer(): McpServer {
   server.registerTool(
     TOOL_NAMES.SEND_KEYS,
     {
+      title: 'Send Keys',
       description: 'Send keystrokes to a TUI session. Returns updated screen state after rendering settles.',
       inputSchema: {
         sessionId: z.string().describe('The session ID returned by tui_launch.'),
@@ -425,7 +533,9 @@ export function createServer(): McpServer {
         specialKey: z
           .enum(SPECIAL_KEY_ENUM)
           .optional()
-          .describe('A named special key to send (e.g. "enter", "tab", "ctrl+c", "f1"). Mutually usable with keys.'),
+          .describe(
+            'A named special key to send (e.g. "enter", "tab", "ctrl+c", "f1"). Mutually exclusive with keys — provide one or the other.'
+          ),
         waitMs: z
           .number()
           .int()
@@ -434,9 +544,59 @@ export function createServer(): McpServer {
           .optional()
           .describe('Milliseconds to wait for the screen to settle after sending keys (default: 300).'),
       },
+      annotations: {
+        openWorldHint: true,
+      },
     },
     async args => {
       return await handleSendKeys(args);
+    }
+  );
+
+  // --- tui_action ---
+  server.registerTool(
+    TOOL_NAMES.ACTION,
+    {
+      title: 'Perform Action',
+      description:
+        'Composite tool: send keys, wait for a pattern, and read screen — all in one call. ' +
+        'Eliminates round-trips between separate tui_send_keys, tui_wait_for, and tui_read_screen calls. ' +
+        'At least one of keys, specialKey, or pattern must be provided.',
+      inputSchema: {
+        sessionId: z.string().describe('The session ID returned by tui_launch.'),
+        keys: z.string().optional().describe('Raw text to type into the terminal. Mutually exclusive with specialKey.'),
+        specialKey: z
+          .enum(SPECIAL_KEY_ENUM)
+          .optional()
+          .describe('A named special key to send (e.g. "enter", "tab", "ctrl+c"). Mutually exclusive with keys.'),
+        waitMs: z
+          .number()
+          .int()
+          .min(0)
+          .max(10000)
+          .optional()
+          .describe('Milliseconds to wait for the screen to settle after sending keys (default: 300).'),
+        pattern: z.string().optional().describe('Text or regex pattern to wait for on screen after sending keys.'),
+        timeoutMs: z
+          .number()
+          .int()
+          .min(100)
+          .max(30000)
+          .optional()
+          .describe('Maximum time to wait for the pattern in milliseconds (default: 5000).'),
+        isRegex: z.boolean().optional().describe('When true, interpret the pattern as a regular expression.'),
+        numbered: z.boolean().optional().describe('When true, prefix each screen line with its 1-indexed line number.'),
+        includeScrollback: z
+          .boolean()
+          .optional()
+          .describe('When true, include scrollback history in the screen output.'),
+      },
+      annotations: {
+        openWorldHint: true,
+      },
+    },
+    async args => {
+      return await handleAction(args);
     }
   );
 
@@ -444,6 +604,7 @@ export function createServer(): McpServer {
   server.registerTool(
     TOOL_NAMES.READ_SCREEN,
     {
+      title: 'Read Screen',
       description: 'Read the current terminal screen state. Safe read-only operation.',
       inputSchema: {
         sessionId: z.string().describe('The session ID returned by tui_launch.'),
@@ -467,6 +628,7 @@ export function createServer(): McpServer {
   server.registerTool(
     TOOL_NAMES.WAIT_FOR,
     {
+      title: 'Wait For Pattern',
       description:
         'Wait for a text pattern to appear on the terminal screen. Useful for synchronizing with async TUI operations.',
       inputSchema: {
@@ -485,6 +647,9 @@ export function createServer(): McpServer {
           .describe('Maximum time in milliseconds to wait for the pattern to appear (default: 5000).'),
         isRegex: z.boolean().optional().describe('When true, interpret the pattern as a regular expression.'),
       },
+      annotations: {
+        readOnlyHint: true,
+      },
     },
     async args => {
       return await handleWaitFor(args);
@@ -495,6 +660,7 @@ export function createServer(): McpServer {
   server.registerTool(
     TOOL_NAMES.SCREENSHOT,
     {
+      title: 'Take Screenshot',
       description:
         'Capture a screenshot of the terminal. Supports text format (bordered, line-numbered) ' +
         'or SVG format (rendered visual screenshot). Optionally saves the output to disk.',
@@ -531,6 +697,7 @@ export function createServer(): McpServer {
   server.registerTool(
     TOOL_NAMES.CLOSE,
     {
+      title: 'Close Session',
       description: 'Close a TUI session and terminate the process.',
       inputSchema: {
         sessionId: z.string().describe('The session ID returned by tui_launch.'),
@@ -552,6 +719,7 @@ export function createServer(): McpServer {
   server.registerTool(
     TOOL_NAMES.LIST_SESSIONS,
     {
+      title: 'List Sessions',
       description: 'List all active TUI sessions.',
       annotations: {
         readOnlyHint: true,

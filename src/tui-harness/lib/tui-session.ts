@@ -17,7 +17,15 @@ import { register, unregister } from './session-manager.js';
 import { SettlingMonitor } from './settling.js';
 import { renderTerminalToSvg } from './svg-renderer.js';
 import type { SvgRenderOptions } from './svg-renderer.js';
-import type { CloseResult, LaunchOptions, ReadOptions, ScreenState, SessionInfo, SpecialKey } from './types.js';
+import type {
+  CloseResult,
+  LaunchOptions,
+  ReadOptions,
+  ScreenState,
+  SendResult,
+  SessionInfo,
+  SpecialKey,
+} from './types.js';
 import { LaunchError, WaitForTimeoutError } from './types.js';
 import xtermHeadless from '@xterm/headless';
 import { randomUUID } from 'crypto';
@@ -314,13 +322,13 @@ export class TuiSession {
    * @param keys - The raw characters or escape sequences to write.
    * @param waitMs - Optional settling time in milliseconds. Defaults to the
    *   settling monitor's default (300ms).
-   * @returns The screen state after output settles.
+   * @returns The screen state and settling status after output settles.
    */
-  async sendKeys(keys: string, waitMs?: number): Promise<ScreenState> {
+  async sendKeys(keys: string, waitMs?: number): Promise<SendResult> {
     this.assertAlive();
     this.ptyProcess.write(keys);
-    await this.settlingMonitor.waitForSettle(waitMs);
-    return this.readScreen();
+    const settled = await this.settlingMonitor.waitForSettle(waitMs);
+    return { screen: this.readScreen(), settled };
   }
 
   /**
@@ -328,14 +336,14 @@ export class TuiSession {
    *
    * @param key - The special key name (e.g., 'enter', 'ctrl+c', 'f5').
    * @param waitMs - Optional settling time in milliseconds.
-   * @returns The screen state after output settles.
+   * @returns The screen state and settling status after output settles.
    */
-  async sendSpecialKey(key: SpecialKey, waitMs?: number): Promise<ScreenState> {
+  async sendSpecialKey(key: SpecialKey, waitMs?: number): Promise<SendResult> {
     this.assertAlive();
     const sequence = resolveKey(key);
     this.ptyProcess.write(sequence);
-    await this.settlingMonitor.waitForSettle(waitMs);
-    return this.readScreen();
+    const settled = await this.settlingMonitor.waitForSettle(waitMs);
+    return { screen: this.readScreen(), settled };
   }
 
   // ---------------------------------------------------------------------------

@@ -60,6 +60,19 @@ export interface ReadOptions {
 }
 
 /**
+ * Result from sending keys to a TUI session.
+ *
+ * @property screen - The screen state after output settles.
+ * @property settled - Whether the terminal output fully settled within the
+ *   wait period. When `false`, the hard ceiling timeout was reached and the
+ *   screen content may still be updating.
+ */
+export interface SendResult {
+  screen: ScreenState;
+  settled: boolean;
+}
+
+/**
  * Result returned when a TUI session is closed.
  *
  * @property exitCode - The process exit code, or null if terminated by signal.
