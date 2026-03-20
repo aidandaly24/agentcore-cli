@@ -12,14 +12,35 @@ export interface ValidateOptions {
   directory?: string;
 }
 
-export interface ValidateResult {
+export interface ValidateFileResult {
+  file: string;
   success: boolean;
+  skipped?: boolean;
   error?: string;
 }
 
+export interface ValidateResult {
+  success: boolean;
+  error?: string;
+  results: ValidateFileResult[];
+}
+
+/**
+ * Schema files validated by the validate command.
+ * Required files must exist; optional files are skipped when absent.
+ */
+const SCHEMA_FILES = [
+  { key: 'project', label: 'agentcore.json', required: true },
+  { key: 'targets', label: 'aws-targets.json', required: true },
+  { key: 'mcp', label: 'mcp.json', required: false },
+  { key: 'mcpDefs', label: 'mcp-defs.json', required: false },
+  { key: 'state', label: '.cli/state.json', required: false },
+] as const;
+
 /**
  * Validates all AgentCore schema files in the project.
- * Returns a binary success/fail result with an error message if validation fails.
+ * Returns per-file results so both CLI and TUI can report granular status.
+ * All files are validated even if earlier ones fail.
  */
 export async function handleValidate(options: ValidateOptions): Promise<ValidateResult> {
   const baseDir = options.directory ?? process.cwd();
@@ -30,35 +51,48 @@ export async function handleValidate(options: ValidateOptions): Promise<Validate
     return {
       success: false,
       error: new NoProjectError().message,
+      results: [],
     };
   }
 
   const configIO = new ConfigIO({ baseDir: configRoot });
+  const results: ValidateFileResult[] = [];
 
-  // Validate project spec (agentcore.json)
-  try {
-    await configIO.readProjectSpec();
-  } catch (err) {
-    return { success: false, error: formatError(err, 'agentcore.json') };
-  }
+  for (const file of SCHEMA_FILES) {
+    // For optional files, skip if not present
+    if (!file.required) {
+      if (!configIO.configExists(file.key)) {
+        results.push({ file: file.label, success: true, skipped: true });
+        continue;
+      }
+    }
 
-  // Validate AWS targets (aws-targets.json)
-  try {
-    await configIO.readAWSDeploymentTargets();
-  } catch (err) {
-    return { success: false, error: formatError(err, 'aws-targets.json') };
-  }
-
-  // Validate deployed state if it exists (.cli/state.json)
-  if (configIO.configExists('state')) {
     try {
-      await configIO.readDeployedState();
+      if (file.key === 'project') {
+        await configIO.readProjectSpec();
+      } else if (file.key === 'targets') {
+        await configIO.readAWSDeploymentTargets();
+      } else if (file.key === 'mcp') {
+        await configIO.readMcpSpec();
+      } else if (file.key === 'mcpDefs') {
+        await configIO.readMcpDefs();
+      } else if (file.key === 'state') {
+        await configIO.readDeployedState();
+      }
+      results.push({ file: file.label, success: true });
     } catch (err) {
-      return { success: false, error: formatError(err, '.cli/state.json') };
+      results.push({ file: file.label, success: false, error: formatError(err, file.label) });
     }
   }
 
-  return { success: true };
+  const errors = results.filter(r => !r.success);
+  const hasErrors = errors.length > 0;
+
+  return {
+    success: !hasErrors,
+    error: hasErrors ? errors.map(r => r.error).join('\n') : undefined,
+    results,
+  };
 }
 
 function formatError(err: unknown, fileName: string): string {

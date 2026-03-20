@@ -13,3 +13,4 @@ export { registerRun } from './run';
 export { registerStatus } from './status';
 export { registerTraces } from './traces';
 export { registerUpdate } from './update';
+export { registerValidate } from './validate';

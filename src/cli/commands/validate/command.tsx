@@ -1,7 +1,7 @@
 import { COMMAND_DESCRIPTIONS } from '../../tui/copy';
 import { handleValidate } from './action';
 import type { Command } from '@commander-js/extra-typings';
-import { Text, render } from 'ink';
+import { Box, Text, render } from 'ink';
 
 export const registerValidate = (program: Command) => {
   program
@@ -15,7 +15,18 @@ export const registerValidate = (program: Command) => {
         render(<Text color="green">Valid</Text>);
         process.exit(0);
       } else {
-        render(<Text color="red">{result.error}</Text>);
+        render(
+          <Box flexDirection="column">
+            {result.results
+              .filter(r => !r.success)
+              .map(r => (
+                <Text key={r.file} color="red">
+                  {r.error}
+                </Text>
+              ))}
+            {result.results.length === 0 && result.error && <Text color="red">{result.error}</Text>}
+          </Box>
+        );
         process.exit(1);
       }
     });
