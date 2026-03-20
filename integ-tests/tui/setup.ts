@@ -7,9 +7,15 @@ beforeAll(async () => {
   try {
     const { isAvailable, unavailableReason } = await import('../../src/tui-harness/lib/availability.js');
     if (!isAvailable) {
+      if (process.env.CI) {
+        throw new Error(`TUI harness unavailable in CI: ${unavailableReason}. Failing to prevent silent skip.`);
+      }
       console.warn(`TUI harness unavailable: ${unavailableReason}. Skipping all TUI tests.`);
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('TUI harness unavailable in CI')) {
+      throw err;
+    }
     // Harness not yet built
   }
 });

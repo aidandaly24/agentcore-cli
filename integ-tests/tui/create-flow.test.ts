@@ -132,8 +132,9 @@ describe.skipIf(!isAvailable)('create wizard TUI flow', () => {
     await session.waitFor('Review Configuration', 10000);
     await session.sendSpecialKey('enter');
 
-    // Step 21: Wait for project creation to complete (generous timeout)
-    const successScreen = await session.waitFor('Project created successfully', 30000);
+    // Step 21: Wait for project creation to complete (generous timeout —
+    // CDK scaffolding + git init can take >30s under load)
+    const successScreen = await session.waitFor('Project created successfully', 60000);
 
     const successText = successScreen.lines.join('\n');
     expect(successText).toContain('Project created successfully');
@@ -174,7 +175,7 @@ describe.skipIf(!isAvailable)('create wizard TUI flow', () => {
     await session.sendSpecialKey('enter');
 
     // Wait for project creation to complete
-    const successScreen = await session.waitFor('Project created successfully', 30000);
+    const successScreen = await session.waitFor('Project created successfully', 60000);
 
     const successText = successScreen.lines.join('\n');
     expect(successText).toContain('Project created successfully');

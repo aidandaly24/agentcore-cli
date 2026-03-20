@@ -44,7 +44,7 @@ describe.skipIf(!isAvailable)('TUI add-resource flow', () => {
 
     // Type 'add' to filter the command list, then press Enter to select it.
     await session.sendKeys('add');
-    await session.waitFor('add', 3000);
+    await session.waitFor('add', 1500);
     await session.sendSpecialKey('enter');
 
     // Confirm the Add Resource screen has rendered.
@@ -73,7 +73,7 @@ describe.skipIf(!isAvailable)('TUI add-resource flow', () => {
 
     // Navigate to Add Resource screen.
     await session.sendKeys('add');
-    await session.waitFor('add', 3000);
+    await session.waitFor('add', 1500);
     await session.sendSpecialKey('enter');
     await session.waitFor('Add Resource', 10000);
 
@@ -106,7 +106,7 @@ describe.skipIf(!isAvailable)('TUI add-resource flow', () => {
 
     // Navigate: HelpScreen -> Add Resource -> Add Agent
     await session.sendKeys('add');
-    await session.waitFor('add', 3000);
+    await session.waitFor('add', 1500);
     await session.sendSpecialKey('enter');
     await session.waitFor('Add Resource', 10000);
     await session.sendSpecialKey('enter');
@@ -137,7 +137,7 @@ describe.skipIf(!isAvailable)('TUI add-resource flow', () => {
 
     // Navigate to Add Resource screen.
     await session.sendKeys('add');
-    await session.waitFor('add', 3000);
+    await session.waitFor('add', 1500);
     await session.sendSpecialKey('enter');
     await session.waitFor('Add Resource', 10000);
 
