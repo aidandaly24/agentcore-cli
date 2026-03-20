@@ -157,6 +157,10 @@ describe('exit-codes', () => {
     });
 
     describe('agent not found errors → EXIT_AGENT_NOT_FOUND (5)', () => {
+      it('returns 5 for ResourceNotFoundException error name', () => {
+        expect(getExitCode({ name: 'ResourceNotFoundException' })).toBe(ExitCode.AGENT_NOT_FOUND);
+      });
+
       it('returns 5 for agent not found message', () => {
         expect(getExitCode(new Error("Agent 'my-agent' not found"))).toBe(ExitCode.AGENT_NOT_FOUND);
       });
@@ -167,6 +171,10 @@ describe('exit-codes', () => {
 
       it('returns 5 for no agents defined message', () => {
         expect(getExitCode(new Error('No agents defined in agentcore.json'))).toBe(ExitCode.AGENT_NOT_FOUND);
+      });
+
+      it('returns 5 for agent not found in deployed state', () => {
+        expect(getExitCode(new Error("Agent 'my-agent' not found in deployed state"))).toBe(ExitCode.AGENT_NOT_FOUND);
       });
     });
 

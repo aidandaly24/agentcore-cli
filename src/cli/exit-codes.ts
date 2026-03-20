@@ -119,9 +119,18 @@ function isCommanderInvalidArgError(err: unknown): boolean {
 
 /**
  * Checks if an error indicates that a requested agent was not found.
- * Uses message-based pattern matching as a best-effort classification.
+ * Matches AWS ResourceNotFoundException and message-based patterns.
  */
 function isAgentNotFoundError(err: unknown): boolean {
+  if (err && typeof err === 'object') {
+    const error = err as Record<string, unknown>;
+
+    // Check AWS SDK error name for ResourceNotFoundException
+    if (typeof error.name === 'string' && error.name === 'ResourceNotFoundException') {
+      return true;
+    }
+  }
+
   const message = getErrorMessage(err).toLowerCase();
 
   // Match patterns like "Agent 'my-agent' not found"
