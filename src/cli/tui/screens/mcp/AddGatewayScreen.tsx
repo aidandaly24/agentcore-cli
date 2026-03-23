@@ -307,7 +307,7 @@ export function AddGatewayScreen({
       ? HELP_TEXT.MULTI_SELECT
       : jwtSubStep === 'customClaims'
         ? claimsManagerMode === 'add' || claimsManagerMode === 'edit'
-          ? 'Tab field · ←/→ cycle · Enter save · Esc cancel'
+          ? '↑/↓ field · ←/→ cycle · Enter next/save · Esc cancel'
           : 'Navigate · Enter select · Esc back'
         : HELP_TEXT.TEXT_INPUT
     : isIncludeTargetsStep || isAdvancedConfigStep
@@ -914,10 +914,10 @@ function CustomClaimForm({ initialClaim, onSave, onCancel }: CustomClaimFormProp
       return;
     }
 
-    // Tab / Shift+Tab to cycle fields
-    if (key.tab) {
+    // Tab / Shift+Tab / Up / Down to cycle fields
+    if (key.tab || key.upArrow || key.downArrow) {
       const idx = CLAIM_FIELDS.indexOf(activeField);
-      if (key.shift) {
+      if (key.shift || key.upArrow) {
         setActiveField(CLAIM_FIELDS[(idx - 1 + CLAIM_FIELDS.length) % CLAIM_FIELDS.length]!);
       } else {
         setActiveField(CLAIM_FIELDS[(idx + 1) % CLAIM_FIELDS.length]!);
@@ -926,8 +926,26 @@ function CustomClaimForm({ initialClaim, onSave, onCancel }: CustomClaimFormProp
       return;
     }
 
-    // Enter to submit
+    // Enter: advance to next field, or submit on the last field
     if (key.return) {
+      const idx = CLAIM_FIELDS.indexOf(activeField);
+      if (idx < CLAIM_FIELDS.length - 1) {
+        // Validate current field before advancing
+        if (activeField === 'claimName') {
+          if (!claimName.trim()) {
+            setError('Claim name is required');
+            return;
+          }
+          if (!/^[A-Za-z0-9_.\-:]+$/.test(claimName.trim())) {
+            setError('Claim name may only contain letters, digits, _, ., -, :');
+            return;
+          }
+        }
+        setActiveField(CLAIM_FIELDS[idx + 1]!);
+        setError(null);
+        return;
+      }
+      // Last field — submit
       if (!claimName.trim()) {
         setError('Claim name is required');
         return;
