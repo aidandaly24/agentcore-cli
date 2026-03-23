@@ -400,17 +400,7 @@ interface JwtConfigInputProps {
 /** OIDC well-known suffix for validation */
 const OIDC_WELL_KNOWN_SUFFIX = '/.well-known/openid-configuration';
 
-/** Validates comma-separated list has at least one non-empty value */
-function validateCommaSeparated(value: string): true | string {
-  const items = value
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-  if (items.length === 0) {
-    return 'At least one value is required';
-  }
-  return true;
-}
+
 
 function JwtConfigInput({
   subStep,
@@ -466,10 +456,11 @@ function JwtConfigInput({
         {subStep === 2 && (
           <TextInput
             prompt="Allowed Clients (comma-separated, e.g., 7abc123def456)"
+            placeholder="press Enter for none"
             initialValue=""
             onSubmit={onClients}
             onCancel={onCancel}
-            customValidation={validateCommaSeparated}
+            allowEmpty
           />
         )}
         {subStep === 3 && (
