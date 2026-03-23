@@ -409,8 +409,14 @@ describe('Custom Claims Form', () => {
     }
     await delay();
 
-    // Press Enter without filling matchValue
-    stdin.write(ENTER);
+    // Enter advances through fields: claimName -> valueType -> operator -> matchValue
+    stdin.write(ENTER); // advance to valueType
+    await delay();
+    stdin.write(ENTER); // advance to operator
+    await delay();
+    stdin.write(ENTER); // advance to matchValue
+    await delay();
+    stdin.write(ENTER); // submit on last field — matchValue is empty
     await delay();
 
     expect(lastFrame()).toContain('Match value is required');
