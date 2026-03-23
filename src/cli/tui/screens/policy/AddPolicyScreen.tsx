@@ -1,6 +1,7 @@
 import { PolicyNameSchema } from '../../../../schema';
 import { detectRegion } from '../../../aws';
 import { getPolicyGeneration, startPolicyGeneration } from '../../../aws/policy-generation';
+import { policyEnginePrimitive } from '../../../primitives/registry';
 import { ConfirmReview, Panel, PathInput, Screen, StepIndicator, TextInput, WizardSelect } from '../../components';
 import type { SelectableItem } from '../../components';
 import { HELP_TEXT } from '../../constants';
@@ -9,7 +10,6 @@ import { generateUniqueName } from '../../utils';
 import type { AddPolicyConfig, PolicySourceMethod } from './types';
 import { POLICY_SOURCE_METHOD_OPTIONS, POLICY_STEP_LABELS, VALIDATION_MODE_OPTIONS } from './types';
 import { useAddPolicyWizard } from './useAddPolicyWizard';
-import { policyEnginePrimitive } from '../../../primitives/registry';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';

@@ -17,6 +17,7 @@ const DEFAULT_PROPS = {
   onExit: vi.fn(),
   existingGateways: [],
   unassignedTargets: [],
+  existingPolicyEngines: [],
 };
 
 // Helper: navigate past the name step by pressing Enter to accept the generated default name

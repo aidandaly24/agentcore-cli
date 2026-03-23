@@ -1,4 +1,9 @@
-import type { CustomClaimValidation, GatewayAuthorizerType, GatewayExceptionLevel, PolicyEngineMode } from '../../../../schema';
+import type {
+  CustomClaimValidation,
+  GatewayAuthorizerType,
+  GatewayExceptionLevel,
+  PolicyEngineMode,
+} from '../../../../schema';
 import type { AddGatewayConfig, AddGatewayStep } from './types';
 import { useCallback, useMemo, useState } from 'react';
 

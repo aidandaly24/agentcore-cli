@@ -558,6 +558,7 @@ interface JwtConfigInputProps {
   onBack: () => void;
   onClaimsManagerModeChange?: (mode: ClaimsManagerMode) => void;
 }
+
 function JwtConfigInput({
   subStep,
   steps,
