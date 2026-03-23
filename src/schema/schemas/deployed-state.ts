@@ -86,8 +86,9 @@ export const ExternallyManagedResourceSchema = z.object({
 export type ExternallyManagedResource = z.infer<typeof ExternallyManagedResourceSchema>;
 
 export const CustomJwtAuthorizerSchema = ExternallyManagedResourceSchema.extend({
-  allowedAudience: z.array(z.string()),
-  allowedClients: z.array(z.string()),
+  allowedAudience: z.array(z.string()).optional(),
+  allowedClients: z.array(z.string()).optional(),
+  allowedScopes: z.array(z.string()).optional(),
   discoveryUrl: z.string(),
 });
 

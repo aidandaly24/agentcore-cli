@@ -230,7 +230,10 @@ export function validateAddGatewayOptions(options: AddGatewayOptions): Validatio
     }
 
     try {
-      new URL(options.discoveryUrl);
+      const url = new URL(options.discoveryUrl);
+      if (url.protocol !== 'https:') {
+        return { valid: false, error: 'Discovery URL must use HTTPS' };
+      }
     } catch {
       return { valid: false, error: 'Discovery URL must be a valid URL' };
     }
@@ -239,30 +242,29 @@ export function validateAddGatewayOptions(options: AddGatewayOptions): Validatio
       return { valid: false, error: `Discovery URL must end with ${OIDC_WELL_KNOWN_SUFFIX}` };
     }
 
-    // allowedAudience is optional - empty means no audience validation
-
-    if (!options.allowedClients) {
-      return { valid: false, error: '--allowed-clients is required for CUSTOM_JWT authorizer' };
+    // allowedAudience, allowedClients, allowedScopes are all optional individually,
+    // but at least one must be provided
+    const hasAudience = !!options.allowedAudience?.trim();
+    const hasClients = !!options.allowedClients?.trim();
+    const hasScopes = !!options.allowedScopes?.trim();
+    if (!hasAudience && !hasClients && !hasScopes) {
+      return {
+        valid: false,
+        error:
+          'At least one of --allowed-audience, --allowed-clients, or --allowed-scopes must be provided for CUSTOM_JWT authorizer',
+      };
     }
-
-    const clients = options.allowedClients
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
-    if (clients.length === 0) {
-      return { valid: false, error: 'At least one client value is required' };
-    }
   }
 
-  // Validate agent OAuth credentials
-  if (options.agentClientId && !options.agentClientSecret) {
-    return { valid: false, error: 'Both --agent-client-id and --agent-client-secret must be provided together' };
+  // Validate OAuth client credentials
+  if (options.clientId && !options.clientSecret) {
+    return { valid: false, error: 'Both --client-id and --client-secret must be provided together' };
   }
-  if (options.agentClientSecret && !options.agentClientId) {
-    return { valid: false, error: 'Both --agent-client-id and --agent-client-secret must be provided together' };
+  if (options.clientSecret && !options.clientId) {
+    return { valid: false, error: 'Both --client-id and --client-secret must be provided together' };
   }
-  if (options.agentClientId && options.authorizerType !== 'CUSTOM_JWT') {
-    return { valid: false, error: 'Agent OAuth credentials are only valid with CUSTOM_JWT authorizer' };
+  if (options.clientId && options.authorizerType !== 'CUSTOM_JWT') {
+    return { valid: false, error: 'OAuth client credentials are only valid with CUSTOM_JWT authorizer' };
   }
 
   // Validate exception level if provided

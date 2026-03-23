@@ -32,11 +32,11 @@ export interface AddGatewayConfig {
   /** JWT authorizer configuration (when authorizerType is 'CUSTOM_JWT') */
   jwtConfig?: {
     discoveryUrl: string;
-    allowedAudience: string[];
-    allowedClients: string[];
+    allowedAudience?: string[];
+    allowedClients?: string[];
     allowedScopes?: string[];
-    agentClientId?: string;
-    agentClientSecret?: string;
+    clientId?: string;
+    clientSecret?: string;
   };
   /** Selected unassigned targets to include in this gateway */
   selectedTargets?: string[];

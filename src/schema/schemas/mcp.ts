@@ -36,6 +36,9 @@ const OIDC_WELL_KNOWN_SUFFIX = '/.well-known/openid-configuration';
 const OidcDiscoveryUrlSchema = z
   .string()
   .url('Must be a valid URL')
+  .refine(url => url.startsWith('https://'), {
+    message: 'OIDC discovery URL must use HTTPS',
+  })
   .refine(url => url.endsWith(OIDC_WELL_KNOWN_SUFFIX), {
     message: `OIDC discovery URL must end with '${OIDC_WELL_KNOWN_SUFFIX}'`,
   });
@@ -43,16 +46,34 @@ const OidcDiscoveryUrlSchema = z
 /**
  * Custom JWT authorizer configuration.
  * Used when authorizerType is 'CUSTOM_JWT'.
+ *
+ * At least one of allowedAudience, allowedClients, or allowedScopes
+ * must be provided. Only discoveryUrl is unconditionally required.
  */
-export const CustomJwtAuthorizerConfigSchema = z.object({
-  /** OIDC discovery URL (e.g., https://cognito-idp.{region}.amazonaws.com/{userPoolId}/.well-known/openid-configuration) */
-  discoveryUrl: OidcDiscoveryUrlSchema,
-  /** List of allowed audiences (typically client IDs). Empty array means no audience validation. */
-  allowedAudience: z.array(z.string().min(1)),
-  /** List of allowed client IDs */
-  allowedClients: z.array(z.string().min(1)).min(1),
-  allowedScopes: z.array(z.string().min(1)).optional(),
-});
+export const CustomJwtAuthorizerConfigSchema = z
+  .object({
+    /** OIDC discovery URL (e.g., https://cognito-idp.{region}.amazonaws.com/{userPoolId}/.well-known/openid-configuration) */
+    discoveryUrl: OidcDiscoveryUrlSchema,
+    /** List of allowed audiences (typically client IDs) */
+    allowedAudience: z.array(z.string().min(1)).optional(),
+    /** List of allowed client IDs */
+    allowedClients: z.array(z.string().min(1)).optional(),
+    /** List of allowed scopes */
+    allowedScopes: z.array(z.string().min(1)).optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    const hasAudience = data.allowedAudience && data.allowedAudience.length > 0;
+    const hasClients = data.allowedClients && data.allowedClients.length > 0;
+    const hasScopes = data.allowedScopes && data.allowedScopes.length > 0;
+
+    if (!hasAudience && !hasClients && !hasScopes) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one of allowedAudience, allowedClients, or allowedScopes must be provided',
+      });
+    }
+  });
 
 export type CustomJwtAuthorizerConfig = z.infer<typeof CustomJwtAuthorizerConfigSchema>;
 

@@ -47,13 +47,13 @@ export function AddGatewayScreen({
 }: AddGatewayScreenProps) {
   const wizard = useAddGatewayWizard(unassignedTargets.length, existingPolicyEngines.length);
 
-  // JWT config sub-step tracking (0=discoveryUrl, 1=audience, 2=clients, 3=scopes, 4=agentClientId, 5=agentClientSecret)
+  // JWT config sub-step tracking (0=discoveryUrl, 1=audience, 2=clients, 3=scopes, 4=clientId, 5=clientSecret)
   const [jwtSubStep, setJwtSubStep] = useState(0);
   const [jwtDiscoveryUrl, setJwtDiscoveryUrl] = useState('');
   const [jwtAudience, setJwtAudience] = useState('');
   const [jwtClients, setJwtClients] = useState('');
   const [jwtScopes, setJwtScopes] = useState('');
-  const [jwtAgentClientId, setJwtAgentClientId] = useState('');
+  const [jwtClientId, setJwtClientId] = useState('');
 
   const unassignedTargetItems: SelectableItem[] = useMemo(
     () => unassignedTargets.map(name => ({ id: name, title: name })),
@@ -193,12 +193,12 @@ export function AddGatewayScreen({
     setJwtSubStep(4);
   };
 
-  const handleJwtAgentClientId = (clientId: string) => {
-    setJwtAgentClientId(clientId);
+  const handleJwtClientId = (clientId: string) => {
+    setJwtClientId(clientId);
     setJwtSubStep(5);
   };
 
-  const handleJwtAgentClientSecret = (clientSecret: string) => {
+  const handleJwtClientSecret = (clientSecret: string) => {
     const audienceList = jwtAudience
       .split(',')
       .map(s => s.trim())
@@ -214,10 +214,10 @@ export function AddGatewayScreen({
 
     wizard.setJwtConfig({
       discoveryUrl: jwtDiscoveryUrl,
-      allowedAudience: audienceList,
-      allowedClients: clientsList,
+      ...(audienceList.length > 0 ? { allowedAudience: audienceList } : {}),
+      ...(clientsList.length > 0 ? { allowedClients: clientsList } : {}),
       ...(scopesList.length > 0 ? { allowedScopes: scopesList } : {}),
-      ...(jwtAgentClientId ? { agentClientId: jwtAgentClientId, agentClientSecret: clientSecret } : {}),
+      ...(jwtClientId ? { clientId: jwtClientId, clientSecret } : {}),
     });
 
     setJwtSubStep(0);
@@ -280,8 +280,8 @@ export function AddGatewayScreen({
             onAudience={handleJwtAudience}
             onClients={handleJwtClients}
             onScopes={handleJwtScopes}
-            onAgentClientId={handleJwtAgentClientId}
-            onAgentClientSecret={handleJwtAgentClientSecret}
+            onClientId={handleJwtClientId}
+            onClientSecret={handleJwtClientSecret}
             onCancel={handleJwtCancel}
           />
         )}
@@ -349,13 +349,17 @@ export function AddGatewayScreen({
               ...(wizard.config.authorizerType === 'CUSTOM_JWT' && wizard.config.jwtConfig
                 ? [
                     { label: 'Discovery URL', value: wizard.config.jwtConfig.discoveryUrl },
-                    { label: 'Allowed Audience', value: wizard.config.jwtConfig.allowedAudience.join(', ') },
-                    { label: 'Allowed Clients', value: wizard.config.jwtConfig.allowedClients.join(', ') },
+                    ...(wizard.config.jwtConfig.allowedAudience?.length
+                      ? [{ label: 'Allowed Audience', value: wizard.config.jwtConfig.allowedAudience.join(', ') }]
+                      : []),
+                    ...(wizard.config.jwtConfig.allowedClients?.length
+                      ? [{ label: 'Allowed Clients', value: wizard.config.jwtConfig.allowedClients.join(', ') }]
+                      : []),
                     ...(wizard.config.jwtConfig.allowedScopes?.length
                       ? [{ label: 'Allowed Scopes', value: wizard.config.jwtConfig.allowedScopes.join(', ') }]
                       : []),
-                    ...(wizard.config.jwtConfig.agentClientId
-                      ? [{ label: 'Agent Credential', value: computeManagedOAuthCredentialName(wizard.config.name) }]
+                    ...(wizard.config.jwtConfig.clientId
+                      ? [{ label: 'Gateway Credential', value: computeManagedOAuthCredentialName(wizard.config.name) }]
                       : []),
                   ]
                 : []),
@@ -388,8 +392,8 @@ interface JwtConfigInputProps {
   onAudience: (audience: string) => void;
   onClients: (clients: string) => void;
   onScopes: (scopes: string) => void;
-  onAgentClientId: (clientId: string) => void;
-  onAgentClientSecret: (clientSecret: string) => void;
+  onClientId: (clientId: string) => void;
+  onClientSecret: (clientSecret: string) => void;
   onCancel: () => void;
 }
 
@@ -397,13 +401,13 @@ interface JwtConfigInputProps {
 const OIDC_WELL_KNOWN_SUFFIX = '/.well-known/openid-configuration';
 
 /** Validates comma-separated list has at least one non-empty value */
-function validateCommaSeparatedList(value: string, fieldName: string): true | string {
+function validateCommaSeparated(value: string): true | string {
   const items = value
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
   if (items.length === 0) {
-    return `At least one ${fieldName} is required`;
+    return 'At least one value is required';
   }
   return true;
 }
@@ -414,8 +418,8 @@ function JwtConfigInput({
   onAudience,
   onClients,
   onScopes,
-  onAgentClientId,
-  onAgentClientSecret,
+  onClientId,
+  onClientSecret,
   onCancel,
 }: JwtConfigInputProps) {
   const totalSteps = 6;
@@ -433,10 +437,14 @@ function JwtConfigInput({
             onSubmit={onDiscoveryUrl}
             onCancel={onCancel}
             customValidation={value => {
+              let parsed: URL;
               try {
-                new URL(value);
+                parsed = new URL(value);
               } catch {
                 return 'Must be a valid URL';
+              }
+              if (parsed.protocol !== 'https:') {
+                return 'Discovery URL must use HTTPS';
               }
               if (!value.endsWith(OIDC_WELL_KNOWN_SUFFIX)) {
                 return `URL must end with '${OIDC_WELL_KNOWN_SUFFIX}'`;
@@ -461,7 +469,7 @@ function JwtConfigInput({
             initialValue=""
             onSubmit={onClients}
             onCancel={onCancel}
-            customValidation={value => validateCommaSeparatedList(value, 'client')}
+            customValidation={validateCommaSeparated}
           />
         )}
         {subStep === 3 && (
@@ -476,16 +484,16 @@ function JwtConfigInput({
         )}
         {subStep === 4 && (
           <SecretInput
-            prompt="Agent OAuth Client ID (for Bearer token auth)"
-            onSubmit={onAgentClientId}
+            prompt="OAuth Client ID (for Bearer token auth)"
+            onSubmit={onClientId}
             onCancel={onCancel}
             revealChars={4}
           />
         )}
         {subStep === 5 && (
           <SecretInput
-            prompt="Agent OAuth Client Secret"
-            onSubmit={onAgentClientSecret}
+            prompt="OAuth Client Secret"
+            onSubmit={onClientSecret}
             onCancel={onCancel}
             customValidation={value => value.trim().length > 0 || 'Client secret is required'}
             revealChars={4}
