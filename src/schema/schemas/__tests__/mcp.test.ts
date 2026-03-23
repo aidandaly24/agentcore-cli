@@ -4,6 +4,8 @@ import {
   AgentCoreMcpRuntimeToolSchema,
   AgentCoreMcpSpecSchema,
   ApiGatewayConfigSchema,
+  ClaimMatchValueSchema,
+  CustomClaimValidationSchema,
   CustomJwtAuthorizerConfigSchema,
   GatewayAuthorizerTypeSchema,
   GatewayExceptionLevelSchema,
@@ -85,20 +87,55 @@ describe('CustomJwtAuthorizerConfigSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects empty allowedClients', () => {
+  it('accepts empty allowedClients when other constraints present', () => {
     const result = CustomJwtAuthorizerConfigSchema.safeParse({
       ...validConfig,
       allowedClients: [],
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
-  it('accepts empty allowedAudience (no audience validation)', () => {
+  it('accepts empty allowedAudience when other constraints present', () => {
     const result = CustomJwtAuthorizerConfigSchema.safeParse({
       ...validConfig,
       allowedAudience: [],
     });
     expect(result.success).toBe(true);
+  });
+
+  it('rejects when all constraint fields are empty or absent', () => {
+    const result = CustomJwtAuthorizerConfigSchema.safeParse({
+      discoveryUrl: validConfig.discoveryUrl,
+      allowedAudience: [],
+      allowedClients: [],
+      allowedScopes: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts config with only allowedScopes', () => {
+    const result = CustomJwtAuthorizerConfigSchema.safeParse({
+      discoveryUrl: validConfig.discoveryUrl,
+      allowedScopes: ['openid'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects http:// discovery URL', () => {
+    const result = CustomJwtAuthorizerConfigSchema.safeParse({
+      discoveryUrl: 'http://example.com/.well-known/openid-configuration',
+      allowedAudience: ['client-id-1'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects extra fields (strict)', () => {
+    const result = CustomJwtAuthorizerConfigSchema.safeParse({
+      discoveryUrl: 'https://cognito-idp.us-east-1.amazonaws.com/pool123/.well-known/openid-configuration',
+      allowedAudience: ['client-id-1'],
+      extraField: 'not-allowed',
+    });
+    expect(result.success).toBe(false);
   });
 });
 
@@ -1060,5 +1097,45 @@ describe('AgentCoreMcpSpecSchema', () => {
       agentCoreGateways: [],
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('ClaimMatchValueSchema', () => {
+  it('accepts matchValueString only', () => {
+    const result = ClaimMatchValueSchema.safeParse({ matchValueString: 'admin' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts matchValueStringList only', () => {
+    const result = ClaimMatchValueSchema.safeParse({ matchValueStringList: ['admin', 'dev'] });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects when both matchValueString and matchValueStringList are provided', () => {
+    const result = ClaimMatchValueSchema.safeParse({
+      matchValueString: 'admin',
+      matchValueStringList: ['admin', 'dev'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects when neither matchValueString nor matchValueStringList is provided', () => {
+    const result = ClaimMatchValueSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('CustomClaimValidationSchema', () => {
+  it('rejects extra fields (strict)', () => {
+    const result = CustomClaimValidationSchema.safeParse({
+      inboundTokenClaimName: 'department',
+      inboundTokenClaimValueType: 'STRING',
+      authorizingClaimMatchValue: {
+        claimMatchOperator: 'EQUALS',
+        claimMatchValue: { matchValueString: 'engineering' },
+      },
+      extraField: 'not-allowed',
+    });
+    expect(result.success).toBe(false);
   });
 });

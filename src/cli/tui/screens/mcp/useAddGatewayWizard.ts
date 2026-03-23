@@ -1,4 +1,4 @@
-import type { GatewayAuthorizerType, GatewayExceptionLevel } from '../../../../schema';
+import type { CustomClaimValidation, GatewayAuthorizerType, GatewayExceptionLevel } from '../../../../schema';
 import type { AddGatewayConfig, AddGatewayStep } from './types';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -75,11 +75,12 @@ export function useAddGatewayWizard(unassignedTargetsCount = 0) {
   const setJwtConfig = useCallback(
     (jwtConfig: {
       discoveryUrl: string;
-      allowedAudience: string[];
-      allowedClients: string[];
+      allowedAudience?: string[];
+      allowedClients?: string[];
       allowedScopes?: string[];
-      agentClientId?: string;
-      agentClientSecret?: string;
+      customClaims?: CustomClaimValidation[];
+      clientId?: string;
+      clientSecret?: string;
     }) => {
       setConfig(c => ({
         ...c,

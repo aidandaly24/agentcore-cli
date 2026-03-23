@@ -26,8 +26,9 @@ export function useCreateGateway() {
         allowedAudience: config.jwtConfig?.allowedAudience?.join(','),
         allowedClients: config.jwtConfig?.allowedClients?.join(','),
         allowedScopes: config.jwtConfig?.allowedScopes?.join(','),
-        agentClientId: config.jwtConfig?.agentClientId,
-        agentClientSecret: config.jwtConfig?.agentClientSecret,
+        customClaims: config.jwtConfig?.customClaims,
+        clientId: config.jwtConfig?.clientId,
+        clientSecret: config.jwtConfig?.clientSecret,
         enableSemanticSearch: config.enableSemanticSearch,
         exceptionLevel: config.exceptionLevel,
       });

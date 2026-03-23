@@ -52,7 +52,7 @@ export function parseGatewayOutputs(
   const gatewayNames = Object.keys(gatewaySpecs);
   const gatewayIdMap = new Map(gatewayNames.map(name => [toPascalId(name), name]));
 
-  // Match patterns: Gateway{Name}{Type}Output
+  // Match patterns: Gateway{Name}{Type}Output{Hash}
   const outputPattern = /^Gateway(.+?)(Id|Arn|Url)Output/;
 
   for (const [key, value] of Object.entries(outputs)) {
