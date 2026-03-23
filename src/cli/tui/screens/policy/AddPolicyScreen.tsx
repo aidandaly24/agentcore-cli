@@ -9,6 +9,7 @@ import { generateUniqueName } from '../../utils';
 import type { AddPolicyConfig, PolicySourceMethod } from './types';
 import { POLICY_SOURCE_METHOD_OPTIONS, POLICY_STEP_LABELS, VALIDATION_MODE_OPTIONS } from './types';
 import { useAddPolicyWizard } from './useAddPolicyWizard';
+import { policyEnginePrimitive } from '../../../primitives/registry';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -187,7 +188,6 @@ export function AddPolicyScreen({
         const region = regionResult.region;
 
         // policyEngineId is needed; get it from deployed state
-        const { policyEnginePrimitive } = await import('../../../primitives/registry');
         const policyEngineId = await policyEnginePrimitive.getDeployedEngineId(wizard.config.engine);
 
         if (!policyEngineId) {
