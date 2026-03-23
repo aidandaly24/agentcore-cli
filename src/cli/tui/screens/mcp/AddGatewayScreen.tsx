@@ -243,7 +243,7 @@ export function AddGatewayScreen({
   const headerContent = <StepIndicator steps={wizard.steps} currentStep={wizard.step} labels={GATEWAY_STEP_LABELS} />;
 
   return (
-    <Screen title="Add Gateway" onExit={onExit} helpText={helpText} headerContent={headerContent}>
+    <Screen title="Add Gateway" onExit={onExit} helpText={helpText} headerContent={headerContent} exitEnabled={false}>
       <Panel>
         {isNameStep && (
           <TextInput
@@ -345,7 +345,12 @@ export function AddGatewayScreen({
             fields={[
               { label: 'Name', value: wizard.config.name },
               { label: 'Description', value: wizard.config.description },
-              { label: 'Authorizer', value: wizard.config.authorizerType },
+              {
+                label: 'Authorizer',
+                value:
+                  AUTHORIZER_TYPE_OPTIONS.find(o => o.id === wizard.config.authorizerType)?.title ??
+                  wizard.config.authorizerType,
+              },
               ...(wizard.config.authorizerType === 'CUSTOM_JWT' && wizard.config.jwtConfig
                 ? [
                     { label: 'Discovery URL', value: wizard.config.jwtConfig.discoveryUrl },
