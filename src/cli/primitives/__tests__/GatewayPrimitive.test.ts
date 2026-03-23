@@ -51,6 +51,78 @@ describe('GatewayPrimitive', () => {
     primitive = new GatewayPrimitive();
   });
 
+  describe('customClaims pipeline', () => {
+    const SAMPLE_CLAIMS = [
+      {
+        inboundTokenClaimName: 'department',
+        inboundTokenClaimValueType: 'STRING_ARRAY' as const,
+        authorizingClaimMatchValue: {
+          claimMatchOperator: 'CONTAINS_ANY' as const,
+          claimMatchValue: { matchValueStringList: ['engineering', 'sales'] },
+        },
+      },
+    ];
+
+    it('custom claims from TUI flow are written to authorizerConfiguration', async () => {
+      await primitive.add({
+        name: 'jwt-gw',
+        authorizerType: 'CUSTOM_JWT',
+        discoveryUrl: 'https://example.com/.well-known/openid-configuration',
+        allowedAudience: 'aud1',
+        customClaims: SAMPLE_CLAIMS,
+      });
+
+      const gw = getWrittenGateway();
+      expect(gw.authorizerConfiguration?.customJwtAuthorizer).toBeDefined();
+      expect(gw.authorizerConfiguration!.customJwtAuthorizer!.customClaims).toEqual(SAMPLE_CLAIMS);
+    });
+
+    it('custom claims are preserved alongside audience and clients', async () => {
+      await primitive.add({
+        name: 'jwt-gw',
+        authorizerType: 'CUSTOM_JWT',
+        discoveryUrl: 'https://example.com/.well-known/openid-configuration',
+        allowedAudience: 'aud1,aud2',
+        allowedClients: 'client1',
+        customClaims: SAMPLE_CLAIMS,
+      });
+
+      const gw = getWrittenGateway();
+      const jwtConfig = gw.authorizerConfiguration!.customJwtAuthorizer!;
+      expect(jwtConfig.allowedAudience).toEqual(['aud1', 'aud2']);
+      expect(jwtConfig.allowedClients).toEqual(['client1']);
+      expect(jwtConfig.customClaims).toEqual(SAMPLE_CLAIMS);
+    });
+
+    it('omits customClaims from authorizerConfiguration when not provided', async () => {
+      await primitive.add({
+        name: 'jwt-gw',
+        authorizerType: 'CUSTOM_JWT',
+        discoveryUrl: 'https://example.com/.well-known/openid-configuration',
+        allowedAudience: 'aud1',
+      });
+
+      const gw = getWrittenGateway();
+      expect(gw.authorizerConfiguration!.customJwtAuthorizer!.customClaims).toBeUndefined();
+    });
+
+    it('custom claims only (no audience/clients/scopes) produces valid config', async () => {
+      await primitive.add({
+        name: 'jwt-gw',
+        authorizerType: 'CUSTOM_JWT',
+        discoveryUrl: 'https://example.com/.well-known/openid-configuration',
+        customClaims: SAMPLE_CLAIMS,
+      });
+
+      const gw = getWrittenGateway();
+      const jwtConfig = gw.authorizerConfiguration!.customJwtAuthorizer!;
+      expect(jwtConfig.allowedAudience).toBeUndefined();
+      expect(jwtConfig.allowedClients).toBeUndefined();
+      expect(jwtConfig.allowedScopes).toBeUndefined();
+      expect(jwtConfig.customClaims).toEqual(SAMPLE_CLAIMS);
+    });
+  });
+
   describe('exceptionLevel', () => {
     it('defaults to exceptionLevel NONE', async () => {
       await primitive.add({ name: 'test-gw', authorizerType: 'NONE' });

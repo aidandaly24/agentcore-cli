@@ -4,6 +4,7 @@ import type {
   AgentCoreGatewayTarget,
   AgentCoreMcpSpec,
   AgentCoreProjectSpec,
+  CustomClaimValidation,
   GatewayAuthorizerType,
 } from '../../schema';
 import { AgentCoreGatewaySchema, PolicyEngineModeSchema } from '../../schema';
@@ -29,6 +30,7 @@ export interface AddGatewayOptions {
   allowedAudience?: string;
   allowedClients?: string;
   allowedScopes?: string;
+  customClaims?: CustomClaimValidation[];
   clientId?: string;
   clientSecret?: string;
   agents?: string;
@@ -164,6 +166,7 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
       .option('--allowed-audience <audience>', 'Comma-separated allowed audiences (for CUSTOM_JWT)')
       .option('--allowed-clients <clients>', 'Comma-separated allowed client IDs (for CUSTOM_JWT)')
       .option('--allowed-scopes <scopes>', 'Comma-separated allowed scopes (for CUSTOM_JWT)')
+      .option('--custom-claims <json>', 'Custom claim validations as JSON array (for CUSTOM_JWT)')
       .option('--client-id <id>', 'OAuth client ID for gateway bearer token')
       .option('--client-secret <secret>', 'OAuth client secret')
       .option('--agents <agents>', 'Comma-separated agent names')
@@ -190,6 +193,11 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
             process.exit(1);
           }
 
+          // Parse custom claims JSON if provided (already validated)
+          const parsedCustomClaims = cliOptions.customClaims
+            ? (JSON.parse(cliOptions.customClaims) as CustomClaimValidation[])
+            : undefined;
+
           const result = await this.add({
             name: cliOptions.name!,
             description: cliOptions.description,
@@ -198,6 +206,7 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
             allowedAudience: cliOptions.allowedAudience,
             allowedClients: cliOptions.allowedClients,
             allowedScopes: cliOptions.allowedScopes,
+            customClaims: parsedCustomClaims,
             clientId: cliOptions.clientId,
             clientSecret: cliOptions.clientSecret,
             agents: cliOptions.agents,
@@ -334,6 +343,7 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
         ...(allowedAudience?.length ? { allowedAudience } : {}),
         ...(allowedClients?.length ? { allowedClients } : {}),
         ...(allowedScopes?.length ? { allowedScopes } : {}),
+        ...(options.customClaims?.length ? { customClaims: options.customClaims } : {}),
         ...(options.clientId ? { clientId: options.clientId } : {}),
         ...(options.clientSecret ? { clientSecret: options.clientSecret } : {}),
       };
@@ -434,6 +444,7 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
         ...(config.jwtConfig.allowedAudience?.length ? { allowedAudience: config.jwtConfig.allowedAudience } : {}),
         ...(config.jwtConfig.allowedClients?.length ? { allowedClients: config.jwtConfig.allowedClients } : {}),
         ...(config.jwtConfig.allowedScopes?.length ? { allowedScopes: config.jwtConfig.allowedScopes } : {}),
+        ...(config.jwtConfig.customClaims?.length ? { customClaims: config.jwtConfig.customClaims } : {}),
       },
     };
   }
