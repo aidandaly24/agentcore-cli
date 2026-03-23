@@ -1017,10 +1017,11 @@ function CustomClaimForm({ initialClaim, onSave, onCancel }: CustomClaimFormProp
       <Box marginTop={1} flexDirection="column">
         <Box>
           <Text color={activeField === 'claimName' ? 'cyan' : 'gray'}>Claim name: </Text>
+          {activeField === 'claimName' && !claimName && <Cursor />}
           <Text color={activeField === 'claimName' ? undefined : 'gray'}>
             {claimName || <Text dimColor>e.g., department</Text>}
           </Text>
-          {activeField === 'claimName' && <Cursor />}
+          {activeField === 'claimName' && claimName && <Cursor />}
         </Box>
 
         <Box>
@@ -1051,6 +1052,7 @@ function CustomClaimForm({ initialClaim, onSave, onCancel }: CustomClaimFormProp
 
         <Box>
           <Text color={activeField === 'matchValue' ? 'cyan' : 'gray'}>Match value: </Text>
+          {activeField === 'matchValue' && !matchValue && <Cursor />}
           <Text color={activeField === 'matchValue' ? undefined : 'gray'}>
             {matchValue || (
               <Text dimColor>
@@ -1058,7 +1060,7 @@ function CustomClaimForm({ initialClaim, onSave, onCancel }: CustomClaimFormProp
               </Text>
             )}
           </Text>
-          {activeField === 'matchValue' && <Cursor />}
+          {activeField === 'matchValue' && matchValue && <Cursor />}
         </Box>
       </Box>
 
