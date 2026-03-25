@@ -46,13 +46,28 @@ const OidcDiscoveryUrlSchema = z
 
 // ── Custom Claims Schemas (matches CFN CustomClaimValidationType) ──
 
+// API-documented patterns (from ClaimMatchValueType and CustomClaimValidationType)
+const MATCH_VALUE_PATTERN = /^[A-Za-z0-9_.-]+$/;
+const CLAIM_NAME_PATTERN = /^[A-Za-z0-9_.:-]+$/;
+// Server-side reserved claim names (not regex-documented; API rejects these at deploy time)
+const RESERVED_CLAIM_NAMES = ['client_id'];
+
 export const ClaimMatchOperatorSchema = z.enum(['EQUALS', 'CONTAINS', 'CONTAINS_ANY']);
 export type ClaimMatchOperator = z.infer<typeof ClaimMatchOperatorSchema>;
 
 export const ClaimMatchValueSchema = z
   .object({
-    matchValueString: z.string().min(1).optional(),
-    matchValueStringList: z.array(z.string().min(1)).min(1).max(255).optional(),
+    matchValueString: z
+      .string()
+      .min(1)
+      .max(255)
+      .regex(MATCH_VALUE_PATTERN, 'Match value must match [A-Za-z0-9_.-]+')
+      .optional(),
+    matchValueStringList: z
+      .array(z.string().min(1).max(255).regex(MATCH_VALUE_PATTERN, 'Each match value must match [A-Za-z0-9_.-]+'))
+      .min(1)
+      .max(255)
+      .optional(),
   })
   .refine(data => data.matchValueString !== undefined || data.matchValueStringList !== undefined, {
     message: 'Either matchValueString or matchValueStringList must be provided',
@@ -70,7 +85,11 @@ export const CustomClaimValidationSchema = z
     inboundTokenClaimName: z
       .string()
       .min(1)
-      .regex(/^[A-Za-z0-9_.\-:]+$/, 'Claim name must match [A-Za-z0-9_.-:]+'),
+      .max(255)
+      .regex(CLAIM_NAME_PATTERN, 'Claim name must match [A-Za-z0-9_.-:]+')
+      .refine(name => !RESERVED_CLAIM_NAMES.includes(name), {
+        message: `Claim name cannot be a reserved name (${RESERVED_CLAIM_NAMES.join(', ')})`,
+      }),
     inboundTokenClaimValueType: InboundTokenClaimValueTypeSchema,
     authorizingClaimMatchValue: z.object({
       claimMatchOperator: ClaimMatchOperatorSchema,

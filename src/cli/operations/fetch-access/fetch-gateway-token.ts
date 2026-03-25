@@ -206,7 +206,7 @@ function resolveClientId(
     return envClientId;
   }
 
-  // Tier 3: allowedClients[0] from mcp.json (fallback)
+  // Tier 3: allowedClients[0] from agentcore.json (fallback)
   if (jwtConfig.allowedClients && jwtConfig.allowedClients.length > 0) {
     return jwtConfig.allowedClients[0];
   }
