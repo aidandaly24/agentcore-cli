@@ -180,3 +180,68 @@ export function getSupportedFrameworksForProtocol(protocol: ProtocolMode): reado
 export function isFrameworkSupportedForProtocol(protocol: ProtocolMode, framework: SDKFramework): boolean {
   return PROTOCOL_FRAMEWORK_MATRIX[protocol].includes(framework);
 }
+
+// ============================================================================
+// OAuth2 Vendor Provider Categories
+// ============================================================================
+
+/**
+ * Named providers have a dedicated `xxxOauth2ProviderConfig` key in the SDK.
+ * They only require clientId + clientSecret (no discoveryUrl).
+ * Microsoft additionally supports an optional tenantId.
+ */
+export const NAMED_PROVIDER_CONFIG_KEYS: Record<string, string> = {
+  GoogleOauth2: 'googleOauth2ProviderConfig',
+  GithubOauth2: 'githubOauth2ProviderConfig',
+  SlackOauth2: 'slackOauth2ProviderConfig',
+  SalesforceOauth2: 'salesforceOauth2ProviderConfig',
+  MicrosoftOauth2: 'microsoftOauth2ProviderConfig',
+  AtlassianOauth2: 'atlassianOauth2ProviderConfig',
+  LinkedinOauth2: 'linkedinOauth2ProviderConfig',
+};
+
+/**
+ * Included providers use a shared `includedOauth2ProviderConfig` key.
+ * They require clientId + clientSecret, with optional issuer,
+ * authorizationEndpoint, and tokenEndpoint for tenant-specific overrides.
+ */
+export const INCLUDED_PROVIDERS = new Set([
+  'Auth0Oauth2',
+  'CognitoOauth2',
+  'CyberArkOauth2',
+  'DropboxOauth2',
+  'FacebookOauth2',
+  'FusionAuthOauth2',
+  'HubspotOauth2',
+  'NotionOauth2',
+  'OktaOauth2',
+  'OneLoginOauth2',
+  'PingOneOauth2',
+  'RedditOauth2',
+  'SpotifyOauth2',
+  'TwitchOauth2',
+  'XOauth2',
+  'YandexOauth2',
+  'ZoomOauth2',
+]);
+
+/**
+ * Check if a vendor uses a named provider config (dedicated SDK config key).
+ */
+export function isNamedProvider(vendor: string): boolean {
+  return vendor in NAMED_PROVIDER_CONFIG_KEYS;
+}
+
+/**
+ * Check if a vendor uses the included provider config (shared SDK config key).
+ */
+export function isIncludedProvider(vendor: string): boolean {
+  return INCLUDED_PROVIDERS.has(vendor);
+}
+
+/**
+ * Check if a vendor requires a discoveryUrl. Only Custom (or unrecognized) vendors do.
+ */
+export function vendorRequiresDiscoveryUrl(vendor: string): boolean {
+  return !isNamedProvider(vendor) && !isIncludedProvider(vendor);
+}

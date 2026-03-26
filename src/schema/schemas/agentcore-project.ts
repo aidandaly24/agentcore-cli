@@ -6,7 +6,7 @@
  *
  * @module agentcore-project
  */
-import { isReservedProjectName } from '../constants';
+import { isReservedProjectName, vendorRequiresDiscoveryUrl } from '../constants';
 import { AgentEnvSpecSchema } from './agent-env';
 import { AgentCoreGatewaySchema, AgentCoreGatewayTargetSchema, AgentCoreMcpRuntimeToolSchema } from './mcp';
 import { EvaluationLevelSchema, EvaluatorConfigSchema, EvaluatorNameSchema } from './primitives/evaluator';
@@ -167,20 +167,38 @@ export const ApiKeyCredentialSchema = z.object({
 
 export type ApiKeyCredential = z.infer<typeof ApiKeyCredentialSchema>;
 
-export const OAuthCredentialSchema = z.object({
-  authorizerType: z.literal('OAuthCredentialProvider'),
-  name: CredentialNameSchema,
-  /** OIDC discovery URL for the OAuth provider (optional for imported providers that already exist in Identity service) */
-  discoveryUrl: z.string().url().optional(),
-  /** Scopes this credential provider supports */
-  scopes: z.array(z.string()).optional(),
-  /** Credential provider vendor type */
-  vendor: z.string().default('CustomOauth2'),
-  /** Whether this credential was auto-created by the CLI (e.g., for CUSTOM_JWT inbound auth) */
-  managed: z.boolean().optional(),
-  /** Whether this credential is used for inbound or outbound auth */
-  usage: z.enum(['inbound', 'outbound']).optional(),
-});
+export const OAuthCredentialSchema = z
+  .object({
+    authorizerType: z.literal('OAuthCredentialProvider'),
+    name: CredentialNameSchema,
+    /** OIDC discovery URL — required for Custom/unknown vendors, ignored for Named/Included */
+    discoveryUrl: z.string().url().optional(),
+    /** Scopes this credential provider supports */
+    scopes: z.array(z.string()).optional(),
+    /** Credential provider vendor type (semi-open for forward compatibility) */
+    vendor: z.string().default('CustomOauth2'),
+    /** Whether this credential was auto-created by the CLI (e.g., for CUSTOM_JWT inbound auth) */
+    managed: z.boolean().optional(),
+    /** Whether this credential is used for inbound or outbound auth */
+    usage: z.enum(['inbound', 'outbound']).optional(),
+    /** Microsoft Entra ID tenant ID (MicrosoftOauth2 only) */
+    tenantId: z.string().optional(),
+    /** Token issuer for Included providers (e.g. Okta, Auth0, Cognito) */
+    issuer: z.string().optional(),
+    /** OAuth2 authorization endpoint for Included providers */
+    authorizationEndpoint: z.string().optional(),
+    /** OAuth2 token endpoint for Included providers */
+    tokenEndpoint: z.string().optional(),
+  })
+  .superRefine((cred, ctx) => {
+    if (vendorRequiresDiscoveryUrl(cred.vendor) && !cred.discoveryUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['discoveryUrl'],
+        message: `discoveryUrl is required for vendor "${cred.vendor}"`,
+      });
+    }
+  });
 
 export type OAuthCredential = z.infer<typeof OAuthCredentialSchema>;
 
