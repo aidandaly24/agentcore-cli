@@ -5,11 +5,13 @@
  * as CDK constructs. These operations run as a pre-deploy step outside the
  * main CDK synthesis/deploy path.
  */
+import { INCLUDED_PROVIDERS, NAMED_PROVIDER_CONFIG_KEYS } from '../../../schema';
 import {
   BedrockAgentCoreControlClient,
   CreateOauth2CredentialProviderCommand,
   type CredentialProviderVendorType,
   GetOauth2CredentialProviderCommand,
+  type Oauth2ProviderConfigInput,
   ResourceNotFoundException,
   UpdateOauth2CredentialProviderCommand,
 } from '@aws-sdk/client-bedrock-agentcore-control';
@@ -23,9 +25,17 @@ export interface OAuth2ProviderResult {
 export interface OAuth2ProviderParams {
   name: string;
   vendor: string;
-  discoveryUrl: string;
+  discoveryUrl?: string;
   clientId: string;
   clientSecret: string;
+  /** Microsoft Entra ID tenant ID (MicrosoftOauth2 only) */
+  tenantId?: string;
+  /** Token issuer for Included providers (e.g. Okta, Auth0) */
+  issuer?: string;
+  /** Authorization endpoint for Included providers */
+  authorizationEndpoint?: string;
+  /** Token endpoint for Included providers */
+  tokenEndpoint?: string;
 }
 
 /**
@@ -65,24 +75,51 @@ export async function oAuth2ProviderExists(
 
 /**
  * Build the OAuth2 provider config for Create/Update commands.
- * Always uses customOauth2ProviderConfig — the vendor field controls server-side
- * behavior (token endpoints, scopes), but the config shape is the same for all
- * vendors in the current API. Vendor-specific config paths (e.g. googleOauth2ProviderConfig)
- * would be needed if we add vendor selection in a future phase.
+ * Routes to the correct SDK config key based on vendor type:
+ * - Named providers (Google, GitHub, Slack, etc.) → dedicated config key
+ * - Included providers (Okta, Auth0, Cognito, etc.) → includedOauth2ProviderConfig
+ * - Custom/unknown → customOauth2ProviderConfig (requires discoveryUrl)
  */
 function buildOAuth2Config(params: OAuth2ProviderParams) {
-  return {
-    name: params.name,
-    credentialProviderVendor: params.vendor as CredentialProviderVendorType,
-    oauth2ProviderConfigInput: {
+  let configInput: Oauth2ProviderConfigInput;
+
+  // Named provider — dedicated config key (e.g. googleOauth2ProviderConfig)
+  const namedConfigKey = NAMED_PROVIDER_CONFIG_KEYS[params.vendor];
+  if (namedConfigKey) {
+    const namedConfig: Record<string, unknown> = {
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+    };
+    if (params.vendor === 'MicrosoftOauth2' && params.tenantId) {
+      namedConfig.tenantId = params.tenantId;
+    }
+    // Computed key requires double assertion — routing logic guarantees correctness
+    configInput = { [namedConfigKey]: namedConfig } as unknown as Oauth2ProviderConfigInput;
+  } else if (INCLUDED_PROVIDERS.has(params.vendor)) {
+    // Included provider — shared includedOauth2ProviderConfig
+    const includedConfig: Record<string, unknown> = {
+      clientId: params.clientId,
+      clientSecret: params.clientSecret,
+    };
+    if (params.issuer) includedConfig.issuer = params.issuer;
+    if (params.authorizationEndpoint) includedConfig.authorizationEndpoint = params.authorizationEndpoint;
+    if (params.tokenEndpoint) includedConfig.tokenEndpoint = params.tokenEndpoint;
+    configInput = { includedOauth2ProviderConfig: includedConfig } as unknown as Oauth2ProviderConfigInput;
+  } else {
+    // Custom provider — requires discoveryUrl
+    configInput = {
       customOauth2ProviderConfig: {
         clientId: params.clientId,
         clientSecret: params.clientSecret,
-        oauthDiscovery: {
-          discoveryUrl: params.discoveryUrl,
-        },
+        oauthDiscovery: { discoveryUrl: params.discoveryUrl! },
       },
-    },
+    };
+  }
+
+  return {
+    name: params.name,
+    credentialProviderVendor: params.vendor as CredentialProviderVendorType,
+    oauth2ProviderConfigInput: configInput,
   };
 }
 

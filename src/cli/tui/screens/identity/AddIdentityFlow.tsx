@@ -40,13 +40,18 @@ export function AddIdentityFlow({ isInteractive = true, onExit, onBack, onDev, o
           ? {
               authorizerType: 'OAuthCredentialProvider' as const,
               name: config.name,
-              discoveryUrl: config.discoveryUrl!,
+              discoveryUrl: config.discoveryUrl,
               clientId: config.clientId!,
               clientSecret: config.clientSecret!,
               scopes: config.scopes
                 ?.split(',')
                 .map(s => s.trim())
                 .filter(Boolean),
+              vendor: config.vendor,
+              tenantId: config.tenantId,
+              issuer: config.issuer,
+              authorizationEndpoint: config.authorizationEndpoint,
+              tokenEndpoint: config.tokenEndpoint,
             }
           : {
               authorizerType: 'ApiKeyCredentialProvider' as const,

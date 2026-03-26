@@ -6,7 +6,7 @@ import { HELP_TEXT } from '../../constants';
 import { useListNavigation } from '../../hooks';
 import { generateUniqueName } from '../../utils';
 import type { AddIdentityConfig } from './types';
-import { IDENTITY_STEP_LABELS, IDENTITY_TYPE_OPTIONS } from './types';
+import { IDENTITY_STEP_LABELS, IDENTITY_TYPE_OPTIONS, VENDOR_OPTIONS } from './types';
 import { useAddIdentityWizard } from './useAddIdentityWizard';
 import React, { useMemo } from 'react';
 
@@ -25,10 +25,17 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
     []
   );
 
+  const vendorItems: SelectableItem[] = useMemo(
+    () => VENDOR_OPTIONS.map(opt => ({ id: opt.id, title: opt.title, description: opt.description })),
+    []
+  );
+
   const isTypeStep = wizard.step === 'type';
   const isNameStep = wizard.step === 'name';
+  const isVendorStep = wizard.step === 'vendor';
   const isApiKeyStep = wizard.step === 'apiKey';
   const isDiscoveryUrlStep = wizard.step === 'discoveryUrl';
+  const isTenantIdStep = wizard.step === 'tenantId';
   const isClientIdStep = wizard.step === 'clientId';
   const isClientSecretStep = wizard.step === 'clientSecret';
   const isScopesStep = wizard.step === 'scopes';
@@ -42,6 +49,13 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
     isActive: isTypeStep,
   });
 
+  const vendorNav = useListNavigation({
+    items: vendorItems,
+    onSelect: item => wizard.setVendor(item.id),
+    onExit: () => wizard.goBack(),
+    isActive: isVendorStep,
+  });
+
   useListNavigation({
     items: [{ id: 'confirm', title: 'Confirm' }],
     onSelect: () => onComplete(wizard.config),
@@ -49,17 +63,20 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
     isActive: isConfirmStep,
   });
 
-  const helpText = isTypeStep
-    ? HELP_TEXT.NAVIGATE_SELECT
-    : isConfirmStep
-      ? HELP_TEXT.CONFIRM_CANCEL
-      : HELP_TEXT.TEXT_INPUT;
+  const helpText =
+    isTypeStep || isVendorStep
+      ? HELP_TEXT.NAVIGATE_SELECT
+      : isConfirmStep
+        ? HELP_TEXT.CONFIRM_CANCEL
+        : HELP_TEXT.TEXT_INPUT;
 
   const headerContent = <StepIndicator steps={wizard.steps} currentStep={wizard.step} labels={IDENTITY_STEP_LABELS} />;
 
   const defaultName = isOAuth
     ? generateUniqueName('MyOAuth', existingIdentityNames)
     : generateUniqueName('MyApiKey', existingIdentityNames);
+
+  const vendorLabel = VENDOR_OPTIONS.find(v => v.id === wizard.config.vendor)?.title ?? wizard.config.vendor ?? '';
 
   return (
     <Screen title="Add Credential" onExit={onExit} helpText={helpText} headerContent={headerContent}>
@@ -82,6 +99,15 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
             onCancel={() => wizard.goBack()}
             schema={CredentialNameSchema}
             customValidation={value => !existingIdentityNames.includes(value) || 'Credential name already exists'}
+          />
+        )}
+
+        {isVendorStep && (
+          <WizardSelect
+            title="Select OAuth provider"
+            description="Choose a provider or use Custom for any OAuth2 endpoint"
+            items={vendorItems}
+            selectedIndex={vendorNav.selectedIndex}
           />
         )}
 
@@ -109,11 +135,20 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
               } catch {
                 return 'Must be a valid URL';
               }
-              if (!value.endsWith('/.well-known/openid-configuration')) {
-                return "URL must end with '/.well-known/openid-configuration'";
-              }
               return true;
             }}
+          />
+        )}
+
+        {isTenantIdStep && (
+          <TextInput
+            key="tenantId"
+            prompt="Microsoft Entra ID Tenant ID (optional, press Enter to skip)"
+            placeholder="e.g. your-tenant-id or common"
+            initialValue=""
+            onSubmit={wizard.setTenantId}
+            onCancel={() => wizard.goBack()}
+            allowEmpty
           />
         )}
 
@@ -157,8 +192,12 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
               isOAuth
                 ? [
                     { label: 'Type', value: 'OAuth' },
+                    { label: 'Provider', value: vendorLabel },
                     { label: 'Name', value: wizard.config.name },
-                    { label: 'Discovery URL', value: wizard.config.discoveryUrl ?? '' },
+                    ...(wizard.config.discoveryUrl
+                      ? [{ label: 'Discovery URL', value: wizard.config.discoveryUrl }]
+                      : []),
+                    ...(wizard.config.tenantId ? [{ label: 'Tenant ID', value: wizard.config.tenantId }] : []),
                     {
                       label: 'Client ID',
                       value: wizard.config.clientId ? '****' + wizard.config.clientId.slice(-4) : '',

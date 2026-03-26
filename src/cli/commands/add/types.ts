@@ -131,6 +131,11 @@ export interface AddCredentialOptions {
   clientId?: string;
   clientSecret?: string;
   scopes?: string;
+  vendor?: string;
+  tenantId?: string;
+  issuer?: string;
+  authorizationEndpoint?: string;
+  tokenEndpoint?: string;
   json?: boolean;
 }
 

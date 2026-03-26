@@ -24,10 +24,15 @@ export interface AddApiKeyCredentialOptions {
 export interface AddOAuthCredentialOptions {
   authorizerType: 'OAuthCredentialProvider';
   name: string;
-  discoveryUrl: string;
+  discoveryUrl?: string;
   clientId: string;
   clientSecret: string;
   scopes?: string[];
+  vendor?: string;
+  tenantId?: string;
+  issuer?: string;
+  authorizationEndpoint?: string;
+  tokenEndpoint?: string;
 }
 
 /**
@@ -261,6 +266,11 @@ export class CredentialPrimitive extends BasePrimitive<AddCredentialOptions, Rem
       .option('--client-id <id>', 'OAuth client ID [non-interactive]')
       .option('--client-secret <secret>', 'OAuth client secret [non-interactive]')
       .option('--scopes <scopes>', 'OAuth scopes, comma-separated [non-interactive]')
+      .option('--vendor <vendor>', 'OAuth vendor type (e.g. GoogleOauth2, SlackOauth2, OktaOauth2) [non-interactive]')
+      .option('--tenant-id <tenantId>', 'Microsoft Entra ID tenant ID (MicrosoftOauth2 only) [non-interactive]')
+      .option('--issuer <issuer>', 'Token issuer URL for Included providers (e.g. Okta, Auth0) [non-interactive]')
+      .option('--authorization-endpoint <url>', 'Authorization endpoint for Included providers [non-interactive]')
+      .option('--token-endpoint <url>', 'Token endpoint for Included providers [non-interactive]')
       .action(
         async (cliOptions: {
           name?: string;
@@ -271,6 +281,11 @@ export class CredentialPrimitive extends BasePrimitive<AddCredentialOptions, Rem
           clientId?: string;
           clientSecret?: string;
           scopes?: string;
+          vendor?: string;
+          tenantId?: string;
+          issuer?: string;
+          authorizationEndpoint?: string;
+          tokenEndpoint?: string;
         }) => {
           try {
             if (!findConfigRoot()) {
@@ -286,7 +301,12 @@ export class CredentialPrimitive extends BasePrimitive<AddCredentialOptions, Rem
               cliOptions.discoveryUrl ||
               cliOptions.clientId ||
               cliOptions.clientSecret ||
-              cliOptions.scopes
+              cliOptions.scopes ||
+              cliOptions.vendor ||
+              cliOptions.tenantId ||
+              cliOptions.issuer ||
+              cliOptions.authorizationEndpoint ||
+              cliOptions.tokenEndpoint
             ) {
               // CLI mode
               const validation = validateAddCredentialOptions({
@@ -297,6 +317,11 @@ export class CredentialPrimitive extends BasePrimitive<AddCredentialOptions, Rem
                 clientId: cliOptions.clientId,
                 clientSecret: cliOptions.clientSecret,
                 scopes: cliOptions.scopes,
+                vendor: cliOptions.vendor,
+                tenantId: cliOptions.tenantId,
+                issuer: cliOptions.issuer,
+                authorizationEndpoint: cliOptions.authorizationEndpoint,
+                tokenEndpoint: cliOptions.tokenEndpoint,
               });
 
               if (!validation.valid) {
@@ -313,13 +338,18 @@ export class CredentialPrimitive extends BasePrimitive<AddCredentialOptions, Rem
                   ? {
                       authorizerType: 'OAuthCredentialProvider' as const,
                       name: cliOptions.name!,
-                      discoveryUrl: cliOptions.discoveryUrl!,
+                      discoveryUrl: cliOptions.discoveryUrl,
                       clientId: cliOptions.clientId!,
                       clientSecret: cliOptions.clientSecret!,
                       scopes: cliOptions.scopes
                         ?.split(',')
                         .map(s => s.trim())
                         .filter(Boolean),
+                      vendor: cliOptions.vendor,
+                      tenantId: cliOptions.tenantId,
+                      issuer: cliOptions.issuer,
+                      authorizationEndpoint: cliOptions.authorizationEndpoint,
+                      tokenEndpoint: cliOptions.tokenEndpoint,
                     }
                   : {
                       authorizerType: 'ApiKeyCredentialProvider' as const,
@@ -390,9 +420,13 @@ export class CredentialPrimitive extends BasePrimitive<AddCredentialOptions, Rem
       credential = {
         authorizerType: 'OAuthCredentialProvider',
         name: config.name,
-        discoveryUrl: config.discoveryUrl,
-        vendor: 'CustomOauth2',
+        vendor: config.vendor ?? 'CustomOauth2',
         scopes: config.scopes,
+        ...(config.discoveryUrl ? { discoveryUrl: config.discoveryUrl } : {}),
+        ...(config.tenantId ? { tenantId: config.tenantId } : {}),
+        ...(config.issuer ? { issuer: config.issuer } : {}),
+        ...(config.authorizationEndpoint ? { authorizationEndpoint: config.authorizationEndpoint } : {}),
+        ...(config.tokenEndpoint ? { tokenEndpoint: config.tokenEndpoint } : {}),
       };
       project.credentials.push(credential);
       await this.writeProjectSpec(project);

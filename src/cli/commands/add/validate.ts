@@ -14,6 +14,7 @@ import {
   getSupportedFrameworksForProtocol,
   getSupportedModelProviders,
   matchEnumValue,
+  vendorRequiresDiscoveryUrl,
 } from '../../../schema';
 import { ARN_VALIDATION_MESSAGE, isValidArn } from '../shared/arn-utils';
 import { parseAndValidateLifecycleOptions } from '../shared/lifecycle-utils';
@@ -745,14 +746,27 @@ export function validateAddCredentialOptions(options: AddCredentialOptions): Val
   const identityType = options.type ?? 'api-key';
 
   if (identityType === 'oauth') {
-    if (!options.discoveryUrl) {
-      return { valid: false, error: '--discovery-url is required for OAuth credentials' };
+    const vendor = options.vendor ?? 'CustomOauth2';
+
+    // discoveryUrl is only required for Custom/unknown vendors
+    if (vendorRequiresDiscoveryUrl(vendor)) {
+      if (!options.discoveryUrl) {
+        return { valid: false, error: '--discovery-url is required for Custom OAuth credentials' };
+      }
+      try {
+        new URL(options.discoveryUrl);
+      } catch {
+        return { valid: false, error: '--discovery-url must be a valid URL' };
+      }
+    } else if (options.discoveryUrl) {
+      // Validate URL format if provided even for Named/Included vendors
+      try {
+        new URL(options.discoveryUrl);
+      } catch {
+        return { valid: false, error: '--discovery-url must be a valid URL' };
+      }
     }
-    try {
-      new URL(options.discoveryUrl);
-    } catch {
-      return { valid: false, error: '--discovery-url must be a valid URL' };
-    }
+
     if (!options.clientId) {
       return { valid: false, error: '--client-id is required for OAuth credentials' };
     }

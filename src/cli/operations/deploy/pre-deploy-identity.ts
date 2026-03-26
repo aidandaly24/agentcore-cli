@@ -357,6 +357,10 @@ async function setupSingleOAuth2Provider(
     discoveryUrl: credential.discoveryUrl,
     clientId,
     clientSecret,
+    tenantId: credential.tenantId,
+    issuer: credential.issuer,
+    authorizationEndpoint: credential.authorizationEndpoint,
+    tokenEndpoint: credential.tokenEndpoint,
   };
 
   try {
