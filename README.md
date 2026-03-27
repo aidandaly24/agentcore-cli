@@ -66,12 +66,12 @@ agentcore invoke
 
 ## Supported Model Providers
 
-| Provider       | API Key Required          | Default Model                                    |
-| -------------- | ------------------------- | ------------------------------------------------ |
-| Amazon Bedrock | No (uses AWS credentials) | us.anthropic.claude-sonnet-4-5-20250514-v1:0     |
-| Anthropic      | Yes                       | claude-sonnet-4-5-20250514                       |
-| Google Gemini  | Yes                       | gemini-2.5-flash                                 |
-| OpenAI         | Yes                       | gpt-4.1                                          |
+| Provider       | API Key Required          | Default Model                                |
+| -------------- | ------------------------- | -------------------------------------------- |
+| Amazon Bedrock | No (uses AWS credentials) | us.anthropic.claude-sonnet-4-5-20250514-v1:0 |
+| Anthropic      | Yes                       | claude-sonnet-4-5-20250514                   |
+| Google Gemini  | Yes                       | gemini-2.5-flash                             |
+| OpenAI         | Yes                       | gpt-4.1                                      |
 
 ## Commands
 
@@ -95,33 +95,33 @@ agentcore invoke
 
 ### Observability
 
-| Command        | Description                              |
-| -------------- | ---------------------------------------- |
-| `logs`         | Stream or search agent runtime logs      |
-| `traces list`  | List recent traces for a deployed agent  |
-| `traces get`   | Download a trace to a JSON file          |
-| `status`       | Show deployed resource details           |
+| Command       | Description                             |
+| ------------- | --------------------------------------- |
+| `logs`        | Stream or search agent runtime logs     |
+| `traces list` | List recent traces for a deployed agent |
+| `traces get`  | Download a trace to a JSON file         |
+| `status`      | Show deployed resource details          |
 
 ### Evaluations
 
 | Command              | Description                                   |
 | -------------------- | --------------------------------------------- |
 | `add evaluator`      | Add a custom LLM-as-a-Judge evaluator         |
-| `add online-eval`    | Add continuous evaluation for live traffic     |
-| `run eval`           | Run on-demand evaluation against agent traces  |
-| `evals history`      | View past eval run results                     |
-| `pause online-eval`  | Pause a deployed online eval config            |
-| `resume online-eval` | Resume a paused online eval config             |
-| `logs evals`         | Stream or search online eval logs              |
+| `add online-eval`    | Add continuous evaluation for live traffic    |
+| `run eval`           | Run on-demand evaluation against agent traces |
+| `evals history`      | View past eval run results                    |
+| `pause online-eval`  | Pause a deployed online eval config           |
+| `resume online-eval` | Resume a paused online eval config            |
+| `logs evals`         | Stream or search online eval logs             |
 
 ### Utilities
 
-| Command        | Description                              |
-| -------------- | ---------------------------------------- |
-| `validate`     | Validate configuration files             |
-| `package`      | Package agent artifacts without deploying|
-| `fetch access` | Fetch access info for deployed resources |
-| `update`       | Check for and install CLI updates        |
+| Command        | Description                               |
+| -------------- | ----------------------------------------- |
+| `validate`     | Validate configuration files              |
+| `package`      | Package agent artifacts without deploying |
+| `fetch access` | Fetch access info for deployed resources  |
+| `update`       | Check for and install CLI updates         |
 
 ## Project Structure
 

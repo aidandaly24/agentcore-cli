@@ -126,14 +126,14 @@ agentcore status --agent-runtime-id abc123
 agentcore status --json
 ```
 
-| Flag                      | Description                                                                                     |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| `--agent-runtime-id <id>` | Look up a specific agent runtime by ID                                                          |
-| `--target <name>`         | Select deployment target                                                                        |
+| Flag                      | Description                                                                                                                |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `--agent-runtime-id <id>` | Look up a specific agent runtime by ID                                                                                     |
+| `--target <name>`         | Select deployment target                                                                                                   |
 | `--type <type>`           | Filter by resource type: `agent`, `memory`, `credential`, `gateway`, `evaluator`, `online-eval`, `policy-engine`, `policy` |
-| `--state <state>`         | Filter by deployment state: `deployed`, `local-only`, `pending-removal`                         |
-| `--agent <name>`          | Filter to a specific agent                                                                      |
-| `--json`                  | JSON output                                                                                     |
+| `--state <state>`         | Filter by deployment state: `deployed`, `local-only`, `pending-removal`                                                    |
+| `--agent <name>`          | Filter to a specific agent                                                                                                 |
+| `--json`                  | JSON output                                                                                                                |
 
 ### validate
 
@@ -331,30 +331,30 @@ agentcore add gateway-target \
   --gateway MyGateway
 ```
 
-| Flag                               | Description                                                                                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `--name <name>`                    | Target name                                                                                                   |
-| `--description <desc>`             | Target description                                                                                            |
-| `--type <type>`                    | Target type (required): `mcp-server`, `api-gateway`, `open-api-schema`, `smithy-model`, `lambda-function-arn` |
-| `--endpoint <url>`                 | MCP server endpoint URL (mcp-server)                                                                          |
-| `--language <lang>`                | Implementation language: Python, TypeScript, Other (mcp-server)                                               |
-| `--host <host>`                    | Compute host: Lambda or AgentCoreRuntime (mcp-server)                                                         |
-| `--gateway <name>`                 | Gateway to attach target to                                                                                   |
-| `--outbound-auth <type>`           | `oauth`, `api-key`, or `none` (varies by target type)                                                         |
-| `--credential-name <name>`         | Existing credential name for outbound auth                                                                    |
-| `--oauth-client-id <id>`           | OAuth client ID (creates credential inline)                                                                   |
-| `--oauth-client-secret <secret>`   | OAuth client secret (creates credential inline)                                                               |
-| `--oauth-discovery-url <url>`      | OAuth discovery URL (creates credential inline)                                                               |
-| `--oauth-scopes <scopes>`          | OAuth scopes, comma-separated                                                                                 |
-| `--rest-api-id <id>`               | API Gateway REST API ID (api-gateway)                                                                         |
-| `--stage <stage>`                  | API Gateway stage name (api-gateway)                                                                          |
-| `--tool-filter-path <path>`        | Filter API paths, supports wildcards (api-gateway)                                                            |
-| `--tool-filter-methods <methods>`  | Comma-separated HTTP methods to expose (api-gateway)                                                          |
-| `--schema <path>`                  | Path to schema file, relative to project root (open-api-schema, smithy-model)                                 |
-| `--schema-s3-account <account>`    | AWS account for S3-hosted schema (open-api-schema, smithy-model)                                              |
-| `--lambda-arn <arn>`               | Lambda function ARN (lambda-function-arn)                                                                     |
-| `--tool-schema-file <path>`        | Tool schema file, relative to project root or absolute path (lambda-function-arn)                             |
-| `--json`                           | JSON output                                                                                                   |
+| Flag                              | Description                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `--name <name>`                   | Target name                                                                                                   |
+| `--description <desc>`            | Target description                                                                                            |
+| `--type <type>`                   | Target type (required): `mcp-server`, `api-gateway`, `open-api-schema`, `smithy-model`, `lambda-function-arn` |
+| `--endpoint <url>`                | MCP server endpoint URL (mcp-server)                                                                          |
+| `--language <lang>`               | Implementation language: Python, TypeScript, Other (mcp-server)                                               |
+| `--host <host>`                   | Compute host: Lambda or AgentCoreRuntime (mcp-server)                                                         |
+| `--gateway <name>`                | Gateway to attach target to                                                                                   |
+| `--outbound-auth <type>`          | `oauth`, `api-key`, or `none` (varies by target type)                                                         |
+| `--credential-name <name>`        | Existing credential name for outbound auth                                                                    |
+| `--oauth-client-id <id>`          | OAuth client ID (creates credential inline)                                                                   |
+| `--oauth-client-secret <secret>`  | OAuth client secret (creates credential inline)                                                               |
+| `--oauth-discovery-url <url>`     | OAuth discovery URL (creates credential inline)                                                               |
+| `--oauth-scopes <scopes>`         | OAuth scopes, comma-separated                                                                                 |
+| `--rest-api-id <id>`              | API Gateway REST API ID (api-gateway)                                                                         |
+| `--stage <stage>`                 | API Gateway stage name (api-gateway)                                                                          |
+| `--tool-filter-path <path>`       | Filter API paths, supports wildcards (api-gateway)                                                            |
+| `--tool-filter-methods <methods>` | Comma-separated HTTP methods to expose (api-gateway)                                                          |
+| `--schema <path>`                 | Path to schema file, relative to project root (open-api-schema, smithy-model)                                 |
+| `--schema-s3-account <account>`   | AWS account for S3-hosted schema (open-api-schema, smithy-model)                                              |
+| `--lambda-arn <arn>`              | Lambda function ARN (lambda-function-arn)                                                                     |
+| `--tool-schema-file <path>`       | Tool schema file, relative to project root or absolute path (lambda-function-arn)                             |
+| `--json`                          | JSON output                                                                                                   |
 
 > **Note**: `smithy-model` and `lambda-function-arn` use IAM role auth and do not support `--outbound-auth`.
 > `open-api-schema` requires `--outbound-auth` (`oauth` or `api-key`). `api-gateway` supports `api-key` or `none`.
@@ -699,12 +699,12 @@ agentcore fetch access --name MyGateway --type gateway --json
 agentcore fetch access --name MyAgent --type agent --target staging
 ```
 
-| Flag              | Description                                     |
-| ----------------- | ----------------------------------------------- |
-| `--name <name>`   | Gateway or agent name                           |
-| `--type <type>`   | Resource type: `gateway` (default) or `agent`   |
-| `--target <name>` | Deployment target                               |
-| `--json`          | JSON output                                     |
+| Flag              | Description                                   |
+| ----------------- | --------------------------------------------- |
+| `--name <name>`   | Gateway or agent name                         |
+| `--type <type>`   | Resource type: `gateway` (default) or `agent` |
+| `--target <name>` | Deployment target                             |
+| `--json`          | JSON output                                   |
 
 ### package
 

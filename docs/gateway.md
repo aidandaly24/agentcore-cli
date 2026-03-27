@@ -250,9 +250,9 @@ To get the correct code for your setup:
 
 Gateways support additional configuration fields in `agentcore.json`:
 
-| Field                  | Default | Description                                                    |
-| ---------------------- | ------- | -------------------------------------------------------------- |
-| `enableSemanticSearch` | `true`  | Enable semantic search for tool discovery                      |
+| Field                  | Default | Description                                                      |
+| ---------------------- | ------- | ---------------------------------------------------------------- |
+| `enableSemanticSearch` | `true`  | Enable semantic search for tool discovery                        |
 | `exceptionLevel`       | `NONE`  | Exception verbosity: `"NONE"` or `"DEBUG"` (for troubleshooting) |
 
 ```json

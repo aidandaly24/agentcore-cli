@@ -4,12 +4,12 @@ AgentCore projects use JSON configuration files in the `agentcore/` directory.
 
 ## Files Overview
 
-| File                       | Purpose                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| `agentcore.json`           | Project, agents, memories, credentials, evaluators, online evals, gateways    |
-| `aws-targets.json`         | Deployment targets                                                            |
-| `.cli/deployed-state.json` | Runtime state (auto-managed, do not edit)                                     |
-| `.env.local`               | API keys for local development (gitignored)                                   |
+| File                       | Purpose                                                                    |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `agentcore.json`           | Project, agents, memories, credentials, evaluators, online evals, gateways |
+| `aws-targets.json`         | Deployment targets                                                         |
+| `.cli/deployed-state.json` | Runtime state (auto-managed, do not edit)                                  |
+| `.env.local`               | API keys for local development (gitignored)                                |
 
 ---
 
@@ -64,7 +64,8 @@ Main project configuration using a **flat resource model**. Agents, memories, an
 | `mcpRuntimeTools`   | No       | Array of MCP runtime tool definitions                       |
 | `unassignedTargets` | No       | Targets not yet assigned to a gateway                       |
 
-> Gateway configuration is in the `agentCoreGateways` field. See [Gateways and MCP Tools](#gateways-and-mcp-tools) below.
+> Gateway configuration is in the `agentCoreGateways` field. See [Gateways and MCP Tools](#gateways-and-mcp-tools)
+> below.
 
 ---
 
@@ -178,25 +179,25 @@ on the next deployment.
 }
 ```
 
-| Field             | Required | Description                                        |
-| ----------------- | -------- | -------------------------------------------------- |
-| `type`            | Yes      | Always `"AgentCoreRuntime"`                        |
-| `name`            | Yes      | Agent name (1-48 chars, alphanumeric + underscore) |
-| `build`           | Yes      | `"CodeZip"` or `"Container"`                       |
-| `entrypoint`      | Yes      | Entry file (e.g., `main.py` or `main.py:handler`)  |
-| `codeLocation`    | Yes      | Directory containing agent code                    |
-| `runtimeVersion`  | Yes      | Runtime version (see below)                        |
-| `networkMode`     | No       | `"PUBLIC"` (default) or `"VPC"`                    |
-| `networkConfig`   | No       | VPC configuration (subnets, security groups)       |
-| `protocol`        | No       | `"HTTP"` (default), `"MCP"`, or `"A2A"`            |
-| `modelProvider`   | No       | `"Bedrock"`, `"Anthropic"`, `"OpenAI"`, `"Gemini"` |
-| `envVars`         | No       | Custom environment variables                       |
-| `instrumentation` | No       | OpenTelemetry settings                             |
-| `authorizerType`  | No       | `"AWS_IAM"` or `"CUSTOM_JWT"`                      |
-| `authorizerConfiguration` | No | JWT authorizer settings (for `CUSTOM_JWT`)   |
-| `requestHeaderAllowlist` | No | Headers to forward to the agent               |
-| `lifecycleConfiguration` | No | Runtime session lifecycle settings (idle timeout, max lifetime) |
-| `tags`            | No       | Agent-level tags                                   |
+| Field                     | Required | Description                                                     |
+| ------------------------- | -------- | --------------------------------------------------------------- |
+| `type`                    | Yes      | Always `"AgentCoreRuntime"`                                     |
+| `name`                    | Yes      | Agent name (1-48 chars, alphanumeric + underscore)              |
+| `build`                   | Yes      | `"CodeZip"` or `"Container"`                                    |
+| `entrypoint`              | Yes      | Entry file (e.g., `main.py` or `main.py:handler`)               |
+| `codeLocation`            | Yes      | Directory containing agent code                                 |
+| `runtimeVersion`          | Yes      | Runtime version (see below)                                     |
+| `networkMode`             | No       | `"PUBLIC"` (default) or `"VPC"`                                 |
+| `networkConfig`           | No       | VPC configuration (subnets, security groups)                    |
+| `protocol`                | No       | `"HTTP"` (default), `"MCP"`, or `"A2A"`                         |
+| `modelProvider`           | No       | `"Bedrock"`, `"Anthropic"`, `"OpenAI"`, `"Gemini"`              |
+| `envVars`                 | No       | Custom environment variables                                    |
+| `instrumentation`         | No       | OpenTelemetry settings                                          |
+| `authorizerType`          | No       | `"AWS_IAM"` or `"CUSTOM_JWT"`                                   |
+| `authorizerConfiguration` | No       | JWT authorizer settings (for `CUSTOM_JWT`)                      |
+| `requestHeaderAllowlist`  | No       | Headers to forward to the agent                                 |
+| `lifecycleConfiguration`  | No       | Runtime session lifecycle settings (idle timeout, max lifetime) |
+| `tags`                    | No       | Agent-level tags                                                |
 
 ### Runtime Versions
 
@@ -226,11 +227,11 @@ on the next deployment.
 }
 ```
 
-| Field                 | Required | Description                             |
-| --------------------- | -------- | --------------------------------------- |
-| `type`                | Yes      | Always `"AgentCoreMemory"`              |
-| `name`                | Yes      | Memory name (1-48 chars)                |
-| `eventExpiryDuration` | Yes      | Days until events expire (7-365)        |
+| Field                 | Required | Description                                                     |
+| --------------------- | -------- | --------------------------------------------------------------- |
+| `type`                | Yes      | Always `"AgentCoreMemory"`                                      |
+| `name`                | Yes      | Memory name (1-48 chars)                                        |
+| `eventExpiryDuration` | Yes      | Days until events expire (7-365)                                |
 | `strategies`          | Yes      | Array of memory strategies (can be empty for short-term memory) |
 
 ### Memory Strategies
@@ -381,7 +382,8 @@ See [Evaluations](evals.md) for the full guide.
 
 ## Gateways and MCP Tools
 
-Gateway and MCP tool configuration is part of `agentcore.json` (in the `agentCoreGateways`, `mcpRuntimeTools`, and `unassignedTargets` fields).
+Gateway and MCP tool configuration is part of `agentcore.json` (in the `agentCoreGateways`, `mcpRuntimeTools`, and
+`unassignedTargets` fields).
 
 ```json
 {
@@ -471,14 +473,14 @@ implementations.
 }
 ```
 
-| Field             | Required | Description                                                          |
-| ----------------- | -------- | -------------------------------------------------------------------- |
-| `name`            | Yes      | Target name                                                          |
+| Field             | Required | Description                                                                                             |
+| ----------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `name`            | Yes      | Target name                                                                                             |
 | `targetType`      | Yes      | `"mcpServer"`, `"lambda"`, `"openApiSchema"`, `"smithyModel"`, `"apiGateway"`, or `"lambdaFunctionArn"` |
-| `endpoint`        | Cond.    | MCP server URL (required for external `mcpServer` targets)           |
-| `compute`         | Cond.    | Compute configuration (required for `lambda` and scaffolded targets) |
-| `toolDefinitions` | Cond.    | Array of tool definitions (required for `lambda` targets)            |
-| `outboundAuth`    | No       | Outbound authentication configuration                                |
+| `endpoint`        | Cond.    | MCP server URL (required for external `mcpServer` targets)                                              |
+| `compute`         | Cond.    | Compute configuration (required for `lambda` and scaffolded targets)                                    |
+| `toolDefinitions` | Cond.    | Array of tool definitions (required for `lambda` targets)                                               |
+| `outboundAuth`    | No       | Outbound authentication configuration                                                                   |
 
 ### Outbound Auth
 
