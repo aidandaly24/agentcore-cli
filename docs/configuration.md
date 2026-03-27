@@ -377,7 +377,7 @@ Gateway and MCP tool configuration is part of `agentcore.json` (in the `agentCor
 {
   "name": "MyProject",
   "version": 1,
-  "agents": [...],
+  "runtimes": [...],
   "agentCoreGateways": [
     {
       "name": "MyGateway",
