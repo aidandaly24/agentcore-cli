@@ -4,11 +4,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain.tools import tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
 from capabilities.gateway import get_gateway_mcp_client
-{{else}}
-from mcp_client.client import get_streamable_http_mcp_client
-{{/if}}
 
 app = BedrockAgentCoreApp()
 log = app.logger
@@ -38,11 +34,7 @@ async def invoke(payload, context):
     log.info("Invoking Agent.....")
 
     # Get MCP Client
-    {{#if hasGateway}}
     mcp_client = get_gateway_mcp_client()
-    {{else}}
-    mcp_client = get_streamable_http_mcp_client()
-    {{/if}}
 
     # Load MCP Tools
     mcp_tools = []

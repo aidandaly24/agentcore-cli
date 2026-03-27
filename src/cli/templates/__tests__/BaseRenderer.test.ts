@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mockCopyAndRenderDir = vi.fn();
 const mockExistsSync = vi.fn();
+const mockMkdir = vi.fn().mockResolvedValue(undefined);
+const mockCopyFile = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../render.js', () => ({
   copyAndRenderDir: (...args: unknown[]) => mockCopyAndRenderDir(...args),
@@ -11,6 +13,15 @@ vi.mock('../render.js', () => ({
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual('node:fs');
   return { ...actual, existsSync: (...args: unknown[]) => mockExistsSync(...args) };
+});
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual('node:fs/promises');
+  return {
+    ...actual,
+    mkdir: (...args: unknown[]) => mockMkdir(...args),
+    copyFile: (...args: unknown[]) => mockCopyFile(...args),
+  };
 });
 
 vi.mock('../../../lib', () => ({

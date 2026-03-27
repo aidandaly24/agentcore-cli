@@ -2,22 +2,13 @@ import os
 from agents import Agent, Runner, function_tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
 from capabilities.gateway import get_gateway_mcp_servers
-{{else}}
-from mcp_client.client import get_streamable_http_mcp_client
-{{/if}}
 
 app = BedrockAgentCoreApp()
 log = app.logger
 
 # Get MCP Server
-{{#if hasGateway}}
 mcp_servers = get_gateway_mcp_servers()
-{{else}}
-mcp_server = get_streamable_http_mcp_client()
-mcp_servers = [mcp_server] if mcp_server else []
-{{/if}}
 
 _credentials_loaded = False
 
@@ -39,7 +30,6 @@ def add_numbers(a: int, b: int) -> int:
 async def main(query):
     ensure_credentials_loaded()
     try:
-        {{#if hasGateway}}
         if mcp_servers:
             agent = Agent(
                 name="{{ name }}",
@@ -58,28 +48,6 @@ async def main(query):
             )
             result = await Runner.run(agent, query)
             return result
-        {{else}}
-        if mcp_servers:
-            async with mcp_servers[0] as server:
-                active_servers = [server]
-                agent = Agent(
-                    name="{{ name }}",
-                    model="gpt-4.1",
-                    mcp_servers=active_servers,
-                    tools=[add_numbers]
-                )
-                result = await Runner.run(agent, query)
-                return result
-        else:
-            agent = Agent(
-                name="{{ name }}",
-                model="gpt-4.1",
-                mcp_servers=[],
-                tools=[add_numbers]
-            )
-            result = await Runner.run(agent, query)
-            return result
-        {{/if}}
     except Exception as e:
         log.error(f"Error during agent execution: {e}", exc_info=True)
         raise e

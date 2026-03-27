@@ -73,14 +73,13 @@ export abstract class BaseRenderer {
     const baseDir = path.join(templateDir, 'base');
     await copyAndRenderDir(baseDir, projectDir, templateData);
 
-    // Generate capabilities/gateway.py when gateways are configured
-    if (this.config.hasGateway) {
-      const gatewayTemplatePath = this.getGatewayTemplatePath();
-      if (gatewayTemplatePath) {
-        const capabilitiesDir = path.join(projectDir, 'capabilities');
-        await mkdir(capabilitiesDir, { recursive: true });
-        await copyFile(gatewayTemplatePath, path.join(capabilitiesDir, 'gateway.py'));
-      }
+    // Always generate capabilities/gateway.py — runtime env-var discovery
+    // handles the no-gateways case (returns empty tool list).
+    const gatewayTemplatePath = this.getGatewayTemplatePath();
+    if (gatewayTemplatePath) {
+      const capabilitiesDir = path.join(projectDir, 'capabilities');
+      await mkdir(capabilitiesDir, { recursive: true });
+      await copyFile(gatewayTemplatePath, path.join(capabilitiesDir, 'gateway.py'));
     }
 
     if (this.shouldRenderMemory()) {

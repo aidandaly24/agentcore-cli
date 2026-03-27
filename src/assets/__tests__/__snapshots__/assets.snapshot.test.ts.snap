@@ -3054,11 +3054,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
 from capabilities.gateway import get_gateway_toolsets
-{{else}}
-from mcp_client.client import get_streamable_http_mcp_client
-{{/if}}
 
 app = BedrockAgentCoreApp()
 log = app.logger
@@ -3076,12 +3072,7 @@ def add_numbers(a: int, b: int) -> int:
 
 
 # Get MCP Toolset
-{{#if hasGateway}}
 mcp_toolset = get_gateway_toolsets()
-{{else}}
-mcp_client = get_streamable_http_mcp_client()
-mcp_toolset = [mcp_client] if mcp_client else []
-{{/if}}
 
 _credentials_loaded = False
 
@@ -3405,11 +3396,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain.tools import tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
 from capabilities.gateway import get_gateway_mcp_client
-{{else}}
-from mcp_client.client import get_streamable_http_mcp_client
-{{/if}}
 
 app = BedrockAgentCoreApp()
 log = app.logger
@@ -3439,11 +3426,7 @@ async def invoke(payload, context):
     log.info("Invoking Agent.....")
 
     # Get MCP Client
-    {{#if hasGateway}}
     mcp_client = get_gateway_mcp_client()
-    {{else}}
-    mcp_client = get_streamable_http_mcp_client()
-    {{/if}}
 
     # Load MCP Tools
     mcp_tools = []
@@ -3822,22 +3805,13 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/ht
 from agents import Agent, Runner, function_tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
 from capabilities.gateway import get_gateway_mcp_servers
-{{else}}
-from mcp_client.client import get_streamable_http_mcp_client
-{{/if}}
 
 app = BedrockAgentCoreApp()
 log = app.logger
 
 # Get MCP Server
-{{#if hasGateway}}
 mcp_servers = get_gateway_mcp_servers()
-{{else}}
-mcp_server = get_streamable_http_mcp_client()
-mcp_servers = [mcp_server] if mcp_server else []
-{{/if}}
 
 _credentials_loaded = False
 
@@ -3859,7 +3833,6 @@ def add_numbers(a: int, b: int) -> int:
 async def main(query):
     ensure_credentials_loaded()
     try:
-        {{#if hasGateway}}
         if mcp_servers:
             agent = Agent(
                 name="{{ name }}",
@@ -3878,28 +3851,6 @@ async def main(query):
             )
             result = await Runner.run(agent, query)
             return result
-        {{else}}
-        if mcp_servers:
-            async with mcp_servers[0] as server:
-                active_servers = [server]
-                agent = Agent(
-                    name="{{ name }}",
-                    model="gpt-4.1",
-                    mcp_servers=active_servers,
-                    tools=[add_numbers]
-                )
-                result = await Runner.run(agent, query)
-                return result
-        else:
-            agent = Agent(
-                name="{{ name }}",
-                model="gpt-4.1",
-                mcp_servers=[],
-                tools=[add_numbers]
-            )
-            result = await Runner.run(agent, query)
-            return result
-        {{/if}}
     except Exception as e:
         log.error(f"Error during agent execution: {e}", exc_info=True)
         raise e
@@ -4169,11 +4120,7 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/ht
 "from strands import Agent, tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
 from capabilities.gateway import get_gateway_tools
-{{else}}
-from mcp_client.client import get_streamable_http_mcp_client
-{{/if}}
 {{#if hasMemory}}
 from memory.session import get_memory_session_manager
 {{/if}}
@@ -4182,11 +4129,7 @@ app = BedrockAgentCoreApp()
 log = app.logger
 
 # Define MCP tool providers
-{{#if hasGateway}}
 mcp_clients = get_gateway_tools()
-{{else}}
-mcp_clients = [get_streamable_http_mcp_client()]
-{{/if}}
 
 # Define a collection of tools used by the model
 tools = []

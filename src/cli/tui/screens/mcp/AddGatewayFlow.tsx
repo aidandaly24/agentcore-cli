@@ -1,7 +1,5 @@
-import { hasIamAuth, wireGatewayToAgent } from '../../../operations/mcp/wire-gateway';
 import { ErrorPrompt } from '../../components';
 import {
-  useAvailableAgents,
   useCreateGateway,
   useExistingGateways,
   useExistingPolicyEngines,
@@ -9,25 +7,14 @@ import {
 } from '../../hooks/useCreateMcp';
 import { AddSuccessScreen } from '../add/AddSuccessScreen';
 import { AddGatewayScreen } from './AddGatewayScreen';
-import { WireAgentsScreen } from './WireAgentsScreen';
 import type { AddGatewayConfig } from './types';
-import { Box, Text } from 'ink';
 import { useCallback, useEffect, useState } from 'react';
-
-interface WireResult {
-  agentName: string;
-  success: boolean;
-  framework?: string;
-  error?: string;
-}
 
 type FlowState =
   | { name: 'create-wizard' }
-  | { name: 'wire-agents'; gatewayName: string }
   | {
       name: 'create-success';
       gatewayName: string;
-      wireResults?: WireResult[];
       loading?: boolean;
       loadingMessage?: string;
     }
@@ -49,7 +36,6 @@ export function AddGatewayFlow({ isInteractive = true, onExit, onBack, onDev, on
   const { gateways: existingGateways, refresh: refreshGateways } = useExistingGateways();
   const { targets: unassignedTargets } = useUnassignedTargets();
   const { engines: existingPolicyEngines } = useExistingPolicyEngines();
-  const { agents } = useAvailableAgents();
   const [flow, setFlow] = useState<FlowState>({ name: 'create-wizard' });
 
   // In non-interactive mode, exit after success (but not while loading)
@@ -71,65 +57,14 @@ export function AddGatewayFlow({ isInteractive = true, onExit, onBack, onDev, on
       });
       void createGateway(config).then(result => {
         if (result.ok) {
-          // Offer to wire agents if any exist (regardless of interactive mode)
-          if (agents.length > 0) {
-            setFlow({ name: 'wire-agents', gatewayName: result.result.name });
-          } else {
-            setFlow({ name: 'create-success', gatewayName: result.result.name });
-          }
+          setFlow({ name: 'create-success', gatewayName: result.result.name });
           return;
         }
         setFlow({ name: 'error', message: result.error });
       });
     },
-    [createGateway, agents.length]
+    [createGateway]
   );
-
-  const handleWireConfirm = useCallback((gatewayName: string, selectedAgents: string[]) => {
-    setFlow({
-      name: 'create-success',
-      gatewayName,
-      loading: true,
-      loadingMessage: 'Wiring gateway into agents...',
-    });
-    void (async () => {
-      const useIam = await hasIamAuth();
-      const results: WireResult[] = [];
-      for (const agentName of selectedAgents) {
-        const result = await wireGatewayToAgent(agentName, useIam);
-        results.push({
-          agentName,
-          success: result.success,
-          framework: result.framework,
-          error: result.error,
-        });
-      }
-      setFlow({ name: 'create-success', gatewayName, wireResults: results });
-    })();
-  }, []);
-
-  // Build wire results summary for the success screen
-  const wireSummary =
-    flow.name === 'create-success' && flow.wireResults && flow.wireResults.length > 0 ? (
-      <Box flexDirection="column" marginTop={1}>
-        <Text bold>Wired agents:</Text>
-        {flow.wireResults.map(r => (
-          <Box key={r.agentName}>
-            {r.success ? (
-              <Text>
-                <Text color="green"> ✓ {r.agentName}</Text>
-                {r.framework && <Text dimColor> ({r.framework})</Text>}
-              </Text>
-            ) : (
-              <Text color="red">
-                {' '}
-                ✗ {r.agentName}: {r.error}
-              </Text>
-            )}
-          </Box>
-        ))}
-      </Box>
-    ) : undefined;
 
   // Create wizard
   if (flow.name === 'create-wizard') {
@@ -144,18 +79,6 @@ export function AddGatewayFlow({ isInteractive = true, onExit, onBack, onDev, on
     );
   }
 
-  // Wire agents step
-  if (flow.name === 'wire-agents') {
-    return (
-      <WireAgentsScreen
-        gatewayName={flow.gatewayName}
-        agents={agents}
-        onConfirm={selectedAgents => handleWireConfirm(flow.gatewayName, selectedAgents)}
-        onSkip={() => setFlow({ name: 'create-success', gatewayName: flow.gatewayName })}
-      />
-    );
-  }
-
   // Create success
   if (flow.name === 'create-success') {
     return (
@@ -163,7 +86,6 @@ export function AddGatewayFlow({ isInteractive = true, onExit, onBack, onDev, on
         isInteractive={isInteractive}
         message={`Added gateway: ${flow.gatewayName}`}
         detail="Gateway defined in `agentcore/agentcore.json`. Next: Use 'add gateway-target' to route targets through this gateway."
-        summary={wireSummary}
         loading={flow.loading}
         loadingMessage={flow.loadingMessage}
         showDevOption={true}
