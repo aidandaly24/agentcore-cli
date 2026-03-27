@@ -86,10 +86,10 @@ agentcore invoke
 
 ### Resource Management
 
-| Command  | Description                                       |
-| -------- | ------------------------------------------------- |
-| `add`    | Add agents, memory, identity, evaluators, targets |
-| `remove` | Remove resources from project                     |
+| Command  | Description                                          |
+| -------- | ---------------------------------------------------- |
+| `add`    | Add agents, memory, credentials, evaluators, targets |
+| `remove` | Remove resources from project                        |
 
 > **Note**: Run `agentcore deploy` after `add` or `remove` to update resources in AWS.
 
@@ -149,7 +149,7 @@ my-project/
 
 Projects use JSON schema files in the `agentcore/` directory:
 
-- `agentcore.json` - Agent specifications, memory, identity, evaluators, online evals
+- `agentcore.json` - Agent specifications, memory, credentials, evaluators, online evals
 - `deployed-state.json` - Runtime state in agentcore/.cli/ (auto-managed)
 - `aws-targets.json` - Deployment targets (account, region)
 
@@ -157,7 +157,7 @@ Projects use JSON schema files in the `agentcore/` directory:
 
 - **Runtime** - Managed execution environment for deployed agents
 - **Memory** - Semantic, summarization, and user preference strategies
-- **Identity** - Secure API key management via Secrets Manager
+- **Credentials** - Secure API key management via Secrets Manager
 - **Evaluations** - LLM-as-a-Judge for on-demand and continuous agent quality monitoring
 
 ## Documentation

@@ -27,14 +27,12 @@ Main project configuration using a **flat resource model**. Agents, memories, an
   },
   "runtimes": [
     {
-      "type": "AgentCoreRuntime",
       "name": "MyAgent",
       "build": "CodeZip",
       "entrypoint": "main.py",
       "codeLocation": "app/MyAgent/",
       "runtimeVersion": "PYTHON_3_13",
       "networkMode": "PUBLIC",
-      "modelProvider": "Bedrock",
       "protocol": "HTTP"
     }
   ],
@@ -117,7 +115,6 @@ resource-level value takes precedence for that specific resource.
   },
   "runtimes": [
     {
-      "type": "AgentCoreRuntime",
       "name": "MyAgent",
       "tags": {
         "Environment": "staging",
@@ -165,7 +162,6 @@ on the next deployment.
 
 ```json
 {
-  "type": "AgentCoreRuntime",
   "name": "MyAgent",
   "build": "CodeZip",
   "entrypoint": "main.py",
@@ -181,7 +177,6 @@ on the next deployment.
 
 | Field                     | Required | Description                                                     |
 | ------------------------- | -------- | --------------------------------------------------------------- |
-| `type`                    | Yes      | Always `"AgentCoreRuntime"`                                     |
 | `name`                    | Yes      | Agent name (1-48 chars, alphanumeric + underscore)              |
 | `build`                   | Yes      | `"CodeZip"` or `"Container"`                                    |
 | `entrypoint`              | Yes      | Entry file (e.g., `main.py` or `main.py:handler`)               |
@@ -190,7 +185,6 @@ on the next deployment.
 | `networkMode`             | No       | `"PUBLIC"` (default) or `"VPC"`                                 |
 | `networkConfig`           | No       | VPC configuration (subnets, security groups)                    |
 | `protocol`                | No       | `"HTTP"` (default), `"MCP"`, or `"A2A"`                         |
-| `modelProvider`           | No       | `"Bedrock"`, `"Anthropic"`, `"OpenAI"`, `"Gemini"`              |
 | `envVars`                 | No       | Custom environment variables                                    |
 | `instrumentation`         | No       | OpenTelemetry settings                                          |
 | `authorizerType`          | No       | `"AWS_IAM"` or `"CUSTOM_JWT"`                                   |
@@ -220,7 +214,6 @@ on the next deployment.
 
 ```json
 {
-  "type": "AgentCoreMemory",
   "name": "MyMemory",
   "eventExpiryDuration": 30,
   "strategies": [{ "type": "SEMANTIC" }, { "type": "SUMMARIZATION" }]
@@ -229,7 +222,6 @@ on the next deployment.
 
 | Field                 | Required | Description                                                     |
 | --------------------- | -------- | --------------------------------------------------------------- |
-| `type`                | Yes      | Always `"AgentCoreMemory"`                                      |
 | `name`                | Yes      | Memory name (1-48 chars)                                        |
 | `eventExpiryDuration` | Yes      | Days until events expire (7-365)                                |
 | `strategies`          | Yes      | Array of memory strategies (can be empty for short-term memory) |
@@ -262,36 +254,36 @@ Strategy configuration:
 
 ```json
 {
-  "type": "ApiKeyCredentialProvider",
+  "authorizerType": "ApiKeyCredentialProvider",
   "name": "OpenAI"
 }
 ```
 
-| Field  | Required | Description                         |
-| ------ | -------- | ----------------------------------- |
-| `type` | Yes      | Always `"ApiKeyCredentialProvider"` |
-| `name` | Yes      | Credential name (1-128 chars)       |
+| Field            | Required | Description                         |
+| ---------------- | -------- | ----------------------------------- |
+| `authorizerType` | Yes      | Always `"ApiKeyCredentialProvider"` |
+| `name`           | Yes      | Credential name (1-128 chars)       |
 
 ### OAuth Credential
 
 ```json
 {
-  "type": "OAuthCredentialProvider",
+  "authorizerType": "OAuthCredentialProvider",
   "name": "MyOAuthProvider",
   "discoveryUrl": "https://idp.example.com/.well-known/openid-configuration",
   "scopes": ["read", "write"]
 }
 ```
 
-| Field          | Required | Description                                            |
-| -------------- | -------- | ------------------------------------------------------ |
-| `type`         | Yes      | Always `"OAuthCredentialProvider"`                     |
-| `name`         | Yes      | Credential name (1-128 chars)                          |
-| `discoveryUrl` | Yes      | OIDC discovery URL (must be a valid URL)               |
-| `scopes`       | No       | Array of OAuth scopes                                  |
-| `vendor`       | No       | Credential provider vendor (default: `"CustomOauth2"`) |
-| `managed`      | No       | Whether auto-created by the CLI (do not edit)          |
-| `usage`        | No       | `"inbound"` or `"outbound"`                            |
+| Field            | Required | Description                                            |
+| ---------------- | -------- | ------------------------------------------------------ |
+| `authorizerType` | Yes      | Always `"OAuthCredentialProvider"`                     |
+| `name`           | Yes      | Credential name (1-128 chars)                          |
+| `discoveryUrl`   | Yes      | OIDC discovery URL (must be a valid URL)               |
+| `scopes`         | No       | Array of OAuth scopes                                  |
+| `vendor`         | No       | Credential provider vendor (default: `"CustomOauth2"`) |
+| `managed`        | No       | Whether auto-created by the CLI (do not edit)          |
+| `usage`          | No       | `"inbound"` or `"outbound"`                            |
 
 The actual secrets (API keys, client IDs, client secrets) are stored in `.env.local` for local development and in
 AgentCore Identity service for deployed environments.
@@ -304,7 +296,6 @@ See [Evaluations](evals.md) for the full guide.
 
 ```json
 {
-  "type": "CustomEvaluator",
   "name": "ResponseQuality",
   "level": "SESSION",
   "description": "Evaluate response quality",
@@ -325,7 +316,6 @@ See [Evaluations](evals.md) for the full guide.
 
 | Field         | Required | Description                                     |
 | ------------- | -------- | ----------------------------------------------- |
-| `type`        | Yes      | Always `"CustomEvaluator"`                      |
 | `name`        | Yes      | Evaluator name (1-48 chars, alphanumeric + `_`) |
 | `level`       | Yes      | `"SESSION"`, `"TRACE"`, or `"TOOL_CALL"`        |
 | `description` | No       | Evaluator description                           |
@@ -359,7 +349,6 @@ See [Evaluations](evals.md) for the full guide.
 
 ```json
 {
-  "type": "OnlineEvaluationConfig",
   "name": "QualityMonitor",
   "agent": "MyAgent",
   "evaluators": ["ResponseQuality", "Builtin.Faithfulness"],
@@ -370,7 +359,6 @@ See [Evaluations](evals.md) for the full guide.
 
 | Field            | Required | Description                                                  |
 | ---------------- | -------- | ------------------------------------------------------------ |
-| `type`           | Yes      | Always `"OnlineEvaluationConfig"`                            |
 | `name`           | Yes      | Config name (1-48 chars, alphanumeric + `_`)                 |
 | `agent`          | Yes      | Agent name to monitor (must match a project agent)           |
 | `evaluators`     | Yes      | Array of evaluator names, `Builtin.*` IDs, or evaluator ARNs |

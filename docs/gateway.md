@@ -172,7 +172,7 @@ agentcore add gateway-target \
 You can also reference an existing credential:
 
 ```bash
-agentcore add identity \
+agentcore add credential \
   --name MyOAuthProvider \
   --type oauth \
   --discovery-url https://auth.example.com/.well-known/openid-configuration \

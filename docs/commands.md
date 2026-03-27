@@ -98,7 +98,7 @@ Deploy infrastructure to AWS.
 agentcore deploy
 agentcore deploy -y                  # Auto-confirm
 agentcore deploy -y -v               # Auto-confirm with verbose output
-agentcore deploy --plan              # Preview without deploying (dry-run)
+agentcore deploy --dry-run           # Preview without deploying
 agentcore deploy --diff              # Show CDK diff without deploying
 agentcore deploy --target staging -y # Deploy to a specific target
 agentcore deploy -y --json           # JSON output
@@ -109,7 +109,7 @@ agentcore deploy -y --json           # JSON output
 | `--target <name>` | Deployment target name (default: `"default"`) |
 | `-y, --yes`       | Auto-confirm prompts                          |
 | `-v, --verbose`   | Resource-level deployment events              |
-| `--plan`          | Preview deployment without deploying          |
+| `--dry-run`       | Preview deployment without deploying          |
 | `--diff`          | Show CDK diff without deploying               |
 | `--json`          | JSON output                                   |
 
@@ -360,18 +360,18 @@ agentcore add gateway-target \
 > `open-api-schema` requires `--outbound-auth` (`oauth` or `api-key`). `api-gateway` supports `api-key` or `none`.
 > `mcp-server` supports `oauth` or `none`.
 
-### add identity
+### add credential
 
 Add a credential to the project. Supports API key and OAuth credential types.
 
 ```bash
 # API key credential
-agentcore add identity \
+agentcore add credential \
   --name OpenAI \
   --api-key sk-...
 
 # OAuth credential
-agentcore add identity \
+agentcore add credential \
   --name MyOAuthProvider \
   --type oauth \
   --discovery-url https://idp.example.com/.well-known/openid-configuration \
@@ -441,23 +441,23 @@ agentcore add online-eval \
 Remove resources from project.
 
 ```bash
-agentcore remove agent --name MyAgent --force
+agentcore remove agent --name MyAgent -y
 agentcore remove memory --name SharedMemory
-agentcore remove identity --name OpenAI
+agentcore remove credential --name OpenAI
 agentcore remove evaluator --name ResponseQuality
 agentcore remove online-eval --name QualityMonitor
 agentcore remove gateway --name MyGateway
 agentcore remove gateway-target --name WeatherTools
 
 # Reset everything
-agentcore remove all --force
+agentcore remove all -y
 agentcore remove all --dry-run  # Preview
 ```
 
 | Flag            | Description               |
 | --------------- | ------------------------- |
 | `--name <name>` | Resource name             |
-| `--force`       | Skip confirmation         |
+| `-y, --yes`     | Skip confirmation         |
 | `--dry-run`     | Preview (remove all only) |
 | `--json`        | JSON output               |
 
@@ -751,7 +751,7 @@ agentcore help modes   # Explain interactive vs non-interactive modes
 ```bash
 # Validate, preview, and deploy
 agentcore validate
-agentcore deploy --plan --json        # Preview changes
+agentcore deploy --dry-run --json     # Preview changes
 agentcore deploy -y --json            # Deploy with auto-confirm
 ```
 

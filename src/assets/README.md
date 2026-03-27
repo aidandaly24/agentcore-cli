@@ -58,7 +58,7 @@ The project uses a **flat resource model** where agents, memories, and credentia
 | Command              | Description                                     |
 | -------------------- | ----------------------------------------------- |
 | `agentcore create`   | Create a new AgentCore project                  |
-| `agentcore add`      | Add resources (agent, memory, identity, target) |
+| `agentcore add`      | Add resources (agent, memory, credential, target) |
 | `agentcore remove`   | Remove resources                                |
 | `agentcore dev`      | Run agent locally                               |
 | `agentcore deploy`   | Deploy to AWS                                   |
