@@ -21,6 +21,13 @@ src/
 
 Note: CDK L3 constructs are in a separate package `@aws/agentcore-cdk`.
 
+## Global Options
+
+These options are available on all commands:
+
+- `-h, --help` - Show help for any command
+- `--version` - Print CLI version (root command only)
+
 ## CLI Commands
 
 - `create` - Create new AgentCore project
@@ -34,7 +41,8 @@ Note: CDK L3 constructs are in a separate package `@aws/agentcore-cdk`.
 - `invoke` - Invoke agents (local or deployed)
 - `run eval` - Run on-demand evaluation against agent sessions
 - `evals history` - View past eval run results
-- `fetch access` - Fetch access info for a deployed gateway
+- `fetch access` - Fetch access info for a deployed gateway or agent
+- `import` - Import resources from a Bedrock AgentCore Starter Toolkit project
 - `pause online-eval` - Pause (disable) a deployed online eval config
 - `resume online-eval` - Resume (enable) a paused online eval config
 - `logs` - Stream or search agent runtime logs
