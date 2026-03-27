@@ -78,6 +78,13 @@ describe('add gateway command', () => {
     });
   });
 
+  describe('rejected flags', () => {
+    it('rejects unknown --agents flag', async () => {
+      const result = await runCLI(['add', 'gateway', '--name', 'agents-test', '--agents', 'foo', '--json'], projectDir);
+      expect(result.exitCode).toBe(1);
+    });
+  });
+
   describe('JWT authorizer', () => {
     it('creates gateway with CUSTOM_JWT authorizer', async () => {
       const gatewayName = `jwt-gw-${Date.now()}`;

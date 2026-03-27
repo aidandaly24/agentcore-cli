@@ -265,7 +265,6 @@ agentcore add gateway \
 | `--allowed-scopes <scopes>`      | Comma-separated allowed scopes (optional for CUSTOM_JWT)     |
 | `--agent-client-id <id>`         | Agent OAuth client ID for Bearer token auth (CUSTOM_JWT)     |
 | `--agent-client-secret <secret>` | Agent OAuth client secret (CUSTOM_JWT)                       |
-| `--agents <agents>`              | Comma-separated agent names                                  |
 | `--no-semantic-search`           | Disable semantic search for tool discovery                   |
 | `--exception-level <level>`      | Exception verbosity level (default: `NONE`)                  |
 | `--json`                         | JSON output                                                  |
