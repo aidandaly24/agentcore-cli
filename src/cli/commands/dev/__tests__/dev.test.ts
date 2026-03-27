@@ -36,29 +36,29 @@ describe('dev command', () => {
   });
 
   describe('positional prompt invoke', () => {
-    it('attempts invoke when positional prompt is provided', async () => {
-      // With no dev server running, the invoke path triggers a connection error
+    it('exits with helpful error when no server running and no project found', async () => {
+      // With no dev server running and no project, the auto-start path
+      // detects both conditions and shows a helpful error
       const result = await runCLI(['dev', 'Hello agent'], process.cwd());
 
       expect(result.exitCode).toBe(1);
-      // Should attempt to connect to dev server and fail — not show a project error
       const output = result.stderr.toLowerCase();
       expect(
-        output.includes('fetch failed') || output.includes('econnrefused') || output.includes('dev server not running'),
-        `Should attempt invoke and fail with connection error, got: ${result.stderr}`
+        output.includes('no dev server running'),
+        `Should mention no dev server running, got: ${result.stderr}`
       ).toBeTruthy();
     });
 
-    it('does not require project context when invoking', async () => {
-      // Invoke path loads config but does not call requireProject()
-      // So the error should be about connection, not missing project
+    it('does not go through requireProject guard when invoking', async () => {
+      // Invoke path uses loadProjectConfig (soft check), not requireProject()
+      // The error should mention the dev server, not the generic project guard message
       const result = await runCLI(['dev', 'test prompt'], process.cwd());
 
       expect(result.exitCode).toBe(1);
       const output = result.stderr.toLowerCase();
       expect(
-        !output.includes('no agentcore project found'),
-        `Should not fail with project error when prompt is provided, got: ${result.stderr}`
+        !output.includes('run agentcore create'),
+        `Should not show the requireProject guard message, got: ${result.stderr}`
       ).toBeTruthy();
     });
   });
