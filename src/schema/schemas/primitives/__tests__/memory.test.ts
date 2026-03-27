@@ -37,7 +37,13 @@ describe('MemoryStrategyTypeSchema', () => {
 
   describe('schema options', () => {
     it('contains five valid strategies including EPISODIC and CUSTOM', () => {
-      expect(MemoryStrategyTypeSchema.options).toEqual(['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE', 'EPISODIC', 'CUSTOM']);
+      expect(MemoryStrategyTypeSchema.options).toEqual([
+        'SEMANTIC',
+        'SUMMARIZATION',
+        'USER_PREFERENCE',
+        'EPISODIC',
+        'CUSTOM',
+      ]);
       expect(MemoryStrategyTypeSchema.options).toContain('CUSTOM');
       expect(MemoryStrategyTypeSchema.options).toContain('EPISODIC');
     });

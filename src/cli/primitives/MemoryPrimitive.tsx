@@ -1,6 +1,11 @@
 import { findConfigRoot } from '../../lib';
 import type { Memory, MemoryStrategy, MemoryStrategyType } from '../../schema';
-import { DEFAULT_EPISODIC_REFLECTION_NAMESPACES, DEFAULT_STRATEGY_NAMESPACES, MemorySchema, MemoryStrategyTypeSchema } from '../../schema';
+import {
+  DEFAULT_EPISODIC_REFLECTION_NAMESPACES,
+  DEFAULT_STRATEGY_NAMESPACES,
+  MemorySchema,
+  MemoryStrategyTypeSchema,
+} from '../../schema';
 import { validateAddMemoryOptions } from '../commands/add/validate';
 import { getErrorMessage } from '../errors';
 import type { RemovalPreview, RemovalResult, SchemaChange } from '../operations/remove/types';
