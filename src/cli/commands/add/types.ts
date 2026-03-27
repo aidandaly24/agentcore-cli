@@ -62,12 +62,14 @@ export interface AddGatewayOptions {
   exceptionLevel?: string;
   policyEngine?: string;
   policyEngineMode?: string;
+  wire?: string;
   json?: boolean;
 }
 
 export interface AddGatewayResult {
   success: boolean;
   gatewayName?: string;
+  wiredAgents?: string[];
   error?: string;
 }
 

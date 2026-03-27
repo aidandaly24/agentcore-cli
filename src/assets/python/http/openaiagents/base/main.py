@@ -3,7 +3,7 @@ from agents import Agent, Runner, function_tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
 {{#if hasGateway}}
-from mcp_client.client import get_all_gateway_mcp_servers
+from capabilities.gateway import get_gateway_mcp_servers
 {{else}}
 from mcp_client.client import get_streamable_http_mcp_client
 {{/if}}
@@ -13,7 +13,7 @@ log = app.logger
 
 # Get MCP Server
 {{#if hasGateway}}
-mcp_servers = get_all_gateway_mcp_servers()
+mcp_servers = get_gateway_mcp_servers()
 {{else}}
 mcp_server = get_streamable_http_mcp_client()
 mcp_servers = [mcp_server] if mcp_server else []

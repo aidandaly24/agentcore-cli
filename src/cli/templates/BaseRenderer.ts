@@ -2,6 +2,7 @@ import { APP_DIR } from '../../lib';
 import { copyAndRenderDir } from './render';
 import type { AgentRenderConfig } from './types';
 import { existsSync } from 'node:fs';
+import { copyFile, mkdir } from 'node:fs/promises';
 import * as path from 'node:path';
 
 export interface RendererContext {
@@ -32,6 +33,24 @@ export abstract class BaseRenderer {
     return this.config.hasMemory;
   }
 
+  /** Map sdkName to the gateway template file suffix. */
+  private static readonly SDK_GATEWAY_TEMPLATE_MAP: Record<string, string> = {
+    strands: 'strands',
+    langchain_langgraph: 'langchain',
+    googleadk: 'googleadk',
+    openaiagents: 'openaiagents',
+  };
+
+  /**
+   * Get the path to the framework-specific gateway template asset.
+   * Falls back to generic if no framework-specific template exists.
+   */
+  protected getGatewayTemplatePath(): string | undefined {
+    const suffix = BaseRenderer.SDK_GATEWAY_TEMPLATE_MAP[this.sdkName] ?? 'generic';
+    const templatePath = path.join(this.baseTemplateDir, 'python', 'capabilities', `gateway.${suffix}.py`);
+    return existsSync(templatePath) ? templatePath : undefined;
+  }
+
   protected getTemplateDir(): string {
     const language = this.config.targetLanguage.toLowerCase();
     return path.join(this.baseTemplateDir, language, this.protocolMode, this.sdkName);
@@ -51,12 +70,19 @@ export abstract class BaseRenderer {
       hasMcp: false, // MCP is configured separately
     };
 
-    // Always render base template
     const baseDir = path.join(templateDir, 'base');
     await copyAndRenderDir(baseDir, projectDir, templateData);
 
-    // Render capability templates based on config
-    // Only render if the capability directory exists (not all SDKs have all capabilities)
+    // Generate capabilities/gateway.py when gateways are configured
+    if (this.config.hasGateway) {
+      const gatewayTemplatePath = this.getGatewayTemplatePath();
+      if (gatewayTemplatePath) {
+        const capabilitiesDir = path.join(projectDir, 'capabilities');
+        await mkdir(capabilitiesDir, { recursive: true });
+        await copyFile(gatewayTemplatePath, path.join(capabilitiesDir, 'gateway.py'));
+      }
+    }
+
     if (this.shouldRenderMemory()) {
       const memoryCapabilityDir = path.join(templateDir, 'capabilities', 'memory');
       if (existsSync(memoryCapabilityDir)) {
@@ -65,7 +91,6 @@ export abstract class BaseRenderer {
       }
     }
 
-    // Generate Dockerfile and .dockerignore for Container builds
     if (this.config.buildType === 'Container') {
       const language = this.config.targetLanguage.toLowerCase();
       const containerTemplateDir = path.join(this.baseTemplateDir, 'container', language);

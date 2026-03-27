@@ -11,6 +11,7 @@ import { AgentCoreGatewaySchema, PolicyEngineModeSchema } from '../../schema';
 import type { AddGatewayOptions as CLIAddGatewayOptions } from '../commands/add/types';
 import { validateAddGatewayOptions } from '../commands/add/validate';
 import { getErrorMessage } from '../errors';
+import { getWiringInstructions, hasIamAuth, wireGatewayToAgent } from '../operations/mcp/wire-gateway';
 import type { RemovalPreview, RemovalResult, SchemaChange } from '../operations/remove/types';
 import type { AddGatewayConfig } from '../tui/screens/mcp/types';
 import { BasePrimitive } from './BasePrimitive';
@@ -174,6 +175,10 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
       .option('--exception-level <level>', 'Exception verbosity level', 'NONE')
       .option('--policy-engine <name>', 'Policy engine name for Cedar-based authorization')
       .option('--policy-engine-mode <mode>', 'Policy engine mode: LOG_ONLY or ENFORCE')
+      .option(
+        '--wire <agents>',
+        'Wire gateway client into agent(s), comma-separated (generates capabilities/gateway.py)'
+      )
       .option('--json', 'Output as JSON')
       .action(async (rawOptions: Record<string, string | boolean | undefined>) => {
         const cliOptions = rawOptions as unknown as CLIAddGatewayOptions;
@@ -218,13 +223,46 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
 
           if (cliOptions.json) {
             console.log(JSON.stringify(result));
+            if (!result.success) {
+              process.exit(1);
+            }
           } else if (result.success) {
             console.log(`Added gateway '${result.gatewayName}'`);
           } else {
             console.error(result.error);
+            process.exit(1);
           }
 
-          process.exit(result.success ? 0 : 1);
+          if (result.success && cliOptions.wire) {
+            const agentNames = cliOptions.wire
+              .split(',')
+              .map(s => s.trim())
+              .filter(Boolean);
+            const useIam = await hasIamAuth();
+            if (cliOptions.json) {
+              const wireResults = [];
+              for (const agentName of agentNames) {
+                const wireResult = await wireGatewayToAgent(agentName, useIam);
+                wireResults.push({ agentName, ...wireResult });
+              }
+              console.log(JSON.stringify({ wireResults }));
+            } else {
+              for (const agentName of agentNames) {
+                const wireResult = await wireGatewayToAgent(agentName, useIam);
+                if (wireResult.success && wireResult.filesCreated?.length) {
+                  console.log(`\nWired gateway into agent '${agentName}':`);
+                  for (const f of wireResult.filesCreated) {
+                    console.log(`  Generated: ${f}`);
+                  }
+                  console.log(`\n${getWiringInstructions(wireResult.framework ?? 'generic')}`);
+                } else if (wireResult.error) {
+                  console.log(`\n${wireResult.error}`);
+                }
+              }
+            }
+          }
+
+          process.exit(0);
         } catch (error) {
           if (cliOptions.json) {
             console.log(JSON.stringify({ success: false, error: getErrorMessage(error) }));

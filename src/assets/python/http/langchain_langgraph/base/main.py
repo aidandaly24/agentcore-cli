@@ -5,7 +5,7 @@ from langchain.tools import tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
 {{#if hasGateway}}
-from mcp_client.client import get_all_gateway_mcp_client
+from capabilities.gateway import get_gateway_mcp_client
 {{else}}
 from mcp_client.client import get_streamable_http_mcp_client
 {{/if}}
@@ -39,7 +39,7 @@ async def invoke(payload, context):
 
     # Get MCP Client
     {{#if hasGateway}}
-    mcp_client = get_all_gateway_mcp_client()
+    mcp_client = get_gateway_mcp_client()
     {{else}}
     mcp_client = get_streamable_http_mcp_client()
     {{/if}}

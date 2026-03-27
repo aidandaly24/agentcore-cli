@@ -2,7 +2,7 @@ from strands import Agent, tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
 {{#if hasGateway}}
-from mcp_client.client import get_all_gateway_mcp_clients
+from capabilities.gateway import get_gateway_tools
 {{else}}
 from mcp_client.client import get_streamable_http_mcp_client
 {{/if}}
@@ -13,9 +13,9 @@ from memory.session import get_memory_session_manager
 app = BedrockAgentCoreApp()
 log = app.logger
 
-# Define a Streamable HTTP MCP Client
+# Define MCP tool providers
 {{#if hasGateway}}
-mcp_clients = get_all_gateway_mcp_clients()
+mcp_clients = get_gateway_tools()
 {{else}}
 mcp_clients = [get_streamable_http_mcp_client()]
 {{/if}}
