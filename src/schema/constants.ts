@@ -202,8 +202,8 @@ export const NAMED_PROVIDER_CONFIG_KEYS: Record<string, string> = {
 
 /**
  * Included providers use a shared `includedOauth2ProviderConfig` key.
- * They require clientId + clientSecret, with optional issuer,
- * authorizationEndpoint, and tokenEndpoint for tenant-specific overrides.
+ * They require clientId + clientSecret + issuer + authorizationEndpoint +
+ * tokenEndpoint for tenant-specific OAuth2 configuration.
  */
 export const INCLUDED_PROVIDERS = new Set([
   'Auth0Oauth2',
@@ -245,3 +245,29 @@ export function isIncludedProvider(vendor: string): boolean {
 export function vendorRequiresDiscoveryUrl(vendor: string): boolean {
   return !isNamedProvider(vendor) && !isIncludedProvider(vendor);
 }
+
+/**
+ * Vendor-specific guidance for where to register the OAuth2 callback URL.
+ * Used after deploy to tell users where to complete 3LO setup.
+ * Only includes entries verified against official provider documentation.
+ */
+export const VENDOR_CALLBACK_GUIDANCE: Record<string, string> = {
+  // Named providers (verified)
+  GoogleOauth2: 'Add as "Authorized redirect URI" at console.cloud.google.com → APIs & Services → Credentials',
+  GithubOauth2: 'Add as "Authorization callback URL" at github.com/settings/developers → OAuth Apps',
+  SlackOauth2: 'Add as "Redirect URL" at api.slack.com/apps → OAuth & Permissions',
+  MicrosoftOauth2: 'Add as "Redirect URI" at entra.microsoft.com → App registrations → Authentication',
+  AtlassianOauth2: 'Add as "Callback URL" at developer.atlassian.com → Console → Authorization → OAuth 2.0 (3LO)',
+  LinkedinOauth2: 'Add as "Redirect URL" at linkedin.com/developers → Auth tab',
+  // Included providers (verified)
+  OktaOauth2: 'Add as "Sign-in redirect URI" in Okta Admin → Applications → General',
+  Auth0Oauth2: 'Add as "Allowed Callback URL" at manage.auth0.com → Application → Settings',
+  CognitoOauth2: 'Add as "Allowed callback URL" in AWS Console → Cognito → App client settings',
+  NotionOauth2: 'Add as "Redirect URI" at notion.so/my-integrations → OAuth configuration',
+  SpotifyOauth2: 'Add as "Redirect URI" at developer.spotify.com/dashboard → Edit Settings',
+  TwitchOauth2: 'Add as "OAuth Redirect URL" at dev.twitch.tv/console → Applications',
+  ZoomOauth2: 'Add as "OAuth redirect URL" at marketplace.zoom.us → your app → OAuth Information',
+};
+
+export const DEFAULT_CALLBACK_GUIDANCE =
+  "Register as the redirect/callback URI in your OAuth provider's developer settings";

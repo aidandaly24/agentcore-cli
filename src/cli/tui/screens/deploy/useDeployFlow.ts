@@ -1,4 +1,5 @@
 import { ConfigIO } from '../../../../lib';
+import { DEFAULT_CALLBACK_GUIDANCE, VENDOR_CALLBACK_GUIDANCE } from '../../../../schema';
 import type { CdkToolkitWrapper, DeployMessage, SwitchableIoHost } from '../../../cdk/toolkit-lib';
 import {
   buildDeployedState,
@@ -429,6 +430,19 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
               logger.log(`Transaction search setup failed: ${message}`, 'warn');
             }
           }
+
+          // Surface callback URLs for OAuth credentials that need 3LO registration
+          for (const [credName, credState] of Object.entries(allCredentials)) {
+            if (credState.callbackUrl) {
+              const credSpec = context?.projectSpec.credentials.find(c => c.name === credName);
+              const vendor = credSpec && 'vendor' in credSpec ? credSpec.vendor : '';
+              const guidance = VENDOR_CALLBACK_GUIDANCE[vendor] ?? DEFAULT_CALLBACK_GUIDANCE;
+              setDeployNotes(prev => [
+                ...prev,
+                `OAuth credential "${credName}" callback URL: ${credState.callbackUrl}\n  ${guidance}`,
+              ]);
+            }
+          }
         }
 
         logger.endStep('success');
@@ -491,6 +505,9 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     context?.isTeardownDeploy,
     context?.awsTargets,
     context?.projectSpec.runtimes,
+    context?.projectSpec.credentials,
+    context?.projectSpec.agentCoreGateways?.length,
+    allCredentials,
     diffMode,
   ]);
 

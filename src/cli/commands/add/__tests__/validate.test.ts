@@ -1356,13 +1356,55 @@ describe('validate', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('OAuth with Included vendor passes without discoveryUrl', () => {
+    it('OAuth with Included vendor requires issuer', () => {
       const result = validateAddIdentityOptions({
         name: 'test',
         type: 'oauth',
         vendor: 'OktaOauth2',
         clientId: 'cid',
         clientSecret: 'csec',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('--issuer');
+    });
+
+    it('OAuth with Included vendor requires authorizationEndpoint', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'OktaOauth2',
+        clientId: 'cid',
+        clientSecret: 'csec',
+        issuer: 'https://dev-123.okta.com',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('--authorization-endpoint');
+    });
+
+    it('OAuth with Included vendor requires tokenEndpoint', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'OktaOauth2',
+        clientId: 'cid',
+        clientSecret: 'csec',
+        issuer: 'https://dev-123.okta.com',
+        authorizationEndpoint: 'https://dev-123.okta.com/oauth2/v1/authorize',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('--token-endpoint');
+    });
+
+    it('OAuth with Included vendor + all tenant fields passes', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'OktaOauth2',
+        clientId: 'cid',
+        clientSecret: 'csec',
+        issuer: 'https://dev-123.okta.com',
+        authorizationEndpoint: 'https://dev-123.okta.com/oauth2/v1/authorize',
+        tokenEndpoint: 'https://dev-123.okta.com/oauth2/v1/token',
       });
       expect(result.valid).toBe(true);
     });

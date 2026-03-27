@@ -225,15 +225,21 @@ export function ResourceGraph({ project, mcp, agentName, resourceStatuses }: Res
           {credentials.map(credential => {
             const rsEntry = statusMap.get(`credential:${credential.name}`);
             return (
-              <ResourceRow
-                key={credential.name}
-                icon={ICONS.credential}
-                color="yellow"
-                name={credential.name}
-                detail={rsEntry?.detail ?? credential.authorizerType.replace('CredentialProvider', '')}
-                deploymentState={rsEntry?.deploymentState}
-                identifier={rsEntry?.identifier}
-              />
+              <Box key={credential.name} flexDirection="column">
+                <ResourceRow
+                  icon={ICONS.credential}
+                  color="yellow"
+                  name={credential.name}
+                  detail={rsEntry?.detail ?? credential.authorizerType.replace('CredentialProvider', '')}
+                  deploymentState={rsEntry?.deploymentState}
+                  identifier={rsEntry?.identifier}
+                />
+                {rsEntry?.callbackUrl && (
+                  <Text dimColor>
+                    {'      '}Callback URL: {rsEntry.callbackUrl}
+                  </Text>
+                )}
+              </Box>
             );
           })}
         </Box>

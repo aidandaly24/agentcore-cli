@@ -155,6 +155,50 @@ describe('computeResourceStatuses', () => {
     expect(credEntry!.identifier).toBe('arn:aws:bedrock:us-east-1:123456789:credential-provider/removed-cred');
   });
 
+  it('populates callbackUrl on deployed credential when present in deployed state', () => {
+    const project = {
+      ...baseProject,
+      credentials: [{ name: 'my-oauth', type: 'Oauth2CredentialProvider' }],
+    } as unknown as AgentCoreProjectSpec;
+
+    const resources: DeployedResourceState = {
+      credentials: {
+        'my-oauth': {
+          credentialProviderArn: 'arn:aws:bedrock:us-east-1:123456789:credential-provider/my-oauth',
+          callbackUrl: 'https://example.com/oauth2/callback',
+        },
+      },
+    };
+
+    const result = computeResourceStatuses(project, resources);
+    const credEntry = result.find(r => r.resourceType === 'credential' && r.name === 'my-oauth');
+
+    expect(credEntry).toBeDefined();
+    expect(credEntry!.deploymentState).toBe('deployed');
+    expect(credEntry!.callbackUrl).toBe('https://example.com/oauth2/callback');
+  });
+
+  it('does not populate callbackUrl when absent from deployed state', () => {
+    const project = {
+      ...baseProject,
+      credentials: [{ name: 'my-apikey', type: 'ApiKeyCredentialProvider' }],
+    } as unknown as AgentCoreProjectSpec;
+
+    const resources: DeployedResourceState = {
+      credentials: {
+        'my-apikey': {
+          credentialProviderArn: 'arn:aws:bedrock:us-east-1:123456789:credential-provider/my-apikey',
+        },
+      },
+    };
+
+    const result = computeResourceStatuses(project, resources);
+    const credEntry = result.find(r => r.resourceType === 'credential' && r.name === 'my-apikey');
+
+    expect(credEntry).toBeDefined();
+    expect(credEntry!.callbackUrl).toBeUndefined();
+  });
+
   it('marks memory as deployed when in both local and deployed state', () => {
     const project = {
       ...baseProject,

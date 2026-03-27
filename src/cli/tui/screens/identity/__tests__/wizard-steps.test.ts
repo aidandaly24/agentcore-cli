@@ -3,8 +3,8 @@ import type { AddIdentityStep } from '../types';
 import { describe, expect, it } from 'vitest';
 
 describe('VENDOR_OPTIONS constants', () => {
-  it('has 16 entries (7 Named + some Included + Custom)', () => {
-    expect(VENDOR_OPTIONS).toHaveLength(16);
+  it('has 25 entries (7 Named + 17 Included + Custom)', () => {
+    expect(VENDOR_OPTIONS).toHaveLength(25);
   });
 
   it('last entry is CustomOauth2', () => {
@@ -33,6 +33,9 @@ describe('IDENTITY_STEP_LABELS constants', () => {
       'apiKey',
       'discoveryUrl',
       'tenantId',
+      'issuer',
+      'authorizationEndpoint',
+      'tokenEndpoint',
       'clientId',
       'clientSecret',
       'scopes',

@@ -438,13 +438,54 @@ describe('OAuthCredentialSchema vendor-conditional validation', () => {
     expect(result.success).toBe(true);
   });
 
-  it('included vendor OktaOauth2 without discoveryUrl passes', () => {
+  it('included vendor OktaOauth2 without issuer and tokenEndpoint fails', () => {
     const result = OAuthCredentialSchema.safeParse({ ...base, vendor: 'OktaOauth2' });
+    expect(result.success).toBe(false);
+  });
+
+  it('included vendor OktaOauth2 with only tokenEndpoint fails (missing issuer+authorizationEndpoint)', () => {
+    const result = OAuthCredentialSchema.safeParse({
+      ...base,
+      vendor: 'OktaOauth2',
+      tokenEndpoint: 'https://dev-123.okta.com/oauth2/v1/token',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('included vendor OktaOauth2 with issuer+tokenEndpoint but no authorizationEndpoint fails', () => {
+    const result = OAuthCredentialSchema.safeParse({
+      ...base,
+      vendor: 'OktaOauth2',
+      issuer: 'https://dev-123.okta.com',
+      tokenEndpoint: 'https://dev-123.okta.com/oauth2/v1/token',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('included vendor OktaOauth2 with all three tenant fields passes', () => {
+    const result = OAuthCredentialSchema.safeParse({
+      ...base,
+      vendor: 'OktaOauth2',
+      issuer: 'https://dev-123.okta.com',
+      authorizationEndpoint: 'https://dev-123.okta.com/oauth2/v1/authorize',
+      tokenEndpoint: 'https://dev-123.okta.com/oauth2/v1/token',
+    });
     expect(result.success).toBe(true);
   });
 
-  it('included vendor Auth0Oauth2 without discoveryUrl passes', () => {
+  it('included vendor Auth0Oauth2 without issuer and tokenEndpoint fails', () => {
     const result = OAuthCredentialSchema.safeParse({ ...base, vendor: 'Auth0Oauth2' });
+    expect(result.success).toBe(false);
+  });
+
+  it('included vendor Auth0Oauth2 with all three tenant fields passes', () => {
+    const result = OAuthCredentialSchema.safeParse({
+      ...base,
+      vendor: 'Auth0Oauth2',
+      issuer: 'https://myapp.auth0.com',
+      authorizationEndpoint: 'https://myapp.auth0.com/authorize',
+      tokenEndpoint: 'https://myapp.auth0.com/oauth/token',
+    });
     expect(result.success).toBe(true);
   });
 
@@ -483,7 +524,7 @@ describe('OAuthCredentialSchema vendor-conditional validation', () => {
     expect(result.success).toBe(true);
   });
 
-  it('included vendor with optional included fields passes', () => {
+  it('included vendor with tokenEndpoint and optional fields passes', () => {
     const result = OAuthCredentialSchema.safeParse({
       ...base,
       vendor: 'OktaOauth2',

@@ -1,4 +1,4 @@
-import { vendorRequiresDiscoveryUrl } from '../../../../schema';
+import { isIncludedProvider, vendorRequiresDiscoveryUrl } from '../../../../schema';
 import type { CredentialType } from '../../../../schema';
 import type { AddIdentityConfig, AddIdentityStep } from './types';
 import { useCallback, useMemo, useState } from 'react';
@@ -20,6 +20,11 @@ function getSteps(identityType: CredentialType, vendor: string | undefined, skip
   // tenantId only for Microsoft Entra ID
   if (resolvedVendor === 'MicrosoftOauth2') {
     steps.push('tenantId');
+  }
+
+  // issuer, authorizationEndpoint, tokenEndpoint required for Included providers
+  if (isIncludedProvider(resolvedVendor)) {
+    steps.push('issuer', 'authorizationEndpoint', 'tokenEndpoint');
   }
 
   steps.push('clientId', 'clientSecret', 'scopes', 'confirm');
@@ -132,6 +137,30 @@ export function useAddIdentityWizard(initialType?: CredentialType) {
     [advanceFrom]
   );
 
+  const setIssuer = useCallback(
+    (issuer: string) => {
+      setConfig(c => ({ ...c, issuer }));
+      advanceFrom('issuer');
+    },
+    [advanceFrom]
+  );
+
+  const setAuthorizationEndpoint = useCallback(
+    (authorizationEndpoint: string) => {
+      setConfig(c => ({ ...c, authorizationEndpoint }));
+      advanceFrom('authorizationEndpoint');
+    },
+    [advanceFrom]
+  );
+
+  const setTokenEndpoint = useCallback(
+    (tokenEndpoint: string) => {
+      setConfig(c => ({ ...c, tokenEndpoint }));
+      advanceFrom('tokenEndpoint');
+    },
+    [advanceFrom]
+  );
+
   const setClientId = useCallback(
     (clientId: string) => {
       setConfig(c => ({ ...c, clientId }));
@@ -173,6 +202,9 @@ export function useAddIdentityWizard(initialType?: CredentialType) {
     setApiKey,
     setDiscoveryUrl,
     setTenantId,
+    setIssuer,
+    setAuthorizationEndpoint,
+    setTokenEndpoint,
     setClientId,
     setClientSecret,
     setScopes,

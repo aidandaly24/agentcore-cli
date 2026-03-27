@@ -6,7 +6,7 @@
  *
  * @module agentcore-project
  */
-import { isReservedProjectName, vendorRequiresDiscoveryUrl } from '../constants';
+import { isIncludedProvider, isReservedProjectName, vendorRequiresDiscoveryUrl } from '../constants';
 import { AgentEnvSpecSchema } from './agent-env';
 import { AgentCoreGatewaySchema, AgentCoreGatewayTargetSchema, AgentCoreMcpRuntimeToolSchema } from './mcp';
 import { EvaluationLevelSchema, EvaluatorConfigSchema, EvaluatorNameSchema } from './primitives/evaluator';
@@ -197,6 +197,29 @@ export const OAuthCredentialSchema = z
         path: ['discoveryUrl'],
         message: `discoveryUrl is required for vendor "${cred.vendor}"`,
       });
+    }
+    if (isIncludedProvider(cred.vendor)) {
+      if (!cred.issuer) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['issuer'],
+          message: `issuer is required for vendor "${cred.vendor}"`,
+        });
+      }
+      if (!cred.authorizationEndpoint) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['authorizationEndpoint'],
+          message: `authorizationEndpoint is required for vendor "${cred.vendor}"`,
+        });
+      }
+      if (!cred.tokenEndpoint) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['tokenEndpoint'],
+          message: `tokenEndpoint is required for vendor "${cred.vendor}"`,
+        });
+      }
     }
   });
 

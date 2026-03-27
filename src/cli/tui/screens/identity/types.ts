@@ -11,6 +11,9 @@ export type AddIdentityStep =
   | 'apiKey'
   | 'discoveryUrl'
   | 'tenantId'
+  | 'issuer'
+  | 'authorizationEndpoint'
+  | 'tokenEndpoint'
   | 'clientId'
   | 'clientSecret'
   | 'scopes'
@@ -40,6 +43,9 @@ export const IDENTITY_STEP_LABELS: Record<AddIdentityStep, string> = {
   apiKey: 'API Key',
   discoveryUrl: 'Discovery URL',
   tenantId: 'Tenant ID',
+  issuer: 'Issuer',
+  authorizationEndpoint: 'Authorization Endpoint',
+  tokenEndpoint: 'Token Endpoint',
   clientId: 'Client ID',
   clientSecret: 'Client Secret',
   scopes: 'Scopes',
@@ -75,6 +81,15 @@ export const VENDOR_OPTIONS = [
   { id: 'NotionOauth2', title: 'Notion', description: 'Notion API' },
   { id: 'ZoomOauth2', title: 'Zoom', description: 'Zoom API' },
   { id: 'SpotifyOauth2', title: 'Spotify', description: 'Spotify API' },
+  { id: 'CyberArkOauth2', title: 'CyberArk', description: 'CyberArk identity security' },
+  { id: 'FacebookOauth2', title: 'Facebook', description: 'Facebook / Meta API' },
+  { id: 'FusionAuthOauth2', title: 'FusionAuth', description: 'FusionAuth identity platform' },
+  { id: 'OneLoginOauth2', title: 'OneLogin', description: 'OneLogin identity platform' },
+  { id: 'PingOneOauth2', title: 'PingOne', description: 'PingOne identity platform' },
+  { id: 'RedditOauth2', title: 'Reddit', description: 'Reddit API' },
+  { id: 'TwitchOauth2', title: 'Twitch', description: 'Twitch API' },
+  { id: 'XOauth2', title: 'X (Twitter)', description: 'X / Twitter API' },
+  { id: 'YandexOauth2', title: 'Yandex', description: 'Yandex API' },
   // Custom (always last)
   { id: 'CustomOauth2', title: 'Custom', description: 'Custom OAuth2 provider (requires discovery URL)' },
 ] as const;

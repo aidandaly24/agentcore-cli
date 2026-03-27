@@ -251,6 +251,14 @@ function ResourceEntry({ entry, showRuntime }: { entry: ResourceStatusEntry; sho
         (showRuntime ? <Text> - Runtime: {entry.detail}</Text> : <Text dimColor> ({entry.detail})</Text>)}
       {entry.identifier && <Text dimColor> ({entry.identifier})</Text>}
       {entry.error && <Text color="red"> - Error: {entry.error}</Text>}
+      {entry.callbackUrl && (
+        <>
+          {'\n'}
+          <Text>
+            {'    '}Callback URL: {entry.callbackUrl}
+          </Text>
+        </>
+      )}
     </Text>
   );
 }

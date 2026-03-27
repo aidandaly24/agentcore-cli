@@ -36,6 +36,9 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
   const isApiKeyStep = wizard.step === 'apiKey';
   const isDiscoveryUrlStep = wizard.step === 'discoveryUrl';
   const isTenantIdStep = wizard.step === 'tenantId';
+  const isIssuerStep = wizard.step === 'issuer';
+  const isAuthorizationEndpointStep = wizard.step === 'authorizationEndpoint';
+  const isTokenEndpointStep = wizard.step === 'tokenEndpoint';
   const isClientIdStep = wizard.step === 'clientId';
   const isClientSecretStep = wizard.step === 'clientSecret';
   const isScopesStep = wizard.step === 'scopes';
@@ -152,6 +155,60 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
           />
         )}
 
+        {isIssuerStep && (
+          <TextInput
+            key="issuer"
+            prompt="Issuer URL (your tenant's token issuer)"
+            placeholder="https://your-tenant.example.com"
+            onSubmit={wizard.setIssuer}
+            onCancel={() => wizard.goBack()}
+            customValidation={value => {
+              try {
+                new URL(value);
+              } catch {
+                return 'Must be a valid URL';
+              }
+              return true;
+            }}
+          />
+        )}
+
+        {isAuthorizationEndpointStep && (
+          <TextInput
+            key="authorizationEndpoint"
+            prompt="Authorization Endpoint URL"
+            placeholder="https://your-tenant.example.com/oauth2/authorize"
+            onSubmit={wizard.setAuthorizationEndpoint}
+            onCancel={() => wizard.goBack()}
+            customValidation={value => {
+              try {
+                new URL(value);
+              } catch {
+                return 'Must be a valid URL';
+              }
+              return true;
+            }}
+          />
+        )}
+
+        {isTokenEndpointStep && (
+          <TextInput
+            key="tokenEndpoint"
+            prompt="Token Endpoint URL"
+            placeholder="https://your-tenant.example.com/oauth2/token"
+            onSubmit={wizard.setTokenEndpoint}
+            onCancel={() => wizard.goBack()}
+            customValidation={value => {
+              try {
+                new URL(value);
+              } catch {
+                return 'Must be a valid URL';
+              }
+              return true;
+            }}
+          />
+        )}
+
         {isClientIdStep && (
           <SecretInput
             key="clientId"
@@ -198,6 +255,13 @@ export function AddIdentityScreen({ onComplete, onExit, existingIdentityNames, i
                       ? [{ label: 'Discovery URL', value: wizard.config.discoveryUrl }]
                       : []),
                     ...(wizard.config.tenantId ? [{ label: 'Tenant ID', value: wizard.config.tenantId }] : []),
+                    ...(wizard.config.issuer ? [{ label: 'Issuer', value: wizard.config.issuer }] : []),
+                    ...(wizard.config.authorizationEndpoint
+                      ? [{ label: 'Auth Endpoint', value: wizard.config.authorizationEndpoint }]
+                      : []),
+                    ...(wizard.config.tokenEndpoint
+                      ? [{ label: 'Token Endpoint', value: wizard.config.tokenEndpoint }]
+                      : []),
                     {
                       label: 'Client ID',
                       value: wizard.config.clientId ? '****' + wizard.config.clientId.slice(-4) : '',

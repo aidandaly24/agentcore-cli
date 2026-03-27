@@ -25,6 +25,8 @@ export interface ResourceStatusEntry {
   detail?: string;
   error?: string;
   invocationUrl?: string;
+  /** OAuth2 callback URL for credential resources (returned by AWS after deploy) */
+  callbackUrl?: string;
 }
 
 export interface ProjectStatusResult {
@@ -127,13 +129,22 @@ export function computeResourceStatuses(
     getIdentifier: deployed => deployed.runtimeArn,
   });
 
+  const deployedCredentials = resources?.credentials ?? {};
   const credentials = diffResourceSet({
     resourceType: 'credential',
     localItems: project.credentials,
-    deployedRecord: resources?.credentials ?? {},
+    deployedRecord: deployedCredentials,
     getIdentifier: deployed => deployed.credentialProviderArn,
     getLocalDetail: item => item.authorizerType?.replace('CredentialProvider', ''),
   });
+
+  // Enrich credential entries with callbackUrl from deployed state
+  for (const entry of credentials) {
+    const deployed = deployedCredentials[entry.name];
+    if (deployed?.callbackUrl) {
+      entry.callbackUrl = deployed.callbackUrl;
+    }
+  }
 
   const memories = diffResourceSet({
     resourceType: 'memory',

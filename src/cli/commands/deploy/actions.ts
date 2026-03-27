@@ -1,5 +1,6 @@
 import { ConfigIO, SecureCredentials } from '../../../lib';
 import type { AgentCoreMcpSpec, DeployedState } from '../../../schema';
+import { DEFAULT_CALLBACK_GUIDANCE, VENDOR_CALLBACK_GUIDANCE } from '../../../schema';
 import { validateAwsCredentials } from '../../aws/account';
 import { createSwitchableIoHost } from '../../cdk/toolkit-lib';
 import {
@@ -463,6 +464,16 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
         }
       } catch (err: unknown) {
         logger.log(`Transaction search setup failed: ${getErrorMessage(err)}`, 'warn');
+      }
+    }
+
+    // Post-deploy: Surface callback URLs for OAuth credentials that need 3LO registration
+    for (const [credName, credState] of Object.entries(deployedCredentials)) {
+      if (credState.callbackUrl) {
+        const credSpec = context.projectSpec.credentials.find(c => c.name === credName);
+        const vendor = credSpec && 'vendor' in credSpec ? credSpec.vendor : '';
+        const guidance = VENDOR_CALLBACK_GUIDANCE[vendor] ?? DEFAULT_CALLBACK_GUIDANCE;
+        notes.push(`OAuth credential "${credName}" callback URL: ${credState.callbackUrl}\n  ${guidance}`);
       }
     }
 

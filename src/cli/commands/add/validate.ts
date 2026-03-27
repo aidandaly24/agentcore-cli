@@ -13,6 +13,7 @@ import {
   TargetLanguageSchema,
   getSupportedFrameworksForProtocol,
   getSupportedModelProviders,
+  isIncludedProvider,
   matchEnumValue,
   vendorRequiresDiscoveryUrl,
 } from '../../../schema';
@@ -773,6 +774,20 @@ export function validateAddCredentialOptions(options: AddCredentialOptions): Val
     if (!options.clientSecret) {
       return { valid: false, error: '--client-secret is required for OAuth credentials' };
     }
+
+    // Included providers (Okta, Auth0, Cognito, etc.) require issuer, authorizationEndpoint, and tokenEndpoint
+    if (isIncludedProvider(vendor)) {
+      if (!options.issuer) {
+        return { valid: false, error: '--issuer is required for this provider' };
+      }
+      if (!options.authorizationEndpoint) {
+        return { valid: false, error: '--authorization-endpoint is required for this provider' };
+      }
+      if (!options.tokenEndpoint) {
+        return { valid: false, error: '--token-endpoint is required for this provider' };
+      }
+    }
+
     return { valid: true };
   }
 
