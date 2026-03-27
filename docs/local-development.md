@@ -20,21 +20,17 @@ agentcore dev --logs
 
 ## Invoking Local Agents
 
-Send a prompt to your agent — the dev server starts automatically if it isn't already running:
+Start the dev server in one terminal, then send prompts from another:
 
 ```bash
-# Single prompt (auto-starts server, invokes, shuts down)
+# Terminal 1: start the dev server
+agentcore dev --logs
+
+# Terminal 2: send prompts
 agentcore dev "What can you do?"
-
-# With streaming
 agentcore dev "Tell me a story" --stream
-
-# Specify agent (if multiple)
 agentcore dev "Hello" --agent MyAgent
 ```
-
-If you already have `agentcore dev` or `agentcore dev --logs` running in another terminal, the invoke reuses that
-server.
 
 ## Environment Setup
 

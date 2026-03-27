@@ -14,7 +14,6 @@ import {
   invokeForProtocol,
   listMcpTools,
   loadProjectConfig,
-  waitForServerReady,
 } from '../../operations/dev';
 import { getGatewayEnvVars } from '../../operations/dev/gateway-env.js';
 import { FatalError } from '../../tui/components';
@@ -49,9 +48,9 @@ async function invokeDevServer(
       console.log(response);
     }
   } catch (err) {
-    if (err instanceof Error && err.message.includes('ECONNREFUSED')) {
+    if (isConnectionRefused(err)) {
       console.error(`Error: Dev server not running on port ${port}`);
-      console.error('Start it with: agentcore dev');
+      console.error('Start it with: agentcore dev --logs');
     } else {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -66,14 +65,22 @@ async function invokeA2ADevServer(port: number, prompt: string, headers?: Record
     }
     process.stdout.write('\n');
   } catch (err) {
-    if (err instanceof Error && err.message.includes('ECONNREFUSED')) {
+    if (isConnectionRefused(err)) {
       console.error(`Error: Dev server not running on port ${port}`);
-      console.error('Start it with: agentcore dev');
+      console.error('Start it with: agentcore dev --logs');
     } else {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
     process.exit(1);
   }
+}
+
+function isConnectionRefused(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  // ConnectionError from invoke.ts wraps fetch failures after retries
+  if (err.name === 'ConnectionError') return true;
+  const msg = err.message + (err.cause instanceof Error ? err.cause.message : '');
+  return msg.includes('ECONNREFUSED') || msg.includes('fetch failed');
 }
 
 async function handleMcpInvoke(
@@ -123,9 +130,9 @@ async function handleMcpInvoke(
       process.exit(1);
     }
   } catch (err) {
-    if (err instanceof Error && err.message.includes('ECONNREFUSED')) {
+    if (isConnectionRefused(err)) {
       console.error(`Error: Dev server not running on port ${port}`);
-      console.error('Start it with: agentcore dev');
+      console.error('Start it with: agentcore dev --logs');
     } else {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -138,7 +145,7 @@ export const registerDev = (program: Command) => {
     .command('dev')
     .alias('d')
     .description(COMMAND_DESCRIPTIONS.dev)
-    .argument('[prompt]', 'Invoke local agent with this prompt (auto-starts server if needed) [non-interactive]')
+    .argument('[prompt]', 'Send a prompt to a running dev server [non-interactive]')
     .option('-p, --port <port>', 'Port for development server', '8080')
     .option('-a, --agent <name>', 'Agent to run or invoke (required if multiple agents)')
     .option('-s, --stream', 'Stream response when invoking [non-interactive]')
@@ -161,7 +168,7 @@ export const registerDev = (program: Command) => {
           headers = parseHeaderFlags(opts.header);
         }
 
-        // If a prompt is provided, invoke the dev server (auto-starting if needed)
+        // If a prompt is provided, invoke a running dev server
         const invokePrompt = positionalPrompt;
         if (invokePrompt !== undefined) {
           const workingDir = getWorkingDirectory();
@@ -186,127 +193,18 @@ export const registerDev = (program: Command) => {
           if (protocol === 'A2A') invokePort = 9000;
           else if (protocol === 'MCP') invokePort = 8000;
 
-          // Check if a dev server is already running on the target port
-          const serverRunning = await waitForServerReady(invokePort, 500);
-
-          // If something is listening, verify it's an agentcore dev server (not a random process)
-          if (serverRunning) {
-            try {
-              const probeUrl = getEndpointUrl(invokePort, protocol);
-              const probe = await fetch(probeUrl, { method: 'GET', signal: AbortSignal.timeout(2000) });
-              const contentType = probe.headers.get('content-type') ?? '';
-              if (contentType.includes('text/html')) {
-                console.error(`Error: Port ${invokePort} is in use by another process (not an agentcore dev server).`);
-                console.error(`Stop the other process or use --port to specify a different port.`);
-                process.exit(1);
-              }
-            } catch (probeErr) {
-              // Probe connected (serverRunning=true) but failed to get an HTTP response.
-              // This means a non-HTTP process (e.g., raw TCP listener) occupies the port.
-              const msg = probeErr instanceof Error ? probeErr.message : '';
-              if (!msg.includes('ECONNREFUSED')) {
-                console.error(`Error: Port ${invokePort} is in use by another process (not an agentcore dev server).`);
-                console.error(`Stop the other process or use --port to specify a different port.`);
-                process.exit(1);
-              }
-            }
+          // Show model info if available (not applicable to MCP)
+          if (protocol !== 'MCP' && targetAgent?.modelProvider) {
+            console.log(`Provider: ${targetAgent.modelProvider}`);
           }
 
-          // Auto-start a dev server if none is running
-          let autoStartedServer: ReturnType<typeof createDevServer> | undefined;
-          // eslint-disable-next-line @typescript-eslint/no-empty-function
-          let cleanupServer: () => void = () => {};
-          if (!serverRunning) {
-            if (!invokeProject) {
-              console.error('Error: No dev server running and no agentcore project found.');
-              console.error('Start a dev server first: agentcore dev');
-              process.exit(1);
-            }
-
-            const configRoot = findConfigRoot(workingDir);
-            const envVars = configRoot ? await readEnvFile(configRoot) : {};
-            const gatewayEnvVars = await getGatewayEnvVars();
-            const mergedEnvVars = { ...gatewayEnvVars, ...envVars };
-            const agentName = opts.agent ?? invokeProject.agents[0]?.name;
-            const config = getDevConfig(workingDir, invokeProject, configRoot ?? undefined, agentName);
-
-            if (!config) {
-              console.error('Error: No dev-supported agents found.');
-              process.exit(1);
-            }
-
-            const serverErrors: string[] = [];
-            // eslint-disable-next-line @typescript-eslint/no-empty-function
-            let resolveServerExit: () => void = () => {};
-            const serverExitPromise = new Promise<void>(resolve => {
-              resolveServerExit = resolve;
-            });
-
-            const devCallbacks = {
-              onLog: (level: string, msg: string) => {
-                if (level === 'error') serverErrors.push(msg);
-              },
-              onExit: () => {
-                resolveServerExit();
-              },
-            };
-
-            const server = createDevServer(config, {
-              port: invokePort,
-              envVars: mergedEnvVars,
-              callbacks: devCallbacks,
-            });
-            await server.start();
-
-            // Ensure server cleanup on any exit path (process.exit in invoke helpers, SIGINT, etc.)
-            cleanupServer = () => {
-              try {
-                server.kill();
-              } catch {
-                // Ignore cleanup errors
-              }
-            };
-            process.on('exit', cleanupServer);
-            process.on('SIGINT', () => {
-              cleanupServer();
-            });
-
-            // Wait for server to accept connections, bail early if process crashes
-            const ready = await Promise.race([waitForServerReady(invokePort), serverExitPromise.then(() => false)]);
-
-            if (!ready) {
-              if (serverErrors.length > 0) {
-                console.error(serverErrors.slice(-5).join('\n'));
-              }
-              console.error('Error: Dev server failed to start. Run "agentcore dev --logs" for details.');
-              process.exit(1);
-            }
-            autoStartedServer = server;
-          }
-
-          try {
-            // Show model info if available (not applicable to MCP)
-            if (protocol !== 'MCP' && targetAgent?.modelProvider) {
-              console.log(`Provider: ${targetAgent.modelProvider}`);
-            }
-
-            // Protocol-aware dispatch
-            if (protocol === 'MCP') {
-              await handleMcpInvoke(invokePort, invokePrompt, opts.tool, opts.input, headers);
-            } else if (protocol === 'A2A') {
-              await invokeA2ADevServer(invokePort, invokePrompt, headers);
-            } else {
-              await invokeDevServer(invokePort, invokePrompt, opts.stream ?? false, headers);
-            }
-          } finally {
-            if (autoStartedServer) {
-              try {
-                autoStartedServer.kill();
-              } catch {
-                // Ignore cleanup errors
-              }
-              process.removeListener('exit', cleanupServer);
-            }
+          // Protocol-aware dispatch
+          if (protocol === 'MCP') {
+            await handleMcpInvoke(invokePort, invokePrompt, opts.tool, opts.input, headers);
+          } else if (protocol === 'A2A') {
+            await invokeA2ADevServer(invokePort, invokePrompt, headers);
+          } else {
+            await invokeDevServer(invokePort, invokePrompt, opts.stream ?? false, headers);
           }
           return;
         }

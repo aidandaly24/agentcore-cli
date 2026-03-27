@@ -37,15 +37,14 @@ describe('dev command', () => {
 
   describe('positional prompt invoke', () => {
     it('exits with helpful error when no server running and no project found', async () => {
-      // With no dev server running and no project, the auto-start path
-      // detects both conditions and shows a helpful error
+      // With no dev server running, invoke path shows connection error
       const result = await runCLI(['dev', 'Hello agent'], process.cwd());
 
       expect(result.exitCode).toBe(1);
       const output = result.stderr.toLowerCase();
       expect(
-        output.includes('no dev server running'),
-        `Should mention no dev server running, got: ${result.stderr}`
+        output.includes('dev server not running'),
+        `Should mention dev server not running, got: ${result.stderr}`
       ).toBeTruthy();
     });
 
