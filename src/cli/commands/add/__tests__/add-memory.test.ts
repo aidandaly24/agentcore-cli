@@ -51,16 +51,17 @@ describe('add memory command', () => {
       expect(json.error.includes('INVALID'), `Error: ${json.error}`).toBeTruthy();
     });
 
-    // Issue #235: CUSTOM strategy has been removed
-    it('rejects CUSTOM strategy', async () => {
+    // Issue #677: CUSTOM strategy is now supported
+    it('creates memory with CUSTOM strategy', async () => {
+      const memoryName = `memCustom${Date.now()}`;
       const result = await runCLI(
-        ['add', 'memory', '--name', 'testCustom', '--strategies', 'CUSTOM', '--json'],
+        ['add', 'memory', '--name', memoryName, '--strategies', 'CUSTOM', '--json'],
         projectDir
       );
-      expect(result.exitCode).toBe(1);
+      expect(result.exitCode, `stdout: ${result.stdout}, stderr: ${result.stderr}`).toBe(0);
       const json = JSON.parse(result.stdout);
-      expect(json.success).toBe(false);
-      expect(json.error.includes('CUSTOM'), `Error: ${json.error}`).toBeTruthy();
+      expect(json.success).toBe(true);
+      expect(json.memoryName).toBe(memoryName);
     });
   });
 

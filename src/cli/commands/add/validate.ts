@@ -33,7 +33,7 @@ export interface ValidationResult {
 
 // Constants
 const MEMORY_OPTIONS = ['none', 'shortTerm', 'longAndShortTerm'] as const;
-const VALID_STRATEGIES = ['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE'];
+const VALID_STRATEGIES = ['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE', 'CUSTOM'];
 
 /**
  * Validate that a credential name exists in the project spec.

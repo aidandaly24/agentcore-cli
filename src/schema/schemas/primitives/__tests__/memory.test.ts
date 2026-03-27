@@ -16,13 +16,14 @@ describe('MemoryStrategyTypeSchema', () => {
     });
   });
 
-  describe('invalid strategy types', () => {
-    // Issue #235: CUSTOM strategy has been removed
-    it('rejects CUSTOM strategy', () => {
+  describe('custom strategy type', () => {
+    it('accepts CUSTOM strategy', () => {
       const result = MemoryStrategyTypeSchema.safeParse('CUSTOM');
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
+  });
 
+  describe('invalid strategy types', () => {
     it('rejects arbitrary invalid strategies', () => {
       expect(MemoryStrategyTypeSchema.safeParse('INVALID').success).toBe(false);
       expect(MemoryStrategyTypeSchema.safeParse('').success).toBe(false);
@@ -31,9 +32,9 @@ describe('MemoryStrategyTypeSchema', () => {
   });
 
   describe('schema options', () => {
-    it('only contains three valid strategies', () => {
-      expect(MemoryStrategyTypeSchema.options).toEqual(['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE']);
-      expect(MemoryStrategyTypeSchema.options).not.toContain('CUSTOM');
+    it('contains four valid strategies', () => {
+      expect(MemoryStrategyTypeSchema.options).toEqual(['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE', 'CUSTOM']);
+      expect(MemoryStrategyTypeSchema.options).toContain('CUSTOM');
     });
   });
 });
@@ -54,9 +55,18 @@ describe('MemoryStrategySchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects strategy with CUSTOM type', () => {
+  it('accepts strategy with CUSTOM type', () => {
     const result = MemoryStrategySchema.safeParse({ type: 'CUSTOM' });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts CUSTOM strategy with optional fields', () => {
+    const result = MemoryStrategySchema.safeParse({
+      type: 'CUSTOM',
+      name: 'my_custom',
+      description: 'My custom strategy',
+    });
+    expect(result.success).toBe(true);
   });
 
   it('rejects strategy with invalid type', () => {
@@ -83,7 +93,7 @@ describe('DEFAULT_STRATEGY_NAMESPACES', () => {
     expect(DEFAULT_STRATEGY_NAMESPACES.SUMMARIZATION).toEqual(['/summaries/{actorId}/{sessionId}']);
   });
 
-  it('does not have default namespaces for CUSTOM (removed)', () => {
+  it('does not have default namespaces for CUSTOM', () => {
     expect(DEFAULT_STRATEGY_NAMESPACES).not.toHaveProperty('CUSTOM');
   });
 });

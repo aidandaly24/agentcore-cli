@@ -953,17 +953,15 @@ describe('validate', () => {
       ).toEqual({ valid: true });
     });
 
-    // AC23: CUSTOM strategy is not supported (Issue #235)
-    it('rejects CUSTOM strategy', () => {
+    // Issue #677: CUSTOM strategy is now supported
+    it('accepts CUSTOM strategy', () => {
       const result = validateAddMemoryOptions({ ...validMemoryOptions, strategies: 'CUSTOM' });
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('Invalid strategy: CUSTOM');
+      expect(result.valid).toBe(true);
     });
 
-    it('rejects CUSTOM even when mixed with valid strategies', () => {
+    it('accepts CUSTOM mixed with other strategies', () => {
       const result = validateAddMemoryOptions({ ...validMemoryOptions, strategies: 'SEMANTIC,CUSTOM' });
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain('Invalid strategy: CUSTOM');
+      expect(result.valid).toBe(true);
     });
 
     // AC24: Each individual valid strategy should pass

@@ -32,6 +32,7 @@ const STRATEGY_DESCRIPTIONS: Record<MemoryStrategyType, string> = {
   SEMANTIC: 'Vector-based semantic search over memories',
   SUMMARIZATION: 'Compress and summarize conversation context',
   USER_PREFERENCE: 'Track and recall user preferences',
+  CUSTOM: 'Self-managed strategy with user-controlled extraction logic',
 };
 
 export const MEMORY_STRATEGY_OPTIONS = MemoryStrategyTypeSchema.options.map(type => ({

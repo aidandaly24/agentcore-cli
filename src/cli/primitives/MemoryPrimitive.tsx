@@ -126,7 +126,7 @@ export class MemoryPrimitive extends BasePrimitive<AddMemoryOptions, RemovableMe
       .option('--name <name>', 'Memory name [non-interactive]')
       .option(
         '--strategies <types>',
-        'Comma-separated strategies: SEMANTIC, SUMMARIZATION, USER_PREFERENCE [non-interactive]'
+        'Comma-separated strategies: SEMANTIC, SUMMARIZATION, USER_PREFERENCE, CUSTOM [non-interactive]'
       )
       .option('--expiry <days>', 'Event expiry duration in days (default: 30) [non-interactive]')
       .option('--json', 'Output as JSON [non-interactive]')
