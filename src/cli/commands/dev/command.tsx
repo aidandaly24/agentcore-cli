@@ -189,6 +189,22 @@ export const registerDev = (program: Command) => {
           // Check if a dev server is already running on the target port
           const serverRunning = await waitForServerReady(invokePort, 500);
 
+          // If something is listening, verify it's an agentcore dev server (not a random process)
+          if (serverRunning) {
+            try {
+              const probeUrl = getEndpointUrl(invokePort, protocol);
+              const probe = await fetch(probeUrl, { method: 'GET', signal: AbortSignal.timeout(2000) });
+              const contentType = probe.headers.get('content-type') ?? '';
+              if (contentType.includes('text/html')) {
+                console.error(`Error: Port ${invokePort} is in use by another process (not an agentcore dev server).`);
+                console.error(`Stop the other process or use --port to specify a different port.`);
+                process.exit(1);
+              }
+            } catch {
+              // Probe failed — let the invoke dispatch handle the error
+            }
+          }
+
           // Auto-start a dev server if none is running
           let autoStartedServer: ReturnType<typeof createDevServer> | undefined;
           if (!serverRunning) {
