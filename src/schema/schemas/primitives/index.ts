@@ -1,10 +1,19 @@
-export type { MemoryStrategy, MemoryStrategyType } from './memory';
+export type {
+  MemoryStrategy,
+  MemoryStrategyType,
+  SemanticOverride,
+  SemanticExtractionOverride,
+  SemanticConsolidationOverride,
+} from './memory';
 export {
   DEFAULT_EPISODIC_REFLECTION_NAMESPACES,
   DEFAULT_STRATEGY_NAMESPACES,
   MemoryStrategyNameSchema,
   MemoryStrategySchema,
   MemoryStrategyTypeSchema,
+  SemanticOverrideSchema,
+  SemanticExtractionOverrideSchema,
+  SemanticConsolidationOverrideSchema,
 } from './memory';
 
 export type {
