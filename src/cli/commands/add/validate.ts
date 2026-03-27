@@ -34,7 +34,7 @@ export interface ValidationResult {
 }
 
 // Constants
-const MEMORY_OPTIONS = ['none', 'shortTerm', 'longAndShortTerm'] as const;
+const MEMORY_OPTIONS = ['none', 'shortTerm', 'longAndShortTerm', 'custom'] as const;
 const VALID_STRATEGIES: readonly string[] = MemoryStrategyTypeSchema.options;
 
 /**
@@ -135,7 +135,7 @@ export function validateAddAgentOptions(options: AddAgentOptions): ValidationRes
     if (!MEMORY_OPTIONS.includes(options.memory as (typeof MEMORY_OPTIONS)[number])) {
       return {
         valid: false,
-        error: `Invalid memory option: ${options.memory}. Use none, shortTerm, or longAndShortTerm`,
+        error: `Invalid memory option: ${options.memory}. Use none, shortTerm, longAndShortTerm, or custom`,
       };
     }
     // Parse and validate lifecycle configuration for import path
@@ -243,7 +243,7 @@ export function validateAddAgentOptions(options: AddAgentOptions): ValidationRes
     if (!MEMORY_OPTIONS.includes(options.memory as (typeof MEMORY_OPTIONS)[number])) {
       return {
         valid: false,
-        error: `Invalid memory option: ${options.memory}. Use none, shortTerm, or longAndShortTerm`,
+        error: `Invalid memory option: ${options.memory}. Use none, shortTerm, longAndShortTerm, or custom`,
       };
     }
   }

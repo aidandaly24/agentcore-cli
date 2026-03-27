@@ -120,7 +120,7 @@ export async function createProject(options: CreateProjectOptions): Promise<Crea
   }
 }
 
-type MemoryOption = 'none' | 'shortTerm' | 'longAndShortTerm';
+type MemoryOption = 'none' | 'shortTerm' | 'longAndShortTerm' | 'custom';
 
 export interface CreateWithAgentOptions {
   name: string;
