@@ -50,7 +50,7 @@ agentcore add gateway-target \
   --gateway my-gateway
 ```
 
-Supports outbound auth: `oauth`, `api-key`, or `none`.
+Supports outbound auth: `oauth` or `none`.
 
 ### API Gateway REST API (`api-gateway`)
 
@@ -245,6 +245,28 @@ To get the correct code for your setup:
    ```bash
    agentcore remove agent --name TempAgent
    ```
+
+## Gateway Configuration Options
+
+Gateways support additional configuration fields in `agentcore.json`:
+
+| Field                  | Default | Description                                                    |
+| ---------------------- | ------- | -------------------------------------------------------------- |
+| `enableSemanticSearch` | `true`  | Enable semantic search for tool discovery                      |
+| `exceptionLevel`       | `NONE`  | Exception verbosity: `"NONE"` or `"DEBUG"` (for troubleshooting) |
+
+```json
+{
+  "agentCoreGateways": [
+    {
+      "name": "MyGateway",
+      "enableSemanticSearch": false,
+      "exceptionLevel": "DEBUG",
+      "targets": [...]
+    }
+  ]
+}
+```
 
 ## Local Development
 

@@ -130,7 +130,7 @@ agentcore status --json
 | ------------------------- | ----------------------------------------------------------------------------------------------- |
 | `--agent-runtime-id <id>` | Look up a specific agent runtime by ID                                                          |
 | `--target <name>`         | Select deployment target                                                                        |
-| `--type <type>`           | Filter by resource type: `agent`, `memory`, `credential`, `gateway`, `evaluator`, `online-eval` |
+| `--type <type>`           | Filter by resource type: `agent`, `memory`, `credential`, `gateway`, `evaluator`, `online-eval`, `policy-engine`, `policy` |
 | `--state <state>`         | Filter by deployment state: `deployed`, `local-only`, `pending-removal`                         |
 | `--agent <name>`          | Filter to a specific agent                                                                      |
 | `--json`                  | JSON output                                                                                     |
@@ -350,7 +350,6 @@ agentcore add gateway-target \
 | `--stage <stage>`                  | API Gateway stage name (api-gateway)                                                                          |
 | `--tool-filter-path <path>`        | Filter API paths, supports wildcards (api-gateway)                                                            |
 | `--tool-filter-methods <methods>`  | Comma-separated HTTP methods to expose (api-gateway)                                                          |
-| `--tool-filter-description <desc>` | Tool filter description pattern                                                                               |
 | `--schema <path>`                  | Path to schema file, relative to project root (open-api-schema, smithy-model)                                 |
 | `--schema-s3-account <account>`    | AWS account for S3-hosted schema (open-api-schema, smithy-model)                                              |
 | `--lambda-arn <arn>`               | Lambda function ARN (lambda-function-arn)                                                                     |
@@ -400,7 +399,7 @@ Add a custom LLM-as-a-Judge evaluator. See [Evaluations](evals.md) for full deta
 agentcore add evaluator \
   --name ResponseQuality \
   --level SESSION \
-  --model us.anthropic.claude-sonnet-4-5-20250929-v1:0 \
+  --model us.anthropic.claude-sonnet-4-5-20250514-v1:0 \
   --instructions "Evaluate the response quality. Context: {context}" \
   --rating-scale 1-5-quality
 ```
@@ -689,6 +688,23 @@ agentcore logs evals --follow --json
 ---
 
 ## Utilities
+
+### fetch access
+
+Fetch access info (URL, token, auth guidance) for a deployed gateway or agent.
+
+```bash
+agentcore fetch access
+agentcore fetch access --name MyGateway --type gateway --json
+agentcore fetch access --name MyAgent --type agent --target staging
+```
+
+| Flag              | Description                                     |
+| ----------------- | ----------------------------------------------- |
+| `--name <name>`   | Gateway or agent name                           |
+| `--type <type>`   | Resource type: `gateway` (default) or `agent`   |
+| `--target <name>` | Deployment target                               |
+| `--json`          | JSON output                                     |
 
 ### package
 

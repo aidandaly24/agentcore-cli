@@ -70,8 +70,8 @@ These options are available on all commands:
 
 All resource types (agent, memory, identity, evaluator, online-eval, gateway, gateway-target, policy-engine, policy) are
 modeled as **primitives** -- self-contained classes in `src/cli/primitives/` that own the full add/remove lifecycle for
-their resource type. Resources support config-driven tagging via `agentcore.json` and `mcp.json`, with tags flowing
-through to deployed CloudFormation resources.
+their resource type. Resources support config-driven tagging via `agentcore.json`, with tags flowing through to deployed
+CloudFormation resources.
 
 Each primitive extends `BasePrimitive` and implements: `add()`, `remove()`, `previewRemove()`, `getRemovable()`,
 `registerCommands()`, and `addScreen()`.

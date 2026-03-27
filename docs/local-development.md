@@ -114,7 +114,7 @@ Memory requires deployment to test fully. For local testing, you can mock these 
 When you have deployed gateways, `agentcore dev` automatically injects gateway environment variables into your local
 agent process. This lets your local agent connect to real deployed gateways during development.
 
-The dev server reads `deployed-state.json` and `mcp.json` to generate:
+The dev server reads `deployed-state.json` and `agentcore.json` to generate:
 
 ```bash
 AGENTCORE_GATEWAY_{NAME}_URL=https://{gateway-id}.gateway.agentcore.{region}.amazonaws.com

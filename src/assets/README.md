@@ -70,7 +70,7 @@ The project uses a **flat resource model** where agents, memories, and credentia
 
 ### Agent Types
 
-- **Template agents**: Created from framework templates (Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents)
+- **Template agents**: Created from framework templates (Strands, LangChain_LangGraph, CrewAI, GoogleADK, OpenAIAgents)
 - **BYO agents**: Bring your own code with `agentcore add agent --type byo`
 
 ## Documentation

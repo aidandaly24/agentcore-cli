@@ -37,7 +37,7 @@ agentcore add evaluator
 agentcore add evaluator \
   --name ResponseQuality \
   --level SESSION \
-  --model us.anthropic.claude-sonnet-4-5-20250929-v1:0 \
+  --model us.anthropic.claude-sonnet-4-5-20250514-v1:0 \
   --instructions "Evaluate the agent response quality. Context: {context}" \
   --rating-scale 1-5-quality
 ```
@@ -111,7 +111,7 @@ Evaluators are stored in the `evaluators` array of `agentcore.json`:
       "level": "SESSION",
       "config": {
         "llmAsAJudge": {
-          "model": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "model": "us.anthropic.claude-sonnet-4-5-20250514-v1:0",
           "instructions": "Evaluate the agent response quality. Context: {context}",
           "ratingScale": {
             "numerical": [
@@ -385,7 +385,7 @@ fi
 agentcore add evaluator \
   --name ResponseQuality \
   --level SESSION \
-  --model us.anthropic.claude-sonnet-4-5-20250929-v1:0 \
+  --model us.anthropic.claude-sonnet-4-5-20250514-v1:0 \
   --instructions "Evaluate the agent response quality. Context: {context}"
 
 # 2. Run on-demand eval to verify
