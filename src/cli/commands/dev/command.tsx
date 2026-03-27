@@ -200,13 +200,22 @@ export const registerDev = (program: Command) => {
                 console.error(`Stop the other process or use --port to specify a different port.`);
                 process.exit(1);
               }
-            } catch {
-              // Probe failed — let the invoke dispatch handle the error
+            } catch (probeErr) {
+              // Probe connected (serverRunning=true) but failed to get an HTTP response.
+              // This means a non-HTTP process (e.g., raw TCP listener) occupies the port.
+              const msg = probeErr instanceof Error ? probeErr.message : '';
+              if (!msg.includes('ECONNREFUSED')) {
+                console.error(`Error: Port ${invokePort} is in use by another process (not an agentcore dev server).`);
+                console.error(`Stop the other process or use --port to specify a different port.`);
+                process.exit(1);
+              }
             }
           }
 
           // Auto-start a dev server if none is running
           let autoStartedServer: ReturnType<typeof createDevServer> | undefined;
+          // eslint-disable-next-line @typescript-eslint/no-empty-function
+          let cleanupServer: () => void = () => {};
           if (!serverRunning) {
             if (!invokeProject) {
               console.error('Error: No dev server running and no agentcore project found.');
@@ -250,8 +259,17 @@ export const registerDev = (program: Command) => {
             await server.start();
 
             // Ensure server cleanup on any exit path (process.exit in invoke helpers, SIGINT, etc.)
-            const cleanupServer = () => server.kill();
+            cleanupServer = () => {
+              try {
+                server.kill();
+              } catch {
+                // Ignore cleanup errors
+              }
+            };
             process.on('exit', cleanupServer);
+            process.on('SIGINT', () => {
+              cleanupServer();
+            });
 
             // Wait for server to accept connections, bail early if process crashes
             const ready = await Promise.race([waitForServerReady(invokePort), serverExitPromise.then(() => false)]);
@@ -282,7 +300,12 @@ export const registerDev = (program: Command) => {
             }
           } finally {
             if (autoStartedServer) {
-              autoStartedServer.kill();
+              try {
+                autoStartedServer.kill();
+              } catch {
+                // Ignore cleanup errors
+              }
+              process.removeListener('exit', cleanupServer);
             }
           }
           return;

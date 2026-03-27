@@ -45,6 +45,8 @@ function createMockChildProcess() {
   proc.stdout = new EventEmitter();
   proc.stderr = new EventEmitter();
   proc.killed = false;
+  proc.exitCode = null;
+  proc.pid = 12345;
   proc.kill = vi.fn();
   return proc;
 }
@@ -472,10 +474,11 @@ describe('ContainerDevServer', () => {
 
   describe('kill()', () => {
     it('stops container using docker stop before calling super.kill()', async () => {
+      const processKillSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
       mockSuccessfulPrepare();
 
       const server = new ContainerDevServer(defaultConfig, defaultOptions);
-      const child = await server.start();
+      await server.start();
 
       // Clear mocks to isolate the kill call
       mockSpawn.mockClear();
@@ -484,7 +487,8 @@ describe('ContainerDevServer', () => {
 
       // Container stop is async (spawn not spawnSync) so UI can render "Stopping..." message
       expect(mockSpawn).toHaveBeenCalledWith('docker', ['stop', 'agentcore-dev-testagent'], { stdio: 'ignore' });
-      expect(child!.kill).toHaveBeenCalledWith('SIGTERM'); // eslint-disable-line @typescript-eslint/unbound-method
+      expect(processKillSpy).toHaveBeenCalledWith(-12345, 'SIGTERM');
+      processKillSpy.mockRestore();
     });
 
     it('does not call container stop when runtimeBinary is empty (prepare not called)', () => {

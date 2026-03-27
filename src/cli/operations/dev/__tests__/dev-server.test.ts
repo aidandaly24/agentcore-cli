@@ -13,6 +13,8 @@ function createMockChildProcess() {
   proc.stdout = new EventEmitter();
   proc.stderr = new EventEmitter();
   proc.killed = false;
+  proc.exitCode = null;
+  proc.pid = 12345;
   proc.kill = vi.fn();
   return proc;
 }
@@ -75,6 +77,7 @@ describe('DevServer', () => {
         cwd: '/test',
         env: { PATH: '/usr/bin' },
         stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
       });
     });
 
@@ -101,22 +104,42 @@ describe('DevServer', () => {
   });
 
   describe('kill()', () => {
+    let processKillSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      processKillSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    });
+
+    afterEach(() => {
+      processKillSpy.mockRestore();
+    });
+
     it('does nothing when no child process (no start called)', () => {
       // Should not throw
       server.kill();
     });
 
-    it('does nothing when child already killed', async () => {
+    it('does nothing when child already exited', async () => {
       await server.start();
-      mockChild.killed = true;
+      mockChild.exitCode = 0;
 
       server.kill();
-      expect(mockChild.kill).not.toHaveBeenCalled();
+      expect(processKillSpy).not.toHaveBeenCalled();
     });
 
-    it('sends SIGTERM first', async () => {
+    it('sends SIGTERM to process group first', async () => {
       await server.start();
 
+      server.kill();
+      expect(processKillSpy).toHaveBeenCalledWith(-12345, 'SIGTERM');
+    });
+
+    it('falls back to child.kill if process group kill fails', async () => {
+      processKillSpy.mockImplementation(() => {
+        throw new Error('ESRCH');
+      });
+
+      await server.start();
       server.kill();
       expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
     });
@@ -127,13 +150,13 @@ describe('DevServer', () => {
       await server.start();
       server.kill();
 
-      expect(mockChild.kill).toHaveBeenCalledTimes(1);
-      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(processKillSpy).toHaveBeenCalledTimes(1);
+      expect(processKillSpy).toHaveBeenCalledWith(-12345, 'SIGTERM');
 
       vi.advanceTimersByTime(2000);
 
-      expect(mockChild.kill).toHaveBeenCalledTimes(2);
-      expect(mockChild.kill).toHaveBeenCalledWith('SIGKILL');
+      expect(processKillSpy).toHaveBeenCalledTimes(2);
+      expect(processKillSpy).toHaveBeenCalledWith(-12345, 'SIGKILL');
 
       vi.useRealTimers();
     });
@@ -144,13 +167,13 @@ describe('DevServer', () => {
       await server.start();
       server.kill();
 
-      // Simulate process dying after SIGTERM
-      mockChild.killed = true;
+      // Simulate process exiting after SIGTERM
+      mockChild.exitCode = 0;
 
       vi.advanceTimersByTime(2000);
 
-      expect(mockChild.kill).toHaveBeenCalledTimes(1);
-      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(processKillSpy).toHaveBeenCalledTimes(1);
+      expect(processKillSpy).toHaveBeenCalledWith(-12345, 'SIGTERM');
 
       vi.useRealTimers();
     });

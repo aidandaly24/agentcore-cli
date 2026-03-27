@@ -72,18 +72,37 @@ export abstract class DevServer {
       cwd: spawnConfig.cwd,
       env: spawnConfig.env,
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
     });
 
     this.attachHandlers();
     return this.child;
   }
 
-  /** Kill the dev server process. Sends SIGTERM, then SIGKILL after 2 seconds. */
+  /** Kill the dev server process group. Sends SIGTERM, then SIGKILL after 2 seconds. */
   kill(): void {
-    if (!this.child || this.child.killed) return;
-    this.child.kill('SIGTERM');
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
+    if (!this.child || this.child.exitCode !== null) return;
+    const pid = this.child.pid!;
+    // Kill the entire process group (negative PID) to clean up child processes (e.g., uvicorn workers)
+    try {
+      process.kill(-pid, 'SIGTERM');
+    } catch {
+      this.child.kill('SIGTERM');
+    }
+    const child = this.child;
     const killTimer = setTimeout(() => {
-      if (this.child && !this.child.killed) this.child.kill('SIGKILL');
+      if (child.exitCode === null) {
+        try {
+          process.kill(-pid, 'SIGKILL');
+        } catch {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Process already dead
+          }
+        }
+      }
     }, 2000);
     killTimer.unref();
   }
