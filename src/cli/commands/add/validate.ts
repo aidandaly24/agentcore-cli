@@ -4,6 +4,7 @@ import {
   BuildTypeSchema,
   GatewayExceptionLevelSchema,
   GatewayNameSchema,
+  MemoryStrategyTypeSchema,
   ModelProviderSchema,
   ProtocolModeSchema,
   RuntimeAuthorizerTypeSchema,
@@ -33,7 +34,7 @@ export interface ValidationResult {
 
 // Constants
 const MEMORY_OPTIONS = ['none', 'shortTerm', 'longAndShortTerm'] as const;
-const VALID_STRATEGIES = ['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE', 'CUSTOM'];
+const VALID_STRATEGIES: readonly string[] = MemoryStrategyTypeSchema.options;
 
 /**
  * Validate that a credential name exists in the project spec.
