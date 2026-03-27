@@ -11,9 +11,10 @@ import { z } from 'zod';
  * - SUMMARIZATION → SummaryMemoryStrategy (note: CloudFormation uses "Summary")
  * - USER_PREFERENCE → UserPreferenceMemoryStrategy
  * - EPISODIC → EpisodicMemoryStrategy
+ * - CUSTOM → CustomMemoryStrategy
  * @see https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-bedrockagentcore-memory-memorystrategy.html
  */
-export const MemoryStrategyTypeSchema = z.enum(['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE', 'EPISODIC']);
+export const MemoryStrategyTypeSchema = z.enum(['SEMANTIC', 'SUMMARIZATION', 'USER_PREFERENCE', 'EPISODIC', 'CUSTOM']);
 export type MemoryStrategyType = z.infer<typeof MemoryStrategyTypeSchema>;
 
 /**
