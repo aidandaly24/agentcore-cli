@@ -54,7 +54,6 @@ In `agentcore.json`, set `"build": "Container"`:
 
 ```json
 {
-  "type": "AgentCoreRuntime",
   "name": "MyAgent",
   "build": "Container",
   "entrypoint": "main.py",

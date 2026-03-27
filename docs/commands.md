@@ -119,21 +119,21 @@ Check deployment status and resource details.
 
 ```bash
 agentcore status
-agentcore status --agent MyAgent
+agentcore status --runtime MyAgent
 agentcore status --type evaluator
 agentcore status --state deployed
-agentcore status --agent-runtime-id abc123
+agentcore status --runtime-id abc123
 agentcore status --json
 ```
 
-| Flag                      | Description                                                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `--agent-runtime-id <id>` | Look up a specific agent runtime by ID                                                                                     |
-| `--target <name>`         | Select deployment target                                                                                                   |
-| `--type <type>`           | Filter by resource type: `agent`, `memory`, `credential`, `gateway`, `evaluator`, `online-eval`, `policy-engine`, `policy` |
-| `--state <state>`         | Filter by deployment state: `deployed`, `local-only`, `pending-removal`                                                    |
-| `--agent <name>`          | Filter to a specific agent                                                                                                 |
-| `--json`                  | JSON output                                                                                                                |
+| Flag                | Description                                                                                                                |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `--runtime-id <id>` | Look up a specific runtime by ID                                                                                           |
+| `--target <name>`   | Select deployment target                                                                                                   |
+| `--type <type>`     | Filter by resource type: `agent`, `memory`, `credential`, `gateway`, `evaluator`, `online-eval`, `policy-engine`, `policy` |
+| `--state <state>`   | Filter by deployment state: `deployed`, `local-only`, `pending-removal`                                                    |
+| `--runtime <name>`  | Filter to a specific runtime                                                                                               |
+| `--json`            | JSON output                                                                                                                |
 
 ### validate
 
@@ -421,7 +421,7 @@ Add an online eval config for continuous agent monitoring.
 ```bash
 agentcore add online-eval \
   --name QualityMonitor \
-  --agent MyAgent \
+  --runtime MyAgent \
   --evaluator ResponseQuality Builtin.Faithfulness \
   --sampling-rate 10
 ```
@@ -429,7 +429,7 @@ agentcore add online-eval \
 | Flag                         | Description                                   |
 | ---------------------------- | --------------------------------------------- |
 | `--name <name>`              | Config name                                   |
-| `-a, --agent <name>`         | Agent to monitor                              |
+| `-r, --runtime <name>`       | Runtime to monitor                            |
 | `-e, --evaluator <names...>` | Evaluator name(s), `Builtin.*` IDs, or ARNs   |
 | `--evaluator-arn <arns...>`  | Evaluator ARN(s)                              |
 | `--sampling-rate <rate>`     | Percentage of requests to evaluate (0.01–100) |
@@ -471,25 +471,25 @@ Start local development server with hot-reload.
 
 ```bash
 agentcore dev
-agentcore dev --agent MyAgent --port 3000
+agentcore dev --runtime MyAgent --port 3000
 agentcore dev --logs                      # Non-interactive
 agentcore dev "Hello" --stream            # Invoke running dev server
-agentcore dev "Hello" --agent MyAgent     # Invoke specific agent
+agentcore dev "Hello" --runtime MyAgent    # Invoke specific runtime
 
 # MCP protocol dev commands
 agentcore dev list-tools
 agentcore dev call-tool --tool myTool --input '{"arg": "value"}'
 ```
 
-| Flag / Argument      | Description                                          |
-| -------------------- | ---------------------------------------------------- |
-| `[prompt]`           | Send a prompt to a running dev server                |
-| `-p, --port <port>`  | Port (default: 8080; MCP uses 8000, A2A uses 9000)   |
-| `-a, --agent <name>` | Agent to run or invoke (required if multiple agents) |
-| `-s, --stream`       | Stream response when invoking                        |
-| `-l, --logs`         | Non-interactive stdout logging                       |
-| `--tool <name>`      | MCP tool name (with `call-tool` prompt)              |
-| `--input <json>`     | MCP tool arguments as JSON (with `--tool`)           |
+| Flag / Argument        | Description                                              |
+| ---------------------- | -------------------------------------------------------- |
+| `[prompt]`             | Send a prompt to a running dev server                    |
+| `-p, --port <port>`    | Port (default: 8080; MCP uses 8000, A2A uses 9000)       |
+| `-r, --runtime <name>` | Runtime to run or invoke (required if multiple runtimes) |
+| `-s, --stream`         | Stream response when invoking                            |
+| `-l, --logs`           | Non-interactive stdout logging                           |
+| `--tool <name>`        | MCP tool name (with `call-tool` prompt)                  |
+| `--input <json>`       | MCP tool arguments as JSON (with `--tool`)               |
 
 ### invoke
 
@@ -498,7 +498,7 @@ Invoke a deployed agent endpoint.
 ```bash
 agentcore invoke "What can you do?"
 agentcore invoke --prompt "Hello" --stream
-agentcore invoke --agent MyAgent --target staging
+agentcore invoke --runtime MyAgent --target staging
 agentcore invoke --session-id abc123         # Continue session
 agentcore invoke --json                      # JSON output
 
@@ -515,7 +515,7 @@ agentcore invoke --exec "cat /etc/os-release" --json
 | --------------------- | -------------------------------------------------------- |
 | `[prompt]`            | Prompt text (positional argument)                        |
 | `--prompt <text>`     | Prompt text (flag, takes precedence over positional)     |
-| `--agent <name>`      | Specific agent                                           |
+| `--runtime <name>`    | Specific runtime                                         |
 | `--target <name>`     | Deployment target                                        |
 | `--session-id <id>`   | Continue a specific session                              |
 | `--user-id <id>`      | User ID for runtime invocation (default: `default-user`) |
@@ -536,21 +536,21 @@ Stream or search agent runtime logs.
 
 ```bash
 agentcore logs                                   # Stream logs (follow mode)
-agentcore logs --agent MyAgent                   # Specific agent
+agentcore logs --runtime MyAgent                  # Specific runtime
 agentcore logs --since 1h --level error          # Search last hour for errors
 agentcore logs --since 2d --until 1d --query "timeout"
 agentcore logs --json                            # JSON Lines output
 ```
 
-| Flag              | Description                                                                      |
-| ----------------- | -------------------------------------------------------------------------------- |
-| `--agent <name>`  | Select specific agent                                                            |
-| `--since <time>`  | Start time (defaults to 1h ago in search mode; e.g. `1h`, `30m`, `2d`, ISO 8601) |
-| `--until <time>`  | End time (defaults to now in search mode; e.g. `now`, ISO 8601)                  |
-| `--level <level>` | Filter by log level: `error`, `warn`, `info`, `debug`                            |
-| `-n, --limit <n>` | Maximum number of log lines to return                                            |
-| `--query <text>`  | Server-side text filter                                                          |
-| `--json`          | Output as JSON Lines                                                             |
+| Flag               | Description                                                                      |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `--runtime <name>` | Select specific runtime                                                          |
+| `--since <time>`   | Start time (defaults to 1h ago in search mode; e.g. `1h`, `30m`, `2d`, ISO 8601) |
+| `--until <time>`   | End time (defaults to now in search mode; e.g. `now`, ISO 8601)                  |
+| `--level <level>`  | Filter by log level: `error`, `warn`, `info`, `debug`                            |
+| `-n, --limit <n>`  | Maximum number of log lines to return                                            |
+| `--query <text>`   | Server-side text filter                                                          |
+| `--json`           | Output as JSON Lines                                                             |
 
 ### traces
 
@@ -560,31 +560,31 @@ View and download agent traces.
 
 ```bash
 agentcore traces list
-agentcore traces list --agent MyAgent --limit 50
+agentcore traces list --runtime MyAgent --limit 50
 agentcore traces list --since 1h --until now
 ```
 
-| Flag             | Description                                                                 |
-| ---------------- | --------------------------------------------------------------------------- |
-| `--agent <name>` | Select specific agent                                                       |
-| `--limit <n>`    | Maximum number of traces to display (default: 20)                           |
-| `--since <time>` | Start time (defaults to 12h ago; e.g. `5m`, `1h`, `2d`, ISO 8601, epoch ms) |
-| `--until <time>` | End time (defaults to now; e.g. `now`, `1h`, ISO 8601, epoch ms)            |
+| Flag               | Description                                                                 |
+| ------------------ | --------------------------------------------------------------------------- |
+| `--runtime <name>` | Select specific runtime                                                     |
+| `--limit <n>`      | Maximum number of traces to display (default: 20)                           |
+| `--since <time>`   | Start time (defaults to 12h ago; e.g. `5m`, `1h`, `2d`, ISO 8601, epoch ms) |
+| `--until <time>`   | End time (defaults to now; e.g. `now`, `1h`, ISO 8601, epoch ms)            |
 
 #### traces get
 
 ```bash
 agentcore traces get <traceId>
-agentcore traces get abc123 --agent MyAgent --output ./trace.json
+agentcore traces get abc123 --runtime MyAgent --output ./trace.json
 ```
 
-| Flag              | Description                      |
-| ----------------- | -------------------------------- |
-| `<traceId>`       | Trace ID to retrieve (required)  |
-| `--agent <name>`  | Select specific agent            |
-| `--output <path>` | Output file path                 |
-| `--since <time>`  | Start time (defaults to 12h ago) |
-| `--until <time>`  | End time (defaults to now)       |
+| Flag               | Description                      |
+| ------------------ | -------------------------------- |
+| `<traceId>`        | Trace ID to retrieve (required)  |
+| `--runtime <name>` | Select specific runtime          |
+| `--output <path>`  | Output file path                 |
+| `--since <time>`   | Start time (defaults to 12h ago) |
+| `--until <time>`   | End time (defaults to now)       |
 
 ---
 
@@ -598,27 +598,27 @@ Run on-demand evaluation against historical agent traces.
 
 ```bash
 # Project mode
-agentcore run eval --agent MyAgent --evaluator ResponseQuality --days 7
+agentcore run eval --runtime MyAgent --evaluator ResponseQuality --days 7
 
 # Standalone mode (no project required)
 agentcore run eval \
-  --agent-arn arn:aws:...:runtime/abc123 \
+  --runtime-arn arn:aws:...:runtime/abc123 \
   --evaluator-arn arn:aws:...:evaluator/eval123 \
   --region us-east-1
 ```
 
-| Flag                         | Description                               |
-| ---------------------------- | ----------------------------------------- |
-| `-a, --agent <name>`         | Agent name from project                   |
-| `--agent-arn <arn>`          | Agent runtime ARN (standalone mode)       |
-| `-e, --evaluator <names...>` | Evaluator name(s) or `Builtin.*` IDs      |
-| `--evaluator-arn <arns...>`  | Evaluator ARN(s) (use with `--agent-arn`) |
-| `--region <region>`          | AWS region (required with `--agent-arn`)  |
-| `-s, --session-id <id>`      | Evaluate a specific session               |
-| `-t, --trace-id <id>`        | Evaluate a specific trace                 |
-| `--days <days>`              | Lookback window in days (default: 7)      |
-| `--output <path>`            | Custom output file path                   |
-| `--json`                     | JSON output                               |
+| Flag                         | Description                                 |
+| ---------------------------- | ------------------------------------------- |
+| `-r, --runtime <name>`       | Runtime name from project                   |
+| `--runtime-arn <arn>`        | Runtime ARN (standalone mode)               |
+| `-e, --evaluator <names...>` | Evaluator name(s) or `Builtin.*` IDs        |
+| `--evaluator-arn <arns...>`  | Evaluator ARN(s) (use with `--runtime-arn`) |
+| `--region <region>`          | AWS region (required with `--runtime-arn`)  |
+| `-s, --session-id <id>`      | Evaluate a specific session                 |
+| `-t, --trace-id <id>`        | Evaluate a specific trace                   |
+| `--days <days>`              | Lookback window in days (default: 7)        |
+| `--output <path>`            | Custom output file path                     |
+| `--json`                     | JSON output                                 |
 
 ### evals history
 
@@ -626,14 +626,14 @@ View past on-demand eval run results.
 
 ```bash
 agentcore evals history
-agentcore evals history --agent MyAgent --limit 5 --json
+agentcore evals history --runtime MyAgent --limit 5 --json
 ```
 
-| Flag                  | Description          |
-| --------------------- | -------------------- |
-| `-a, --agent <name>`  | Filter by agent name |
-| `-n, --limit <count>` | Max runs to display  |
-| `--json`              | JSON output          |
+| Flag                   | Description            |
+| ---------------------- | ---------------------- |
+| `-r, --runtime <name>` | Filter by runtime name |
+| `-n, --limit <count>`  | Max runs to display    |
+| `--json`               | JSON output            |
 
 ### pause online-eval
 
@@ -672,18 +672,18 @@ agentcore resume online-eval --arn arn:aws:...:online-eval-config/abc123
 Stream or search online eval logs.
 
 ```bash
-agentcore logs evals --agent MyAgent --since 1h
+agentcore logs evals --runtime MyAgent --since 1h
 agentcore logs evals --follow --json
 ```
 
-| Flag                  | Description                                   |
-| --------------------- | --------------------------------------------- |
-| `-a, --agent <name>`  | Filter by agent                               |
-| `--since <time>`      | Start time (e.g. `1h`, `30m`, `2d`, ISO 8601) |
-| `--until <time>`      | End time                                      |
-| `-n, --limit <count>` | Maximum log lines                             |
-| `-f, --follow`        | Stream in real-time                           |
-| `--json`              | JSON Lines output                             |
+| Flag                   | Description                                   |
+| ---------------------- | --------------------------------------------- |
+| `-r, --runtime <name>` | Filter by runtime                             |
+| `--since <time>`       | Start time (e.g. `1h`, `30m`, `2d`, ISO 8601) |
+| `--until <time>`       | End time                                      |
+| `-n, --limit <count>`  | Maximum log lines                             |
+| `-f, --follow`         | Stream in real-time                           |
+| `--json`               | JSON Lines output                             |
 
 ---
 
@@ -712,14 +712,14 @@ Package agent artifacts without deploying.
 
 ```bash
 agentcore package
-agentcore package --agent MyAgent
+agentcore package --runtime MyAgent
 agentcore package -d ./my-project
 ```
 
-| Flag                     | Description            |
-| ------------------------ | ---------------------- |
-| `-d, --directory <path>` | Project directory      |
-| `-a, --agent <name>`     | Package specific agent |
+| Flag                     | Description              |
+| ------------------------ | ------------------------ |
+| `-d, --directory <path>` | Project directory        |
+| `-r, --runtime <name>`   | Package specific runtime |
 
 ### update
 
@@ -780,13 +780,13 @@ agentcore deploy -y
 
 ```bash
 # Stream runtime logs
-agentcore logs --agent MyAgent
+agentcore logs --runtime MyAgent
 
 # Search for errors in the last 2 hours
 agentcore logs --since 2h --level error
 
 # List recent traces
-agentcore traces list --agent MyAgent --limit 10
+agentcore traces list --runtime MyAgent --limit 10
 
 # Download a specific trace
 agentcore traces get <traceId> --output ./debug-trace.json
