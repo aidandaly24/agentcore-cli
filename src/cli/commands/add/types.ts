@@ -86,6 +86,8 @@ export interface AddGatewayTargetOptions {
   oauthClientSecret?: string;
   oauthDiscoveryUrl?: string;
   oauthScopes?: string;
+  grantType?: string;
+  defaultReturnUrl?: string;
   restApiId?: string;
   stage?: string;
   lambdaArn?: string;

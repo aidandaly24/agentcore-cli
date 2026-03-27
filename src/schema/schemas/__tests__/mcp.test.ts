@@ -13,6 +13,8 @@ import {
   GatewayTargetTypeSchema,
   LambdaFunctionArnConfigSchema,
   McpImplLanguageSchema,
+  OAuthGrantTypeSchema,
+  OutboundAuthSchema,
   RuntimeConfigSchema,
   SchemaSourceSchema,
   ToolComputeConfigSchema,
@@ -1067,5 +1069,142 @@ describe('CustomClaimValidationSchema', () => {
       extraField: 'not-allowed',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('OAuthGrantTypeSchema', () => {
+  it('accepts CLIENT_CREDENTIALS', () => {
+    expect(OAuthGrantTypeSchema.safeParse('CLIENT_CREDENTIALS').success).toBe(true);
+  });
+
+  it('accepts AUTHORIZATION_CODE', () => {
+    expect(OAuthGrantTypeSchema.safeParse('AUTHORIZATION_CODE').success).toBe(true);
+  });
+
+  it('rejects invalid grant type', () => {
+    expect(OAuthGrantTypeSchema.safeParse('IMPLICIT').success).toBe(false);
+  });
+});
+
+describe('OutboundAuthSchema with grantType and defaultReturnUrl', () => {
+  it('accepts OAUTH with grantType CLIENT_CREDENTIALS', () => {
+    const result = OutboundAuthSchema.safeParse({
+      type: 'OAUTH',
+      credentialName: 'my-cred',
+      grantType: 'CLIENT_CREDENTIALS',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts OAUTH with grantType AUTHORIZATION_CODE and defaultReturnUrl', () => {
+    const result = OutboundAuthSchema.safeParse({
+      type: 'OAUTH',
+      credentialName: 'my-cred',
+      grantType: 'AUTHORIZATION_CODE',
+      defaultReturnUrl: 'https://example.com/callback',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts OAUTH without grantType (optional, CDK defaults)', () => {
+    const result = OutboundAuthSchema.safeParse({
+      type: 'OAUTH',
+      credentialName: 'my-cred',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.grantType).toBeUndefined();
+    }
+  });
+
+  it('rejects invalid grantType value', () => {
+    const result = OutboundAuthSchema.safeParse({
+      type: 'OAUTH',
+      credentialName: 'my-cred',
+      grantType: 'IMPLICIT',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects invalid defaultReturnUrl', () => {
+    const result = OutboundAuthSchema.safeParse({
+      type: 'OAUTH',
+      credentialName: 'my-cred',
+      grantType: 'AUTHORIZATION_CODE',
+      defaultReturnUrl: 'not-a-url',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts type NONE without grantType (no interference)', () => {
+    const result = OutboundAuthSchema.safeParse({ type: 'NONE' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.grantType).toBeUndefined();
+    }
+  });
+});
+
+describe('AgentCoreGatewayTargetSchema grantType validation', () => {
+  it('rejects grantType when outbound auth type is not OAUTH', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'myTarget',
+      targetType: 'mcpServer',
+      endpoint: 'https://example.com/mcp',
+      outboundAuth: { type: 'NONE', grantType: 'CLIENT_CREDENTIALS' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects defaultReturnUrl when outbound auth type is not OAUTH', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'myTarget',
+      targetType: 'mcpServer',
+      endpoint: 'https://example.com/mcp',
+      outboundAuth: { type: 'NONE', defaultReturnUrl: 'https://example.com/cb' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts mcpServer with OAUTH + AUTHORIZATION_CODE + defaultReturnUrl', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'myTarget',
+      targetType: 'mcpServer',
+      endpoint: 'https://example.com/mcp',
+      outboundAuth: {
+        type: 'OAUTH',
+        credentialName: 'my-cred',
+        grantType: 'AUTHORIZATION_CODE',
+        defaultReturnUrl: 'https://example.com/callback',
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts mcpServer with OAUTH + CLIENT_CREDENTIALS (no defaultReturnUrl)', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'myTarget',
+      targetType: 'mcpServer',
+      endpoint: 'https://example.com/mcp',
+      outboundAuth: {
+        type: 'OAUTH',
+        credentialName: 'my-cred',
+        grantType: 'CLIENT_CREDENTIALS',
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts mcpServer with OAUTH but no grantType (backward compat)', () => {
+    const result = AgentCoreGatewayTargetSchema.safeParse({
+      name: 'myTarget',
+      targetType: 'mcpServer',
+      endpoint: 'https://example.com/mcp',
+      outboundAuth: {
+        type: 'OAUTH',
+        credentialName: 'my-cred',
+      },
+    });
+    expect(result.success).toBe(true);
   });
 });

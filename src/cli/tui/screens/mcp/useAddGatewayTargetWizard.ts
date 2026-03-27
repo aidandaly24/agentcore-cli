@@ -1,5 +1,11 @@
 import { APP_DIR, MCP_APP_SUBDIR } from '../../../../lib';
-import type { ApiGatewayHttpMethod, GatewayTargetType, SchemaSource, ToolDefinition } from '../../../../schema';
+import type {
+  ApiGatewayHttpMethod,
+  GatewayTargetType,
+  OAuthGrantType,
+  SchemaSource,
+  ToolDefinition,
+} from '../../../../schema';
 import type { AddGatewayTargetStep, GatewayTargetWizardState } from './types';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -39,7 +45,7 @@ export function useAddGatewayTargetWizard(
           baseSteps.push('rest-api-id', 'stage', 'tool-filters', 'gateway', 'api-gateway-auth');
           break;
         case 'openApiSchema':
-          baseSteps.push('schema-source', 'gateway', 'outbound-auth');
+          baseSteps.push('schema-source', 'gateway', 'outbound-auth', 'grant-type');
           break;
         case 'smithyModel':
           baseSteps.push('schema-source', 'gateway');
@@ -49,7 +55,7 @@ export function useAddGatewayTargetWizard(
           break;
         case 'mcpServer':
         default:
-          baseSteps.push('endpoint', 'gateway', 'outbound-auth');
+          baseSteps.push('endpoint', 'gateway', 'outbound-auth', 'grant-type');
           break;
       }
       baseSteps.push('confirm');
@@ -142,6 +148,28 @@ export function useAddGatewayTargetWizard(
         ...c,
         outboundAuth,
       }));
+      if (outboundAuth.type === 'OAUTH') {
+        setStep('grant-type');
+      } else {
+        // Skip grant-type step — find the step after it
+        const grantIdx = steps.indexOf('grant-type');
+        const afterGrant = grantIdx >= 0 ? steps[grantIdx + 1] : undefined;
+        if (afterGrant) {
+          setStep(afterGrant);
+        } else {
+          goToNextStep();
+        }
+      }
+    },
+    [goToNextStep, steps]
+  );
+
+  const setGrantType = useCallback(
+    (grantType: OAuthGrantType) => {
+      setConfig(c => ({
+        ...c,
+        outboundAuth: { ...c.outboundAuth!, grantType },
+      }));
       goToNextStep();
     },
     [goToNextStep]
@@ -213,6 +241,7 @@ export function useAddGatewayTargetWizard(
     setSchemaSource,
     setGateway,
     setOutboundAuth,
+    setGrantType,
     setRestApiId,
     setStage,
     setToolFilters,

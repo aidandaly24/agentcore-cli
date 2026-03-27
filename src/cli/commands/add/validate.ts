@@ -516,6 +516,45 @@ export async function validateAddGatewayTargetOptions(options: AddGatewayTargetO
     return { valid: true };
   }
 
+  // Validate grant type
+  if (options.grantType) {
+    const validGrantTypes = ['client-credentials', 'authorization-code'];
+    if (!validGrantTypes.includes(options.grantType.toLowerCase())) {
+      return {
+        valid: false,
+        error: `Invalid grant type: ${options.grantType}. Valid options: client-credentials, authorization-code`,
+      };
+    }
+    if (options.outboundAuthType?.toLowerCase() !== 'oauth') {
+      return {
+        valid: false,
+        error: '--grant-type is only valid with --outbound-auth oauth',
+      };
+    }
+  }
+
+  // Validate default return URL
+  if (options.defaultReturnUrl) {
+    try {
+      new URL(options.defaultReturnUrl);
+    } catch {
+      return { valid: false, error: '--default-return-url must be a valid URL' };
+    }
+    if (options.outboundAuthType?.toLowerCase() !== 'oauth') {
+      return {
+        valid: false,
+        error: '--default-return-url is only valid with --outbound-auth oauth',
+      };
+    }
+    const gt = options.grantType?.toLowerCase();
+    if (!gt || (gt !== 'authorization-code' && gt !== 'authorization_code')) {
+      return {
+        valid: false,
+        error: '--default-return-url is only valid with --grant-type authorization-code',
+      };
+    }
+  }
+
   // Validate outbound auth configuration
   if (options.outboundAuthType && options.outboundAuthType !== 'NONE') {
     const hasInlineOAuth = !!(options.oauthClientId ?? options.oauthClientSecret ?? options.oauthDiscoveryUrl);

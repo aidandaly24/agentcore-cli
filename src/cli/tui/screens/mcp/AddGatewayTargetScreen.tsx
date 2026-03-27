@@ -1,4 +1,4 @@
-import type { ApiGatewayHttpMethod, GatewayTargetType } from '../../../../schema';
+import type { ApiGatewayHttpMethod, GatewayTargetType, OAuthGrantType } from '../../../../schema';
 import { ToolNameSchema } from '../../../../schema';
 import { ConfirmReview, Panel, Screen, StepIndicator, TextInput, WizardSelect } from '../../components';
 import type { SelectableItem } from '../../components';
@@ -12,7 +12,13 @@ import type {
   GatewayTargetWizardState,
   SchemaBasedTargetConfig,
 } from './types';
-import { API_GATEWAY_AUTH_OPTIONS, MCP_TOOL_STEP_LABELS, TARGET_TYPE_OPTIONS, getOutboundAuthOptions } from './types';
+import {
+  API_GATEWAY_AUTH_OPTIONS,
+  GRANT_TYPE_OPTIONS,
+  MCP_TOOL_STEP_LABELS,
+  TARGET_TYPE_OPTIONS,
+  getOutboundAuthOptions,
+} from './types';
 import { useAddGatewayTargetWizard } from './useAddGatewayTargetWizard';
 import { Box, Text } from 'ink';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -75,6 +81,7 @@ export function AddGatewayTargetScreen({
   const isTextStep = wizard.step === 'name' || wizard.step === 'endpoint';
   const isRestApiIdStep = wizard.step === 'rest-api-id';
   const isStageStep = wizard.step === 'stage';
+  const isGrantTypeStep = wizard.step === 'grant-type';
   const isToolFiltersStep = wizard.step === 'tool-filters';
   const isSchemaSourceStep = wizard.step === 'schema-source';
   const isLambdaArnStep = wizard.step === 'lambda-arn';
@@ -112,6 +119,10 @@ export function AddGatewayTargetScreen({
   const apiKeyCredItems: SelectableItem[] = useMemo(
     () => buildCredentialItems(existingApiKeyCredentialNames, 'API key credential'),
     [existingApiKeyCredentialNames]
+  );
+  const grantTypeItems: SelectableItem[] = useMemo(
+    () => GRANT_TYPE_OPTIONS.map(o => ({ id: o.id, title: o.title, description: o.description })),
+    []
   );
 
   // ── Auth completion callbacks ──
@@ -199,6 +210,14 @@ export function AddGatewayTargetScreen({
     },
     onExit: () => setPendingCredType(null),
     isActive: isAuthStep && pendingCredType === 'OAUTH',
+  });
+
+  // Grant type selection (active after OAuth credential is selected)
+  const grantTypeNav = useListNavigation({
+    items: grantTypeItems,
+    onSelect: item => wizard.setGrantType(item.id as OAuthGrantType),
+    onExit: () => wizard.goBack(),
+    isActive: isGrantTypeStep,
   });
 
   // Shared API Key credential selection (active in either auth step when pendingCredType is API_KEY)
@@ -320,6 +339,16 @@ export function AddGatewayTargetScreen({
             description="How will this target authenticate to the API Gateway?"
             items={apiGatewayAuthItems}
             selectedIndex={apiGatewayAuthNav.selectedIndex}
+          />
+        )}
+
+        {/* Grant type selection — shown after OAuth credential is selected */}
+        {isGrantTypeStep && (
+          <WizardSelect
+            title="Select OAuth grant type"
+            description="How will the OAuth flow authenticate?"
+            items={grantTypeItems}
+            selectedIndex={grantTypeNav.selectedIndex}
           />
         )}
 
@@ -527,6 +556,16 @@ export function AddGatewayTargetScreen({
                 ? [
                     { label: 'Auth Type', value: wizard.config.outboundAuth.type },
                     { label: 'Credential', value: wizard.config.outboundAuth.credentialName ?? 'None' },
+                    ...(wizard.config.outboundAuth.type === 'OAUTH' && wizard.config.outboundAuth.grantType
+                      ? [
+                          {
+                            label: 'Grant Type',
+                            value:
+                              GRANT_TYPE_OPTIONS.find(o => o.id === wizard.config.outboundAuth?.grantType)?.title ??
+                              wizard.config.outboundAuth.grantType,
+                          },
+                        ]
+                      : []),
                   ]
                 : wizard.config.targetType === 'apiGateway'
                   ? [{ label: 'Auth Type', value: 'IAM (default)' }]

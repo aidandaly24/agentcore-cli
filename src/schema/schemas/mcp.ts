@@ -29,11 +29,16 @@ export type GatewayTargetType = z.infer<typeof GatewayTargetTypeSchema>;
 export const OutboundAuthTypeSchema = z.enum(['OAUTH', 'API_KEY', 'NONE']);
 export type OutboundAuthType = z.infer<typeof OutboundAuthTypeSchema>;
 
+export const OAuthGrantTypeSchema = z.enum(['CLIENT_CREDENTIALS', 'AUTHORIZATION_CODE']);
+export type OAuthGrantType = z.infer<typeof OAuthGrantTypeSchema>;
+
 export const OutboundAuthSchema = z
   .object({
     type: OutboundAuthTypeSchema.default('NONE'),
     credentialName: z.string().min(1).optional(),
     scopes: z.array(z.string()).optional(),
+    grantType: OAuthGrantTypeSchema.optional(),
+    defaultReturnUrl: z.string().url().optional(),
   })
   .strict();
 
@@ -541,6 +546,27 @@ export const AgentCoreGatewayTargetSchema = z
         code: z.ZodIssueCode.custom,
         message: `${data.outboundAuth.type} outbound auth requires a credentialName.`,
         path: ['outboundAuth', 'credentialName'],
+      });
+    }
+    if (data.outboundAuth?.grantType && data.outboundAuth.type !== 'OAUTH') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'grantType is only valid when outbound auth type is OAUTH',
+        path: ['outboundAuth', 'grantType'],
+      });
+    }
+    if (data.outboundAuth?.defaultReturnUrl && data.outboundAuth.type !== 'OAUTH') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'defaultReturnUrl is only valid when outbound auth type is OAUTH',
+        path: ['outboundAuth', 'defaultReturnUrl'],
+      });
+    }
+    if (data.outboundAuth?.defaultReturnUrl && data.outboundAuth?.grantType !== 'AUTHORIZATION_CODE') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'defaultReturnUrl is only valid when grantType is AUTHORIZATION_CODE',
+        path: ['outboundAuth', 'defaultReturnUrl'],
       });
     }
   });

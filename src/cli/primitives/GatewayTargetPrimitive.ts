@@ -271,6 +271,8 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
         'OAuth discovery URL — creates credential inline (for oauth auth) [non-interactive]'
       )
       .option('--oauth-scopes <scopes>', 'OAuth scopes, comma-separated (for oauth auth) [non-interactive]')
+      .option('--grant-type <type>', 'OAuth grant type: client-credentials (default) or authorization-code [non-interactive]')
+      .option('--default-return-url <url>', 'Default return URL for authorization code flow [non-interactive]')
       .option('--rest-api-id <id>', 'REST API ID (for api-gateway type) [non-interactive]')
       .option('--stage <stage>', 'Deployment stage (for api-gateway type) [non-interactive]')
       .option('--tool-filter-path <path>', 'Tool filter path pattern, e.g. /pets/* [non-interactive]')
@@ -318,6 +320,12 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
             'api-key': 'API_KEY',
             api_key: 'API_KEY',
             none: 'NONE',
+          };
+          const grantTypeMap: Record<string, 'CLIENT_CREDENTIALS' | 'AUTHORIZATION_CODE'> = {
+            'client-credentials': 'CLIENT_CREDENTIALS',
+            client_credentials: 'CLIENT_CREDENTIALS',
+            'authorization-code': 'AUTHORIZATION_CODE',
+            authorization_code: 'AUTHORIZATION_CODE',
           };
 
           // Handle API Gateway targets (no code generation)
@@ -371,16 +379,25 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
                 }
               : { inline: { path: cliOptions.schema } };
 
+            const mappedAuthType = cliOptions.outboundAuthType
+              ? (outboundAuthMap[cliOptions.outboundAuthType.toLowerCase()] ?? 'NONE')
+              : undefined;
             const config: SchemaBasedTargetConfig = {
               name: cliOptions.name!,
               targetType: cliOptions.type,
               schemaSource,
               gateway: cliOptions.gateway!,
-              ...(cliOptions.outboundAuthType
+              ...(mappedAuthType
                 ? {
                     outboundAuth: {
-                      type: outboundAuthMap[cliOptions.outboundAuthType.toLowerCase()] ?? 'NONE',
+                      type: mappedAuthType,
                       credentialName: cliOptions.credentialName,
+                      ...(mappedAuthType === 'OAUTH' && cliOptions.grantType
+                        ? { grantType: grantTypeMap[cliOptions.grantType.toLowerCase()] ?? 'CLIENT_CREDENTIALS' }
+                        : {}),
+                      ...(mappedAuthType === 'OAUTH' && cliOptions.defaultReturnUrl
+                        ? { defaultReturnUrl: cliOptions.defaultReturnUrl }
+                        : {}),
                     },
                   }
                 : {}),
@@ -416,6 +433,9 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
 
           // Handle MCP server targets (existing endpoint, no code generation)
           if (cliOptions.type === 'mcpServer' && cliOptions.endpoint) {
+            const mcpAuthType = cliOptions.outboundAuthType
+              ? (outboundAuthMap[cliOptions.outboundAuthType.toLowerCase()] ?? 'NONE')
+              : undefined;
             const config: McpServerTargetConfig = {
               targetType: 'mcpServer',
               name: cliOptions.name!,
@@ -427,11 +447,17 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
                 description: cliOptions.description ?? `Tool for ${cliOptions.name!}`,
                 inputSchema: { type: 'object' },
               },
-              ...(cliOptions.outboundAuthType
+              ...(mcpAuthType
                 ? {
                     outboundAuth: {
-                      type: outboundAuthMap[cliOptions.outboundAuthType.toLowerCase()] ?? 'NONE',
+                      type: mcpAuthType,
                       credentialName: cliOptions.credentialName,
+                      ...(mcpAuthType === 'OAUTH' && cliOptions.grantType
+                        ? { grantType: grantTypeMap[cliOptions.grantType.toLowerCase()] ?? 'CLIENT_CREDENTIALS' }
+                        : {}),
+                      ...(mcpAuthType === 'OAUTH' && cliOptions.defaultReturnUrl
+                        ? { defaultReturnUrl: cliOptions.defaultReturnUrl }
+                        : {}),
                     },
                   }
                 : {}),

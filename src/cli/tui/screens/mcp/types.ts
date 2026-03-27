@@ -6,6 +6,7 @@ import type {
   GatewayPolicyEngineConfiguration,
   GatewayTargetType,
   NodeRuntime,
+  OAuthGrantType,
   PythonRuntime,
   SchemaSource,
   ToolDefinition,
@@ -88,6 +89,7 @@ export type AddGatewayTargetStep =
   | 'gateway'
   | 'host'
   | 'outbound-auth'
+  | 'grant-type'
   | 'rest-api-id'
   | 'stage'
   | 'tool-filters'
@@ -117,6 +119,8 @@ export interface GatewayTargetWizardState {
     type: 'OAUTH' | 'API_KEY' | 'NONE';
     credentialName?: string;
     scopes?: string[];
+    grantType?: OAuthGrantType;
+    defaultReturnUrl?: string;
   };
   restApiId?: string;
   stage?: string;
@@ -143,6 +147,8 @@ export interface McpServerTargetConfig {
     type: 'OAUTH' | 'API_KEY' | 'NONE';
     credentialName?: string;
     scopes?: string[];
+    grantType?: OAuthGrantType;
+    defaultReturnUrl?: string;
   };
 }
 
@@ -168,6 +174,8 @@ export interface SchemaBasedTargetConfig {
     type: 'OAUTH' | 'API_KEY' | 'NONE';
     credentialName?: string;
     scopes?: string[];
+    grantType?: OAuthGrantType;
+    defaultReturnUrl?: string;
   };
 }
 
@@ -193,6 +201,7 @@ export const MCP_TOOL_STEP_LABELS: Record<AddGatewayTargetStep, string> = {
   gateway: 'Gateway',
   host: 'Host',
   'outbound-auth': 'Outbound Auth',
+  'grant-type': 'Grant Type',
   'rest-api-id': 'REST API ID',
   stage: 'Stage',
   'tool-filters': 'Tool Filters',
@@ -248,7 +257,7 @@ export const COMPUTE_HOST_OPTIONS = [
 /** All possible outbound auth UI options, keyed by auth type. */
 const AUTH_OPTION_LABELS = {
   NONE: { title: 'No authorization', description: 'No outbound authentication' },
-  OAUTH: { title: 'OAuth 2LO', description: 'OAuth 2.0 client credentials' },
+  OAUTH: { title: 'OAuth', description: 'OAuth 2.0' },
   API_KEY: { title: 'API Key', description: 'API key credential' },
 } as const;
 
@@ -265,6 +274,19 @@ export function getOutboundAuthOptions(
 }
 
 export const OUTBOUND_AUTH_OPTIONS = getOutboundAuthOptions('mcpServer');
+
+export const GRANT_TYPE_OPTIONS = [
+  {
+    id: 'CLIENT_CREDENTIALS',
+    title: 'Client Credentials (M2M)',
+    description: 'Machine-to-machine -- no user interaction required',
+  },
+  {
+    id: 'AUTHORIZATION_CODE',
+    title: 'Authorization Code (3LO)',
+    description: 'User authorization -- requires user to authorize via browser',
+  },
+] as const;
 
 export const API_GATEWAY_AUTH_OPTIONS = [
   { id: 'IAM', title: 'IAM (recommended)', description: 'AWS IAM role-based authorization' },
