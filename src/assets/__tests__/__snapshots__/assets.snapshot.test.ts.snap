@@ -3927,7 +3927,7 @@ The project uses a **flat resource model** where agents, memories, and credentia
 
 ### Agent Types
 
-- **Template agents**: Created from framework templates (Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents)
+- **Template agents**: Created from framework templates (Strands, LangChain_LangGraph, CrewAI, GoogleADK, OpenAIAgents)
 - **BYO agents**: Bring your own code with \`agentcore add agent --type byo\`
 
 ## Documentation
@@ -4019,7 +4019,7 @@ file maps to a JSON config file and includes validation constraints as comments.
 - **LangChain_LangGraph** - Works with Bedrock, Anthropic, OpenAI, Gemini
 - **GoogleADK** - Gemini only
 - **OpenAIAgents** - OpenAI only
-- **AutoGen** - Works with Bedrock, Anthropic, OpenAI, Gemini
+
 
 ### Specific Context
 
