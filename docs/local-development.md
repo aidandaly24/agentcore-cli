@@ -23,17 +23,14 @@ agentcore dev --logs
 With the dev server running, open another terminal:
 
 ```bash
-# Interactive chat
-agentcore invoke
-
 # Single prompt
-agentcore invoke "What can you do?"
+agentcore dev "What can you do?"
 
 # With streaming
-agentcore invoke "Tell me a story" --stream
+agentcore dev "Tell me a story" --stream
 
-# Direct invoke to running server
-agentcore dev --invoke "Hello" --stream
+# Specify agent (if multiple)
+agentcore dev "Hello" --agent MyAgent
 ```
 
 ## Environment Setup

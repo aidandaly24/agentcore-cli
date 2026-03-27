@@ -96,8 +96,8 @@ async function handleMcpInvoke(
       }
     } else if (invokeValue === 'call-tool') {
       if (!toolName) {
-        console.error('Error: --tool is required with --invoke call-tool');
-        console.error('Usage: agentcore dev --invoke call-tool --tool <name> --input \'{"arg": "value"}\'');
+        console.error('Error: --tool is required with call-tool');
+        console.error('Usage: agentcore dev call-tool --tool <name> --input \'{"arg": "value"}\'');
         process.exit(1);
       }
       // Initialize session first, then call tool with the session ID
@@ -117,8 +117,8 @@ async function handleMcpInvoke(
     } else {
       console.error(`Error: Unknown MCP invoke command "${invokeValue}"`);
       console.error('Usage:');
-      console.error('  agentcore dev --invoke list-tools');
-      console.error('  agentcore dev --invoke call-tool --tool <name> --input \'{"arg": "value"}\'');
+      console.error('  agentcore dev list-tools');
+      console.error('  agentcore dev call-tool --tool <name> --input \'{"arg": "value"}\'');
       process.exit(1);
     }
   } catch (err) {
@@ -137,20 +137,20 @@ export const registerDev = (program: Command) => {
     .command('dev')
     .alias('d')
     .description(COMMAND_DESCRIPTIONS.dev)
+    .argument('[prompt]', 'Invoke running dev server with this prompt [non-interactive]')
     .option('-p, --port <port>', 'Port for development server', '8080')
     .option('-a, --agent <name>', 'Agent to run or invoke (required if multiple agents)')
-    .option('-i, --invoke <prompt>', 'Invoke running dev server (use --agent if multiple) [non-interactive]')
-    .option('-s, --stream', 'Stream response when using --invoke [non-interactive]')
+    .option('-s, --stream', 'Stream response when invoking [non-interactive]')
     .option('-l, --logs', 'Run dev server with logs to stdout [non-interactive]')
-    .option('--tool <name>', 'MCP tool name (used with --invoke call-tool) [non-interactive]')
-    .option('--input <json>', 'MCP tool arguments as JSON (used with --invoke call-tool) [non-interactive]')
+    .option('--tool <name>', 'MCP tool name (used with "call-tool" prompt) [non-interactive]')
+    .option('--input <json>', 'MCP tool arguments as JSON (used with --tool) [non-interactive]')
     .option(
       '-H, --header <header>',
       'Custom header to forward to the agent (format: "Name: Value", repeatable) [non-interactive]',
       (val: string, prev: string[]) => [...prev, val],
       [] as string[]
     )
-    .action(async opts => {
+    .action(async (positionalPrompt: string | undefined, opts) => {
       try {
         const port = parseInt(opts.port, 10);
 
@@ -160,8 +160,9 @@ export const registerDev = (program: Command) => {
           headers = parseHeaderFlags(opts.header);
         }
 
-        // If --invoke provided, call the dev server and exit
-        if (opts.invoke) {
+        // If a prompt is provided, call the dev server and exit
+        const invokePrompt = positionalPrompt;
+        if (invokePrompt) {
           const invokeProject = await loadProjectConfig(getWorkingDirectory());
 
           // Determine which agent/port to invoke
@@ -190,11 +191,11 @@ export const registerDev = (program: Command) => {
 
           // Protocol-aware dispatch
           if (protocol === 'MCP') {
-            await handleMcpInvoke(invokePort, opts.invoke, opts.tool, opts.input, headers);
+            await handleMcpInvoke(invokePort, invokePrompt, opts.tool, opts.input, headers);
           } else if (protocol === 'A2A') {
-            await invokeA2ADevServer(invokePort, opts.invoke, headers);
+            await invokeA2ADevServer(invokePort, invokePrompt, headers);
           } else {
-            await invokeDevServer(invokePort, opts.invoke, opts.stream ?? false, headers);
+            await invokeDevServer(invokePort, invokePrompt, opts.stream ?? false, headers);
           }
           return;
         }
