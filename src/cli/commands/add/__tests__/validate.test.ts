@@ -1343,6 +1343,78 @@ describe('validate', () => {
       expect(result.error).toContain('--api-key');
     });
   });
+
+  describe('validateAddIdentityOptions vendor-conditional discoveryUrl', () => {
+    it('OAuth with Named vendor passes without discoveryUrl', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'GoogleOauth2',
+        clientId: 'cid',
+        clientSecret: 'csec',
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('OAuth with Included vendor passes without discoveryUrl', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'OktaOauth2',
+        clientId: 'cid',
+        clientSecret: 'csec',
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('OAuth with CustomOauth2 requires discoveryUrl', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'CustomOauth2',
+        clientId: 'cid',
+        clientSecret: 'csec',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('--discovery-url');
+    });
+
+    it('OAuth without vendor defaults to Custom (requires discoveryUrl)', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        clientId: 'cid',
+        clientSecret: 'csec',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('--discovery-url');
+    });
+
+    it('OAuth with invalid discoveryUrl format fails', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'CustomOauth2',
+        discoveryUrl: 'not-a-url',
+        clientId: 'cid',
+        clientSecret: 'csec',
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('valid URL');
+    });
+
+    it('OAuth with Named vendor + optional discoveryUrl validates URL format', () => {
+      const result = validateAddIdentityOptions({
+        name: 'test',
+        type: 'oauth',
+        vendor: 'GoogleOauth2',
+        discoveryUrl: 'not-a-url',
+        clientId: 'cid',
+        clientSecret: 'csec',
+      });
+      expect(result.valid).toBe(false);
+    });
+  });
 });
 
 describe('validateAddAgentOptions - VPC validation', () => {

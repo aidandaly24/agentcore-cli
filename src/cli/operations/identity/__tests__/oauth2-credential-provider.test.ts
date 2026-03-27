@@ -234,3 +234,129 @@ describe('updateOAuth2Provider', () => {
     expect(result.error).toBe('update failed');
   });
 });
+
+describe('buildOAuth2Config routing (via createOAuth2Provider)', () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it('named vendor (Google): routes to googleOauth2ProviderConfig', async () => {
+    mockSend.mockResolvedValue({ credentialProviderArn: 'arn:test' });
+
+    await createOAuth2Provider(makeMockClient(), {
+      name: 'test',
+      vendor: 'GoogleOauth2',
+      clientId: 'cid',
+      clientSecret: 'csec',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- test assertion: mockSend was called
+    const sentInput = mockSend.mock.calls[0]![0].input;
+    expect(sentInput.credentialProviderVendor).toBe('GoogleOauth2');
+    expect(sentInput.oauth2ProviderConfigInput.googleOauth2ProviderConfig.clientId).toBe('cid');
+    expect(sentInput.oauth2ProviderConfigInput.googleOauth2ProviderConfig.clientSecret).toBe('csec');
+  });
+
+  it('named vendor with tenantId (Microsoft): includes tenantId in microsoftOauth2ProviderConfig', async () => {
+    mockSend.mockResolvedValue({ credentialProviderArn: 'arn:test' });
+
+    await createOAuth2Provider(makeMockClient(), {
+      name: 'ms',
+      vendor: 'MicrosoftOauth2',
+      clientId: 'cid',
+      clientSecret: 'csec',
+      tenantId: 'tenant-123',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const sentInput = mockSend.mock.calls[0]![0].input;
+    expect(sentInput.credentialProviderVendor).toBe('MicrosoftOauth2');
+    expect(sentInput.oauth2ProviderConfigInput.microsoftOauth2ProviderConfig.tenantId).toBe('tenant-123');
+  });
+
+  it('named vendor without tenantId (Microsoft): omits tenantId from microsoftOauth2ProviderConfig', async () => {
+    mockSend.mockResolvedValue({ credentialProviderArn: 'arn:test' });
+
+    await createOAuth2Provider(makeMockClient(), {
+      name: 'ms',
+      vendor: 'MicrosoftOauth2',
+      clientId: 'cid',
+      clientSecret: 'csec',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const sentInput = mockSend.mock.calls[0]![0].input;
+    expect(sentInput.oauth2ProviderConfigInput.microsoftOauth2ProviderConfig).not.toHaveProperty('tenantId');
+  });
+
+  it('included vendor (Okta): routes to includedOauth2ProviderConfig', async () => {
+    mockSend.mockResolvedValue({ credentialProviderArn: 'arn:test' });
+
+    await createOAuth2Provider(makeMockClient(), {
+      name: 'okta',
+      vendor: 'OktaOauth2',
+      clientId: 'cid',
+      clientSecret: 'csec',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const sentInput = mockSend.mock.calls[0]![0].input;
+    expect(sentInput.credentialProviderVendor).toBe('OktaOauth2');
+    expect(sentInput.oauth2ProviderConfigInput.includedOauth2ProviderConfig.clientId).toBe('cid');
+  });
+
+  it('included vendor with issuer: includes issuer in includedOauth2ProviderConfig', async () => {
+    mockSend.mockResolvedValue({ credentialProviderArn: 'arn:test' });
+
+    await createOAuth2Provider(makeMockClient(), {
+      name: 'okta',
+      vendor: 'OktaOauth2',
+      clientId: 'cid',
+      clientSecret: 'csec',
+      issuer: 'https://dev-123.okta.com',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const sentInput = mockSend.mock.calls[0]![0].input;
+    expect(sentInput.oauth2ProviderConfigInput.includedOauth2ProviderConfig.issuer).toBe('https://dev-123.okta.com');
+  });
+
+  it('included vendor with endpoints: includes authorizationEndpoint and tokenEndpoint', async () => {
+    mockSend.mockResolvedValue({ credentialProviderArn: 'arn:test' });
+
+    await createOAuth2Provider(makeMockClient(), {
+      name: 'okta',
+      vendor: 'OktaOauth2',
+      clientId: 'cid',
+      clientSecret: 'csec',
+      authorizationEndpoint: 'https://auth.example.com/authorize',
+      tokenEndpoint: 'https://auth.example.com/token',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const sentInput = mockSend.mock.calls[0]![0].input;
+    expect(sentInput.oauth2ProviderConfigInput.includedOauth2ProviderConfig.authorizationEndpoint).toBe(
+      'https://auth.example.com/authorize'
+    );
+    expect(sentInput.oauth2ProviderConfigInput.includedOauth2ProviderConfig.tokenEndpoint).toBe(
+      'https://auth.example.com/token'
+    );
+  });
+
+  it('custom vendor: routes to customOauth2ProviderConfig with discoveryUrl', async () => {
+    mockSend.mockResolvedValue({ credentialProviderArn: 'arn:test' });
+
+    await createOAuth2Provider(makeMockClient(), {
+      name: 'custom',
+      vendor: 'CustomOauth2',
+      discoveryUrl: 'https://example.com/.well-known/openid-configuration',
+      clientId: 'cid',
+      clientSecret: 'csec',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const sentInput = mockSend.mock.calls[0]![0].input;
+    expect(sentInput.credentialProviderVendor).toBe('CustomOauth2');
+    expect(sentInput.oauth2ProviderConfigInput.customOauth2ProviderConfig.oauthDiscovery.discoveryUrl).toBe(
+      'https://example.com/.well-known/openid-configuration'
+    );
+  });
+});

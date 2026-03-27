@@ -4,6 +4,7 @@ import {
   CredentialSchema,
   MemoryNameSchema,
   MemorySchema,
+  OAuthCredentialSchema,
   ProjectNameSchema,
 } from '../agentcore-project.js';
 import { describe, expect, it } from 'vitest';
@@ -413,6 +414,84 @@ describe('CredentialSchema', () => {
     if (result.success && result.data.authorizerType === 'OAuthCredentialProvider') {
       expect(result.data.vendor).toBe('CustomOauth2');
     }
+  });
+});
+
+describe('OAuthCredentialSchema vendor-conditional validation', () => {
+  const base = { type: 'OAuthCredentialProvider' as const, name: 'MyOAuth' };
+
+  it('named vendor without discoveryUrl passes', () => {
+    const result = OAuthCredentialSchema.safeParse({ ...base, vendor: 'GoogleOauth2' });
+    expect(result.success).toBe(true);
+  });
+
+  it.each([
+    'GoogleOauth2',
+    'GithubOauth2',
+    'SlackOauth2',
+    'SalesforceOauth2',
+    'MicrosoftOauth2',
+    'AtlassianOauth2',
+    'LinkedinOauth2',
+  ])('all 7 named vendors pass without discoveryUrl: %s', vendor => {
+    const result = OAuthCredentialSchema.safeParse({ ...base, vendor });
+    expect(result.success).toBe(true);
+  });
+
+  it('included vendor OktaOauth2 without discoveryUrl passes', () => {
+    const result = OAuthCredentialSchema.safeParse({ ...base, vendor: 'OktaOauth2' });
+    expect(result.success).toBe(true);
+  });
+
+  it('included vendor Auth0Oauth2 without discoveryUrl passes', () => {
+    const result = OAuthCredentialSchema.safeParse({ ...base, vendor: 'Auth0Oauth2' });
+    expect(result.success).toBe(true);
+  });
+
+  it('CustomOauth2 without discoveryUrl fails', () => {
+    const result = OAuthCredentialSchema.safeParse({ ...base, vendor: 'CustomOauth2' });
+    expect(result.success).toBe(false);
+  });
+
+  it('CustomOauth2 with discoveryUrl passes', () => {
+    const result = OAuthCredentialSchema.safeParse({
+      ...base,
+      vendor: 'CustomOauth2',
+      discoveryUrl: 'https://example.com/.well-known/openid-configuration',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('unknown vendor without discoveryUrl fails', () => {
+    const result = OAuthCredentialSchema.safeParse({ ...base, vendor: 'SomeRandomVendor' });
+    expect(result.success).toBe(false);
+  });
+
+  it('default vendor (omitted) requires discoveryUrl', () => {
+    // vendor defaults to CustomOauth2, which requires discoveryUrl
+    const result = OAuthCredentialSchema.safeParse({ ...base });
+    expect(result.success).toBe(false);
+  });
+
+  it('named vendor with optional fields passes', () => {
+    const result = OAuthCredentialSchema.safeParse({
+      ...base,
+      vendor: 'MicrosoftOauth2',
+      tenantId: 'abc',
+      discoveryUrl: undefined,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('included vendor with optional included fields passes', () => {
+    const result = OAuthCredentialSchema.safeParse({
+      ...base,
+      vendor: 'OktaOauth2',
+      issuer: 'https://x.okta.com',
+      authorizationEndpoint: 'https://x.okta.com/authorize',
+      tokenEndpoint: 'https://x.okta.com/token',
+    });
+    expect(result.success).toBe(true);
   });
 });
 
