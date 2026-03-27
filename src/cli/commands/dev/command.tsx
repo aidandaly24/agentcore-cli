@@ -163,7 +163,7 @@ export const registerDev = (program: Command) => {
 
         // If a prompt is provided, invoke the dev server (auto-starting if needed)
         const invokePrompt = positionalPrompt;
-        if (invokePrompt) {
+        if (invokePrompt !== undefined) {
           const workingDir = getWorkingDirectory();
           const invokeProject = await loadProjectConfig(workingDir);
 
@@ -211,7 +211,8 @@ export const registerDev = (program: Command) => {
             }
 
             const serverErrors: string[] = [];
-            let resolveServerExit: () => void;
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
+            let resolveServerExit: () => void = () => {};
             const serverExitPromise = new Promise<void>(resolve => {
               resolveServerExit = resolve;
             });
@@ -232,6 +233,10 @@ export const registerDev = (program: Command) => {
             });
             await server.start();
 
+            // Ensure server cleanup on any exit path (process.exit in invoke helpers, SIGINT, etc.)
+            const cleanupServer = () => server.kill();
+            process.on('exit', cleanupServer);
+
             // Wait for server to accept connections, bail early if process crashes
             const ready = await Promise.race([waitForServerReady(invokePort), serverExitPromise.then(() => false)]);
 
@@ -240,7 +245,6 @@ export const registerDev = (program: Command) => {
                 console.error(serverErrors.slice(-5).join('\n'));
               }
               console.error('Error: Dev server failed to start. Run "agentcore dev --logs" for details.');
-              server.kill();
               process.exit(1);
             }
             autoStartedServer = server;
