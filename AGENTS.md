@@ -24,14 +24,17 @@ Note: CDK L3 constructs are in a separate package `@aws/agentcore-cdk`.
 ## CLI Commands
 
 - `create` - Create new AgentCore project
-- `add` - Add resources (agent, memory, identity, evaluator, online-eval, target)
-- `remove` - Remove resources (agent, memory, identity, evaluator, online-eval, target, all)
+- `add` - Add resources (agent, memory, identity, evaluator, online-eval, gateway, gateway-target, policy-engine,
+  policy)
+- `remove` - Remove resources (agent, memory, identity, evaluator, online-eval, gateway, gateway-target, policy-engine,
+  policy, all)
 - `deploy` - Deploy infrastructure to AWS
 - `status` - Check deployment status
 - `dev` - Local development server (CodeZip: uvicorn with hot-reload; Container: Docker build + run with volume mount)
 - `invoke` - Invoke agents (local or deployed)
 - `run eval` - Run on-demand evaluation against agent sessions
 - `evals history` - View past eval run results
+- `fetch access` - Fetch access info for a deployed gateway
 - `pause online-eval` - Pause (disable) a deployed online eval config
 - `resume online-eval` - Resume (enable) a paused online eval config
 - `logs` - Stream or search agent runtime logs
@@ -45,8 +48,7 @@ Note: CDK L3 constructs are in a separate package `@aws/agentcore-cdk`.
 
 ### Agent Types
 
-- **Template agents**: Created from framework templates (Strands, LangChain_LangGraph, CrewAI, GoogleADK, OpenAIAgents,
-  AutoGen)
+- **Template agents**: Created from framework templates (Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents)
 - **BYO agents**: Bring your own code with `agentcore add agent --type byo`
 - **Imported agents**: Import from Bedrock Agents with `agentcore add agent --type import`
 
@@ -58,10 +60,10 @@ Note: CDK L3 constructs are in a separate package `@aws/agentcore-cdk`.
 
 ## Primitives Architecture
 
-All resource types (agent, memory, identity, evaluator, online-eval, gateway, mcp-tool) are modeled as **primitives** --
-self-contained classes in `src/cli/primitives/` that own the full add/remove lifecycle for their resource type.
-Resources support config-driven tagging via `agentcore.json` and `mcp.json`, with tags flowing through to deployed
-CloudFormation resources.
+All resource types (agent, memory, identity, evaluator, online-eval, gateway, gateway-target, policy-engine, policy) are
+modeled as **primitives** -- self-contained classes in `src/cli/primitives/` that own the full add/remove lifecycle for
+their resource type. Resources support config-driven tagging via `agentcore.json` and `mcp.json`, with tags flowing
+through to deployed CloudFormation resources.
 
 Each primitive extends `BasePrimitive` and implements: `add()`, `remove()`, `previewRemove()`, `getRemovable()`,
 `registerCommands()`, and `addScreen()`.
@@ -73,8 +75,10 @@ Current primitives:
 - `CredentialPrimitive` — credential/identity creation, .env management, removal
 - `EvaluatorPrimitive` — custom evaluator creation/removal with cross-reference validation
 - `OnlineEvalConfigPrimitive` — online eval config creation/removal
-- `GatewayPrimitive` — MCP gateway creation/removal
-- `GatewayTargetPrimitive` — MCP tool creation/removal with code generation
+- `GatewayPrimitive` — gateway creation/removal
+- `GatewayTargetPrimitive` — gateway target creation/removal with code generation
+- `PolicyEnginePrimitive` — Cedar policy engine creation/removal
+- `PolicyPrimitive` — Cedar policy creation/removal within policy engines
 
 Singletons are created in `registry.ts` and wired into CLI commands via `cli.ts`. See `src/cli/AGENTS.md` for details on
 adding new primitives.
