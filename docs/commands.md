@@ -280,7 +280,7 @@ agentcore add gateway \
 | `--client-id <id>`            | OAuth client ID for gateway bearer tokens (CUSTOM_JWT)       |
 | `--client-secret <secret>`    | OAuth client secret for gateway bearer tokens (CUSTOM_JWT)   |
 | `--no-semantic-search`        | Disable semantic search for tool discovery                   |
-| `--exception-level <level>`   | Exception verbosity level: `NONE` (default) or `ALL`         |
+| `--exception-level <level>`   | Exception verbosity level: `NONE` (default) or `DEBUG`       |
 | `--policy-engine <name>`      | Policy engine name for Cedar-based authorization             |
 | `--policy-engine-mode <mode>` | Policy engine mode: `LOG_ONLY` or `ENFORCE`                  |
 | `--json`                      | JSON output                                                  |
