@@ -490,6 +490,7 @@ agentcore dev call-tool --tool myTool --input '{"arg": "value"}'
 | `-l, --logs`           | Non-interactive stdout logging                           |
 | `--tool <name>`        | MCP tool name (with `call-tool` prompt)                  |
 | `--input <json>`       | MCP tool arguments as JSON (with `--tool`)               |
+| `-H, --header <h>`     | Custom header (`"Name: Value"`, repeatable)              |
 
 ### invoke
 
@@ -522,6 +523,8 @@ agentcore invoke --exec "cat /etc/os-release" --json
 | `--stream`            | Stream response in real-time                             |
 | `--tool <name>`       | MCP tool name (use with `call-tool` prompt)              |
 | `--input <json>`      | MCP tool arguments as JSON (use with `--tool`)           |
+| `-H, --header <h>`    | Custom header (`"Name: Value"`, repeatable)              |
+| `--bearer-token <t>`  | Bearer token for CUSTOM_JWT auth                         |
 | `--exec`              | Execute a shell command in the runtime container         |
 | `--timeout <seconds>` | Timeout in seconds for `--exec` commands                 |
 | `--json`              | JSON output                                              |

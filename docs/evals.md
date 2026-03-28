@@ -322,7 +322,7 @@ agentcore logs evals
 agentcore logs evals --runtime MyAgent --since 1h
 
 # JSON output
-agentcore logs evals --json --lines 100
+agentcore logs evals --json --limit 100
 ```
 
 | Flag                   | Description                                   |
@@ -330,7 +330,7 @@ agentcore logs evals --json --lines 100
 | `-r, --runtime <name>` | Filter by runtime                             |
 | `--since <time>`       | Start time (e.g. `1h`, `30m`, `2d`, ISO 8601) |
 | `--until <time>`       | End time (e.g. `now`, ISO 8601)               |
-| `-n, --lines <count>`  | Maximum number of log lines                   |
+| `-n, --limit <count>`  | Maximum number of log lines                   |
 | `-f, --follow`         | Stream logs in real-time                      |
 | `--json`               | JSON Lines output                             |
 
