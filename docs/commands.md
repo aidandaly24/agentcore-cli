@@ -65,30 +65,32 @@ agentcore create \
   --memory none
 ```
 
-| Flag                      | Description                                                                                                    |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--name <name>`           | Project name (alphanumeric, starts with letter, max 23 chars)                                                  |
-| `--defaults`              | Use defaults (Python, Strands, Bedrock, no memory)                                                             |
-| `--no-agent`              | Skip agent creation                                                                                            |
-| `--type <type>`           | `create` (default) or `import`                                                                                 |
-| `--language <lang>`       | `Python` (default)                                                                                             |
-| `--framework <fw>`        | `Strands`, `LangChain_LangGraph`, `GoogleADK`, `OpenAIAgents`                                                  |
-| `--model-provider <p>`    | `Bedrock`, `Anthropic`, `OpenAI`, `Gemini`                                                                     |
-| `--build <type>`          | `CodeZip` (default) or `Container` (see [Container Builds](container-builds.md))                               |
-| `--api-key <key>`         | API key for non-Bedrock providers                                                                              |
-| `--memory <opt>`          | `none`, `shortTerm`, `longAndShortTerm` (see [Memory Shorthand Mapping](memory.md#--memory-shorthand-mapping)) |
-| `--protocol <protocol>`   | `HTTP` (default), `MCP`, `A2A`                                                                                 |
-| `--network-mode <mode>`   | `PUBLIC` (default) or `VPC`                                                                                    |
-| `--subnets <ids>`         | Comma-separated subnet IDs (required for VPC mode)                                                             |
-| `--security-groups <ids>` | Comma-separated security group IDs (required for VPC mode)                                                     |
-| `--agent-id <id>`         | Bedrock Agent ID (import only)                                                                                 |
-| `--agent-alias-id <id>`   | Bedrock Agent Alias ID (import only)                                                                           |
-| `--region <region>`       | AWS region for Bedrock Agent (import only)                                                                     |
-| `--output-dir <dir>`      | Output directory                                                                                               |
-| `--skip-git`              | Skip git initialization                                                                                        |
-| `--skip-python-setup`     | Skip venv setup                                                                                                |
-| `--dry-run`               | Preview without creating                                                                                       |
-| `--json`                  | JSON output                                                                                                    |
+| Flag                       | Description                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `--name <name>`            | Project name (alphanumeric, starts with letter, max 23 chars)                                                  |
+| `--defaults`               | Use defaults (Python, Strands, Bedrock, no memory)                                                             |
+| `--no-agent`               | Skip agent creation                                                                                            |
+| `--type <type>`            | `create` (default) or `import`                                                                                 |
+| `--language <lang>`        | `Python` (default)                                                                                             |
+| `--framework <fw>`         | `Strands`, `LangChain_LangGraph`, `GoogleADK`, `OpenAIAgents`                                                  |
+| `--model-provider <p>`     | `Bedrock`, `Anthropic`, `OpenAI`, `Gemini`                                                                     |
+| `--build <type>`           | `CodeZip` (default) or `Container` (see [Container Builds](container-builds.md))                               |
+| `--api-key <key>`          | API key for non-Bedrock providers                                                                              |
+| `--memory <opt>`           | `none`, `shortTerm`, `longAndShortTerm` (see [Memory Shorthand Mapping](memory.md#--memory-shorthand-mapping)) |
+| `--protocol <protocol>`    | `HTTP` (default), `MCP`, `A2A`                                                                                 |
+| `--network-mode <mode>`    | `PUBLIC` (default) or `VPC`                                                                                    |
+| `--subnets <ids>`          | Comma-separated subnet IDs (required for VPC mode)                                                             |
+| `--security-groups <ids>`  | Comma-separated security group IDs (required for VPC mode)                                                     |
+| `--agent-id <id>`          | Bedrock Agent ID (import only)                                                                                 |
+| `--agent-alias-id <id>`    | Bedrock Agent Alias ID (import only)                                                                           |
+| `--region <region>`        | AWS region for Bedrock Agent (import only)                                                                     |
+| `--idle-timeout <seconds>` | Idle session timeout in seconds                                                                                |
+| `--max-lifetime <seconds>` | Max instance lifetime in seconds                                                                               |
+| `--output-dir <dir>`       | Output directory                                                                                               |
+| `--skip-git`               | Skip git initialization                                                                                        |
+| `--skip-python-setup`      | Skip venv setup                                                                                                |
+| `--dry-run`                | Preview without creating                                                                                       |
+| `--json`                   | JSON output                                                                                                    |
 
 ### deploy
 
@@ -193,26 +195,36 @@ agentcore add agent \
   --memory none
 ```
 
-| Flag                      | Description                                                                                                                       |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `--name <name>`           | Agent name (alphanumeric + underscores, starts with letter, max 48 chars)                                                         |
-| `--type <type>`           | `create` (default), `byo`, or `import`                                                                                            |
-| `--build <type>`          | `CodeZip` (default) or `Container` (see [Container Builds](container-builds.md))                                                  |
-| `--language <lang>`       | `Python` (create); `Python`, `TypeScript`, `Other` (BYO)                                                                          |
-| `--framework <fw>`        | `Strands`, `LangChain_LangGraph`, `GoogleADK`, `OpenAIAgents`                                                                     |
-| `--model-provider <p>`    | `Bedrock`, `Anthropic`, `OpenAI`, `Gemini`                                                                                        |
-| `--api-key <key>`         | API key for non-Bedrock providers                                                                                                 |
-| `--memory <opt>`          | `none`, `shortTerm`, `longAndShortTerm` (create and import; see [Memory Shorthand Mapping](memory.md#--memory-shorthand-mapping)) |
-| `--protocol <protocol>`   | `HTTP` (default), `MCP`, `A2A`                                                                                                    |
-| `--code-location <path>`  | Path to existing code (BYO only)                                                                                                  |
-| `--entrypoint <file>`     | Entry file relative to code-location (BYO, default: `main.py`)                                                                    |
-| `--network-mode <mode>`   | `PUBLIC` (default) or `VPC`                                                                                                       |
-| `--subnets <ids>`         | Comma-separated subnet IDs (required for VPC mode)                                                                                |
-| `--security-groups <ids>` | Comma-separated security group IDs (required for VPC mode)                                                                        |
-| `--agent-id <id>`         | Bedrock Agent ID (import only)                                                                                                    |
-| `--agent-alias-id <id>`   | Bedrock Agent Alias ID (import only)                                                                                              |
-| `--region <region>`       | AWS region for Bedrock Agent (import only)                                                                                        |
-| `--json`                  | JSON output                                                                                                                       |
+| Flag                        | Description                                                                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `--name <name>`             | Agent name (alphanumeric + underscores, starts with letter, max 48 chars)                                                         |
+| `--type <type>`             | `create` (default), `byo`, or `import`                                                                                            |
+| `--build <type>`            | `CodeZip` (default) or `Container` (see [Container Builds](container-builds.md))                                                  |
+| `--language <lang>`         | `Python` (create); `Python`, `TypeScript`, `Other` (BYO)                                                                          |
+| `--framework <fw>`          | `Strands`, `LangChain_LangGraph`, `GoogleADK`, `OpenAIAgents`                                                                     |
+| `--model-provider <p>`      | `Bedrock`, `Anthropic`, `OpenAI`, `Gemini`                                                                                        |
+| `--api-key <key>`           | API key for non-Bedrock providers                                                                                                 |
+| `--memory <opt>`            | `none`, `shortTerm`, `longAndShortTerm` (create and import; see [Memory Shorthand Mapping](memory.md#--memory-shorthand-mapping)) |
+| `--protocol <protocol>`     | `HTTP` (default), `MCP`, `A2A`                                                                                                    |
+| `--code-location <path>`    | Path to existing code (BYO only)                                                                                                  |
+| `--entrypoint <file>`       | Entry file relative to code-location (BYO, default: `main.py`)                                                                    |
+| `--network-mode <mode>`     | `PUBLIC` (default) or `VPC`                                                                                                       |
+| `--subnets <ids>`           | Comma-separated subnet IDs (required for VPC mode)                                                                                |
+| `--security-groups <ids>`   | Comma-separated security group IDs (required for VPC mode)                                                                        |
+| `--agent-id <id>`           | Bedrock Agent ID (import only)                                                                                                    |
+| `--agent-alias-id <id>`     | Bedrock Agent Alias ID (import only)                                                                                              |
+| `--region <region>`         | AWS region for Bedrock Agent (import only)                                                                                        |
+| `--authorizer-type <type>`  | Inbound auth: `AWS_IAM` or `CUSTOM_JWT`                                                                                           |
+| `--discovery-url <url>`     | OIDC discovery URL (for CUSTOM_JWT)                                                                                               |
+| `--allowed-audience <vals>` | Comma-separated allowed audiences (for CUSTOM_JWT)                                                                                |
+| `--allowed-clients <vals>`  | Comma-separated allowed client IDs (for CUSTOM_JWT)                                                                               |
+| `--allowed-scopes <scopes>` | Comma-separated allowed scopes (for CUSTOM_JWT)                                                                                   |
+| `--custom-claims <json>`    | Custom claim validations as JSON array (for CUSTOM_JWT)                                                                           |
+| `--client-id <id>`          | OAuth client ID for agent bearer token                                                                                            |
+| `--client-secret <secret>`  | OAuth client secret                                                                                                               |
+| `--idle-timeout <seconds>`  | Idle session timeout in seconds                                                                                                   |
+| `--max-lifetime <seconds>`  | Max instance lifetime in seconds                                                                                                  |
+| `--json`                    | JSON output                                                                                                                       |
 
 ### add memory
 
@@ -250,24 +262,28 @@ agentcore add gateway \
   --discovery-url https://idp.example.com/.well-known/openid-configuration \
   --allowed-audience my-api \
   --allowed-clients my-client-id \
-  --agent-client-id agent-client-id \
-  --agent-client-secret agent-client-secret
+  --client-id agent-client-id \
+  --client-secret agent-client-secret
 ```
 
-| Flag                             | Description                                                  |
-| -------------------------------- | ------------------------------------------------------------ |
-| `--name <name>`                  | Gateway name                                                 |
-| `--description <desc>`           | Gateway description                                          |
-| `--authorizer-type <type>`       | `NONE` (default) or `CUSTOM_JWT`                             |
-| `--discovery-url <url>`          | OIDC discovery URL (required for CUSTOM_JWT)                 |
-| `--allowed-audience <values>`    | Comma-separated allowed audiences (required for CUSTOM_JWT)  |
-| `--allowed-clients <values>`     | Comma-separated allowed client IDs (required for CUSTOM_JWT) |
-| `--allowed-scopes <scopes>`      | Comma-separated allowed scopes (optional for CUSTOM_JWT)     |
-| `--agent-client-id <id>`         | Agent OAuth client ID for Bearer token auth (CUSTOM_JWT)     |
-| `--agent-client-secret <secret>` | Agent OAuth client secret (CUSTOM_JWT)                       |
-| `--no-semantic-search`           | Disable semantic search for tool discovery                   |
-| `--exception-level <level>`      | Exception verbosity level (default: `NONE`)                  |
-| `--json`                         | JSON output                                                  |
+| Flag                          | Description                                                  |
+| ----------------------------- | ------------------------------------------------------------ |
+| `--name <name>`               | Gateway name                                                 |
+| `--description <desc>`        | Gateway description                                          |
+| `--runtimes <names>`          | Comma-separated runtime names to expose through this gateway |
+| `--authorizer-type <type>`    | `NONE` (default) or `CUSTOM_JWT`                             |
+| `--discovery-url <url>`       | OIDC discovery URL (required for CUSTOM_JWT)                 |
+| `--allowed-audience <values>` | Comma-separated allowed audiences (required for CUSTOM_JWT)  |
+| `--allowed-clients <values>`  | Comma-separated allowed client IDs (required for CUSTOM_JWT) |
+| `--allowed-scopes <scopes>`   | Comma-separated allowed scopes (optional for CUSTOM_JWT)     |
+| `--custom-claims <json>`      | Custom claim validations as JSON array (CUSTOM_JWT)          |
+| `--client-id <id>`            | OAuth client ID for gateway bearer tokens (CUSTOM_JWT)       |
+| `--client-secret <secret>`    | OAuth client secret for gateway bearer tokens (CUSTOM_JWT)   |
+| `--no-semantic-search`        | Disable semantic search for tool discovery                   |
+| `--exception-level <level>`   | Exception verbosity level: `NONE` (default) or `ALL`         |
+| `--policy-engine <name>`      | Policy engine name for Cedar-based authorization             |
+| `--policy-engine-mode <mode>` | Policy engine mode: `LOG_ONLY` or `ENFORCE`                  |
+| `--json`                      | JSON output                                                  |
 
 ### add gateway-target
 

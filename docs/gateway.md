@@ -137,12 +137,12 @@ agentcore add gateway \
   --discovery-url https://idp.example.com/.well-known/openid-configuration \
   --allowed-audience my-api \
   --allowed-clients my-client-id \
-  --agent-client-id agent-client-id \
-  --agent-client-secret agent-client-secret
+  --client-id agent-client-id \
+  --client-secret agent-client-secret
 ```
 
-When you provide `--agent-client-id` and `--agent-client-secret`, the CLI automatically creates a managed OAuth
-credential that your agent uses to obtain Bearer tokens at runtime.
+When you provide `--client-id` and `--client-secret`, the CLI automatically creates a managed OAuth credential that your
+agent uses to obtain Bearer tokens at runtime.
 
 ### Outbound Authentication
 
