@@ -52,6 +52,12 @@ describe('validateInvokeOptions', () => {
     expect(result.error).toContain('--exec cannot be combined');
   });
 
+  it('returns invalid when exec is combined with --stream', () => {
+    const result = validateInvokeOptions({ exec: true, prompt: 'ls', stream: true });
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('--exec already streams');
+  });
+
   it('returns valid with exec and prompt', () => {
     expect(validateInvokeOptions({ exec: true, prompt: 'ls -la' })).toEqual({ valid: true });
   });

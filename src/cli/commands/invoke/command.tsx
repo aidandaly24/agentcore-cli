@@ -62,9 +62,6 @@ async function handleInvokeCLI(options: InvokeOptions): Promise<void> {
       }
     } else {
       // Non-streaming, non-json: print provider info and response or error
-      if (result.providerInfo) {
-        console.error(`Provider: ${result.providerInfo}`);
-      }
       if (result.success && result.response) {
         console.log(result.response);
       } else if (!result.success && result.error) {

@@ -27,6 +27,4 @@ export interface InvokeResult {
   response?: string;
   error?: string;
   logFilePath?: string;
-  /** Model provider (e.g., "Anthropic", "Bedrock") */
-  providerInfo?: string;
 }

@@ -12,6 +12,9 @@ export function validateInvokeOptions(options: InvokeOptions): ValidationResult 
   if (options.exec && (options.tool || options.input)) {
     return { valid: false, error: '--exec cannot be combined with --tool or --input' };
   }
+  if (options.exec && options.stream) {
+    return { valid: false, error: '--exec already streams output; --stream is not needed' };
+  }
   if (options.json && !options.prompt) {
     return { valid: false, error: 'Prompt is required for JSON output' };
   }

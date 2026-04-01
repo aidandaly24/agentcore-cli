@@ -105,9 +105,12 @@ export function useTextInput({
 
       // Backspace variants
       if (key.backspace || key.delete) {
+        if (state.cursor === 0 && state.text.length === 0) {
+          onBackspaceEmpty?.();
+          return;
+        }
         setState(prev => {
           if (prev.cursor === 0) {
-            onBackspaceEmpty?.();
             return prev;
           }
           // Cmd+Backspace: delete to start

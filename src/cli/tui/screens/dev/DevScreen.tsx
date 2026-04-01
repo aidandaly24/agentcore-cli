@@ -189,7 +189,6 @@ export function DevScreen(props: DevScreenProps) {
     logFilePath,
     hasMemory,
     hasVpc,
-    modelProvider,
     protocol,
     mcpTools,
     fetchMcpTools,
@@ -491,12 +490,6 @@ export function DevScreen(props: DevScreenProps) {
         <Box>
           <Text>Protocol: </Text>
           <Text color="green">{protocol}</Text>
-        </Box>
-      )}
-      {protocol !== 'MCP' && modelProvider && (
-        <Box>
-          <Text>Provider: </Text>
-          <Text color="green">{modelProvider}</Text>
         </Box>
       )}
       <Box>

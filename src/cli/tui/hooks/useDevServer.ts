@@ -387,8 +387,15 @@ export function useDevServer(options: {
     }
   };
 
-  const execCommand = async (command: string) => {
-    setConversation(prev => [...prev, { role: 'user', content: `! ${command}` }]);
+  const runSpawnCommand = async (
+    spawnBinary: string,
+    spawnArgs: string[],
+    spawnOpts: { cwd?: string; env?: NodeJS.ProcessEnv },
+    label: string,
+    prefix: string,
+    command: string
+  ) => {
+    setConversation(prev => [...prev, { role: 'user', content: `${prefix} ${command}` }]);
     setStreamingResponse(null);
     setIsStreaming(true);
 
@@ -396,11 +403,7 @@ export function useDevServer(options: {
 
     try {
       await new Promise<void>((resolve, reject) => {
-        const child = spawn('bash', ['-c', command], {
-          cwd: options.workingDir,
-          stdio: 'pipe',
-          env: { ...process.env, ...envVars },
-        });
+        const child = spawn(spawnBinary, spawnArgs, { stdio: 'pipe', ...spawnOpts });
 
         child.stdout?.on('data', (data: Buffer) => {
           output += data.toString();
@@ -424,11 +427,11 @@ export function useDevServer(options: {
 
       setConversation(prev => [...prev, { role: 'assistant', content: output || '(no output)' }]);
       setStreamingResponse(null);
-      loggerRef.current?.log('system', `exec: ${command}`);
+      loggerRef.current?.log('system', `${label}: ${command}`);
       loggerRef.current?.log('response', output);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      addLog('error', `exec failed: ${errMsg}`);
+      addLog('error', `${label} failed: ${errMsg}`);
       setConversation(prev => [...prev, { role: 'assistant', content: `Error: ${errMsg}`, isError: true }]);
       setStreamingResponse(null);
     } finally {
@@ -436,58 +439,40 @@ export function useDevServer(options: {
     }
   };
 
+  const execCommand = async (command: string) => {
+    await runSpawnCommand(
+      'bash',
+      ['-c', command],
+      { cwd: options.workingDir, env: { ...process.env, ...envVars } },
+      'exec',
+      '!',
+      command
+    );
+  };
+
   const execInContainer = async (command: string) => {
     const containerName = `agentcore-dev-${config?.agentName ?? ''}`.toLowerCase();
-    setConversation(prev => [...prev, { role: 'user', content: `!! ${command}` }]);
-    setStreamingResponse(null);
-    setIsStreaming(true);
-
-    let output = '';
-
-    try {
-      const detection = await detectContainerRuntime();
-      if (!detection.runtime) {
-        throw new Error('No container runtime found (docker, podman, or finch required)');
-      }
-      const binary = detection.runtime.binary;
-
-      await new Promise<void>((resolve, reject) => {
-        const child = spawn(binary, ['exec', containerName, 'bash', '-c', command], {
-          stdio: 'pipe',
-        });
-
-        child.stdout?.on('data', (data: Buffer) => {
-          output += data.toString();
-          setStreamingResponse(output);
-        });
-
-        child.stderr?.on('data', (data: Buffer) => {
-          output += data.toString();
-          setStreamingResponse(output);
-        });
-
-        child.on('error', reject);
-        child.on('close', code => {
-          if (code !== 0 && code !== null) {
-            output += `\n[exit code: ${code}]`;
-            setStreamingResponse(output);
-          }
-          resolve();
-        });
-      });
-
-      setConversation(prev => [...prev, { role: 'assistant', content: output || '(no output)' }]);
-      setStreamingResponse(null);
-      loggerRef.current?.log('system', `container exec: ${command}`);
-      loggerRef.current?.log('response', output);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      addLog('error', `container exec failed: ${errMsg}`);
-      setConversation(prev => [...prev, { role: 'assistant', content: `Error: ${errMsg}`, isError: true }]);
-      setStreamingResponse(null);
-    } finally {
-      setIsStreaming(false);
+    const detection = await detectContainerRuntime();
+    if (!detection.runtime) {
+      addLog('error', 'No container runtime found (docker, podman, or finch required)');
+      setConversation(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Error: No container runtime found (docker, podman, or finch required)',
+          isError: true,
+        },
+      ]);
+      return;
     }
+    await runSpawnCommand(
+      detection.runtime.binary,
+      ['exec', containerName, 'bash', '-c', command],
+      {},
+      'container exec',
+      '!!',
+      command
+    );
   };
 
   const clearLogs = () => {
@@ -541,7 +526,6 @@ export function useDevServer(options: {
     logFilePath: loggerRef.current?.getRelativeLogPath(),
     hasMemory: (project?.memories?.length ?? 0) > 0,
     hasVpc: project?.runtimes.find(a => a.name === config?.agentName)?.networkMode === 'VPC',
-    modelProvider: undefined,
     protocol,
     mcpTools,
     fetchMcpTools,

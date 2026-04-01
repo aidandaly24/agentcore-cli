@@ -327,9 +327,7 @@ export async function invokeAgentRuntimeStreaming(options: InvokeAgentRuntimeOpt
         buffer += decoded;
         fullResponse += decoded;
 
-        // Process complete lines from the buffer
         const lines = buffer.split('\n');
-        // Keep the last incomplete line in the buffer
         buffer = lines.pop() ?? '';
 
         for (const line of lines) {
@@ -825,8 +823,9 @@ export async function invokeA2ARuntime(options: A2AInvokeOptions, message: strin
 }
 
 /** Wrap a single string value as an AsyncGenerator for StreamingInvokeResult compatibility. */
+// eslint-disable-next-line @typescript-eslint/require-await
 async function* singleValueStream(value: string): AsyncGenerator<string, void, unknown> {
-  yield await Promise.resolve(value);
+  yield value;
 }
 
 /** Extract text content from A2A JSON-RPC response. Supports both kind:'text' and type:'text' part formats. */
@@ -950,7 +949,7 @@ export async function executeBashCommand(options: ExecuteBashOptions): Promise<E
     runtimeSessionId: options.sessionId,
     body: {
       command: options.command,
-      ...(options.timeout ? { timeout: options.timeout } : {}),
+      ...(options.timeout != null ? { timeout: options.timeout } : {}),
     },
   });
 
@@ -962,8 +961,9 @@ export async function executeBashCommand(options: ExecuteBashOptions): Promise<E
       throw new Error('No stream in response from AgentCore Runtime');
     }
     for await (const event of response.stream) {
+      // SDK types for InvokeAgentRuntimeCommandCommand stream events are not yet published — cast needed until SDK stabilizes
       const chunk = (event as unknown as Record<string, unknown>).chunk as Record<string, unknown> | undefined;
-      if (!chunk) continue;
+      if (!chunk || typeof chunk !== 'object') continue;
 
       if (chunk.contentStart !== undefined) {
         yield { type: 'start' };
