@@ -78,7 +78,9 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
   const [phase, setPhase] = useState<'loading' | 'ready' | 'invoking' | 'error'>('loading');
   const [config, setConfig] = useState<InvokeConfig | null>(null);
   const [selectedAgent, setSelectedAgent] = useState(0);
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string; isHint?: boolean }[]>([]);
+  const [messages, setMessages] = useState<
+    { role: 'user' | 'assistant'; content: string; isHint?: boolean; isExec?: boolean }[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [logFilePath, setLogFilePath] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -391,7 +393,11 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
 
       const logger = loggerRef.current;
 
-      setMessages(prev => [...prev, { role: 'user', content: `! ${command}` }, { role: 'assistant', content: '' }]);
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: `! ${command}`, isExec: true },
+        { role: 'assistant', content: '', isExec: true },
+      ]);
       setPhase('invoking');
       streamingContentRef.current = '';
 
@@ -430,7 +436,7 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
             const updated = [...prev];
             const lastIdx = updated.length - 1;
             if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
-              updated[lastIdx] = { role: 'assistant', content: currentContent };
+              updated[lastIdx] = { ...updated[lastIdx], content: currentContent };
             }
             return updated;
           });
@@ -446,7 +452,7 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
           const updated = [...prev];
           const lastIdx = updated.length - 1;
           if (lastIdx >= 0 && updated[lastIdx]?.role === 'assistant') {
-            updated[lastIdx] = { role: 'assistant', content: `Error: ${errMsg}` };
+            updated[lastIdx] = { ...updated[lastIdx], content: `Error: ${errMsg}` };
           }
           return updated;
         });

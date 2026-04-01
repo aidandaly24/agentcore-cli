@@ -39,6 +39,7 @@ export interface ConversationMessage {
   content: string;
   isError?: boolean;
   isHint?: boolean;
+  isExec?: boolean;
 }
 
 const MAX_LOG_ENTRIES = 50;
@@ -395,7 +396,7 @@ export function useDevServer(options: {
     prefix: string,
     command: string
   ) => {
-    setConversation(prev => [...prev, { role: 'user', content: `${prefix} ${command}` }]);
+    setConversation(prev => [...prev, { role: 'user', content: `${prefix} ${command}`, isExec: true }]);
     setStreamingResponse(null);
     setIsStreaming(true);
 
@@ -425,7 +426,7 @@ export function useDevServer(options: {
         });
       });
 
-      setConversation(prev => [...prev, { role: 'assistant', content: output || '(no output)' }]);
+      setConversation(prev => [...prev, { role: 'assistant', content: output || '(no output)', isExec: true }]);
       setStreamingResponse(null);
       loggerRef.current?.log('system', `${label}: ${command}`);
       loggerRef.current?.log('response', output);

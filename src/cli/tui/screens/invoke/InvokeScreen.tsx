@@ -18,25 +18,37 @@ interface InvokeScreenProps {
 
 type Mode = 'select-agent' | 'chat' | 'input' | 'token-input';
 
+interface ColoredLine {
+  text: string;
+  color?: string;
+}
+
 /**
- * Render conversation messages as a single string for scrolling.
+ * Render conversation as colored lines for scrolling.
+ * Each line carries its own color so that word-wrapping preserves it.
  */
-function formatConversation(messages: { role: 'user' | 'assistant'; content: string; isHint?: boolean }[]): string {
-  const lines: string[] = [];
+function formatConversation(
+  messages: { role: 'user' | 'assistant'; content: string; isHint?: boolean; isExec?: boolean }[]
+): ColoredLine[] {
+  const lines: ColoredLine[] = [];
 
   for (const msg of messages) {
     // Skip empty assistant messages (placeholder before streaming starts)
     if (msg.role === 'assistant' && !msg.content) continue;
 
-    if (msg.role === 'user') {
-      lines.push(`> ${msg.content}`);
+    if (msg.role === 'user' && msg.isExec) {
+      lines.push({ text: msg.content, color: 'magenta' });
+    } else if (msg.role === 'user') {
+      lines.push({ text: `> ${msg.content}`, color: 'blue' });
+    } else if (msg.isExec) {
+      lines.push({ text: msg.content });
     } else {
-      lines.push(msg.content);
+      lines.push({ text: msg.content, color: 'green' });
     }
-    lines.push(''); // blank line between messages
+    lines.push({ text: '', color: 'green' }); // blank line between messages
   }
 
-  return lines.join('\n');
+  return lines;
 }
 
 /**
@@ -81,14 +93,16 @@ function wrapLine(line: string, maxWidth: number): string[] {
 }
 
 /**
- * Wrap multi-line text to fit within maxWidth.
+ * Wrap colored lines for display, preserving color on continuation lines.
  */
-function wrapText(text: string, maxWidth: number): string[] {
-  if (!text) return [];
-  const lines = text.split('\n');
-  const wrapped: string[] = [];
-  for (const line of lines) {
-    wrapped.push(...wrapLine(line, maxWidth));
+function wrapColoredLines(lines: ColoredLine[], maxWidth: number): ColoredLine[] {
+  const wrapped: ColoredLine[] = [];
+  for (const { text, color } of lines) {
+    for (const subLine of text.split('\n')) {
+      for (const wrappedLine of wrapLine(subLine, maxWidth)) {
+        wrapped.push({ text: wrappedLine, color });
+      }
+    }
   }
   return wrapped;
 }
@@ -184,11 +198,11 @@ export function InvokeScreen({
   const displayHeight = mode === 'input' ? Math.max(3, baseHeight - 2) : baseHeight;
   const contentWidth = Math.max(40, terminalWidth - 4);
 
-  // Format conversation content
-  const conversationText = useMemo(() => formatConversation(messages), [messages]);
+  // Format conversation content into colored lines
+  const coloredLines = useMemo(() => formatConversation(messages), [messages]);
 
-  // Wrap text for display
-  const lines = useMemo(() => wrapText(conversationText, contentWidth), [conversationText, contentWidth]);
+  // Wrap lines for display, preserving color on continuation lines
+  const lines = useMemo(() => wrapColoredLines(coloredLines, contentWidth), [coloredLines, contentWidth]);
 
   const totalLines = lines.length;
   const maxScroll = Math.max(0, totalLines - displayHeight);
@@ -440,15 +454,11 @@ export function InvokeScreen({
         {/* Conversation display - always visible when there's content */}
         {messages.length > 0 && (
           <Box flexDirection="column" height={needsScroll ? displayHeight : undefined}>
-            {visibleLines.map((line, idx) => {
-              // Detect user messages (start with "> ")
-              const isUserMessage = line.startsWith('> ');
-              return (
-                <Text key={effectiveOffset + idx} color={isUserMessage ? 'blue' : 'green'} wrap="truncate">
-                  {line || ' '}
-                </Text>
-              );
-            })}
+            {visibleLines.map((line, idx) => (
+              <Text key={effectiveOffset + idx} color={line.color} wrap="truncate">
+                {line.text || ' '}
+              </Text>
+            ))}
             {/* Thinking indicator - shows while waiting for response to start */}
             {showThinking && <GradientText text="Thinking..." />}
           </Box>
@@ -502,7 +512,7 @@ export function InvokeScreen({
         {mode === 'input' && phase === 'ready' && (
           <>
             <Box>
-              <Text color={isExecInput ? 'yellow' : 'blue'}>{isExecInput ? '! ' : '> '}</Text>
+              <Text color={isExecInput ? 'magenta' : 'blue'}>{isExecInput ? '! ' : '> '}</Text>
               <TextInput
                 prompt=""
                 hideArrow
@@ -532,12 +542,11 @@ export function InvokeScreen({
                     setMode('chat');
                     setUserScrolled(false);
                     if (isExecInput) {
-                      setIsExecInput(false);
                       void execCommand(trimmed);
                     } else {
                       void invoke(text);
                     }
-                  } else {
+                  } else if (!isExecInput) {
                     setMode('chat');
                   }
                 }}

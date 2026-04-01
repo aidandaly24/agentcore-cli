@@ -19,7 +19,7 @@ interface DevScreenProps {
 
 interface ColoredLine {
   text: string;
-  color: string;
+  color?: string;
 }
 
 /**
@@ -34,7 +34,9 @@ function formatConversation(
   const lines: ColoredLine[] = [];
 
   for (const msg of conversation) {
-    if (msg.role === 'user') {
+    if (msg.role === 'user' && msg.isExec) {
+      lines.push({ text: msg.content, color: 'magenta' });
+    } else if (msg.role === 'user') {
       lines.push({ text: `> ${msg.content}`, color: 'blue' });
     } else if (msg.isError) {
       for (const errLine of msg.content.split('\n')) {
@@ -42,6 +44,8 @@ function formatConversation(
       }
     } else if (msg.isHint) {
       lines.push({ text: msg.content, color: 'cyan' });
+    } else if (msg.isExec) {
+      lines.push({ text: msg.content });
     } else {
       lines.push({ text: msg.content, color: 'green' });
     }
@@ -601,7 +605,9 @@ export function DevScreen(props: DevScreenProps) {
         {status === 'running' && mode === 'input' && (
           <>
             <Box>
-              <Text color={isExecInput ? 'yellow' : 'blue'}>{isContainerExec ? '!! ' : isExecInput ? '! ' : '> '}</Text>
+              <Text color={isExecInput ? 'magenta' : 'blue'}>
+                {isContainerExec ? '!! ' : isExecInput ? '! ' : '> '}
+              </Text>
               <TextInput
                 prompt=""
                 hideArrow
@@ -646,16 +652,13 @@ export function DevScreen(props: DevScreenProps) {
                   const trimmed = text.trim();
                   if (trimmed) {
                     if (isContainerExec) {
-                      setIsContainerExec(false);
-                      setIsExecInput(false);
                       void handleContainerExec(trimmed);
                     } else if (isExecInput) {
-                      setIsExecInput(false);
                       void handleExec(trimmed);
                     } else {
                       void handleInvoke(text);
                     }
-                  } else {
+                  } else if (!isExecInput && !isContainerExec) {
                     setMode('chat');
                   }
                 }}
