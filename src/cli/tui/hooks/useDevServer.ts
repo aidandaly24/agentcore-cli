@@ -1,5 +1,6 @@
 import { findConfigRoot, readEnvFile } from '../../../lib';
 import type { AgentCoreProjectSpec, ProtocolMode } from '../../../schema';
+import { detectContainerRuntime } from '../../external-requirements';
 import { DevLogger } from '../../logging/dev-logger';
 import {
   type A2AAgentCard,
@@ -23,6 +24,7 @@ import {
 } from '../../operations/dev';
 import { getGatewayEnvVars } from '../../operations/dev/gateway-env.js';
 import { formatMcpToolList } from '../../operations/dev/utils';
+import { spawn } from 'child_process';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type ServerStatus = 'starting' | 'running' | 'error' | 'stopped';
@@ -385,6 +387,109 @@ export function useDevServer(options: {
     }
   };
 
+  const execCommand = async (command: string) => {
+    setConversation(prev => [...prev, { role: 'user', content: `! ${command}` }]);
+    setStreamingResponse(null);
+    setIsStreaming(true);
+
+    let output = '';
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn('bash', ['-c', command], {
+          cwd: options.workingDir,
+          stdio: 'pipe',
+          env: { ...process.env, ...envVars },
+        });
+
+        child.stdout?.on('data', (data: Buffer) => {
+          output += data.toString();
+          setStreamingResponse(output);
+        });
+
+        child.stderr?.on('data', (data: Buffer) => {
+          output += data.toString();
+          setStreamingResponse(output);
+        });
+
+        child.on('error', reject);
+        child.on('close', code => {
+          if (code !== 0 && code !== null) {
+            output += `\n[exit code: ${code}]`;
+            setStreamingResponse(output);
+          }
+          resolve();
+        });
+      });
+
+      setConversation(prev => [...prev, { role: 'assistant', content: output || '(no output)' }]);
+      setStreamingResponse(null);
+      loggerRef.current?.log('system', `exec: ${command}`);
+      loggerRef.current?.log('response', output);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      addLog('error', `exec failed: ${errMsg}`);
+      setConversation(prev => [...prev, { role: 'assistant', content: `Error: ${errMsg}`, isError: true }]);
+      setStreamingResponse(null);
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  const execInContainer = async (command: string) => {
+    const containerName = `agentcore-dev-${config?.agentName ?? ''}`.toLowerCase();
+    setConversation(prev => [...prev, { role: 'user', content: `!! ${command}` }]);
+    setStreamingResponse(null);
+    setIsStreaming(true);
+
+    let output = '';
+
+    try {
+      const detection = await detectContainerRuntime();
+      if (!detection.runtime) {
+        throw new Error('No container runtime found (docker, podman, or finch required)');
+      }
+      const binary = detection.runtime.binary;
+
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(binary, ['exec', containerName, 'bash', '-c', command], {
+          stdio: 'pipe',
+        });
+
+        child.stdout?.on('data', (data: Buffer) => {
+          output += data.toString();
+          setStreamingResponse(output);
+        });
+
+        child.stderr?.on('data', (data: Buffer) => {
+          output += data.toString();
+          setStreamingResponse(output);
+        });
+
+        child.on('error', reject);
+        child.on('close', code => {
+          if (code !== 0 && code !== null) {
+            output += `\n[exit code: ${code}]`;
+            setStreamingResponse(output);
+          }
+          resolve();
+        });
+      });
+
+      setConversation(prev => [...prev, { role: 'assistant', content: output || '(no output)' }]);
+      setStreamingResponse(null);
+      loggerRef.current?.log('system', `container exec: ${command}`);
+      loggerRef.current?.log('response', output);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      addLog('error', `container exec failed: ${errMsg}`);
+      setConversation(prev => [...prev, { role: 'assistant', content: `Error: ${errMsg}`, isError: true }]);
+      setStreamingResponse(null);
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
   const clearLogs = () => {
     setLogs([]);
     logsRef.current = [];
@@ -426,6 +531,9 @@ export function useDevServer(options: {
     configLoaded,
     actualPort,
     invoke,
+    execCommand,
+    execInContainer,
+    isContainer: config?.buildType === 'Container',
     clearLogs,
     clearConversation,
     restart,

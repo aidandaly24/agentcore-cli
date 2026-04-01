@@ -118,10 +118,13 @@ export function InvokeScreen({
     setBearerToken,
     fetchBearerToken,
     invoke,
+    execCommand,
     newSession,
     fetchMcpTools,
   } = useInvokeFlow({ initialSessionId, initialUserId, headers: initialHeaders, initialBearerToken });
   const [mode, setMode] = useState<Mode>('select-agent');
+  const [isExecInput, setIsExecInput] = useState(false);
+  const [execInputEmpty, setExecInputEmpty] = useState(true);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [userScrolled, setUserScrolled] = useState(false);
   const { stdout } = useStdout();
@@ -343,9 +346,11 @@ export function InvokeScreen({
       : mode === 'token-input'
         ? 'Enter confirm · Esc skip'
         : mode === 'input'
-          ? isMcp
-            ? 'Enter send · Esc cancel · "list" to refresh tools'
-            : 'Enter send · Esc cancel'
+          ? isExecInput
+            ? 'Enter run · Esc cancel · Backspace to exit exec mode'
+            : isMcp
+              ? 'Enter send · Esc cancel · "list" to refresh tools · ! exec mode'
+              : 'Enter send · Esc cancel · ! exec mode'
           : phase === 'invoking'
             ? '↑↓ scroll'
             : messages.length > 0
@@ -495,31 +500,63 @@ export function InvokeScreen({
           </Box>
         )}
         {mode === 'input' && phase === 'ready' && (
-          <Box>
-            <Text color="blue">&gt; </Text>
-            <TextInput
-              prompt=""
-              hideArrow
-              placeholder={
-                isMcp ? 'tool_name {"arg": "value"}' : agentProtocol === 'A2A' ? 'Send a message...' : undefined
-              }
-              onSubmit={text => {
-                if (text.trim()) {
-                  setMode('chat');
-                  setUserScrolled(false);
-                  void invoke(text);
-                } else {
-                  setMode('chat');
+          <>
+            <Box>
+              <Text color={isExecInput ? 'yellow' : 'blue'}>{isExecInput ? '! ' : '> '}</Text>
+              <TextInput
+                prompt=""
+                hideArrow
+                placeholder={
+                  isExecInput
+                    ? undefined
+                    : isMcp
+                      ? 'tool_name {"arg": "value"}'
+                      : agentProtocol === 'A2A'
+                        ? 'Send a message...'
+                        : undefined
                 }
-              }}
-              onCancel={() => {
-                justCancelledRef.current = true;
-                setMode('chat');
-              }}
-              onUpArrow={() => scrollUp(1)}
-              onDownArrow={() => scrollDown(1)}
-            />
-          </Box>
+                onChange={(value, setValue) => {
+                  if (!isExecInput && value.startsWith('!')) {
+                    setIsExecInput(true);
+                    const rest = value.slice(1);
+                    setValue(rest);
+                    setExecInputEmpty(!rest);
+                  } else {
+                    setExecInputEmpty(!value);
+                  }
+                }}
+                onBackspaceEmpty={isExecInput ? () => setIsExecInput(false) : undefined}
+                onSubmit={text => {
+                  const trimmed = text.trim();
+                  if (trimmed) {
+                    setMode('chat');
+                    setUserScrolled(false);
+                    if (isExecInput) {
+                      setIsExecInput(false);
+                      void execCommand(trimmed);
+                    } else {
+                      void invoke(text);
+                    }
+                  } else {
+                    setMode('chat');
+                  }
+                }}
+                onCancel={() => {
+                  justCancelledRef.current = true;
+                  setIsExecInput(false);
+                  setMode('chat');
+                }}
+                onUpArrow={() => scrollUp(1)}
+                onDownArrow={() => scrollDown(1)}
+              />
+            </Box>
+            {isExecInput && execInputEmpty && (
+              <Text color="magenta" dimColor>
+                {' '}
+                Run a shell command in the runtime
+              </Text>
+            )}
+          </>
         )}
       </Box>
     </Screen>

@@ -131,6 +131,9 @@ export function DevScreen(props: DevScreenProps) {
   const [selectedAgentName, setSelectedAgentName] = useState<string | undefined>(props.agentName);
   const [agentsLoaded, setAgentsLoaded] = useState(false);
   const [noAgentsError, setNoAgentsError] = useState(false);
+  const [isExecInput, setIsExecInput] = useState(false);
+  const [isContainerExec, setIsContainerExec] = useState(false);
+  const [execInputEmpty, setExecInputEmpty] = useState(true);
 
   const workingDir = props.workingDir ?? process.cwd();
 
@@ -177,6 +180,9 @@ export function DevScreen(props: DevScreenProps) {
     configLoaded,
     actualPort,
     invoke,
+    execCommand,
+    execInContainer,
+    isContainer,
     clearConversation,
     restart,
     stop,
@@ -310,6 +316,20 @@ export function DevScreen(props: DevScreenProps) {
     setMode('input'); // Return to input mode after invoke completes
   };
 
+  const handleExec = async (command: string) => {
+    setMode('chat');
+    setUserScrolled(false);
+    await execCommand(command);
+    setMode('input');
+  };
+
+  const handleContainerExec = async (command: string) => {
+    setMode('chat');
+    setUserScrolled(false);
+    await execInContainer(command);
+    setMode('input');
+  };
+
   useInput(
     (input, key) => {
       // Agent selection mode
@@ -420,13 +440,18 @@ export function DevScreen(props: DevScreenProps) {
 
   // Dynamic help text
   const backOrQuit = supportedAgents.length > 1 ? 'Esc back' : 'Esc quit';
+  const execHint = isContainer ? '! exec local · !! exec container' : '! exec';
   const helpText =
     mode === 'select-agent'
       ? '↑↓ select · Enter confirm · q quit'
       : mode === 'input'
-        ? isMcp
-          ? 'Enter send · Esc cancel · "list" to refresh tools'
-          : 'Enter send · Esc cancel'
+        ? isContainerExec
+          ? 'Enter run in container · Esc cancel · Backspace to local exec'
+          : isExecInput
+            ? `Enter run · Esc cancel · Backspace to exit exec mode${isContainer ? ' · ! container exec' : ''}`
+            : isMcp
+              ? `Enter send · Esc cancel · "list" to refresh tools · ${execHint}`
+              : `Enter send · Esc cancel · ${execHint}`
         : status === 'starting'
           ? backOrQuit
           : isStreaming
@@ -581,27 +606,89 @@ export function DevScreen(props: DevScreenProps) {
           </Box>
         )}
         {status === 'running' && mode === 'input' && (
-          <Box>
-            <Text color="blue">&gt; </Text>
-            <TextInput
-              prompt=""
-              hideArrow
-              placeholder={isMcp ? 'tool_name {"arg": "value"}' : protocol === 'A2A' ? 'Send a message...' : undefined}
-              onSubmit={text => {
-                if (text.trim()) {
-                  void handleInvoke(text);
-                } else {
-                  setMode('chat');
+          <>
+            <Box>
+              <Text color={isExecInput ? 'yellow' : 'blue'}>{isContainerExec ? '!! ' : isExecInput ? '! ' : '> '}</Text>
+              <TextInput
+                prompt=""
+                hideArrow
+                placeholder={
+                  isExecInput
+                    ? undefined
+                    : isMcp
+                      ? 'tool_name {"arg": "value"}'
+                      : protocol === 'A2A'
+                        ? 'Send a message...'
+                        : undefined
                 }
-              }}
-              onCancel={() => {
-                justCancelledRef.current = true;
-                setMode('chat');
-              }}
-              onUpArrow={() => scrollUp(1)}
-              onDownArrow={() => scrollDown(1)}
-            />
-          </Box>
+                onChange={(value, setValue) => {
+                  if (!isExecInput && value.startsWith('!')) {
+                    setIsExecInput(true);
+                    const rest = value.slice(1);
+                    setValue(rest);
+                    setExecInputEmpty(!rest);
+                  } else if (
+                    isExecInput &&
+                    !isContainerExec &&
+                    isContainer &&
+                    execInputEmpty &&
+                    value.startsWith('!')
+                  ) {
+                    setIsContainerExec(true);
+                    const rest = value.slice(1);
+                    setValue(rest);
+                    setExecInputEmpty(!rest);
+                  } else {
+                    setExecInputEmpty(!value);
+                  }
+                }}
+                onBackspaceEmpty={
+                  isContainerExec
+                    ? () => setIsContainerExec(false)
+                    : isExecInput
+                      ? () => setIsExecInput(false)
+                      : undefined
+                }
+                onSubmit={text => {
+                  const trimmed = text.trim();
+                  if (trimmed) {
+                    if (isContainerExec) {
+                      setIsContainerExec(false);
+                      setIsExecInput(false);
+                      void handleContainerExec(trimmed);
+                    } else if (isExecInput) {
+                      setIsExecInput(false);
+                      void handleExec(trimmed);
+                    } else {
+                      void handleInvoke(text);
+                    }
+                  } else {
+                    setMode('chat');
+                  }
+                }}
+                onCancel={() => {
+                  justCancelledRef.current = true;
+                  setIsContainerExec(false);
+                  setIsExecInput(false);
+                  setMode('chat');
+                }}
+                onUpArrow={() => scrollUp(1)}
+                onDownArrow={() => scrollDown(1)}
+              />
+            </Box>
+            {isContainerExec && execInputEmpty && (
+              <Text color="magenta" dimColor>
+                {' '}
+                Run a shell command in the container
+              </Text>
+            )}
+            {isExecInput && !isContainerExec && execInputEmpty && (
+              <Text color="magenta" dimColor>
+                {' '}
+                Run a shell command locally
+              </Text>
+            )}
+          </>
         )}
       </Box>
     </Screen>
