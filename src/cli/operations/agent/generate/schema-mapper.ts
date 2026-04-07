@@ -277,5 +277,6 @@ export async function mapGenerateConfigToRenderConfig(
     gatewayProviders,
     gatewayAuthTypes: [...new Set(gatewayProviders.map(g => g.authType))],
     protocol: config.protocol,
+    dockerfile: config.dockerfile,
   };
 }
