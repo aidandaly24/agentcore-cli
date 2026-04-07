@@ -449,7 +449,13 @@ export function InvokeScreen({
   const showThinking = phase === 'invoking' && lastMessage?.role === 'assistant' && !lastMessage.content;
 
   return (
-    <Screen title="AgentCore Invoke" onExit={onExit} helpText={helpText} headerContent={headerContent}>
+    <Screen
+      title="AgentCore Invoke"
+      onExit={onExit}
+      helpText={helpText}
+      headerContent={headerContent}
+      exitEnabled={mode !== 'input'}
+    >
       <Box flexDirection="column" flexGrow={1}>
         {/* Conversation display - always visible when there's content */}
         {messages.length > 0 && (
@@ -479,7 +485,7 @@ export function InvokeScreen({
 
         {mode === 'chat' && phase === 'ready' && messages.length > 0 && (
           <Box>
-            <Text dimColor>&gt; </Text>
+            <Text dimColor>{isExecInput ? '! ' : '> '}</Text>
           </Box>
         )}
         {mode === 'chat' && phase === 'ready' && messages.length === 0 && (!isMcp || mcpToolsFetched) && (
@@ -551,9 +557,12 @@ export function InvokeScreen({
                   }
                 }}
                 onCancel={() => {
-                  justCancelledRef.current = true;
-                  setIsExecInput(false);
-                  setMode('chat');
+                  if (isExecInput) {
+                    setIsExecInput(false);
+                  } else {
+                    justCancelledRef.current = true;
+                    setMode('chat');
+                  }
                 }}
                 onUpArrow={() => scrollUp(1)}
                 onDownArrow={() => scrollDown(1)}

@@ -323,6 +323,7 @@ export function DevScreen(props: DevScreenProps) {
     setMode('chat');
     setUserScrolled(false);
     await execCommand(command);
+    setExecInputEmpty(true);
     setMode('input');
   };
 
@@ -330,6 +331,7 @@ export function DevScreen(props: DevScreenProps) {
     setMode('chat');
     setUserScrolled(false);
     await execInContainer(command);
+    setExecInputEmpty(true);
     setMode('input');
   };
 
@@ -568,7 +570,13 @@ export function DevScreen(props: DevScreenProps) {
   );
 
   return (
-    <Screen title="Dev Server" onExit={handleExit} helpText={helpText} headerContent={headerContent}>
+    <Screen
+      title="Dev Server"
+      onExit={handleExit}
+      helpText={helpText}
+      headerContent={headerContent}
+      exitEnabled={mode !== 'input'}
+    >
       <Box flexDirection="column" flexGrow={1}>
         {/* Conversation display - always visible when there's content */}
         {(conversation.length > 0 || isStreaming) && (
@@ -599,7 +607,7 @@ export function DevScreen(props: DevScreenProps) {
         {/* Focused: blue arrow with cursor, type and press Enter to send */}
         {status === 'running' && mode === 'chat' && !isStreaming && (
           <Box>
-            <Text dimColor>&gt; </Text>
+            <Text dimColor>{isContainerExec ? '!! ' : isExecInput ? '! ' : '> '}</Text>
           </Box>
         )}
         {status === 'running' && mode === 'input' && (
@@ -663,10 +671,13 @@ export function DevScreen(props: DevScreenProps) {
                   }
                 }}
                 onCancel={() => {
-                  justCancelledRef.current = true;
-                  setIsContainerExec(false);
-                  setIsExecInput(false);
-                  setMode('chat');
+                  if (isExecInput) {
+                    setIsContainerExec(false);
+                    setIsExecInput(false);
+                  } else {
+                    justCancelledRef.current = true;
+                    setMode('chat');
+                  }
                 }}
                 onUpArrow={() => scrollUp(1)}
                 onDownArrow={() => scrollDown(1)}
