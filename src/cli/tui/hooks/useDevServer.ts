@@ -394,11 +394,13 @@ export function useDevServer(options: {
     spawnOpts: { cwd?: string; env?: NodeJS.ProcessEnv },
     label: string,
     prefix: string,
-    command: string
+    command: string,
+    onStart?: () => void
   ) => {
     setConversation(prev => [...prev, { role: 'user', content: `${prefix} ${command}`, isExec: true }]);
     setStreamingResponse(null);
     setIsStreaming(true);
+    onStart?.();
 
     let output = '';
 
@@ -440,18 +442,19 @@ export function useDevServer(options: {
     }
   };
 
-  const execCommand = async (command: string) => {
+  const execCommand = async (command: string, onStart?: () => void) => {
     await runSpawnCommand(
       'bash',
       ['-c', command],
       { cwd: options.workingDir, env: { ...process.env, ...envVars } },
       'exec',
       '!',
-      command
+      command,
+      onStart
     );
   };
 
-  const execInContainer = async (command: string) => {
+  const execInContainer = async (command: string, onStart?: () => void) => {
     const containerName = `agentcore-dev-${config?.agentName ?? ''}`.toLowerCase();
     const detection = await detectContainerRuntime();
     if (!detection.runtime) {
@@ -472,7 +475,8 @@ export function useDevServer(options: {
       {},
       'container exec',
       '!!',
-      command
+      command,
+      onStart
     );
   };
 

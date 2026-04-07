@@ -320,17 +320,15 @@ export function DevScreen(props: DevScreenProps) {
   };
 
   const handleExec = async (command: string) => {
-    setMode('chat');
     setUserScrolled(false);
-    await execCommand(command);
+    await execCommand(command, () => setMode('chat'));
     setExecInputEmpty(true);
     setMode('input');
   };
 
   const handleContainerExec = async (command: string) => {
-    setMode('chat');
     setUserScrolled(false);
-    await execInContainer(command);
+    await execInContainer(command, () => setMode('chat'));
     setExecInputEmpty(true);
     setMode('input');
   };
