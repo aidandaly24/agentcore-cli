@@ -17,6 +17,7 @@ import {
   ConfirmReview,
   Cursor,
   Panel,
+  PathInput,
   Screen,
   StepIndicator,
   TextInput,
@@ -31,7 +32,7 @@ import { generateUniqueName } from '../../utils';
 import { BUILD_TYPE_OPTIONS, GenerateWizardUI, getWizardHelpText, useGenerateWizard } from '../generate';
 import type { BuildType, MemoryOption } from '../generate';
 import type { AdvancedSettingId } from '../generate/types';
-import { ADVANCED_SETTING_OPTIONS, MEMORY_OPTIONS, validateDockerfileInput } from '../generate/types';
+import { ADVANCED_SETTING_OPTIONS, MEMORY_OPTIONS } from '../generate/types';
 import type { AddAgentConfig, AddAgentStep, AgentType } from './types';
 import {
   ADD_AGENT_STEP_LABELS,
@@ -42,10 +43,9 @@ import {
   NETWORK_MODE_OPTIONS,
   RUNTIME_AUTHORIZER_TYPE_OPTIONS,
 } from './types';
-import { existsSync } from 'fs';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import { resolve } from 'path';
+import { basename, resolve } from 'path';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Helper to get provider display name and env var name from ModelProvider
@@ -1067,37 +1067,18 @@ export function AddAgentScreen({ existingAgentNames, onComplete, onExit }: AddAg
         )}
 
         {byoStep === 'dockerfile' && (
-          <Box flexDirection="column">
-            <TextInput
-              prompt="Path to custom Dockerfile (press Enter for default)"
-              initialValue=""
-              allowEmpty
-              customValidation={value => {
-                const result = validateDockerfileInput(value);
-                if (result !== true) return result;
-                const trimmed = value.trim();
-                if (trimmed.includes('/')) {
-                  const resolved = resolve(trimmed);
-                  if (!existsSync(resolved)) {
-                    return `File not found: ${resolved}`;
-                  }
-                }
-                return true;
-              }}
-              onSubmit={value => {
-                const trimmed = value.trim();
-                setByoConfig(c => ({ ...c, dockerfile: trimmed || '' }));
-                goToNextByoStep('dockerfile');
-              }}
-              onCancel={handleByoBack}
-            />
-            <Box marginTop={1}>
-              <Text dimColor>
-                Path to a Dockerfile to copy into your agent directory (e.g. ../shared/Dockerfile.gpu). Leave empty for
-                default.
-              </Text>
-            </Box>
-          </Box>
+          <PathInput
+            placeholder="Select a Dockerfile"
+            basePath={resolve(project?.projectRoot ?? process.cwd(), byoConfig.codeLocation)}
+            pathType="file"
+            allowEmpty
+            emptyHelpText="Press Enter to use the default Dockerfile"
+            onSubmit={value => {
+              setByoConfig(c => ({ ...c, dockerfile: value ? basename(value) : '' }));
+              goToNextByoStep('dockerfile');
+            }}
+            onCancel={handleByoBack}
+          />
         )}
 
         {byoStep === 'modelProvider' && (

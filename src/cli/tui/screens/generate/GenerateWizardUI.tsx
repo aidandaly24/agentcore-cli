@@ -3,7 +3,15 @@ import { DEFAULT_MODEL_IDS, LIFECYCLE_TIMEOUT_MAX, LIFECYCLE_TIMEOUT_MIN, Projec
 import { parseAndNormalizeHeaders, validateHeaderAllowlist } from '../../../commands/shared/header-utils';
 import { validateSecurityGroupIds, validateSubnetIds } from '../../../commands/shared/vpc-utils';
 import { computeDefaultCredentialEnvVarName } from '../../../primitives/credential-utils';
-import { ApiKeySecretInput, Panel, SelectList, StepIndicator, TextInput, WizardMultiSelect } from '../../components';
+import {
+  ApiKeySecretInput,
+  Panel,
+  PathInput,
+  SelectList,
+  StepIndicator,
+  TextInput,
+  WizardMultiSelect,
+} from '../../components';
 import type { SelectableItem } from '../../components';
 import { JwtConfigInput, useJwtConfigFlow } from '../../components/jwt-config';
 import { useListNavigation, useMultiSelectNavigation } from '../../hooks';
@@ -19,12 +27,10 @@ import {
   STEP_LABELS,
   getModelProviderOptionsForSdk,
   getSDKOptionsForProtocol,
-  validateDockerfileInput,
 } from './types';
 import type { useGenerateWizard } from './useGenerateWizard';
-import { existsSync } from 'fs';
 import { Box, Text, useInput } from 'ink';
-import { resolve } from 'path';
+import { basename } from 'path';
 
 // Helper to get provider display name and env var name from ModelProvider
 function getProviderInfo(provider: ModelProvider): { name: string; envVarName: string } {
@@ -215,37 +221,16 @@ export function GenerateWizardUI({
       )}
 
       {isDockerfileStep && (
-        <Box flexDirection="column">
-          <TextInput
-            prompt="Path to custom Dockerfile (press Enter for default)"
-            placeholder="Dockerfile"
-            initialValue=""
-            allowEmpty
-            customValidation={value => {
-              const result = validateDockerfileInput(value);
-              if (result !== true) return result;
-              const trimmed = value.trim();
-              if (trimmed.includes('/')) {
-                const resolved = resolve(trimmed);
-                if (!existsSync(resolved)) {
-                  return `File not found: ${resolved}`;
-                }
-              }
-              return true;
-            }}
-            onSubmit={value => {
-              const trimmed = value.trim();
-              wizard.setDockerfile(trimmed || undefined);
-            }}
-            onCancel={onBack}
-          />
-          <Box marginTop={1}>
-            <Text dimColor>
-              Path to a Dockerfile to copy into your agent directory (e.g. ../shared/Dockerfile.gpu). Leave empty for
-              default.
-            </Text>
-          </Box>
-        </Box>
+        <PathInput
+          placeholder="Select a Dockerfile to copy into your agent directory"
+          pathType="file"
+          allowEmpty
+          emptyHelpText="Press Enter to use the default Dockerfile"
+          onSubmit={value => {
+            wizard.setDockerfile(value ? basename(value) : undefined);
+          }}
+          onCancel={onBack}
+        />
       )}
 
       {isApiKeyStep && (
