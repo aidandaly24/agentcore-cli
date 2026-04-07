@@ -115,6 +115,7 @@ export function mapGenerateConfigToAgent(config: GenerateConfig): AgentEnvSpec {
   return {
     name: config.projectName,
     build: config.buildType ?? 'CodeZip',
+    ...(config.dockerfile && { dockerfile: config.dockerfile }),
     entrypoint: DEFAULT_PYTHON_ENTRYPOINT as FilePath,
     codeLocation: codeLocation as DirectoryPath,
     runtimeVersion: DEFAULT_PYTHON_VERSION,
