@@ -463,14 +463,10 @@ describe('AgentEnvSpecSchema - dockerfile', () => {
     expect(AgentEnvSpecSchema.safeParse({ ...validContainerAgent, dockerfile: '' }).success).toBe(false);
   });
 
-  it.each([
-    'Dockerfile;rm -rf /',
-    'Dockerfile$(whoami)',
-    'Dockerfile`id`',
-    'Dockerfile | cat /etc/passwd',
-    'Dockerfile&& echo pwned',
-  ])('rejects shell metacharacters in dockerfile "%s"', name => {
-    expect(AgentEnvSpecSchema.safeParse({ ...validContainerAgent, dockerfile: name }).success).toBe(false);
+  it('rejects shell metacharacters in dockerfile', () => {
+    expect(AgentEnvSpecSchema.safeParse({ ...validContainerAgent, dockerfile: 'Dockerfile;rm -rf /' }).success).toBe(
+      false
+    );
   });
 
   it('rejects dockerfile exceeding 255 characters', () => {

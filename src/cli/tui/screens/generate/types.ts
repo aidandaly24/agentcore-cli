@@ -164,7 +164,7 @@ export const ADVANCED_SETTING_OPTIONS = [
 ] as const;
 
 /** Dockerfile filename regex — must match the Zod schema in agent-env.ts */
-export const DOCKERFILE_NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const DOCKERFILE_NAME_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
 /**
  * Validate a Dockerfile input value from the TUI.
@@ -186,15 +186,6 @@ export function validateDockerfileInput(value: string): true | string {
   }
   return true;
 }
-
-/** Group labels for the advanced sub-step indicator */
-export const ADVANCED_GROUP_LABELS: Record<AdvancedSettingId, string> = {
-  dockerfile: 'Container',
-  network: 'Network',
-  headers: 'Headers',
-  auth: 'Auth',
-  lifecycle: 'Lifecycle',
-};
 
 export const MEMORY_OPTIONS = [
   { id: 'none', title: 'None', description: 'No memory' },

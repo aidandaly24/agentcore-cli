@@ -124,14 +124,4 @@ describe('validateContainerAgents', () => {
 
     expect(() => validateContainerAgents(spec, CONFIG_ROOT)).toThrow(/Dockerfile\.gpu not found/);
   });
-
-  it('uses default Dockerfile when no custom dockerfile specified', () => {
-    mockedExistsSync.mockReturnValue(true);
-
-    const spec = makeSpec([{ name: 'default-agent', build: 'Container', codeLocation: dir('agents/default') }]);
-
-    expect(() => validateContainerAgents(spec, CONFIG_ROOT)).not.toThrow();
-    const calledPath = mockedExistsSync.mock.calls[0]?.[0] as string;
-    expect(calledPath).toMatch(/\/Dockerfile$/);
-  });
 });

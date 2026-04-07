@@ -252,7 +252,7 @@ export function useGenerateWizard(options?: UseGenerateWizardOptions) {
         }, 0);
       }
     },
-    [config.buildType, steps]
+    [config.buildType]
   );
 
   const setNetworkMode = useCallback(
