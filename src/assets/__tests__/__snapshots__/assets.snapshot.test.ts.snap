@@ -2225,21 +2225,38 @@ agent = Agent(
 )
 
 
-# Session and Runner
-async def setup_session_and_runner(user_id, session_id):
-    ensure_credentials_loaded()
-    session_service = InMemorySessionService()
-    session = await session_service.create_session(
+# Module-level session service and runner (preserves history across invocations)
+_session_service = InMemorySessionService()
+_runner = None
+
+def get_or_create_runner():
+    global _runner
+    if _runner is None:
+        ensure_credentials_loaded()
+        _runner = Runner(
+            agent=agent,
+            app_name=APP_NAME,
+            session_service=_session_service,
+        )
+    return _runner
+
+
+async def get_or_create_session(user_id, session_id):
+    session = await _session_service.get_session(
         app_name=APP_NAME, user_id=user_id, session_id=session_id
     )
-    runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
-    return session, runner
+    if session is None:
+        session = await _session_service.create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+    return session
 
 
 # Agent Interaction
 async def call_agent_async(query, user_id, session_id):
     content = types.Content(role="user", parts=[types.Part(text=query)])
-    session, runner = await setup_session_and_runner(user_id, session_id)
+    runner = get_or_create_runner()
+    session = await get_or_create_session(user_id, session_id)
     events = runner.run_async(
         user_id=user_id, session_id=session.id, new_message=content
     )
@@ -2524,6 +2541,7 @@ Thumbs.db
 exports[`Assets Directory Snapshots > Python framework assets > python/python/http/langchain_langgraph/base/main.py should match snapshot 1`] = `
 "import os
 from langchain_core.messages import HumanMessage
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import create_react_agent
 from langchain.tools import tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
@@ -2556,6 +2574,9 @@ def add_numbers(a: int, b: int) -> int:
 # Define a collection of tools used by the model
 tools = [add_numbers]
 
+# Module-level checkpointer preserves conversation history across invocations
+_checkpointer = InMemorySaver()
+
 
 @app.entrypoint
 async def invoke(payload, context):
@@ -2573,15 +2594,22 @@ async def invoke(payload, context):
     if mcp_client:
         mcp_tools = await mcp_client.get_tools()
 
-    # Define the agent using create_react_agent
-    graph = create_react_agent(get_or_create_model(), tools=mcp_tools + tools)
+    # Define the agent using create_react_agent (checkpointer is shared across invocations)
+    graph = create_react_agent(
+        get_or_create_model(),
+        tools=mcp_tools + tools,
+        prompt="You are a helpful assistant. Use tools when appropriate.",
+        checkpointer=_checkpointer,
+    )
 
     # Process the user prompt
     prompt = payload.get("prompt", "What can you help me with?")
+    session_id = getattr(context, "session_id", "default-session")
     log.info(f"Agent input: {prompt}")
 
-    # Run the agent
-    result = await graph.ainvoke({"messages": [HumanMessage(content=prompt)]})
+    # Run the agent (checkpointer auto-loads/saves history per session)
+    config = {"configurable": {"thread_id": session_id}}
+    result = await graph.ainvoke({"messages": [HumanMessage(content=prompt)]}, config=config)
 
     # Return result
     output = result["messages"][-1].content
@@ -2942,7 +2970,7 @@ Thumbs.db
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/http/openaiagents/base/main.py should match snapshot 1`] = `
 "import os
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, SQLiteSession, function_tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
 {{#if hasGateway}}
@@ -2978,28 +3006,38 @@ def add_numbers(a: int, b: int) -> int:
     return a + b
 
 
+_sessions = {}
+
+def get_session(session_id):
+    if session_id not in _sessions:
+        _sessions[session_id] = SQLiteSession(session_id)
+    return _sessions[session_id]
+
+
 # Define the agent execution
-async def main(query):
+async def main(query, session):
     ensure_credentials_loaded()
     try:
         {{#if hasGateway}}
         if mcp_servers:
             agent = Agent(
                 name="{{ name }}",
+                instructions="You are a helpful assistant. Use tools when appropriate.",
                 model="gpt-4.1",
                 mcp_servers=mcp_servers,
                 tools=[add_numbers]
             )
-            result = await Runner.run(agent, query)
+            result = await Runner.run(agent, query, session=session)
             return result
         else:
             agent = Agent(
                 name="{{ name }}",
+                instructions="You are a helpful assistant. Use tools when appropriate.",
                 model="gpt-4.1",
                 mcp_servers=[],
                 tools=[add_numbers]
             )
-            result = await Runner.run(agent, query)
+            result = await Runner.run(agent, query, session=session)
             return result
         {{else}}
         if mcp_servers:
@@ -3011,16 +3049,17 @@ async def main(query):
                     mcp_servers=active_servers,
                     tools=[add_numbers]
                 )
-                result = await Runner.run(agent, query)
+                result = await Runner.run(agent, query, session=session)
                 return result
         else:
             agent = Agent(
                 name="{{ name }}",
+                instructions="You are a helpful assistant. Use tools when appropriate.",
                 model="gpt-4.1",
                 mcp_servers=[],
                 tools=[add_numbers]
             )
-            result = await Runner.run(agent, query)
+            result = await Runner.run(agent, query, session=session)
             return result
         {{/if}}
     except Exception as e:
@@ -3034,9 +3073,11 @@ async def invoke(payload, context):
 
     # Process the user prompt
     prompt = payload.get("prompt", "What can you help me with?")
+    session_id = getattr(context, "session_id", "default-session")
+    session = get_session(session_id)
 
-    # Run the agent
-    result = await main(prompt)
+    # Run the agent (session automatically loads/saves conversation history)
+    result = await main(prompt, session)
 
     # Return result
     return {"result": result.final_output}
@@ -3346,19 +3387,18 @@ def agent_factory():
     return get_or_create_agent
 get_or_create_agent = agent_factory()
 {{else}}
-_agent = None
+_agents = {}
 
-def get_or_create_agent():
-    global _agent
-    if _agent is None:
-        _agent = Agent(
+def get_or_create_agent(session_id):
+    if session_id not in _agents:
+        _agents[session_id] = Agent(
             model=load_model(),
             system_prompt="""
                 You are a helpful assistant. Use tools when appropriate.
             """,
             tools=tools
         )
-    return _agent
+    return _agents[session_id]
 {{/if}}
 
 
@@ -3371,7 +3411,8 @@ async def invoke(payload, context):
     user_id = getattr(context, 'user_id', 'default-user')
     agent = get_or_create_agent(session_id, user_id)
 {{else}}
-    agent = get_or_create_agent()
+    session_id = getattr(context, 'session_id', 'default-session')
+    agent = get_or_create_agent(session_id)
 {{/if}}
 
     # Execute and format response

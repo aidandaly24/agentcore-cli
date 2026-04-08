@@ -55,19 +55,18 @@ def agent_factory():
     return get_or_create_agent
 get_or_create_agent = agent_factory()
 {{else}}
-_agent = None
+_agents = {}
 
-def get_or_create_agent():
-    global _agent
-    if _agent is None:
-        _agent = Agent(
+def get_or_create_agent(session_id):
+    if session_id not in _agents:
+        _agents[session_id] = Agent(
             model=load_model(),
             system_prompt="""
                 You are a helpful assistant. Use tools when appropriate.
             """,
             tools=tools
         )
-    return _agent
+    return _agents[session_id]
 {{/if}}
 
 
@@ -80,7 +79,8 @@ async def invoke(payload, context):
     user_id = getattr(context, 'user_id', 'default-user')
     agent = get_or_create_agent(session_id, user_id)
 {{else}}
-    agent = get_or_create_agent()
+    session_id = getattr(context, 'session_id', 'default-session')
+    agent = get_or_create_agent(session_id)
 {{/if}}
 
     # Execute and format response
