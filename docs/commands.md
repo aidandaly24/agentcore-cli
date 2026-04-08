@@ -89,6 +89,7 @@ agentcore create \
 | `--output-dir <dir>`       | Output directory                                                                                               |
 | `--skip-git`               | Skip git initialization                                                                                        |
 | `--skip-python-setup`      | Skip venv setup                                                                                                |
+| `--skip-install`           | Skip all dependency installation (npm install, uv sync)                                                        |
 | `--dry-run`                | Preview without creating                                                                                       |
 | `--json`                   | JSON output                                                                                                    |
 
@@ -241,8 +242,12 @@ agentcore add memory \
 | ---------------------- | --------------------------------------------------------------------------- |
 | `--name <name>`        | Memory name                                                                 |
 | `--strategies <types>` | Comma-separated: `SEMANTIC`, `SUMMARIZATION`, `USER_PREFERENCE`, `EPISODIC` |
-| `--expiry <days>`      | Event expiry duration in days (default: 30, min: 7, max: 365)               |
-| `--json`               | JSON output                                                                 |
+| `--expiry <days>`                    | Event expiry duration in days (default: 30, min: 7, max: 365)               |
+| `--delivery-type <type>`             | Delivery target type (default: `kinesis`)                                   |
+| `--data-stream-arn <arn>`            | Kinesis data stream ARN for memory record streaming                         |
+| `--stream-content-level <level>`     | `FULL_CONTENT` (default) or `METADATA_ONLY`                                 |
+| `--stream-delivery-resources <json>` | Stream delivery config as JSON (advanced, overrides flat flags)              |
+| `--json`                             | JSON output                                                                 |
 
 ### add gateway
 
@@ -507,6 +512,7 @@ agentcore dev call-tool --tool myTool --input '{"arg": "value"}'
 | `--tool <name>`        | MCP tool name (with `call-tool` prompt)                  |
 | `--input <json>`       | MCP tool arguments as JSON (with `--tool`)               |
 | `-H, --header <h>`     | Custom header (`"Name: Value"`, repeatable)              |
+| `--exec`               | Execute a shell command in the running dev container (Container only) |
 
 ### invoke
 
@@ -720,10 +726,11 @@ agentcore fetch access --name MyAgent --type agent --target staging
 
 | Flag              | Description                                   |
 | ----------------- | --------------------------------------------- |
-| `--name <name>`   | Gateway or agent name                         |
-| `--type <type>`   | Resource type: `gateway` (default) or `agent` |
-| `--target <name>` | Deployment target                             |
-| `--json`          | JSON output                                   |
+| `--name <name>`          | Gateway or agent name                         |
+| `--type <type>`          | Resource type: `gateway` (default) or `agent` |
+| `--target <name>`        | Deployment target                             |
+| `--identity-name <name>` | Identity credential name for token fetch      |
+| `--json`                 | JSON output                                   |
 
 ### package
 

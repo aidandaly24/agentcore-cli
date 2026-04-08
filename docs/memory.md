@@ -257,7 +257,6 @@ agentcore add memory \
 
 ```json
 {
-  "type": "AgentCoreMemory",
   "name": "MyMemory",
   "eventExpiryDuration": 30,
   "strategies": [{ "type": "SEMANTIC" }],
