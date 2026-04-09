@@ -18,6 +18,7 @@ import {
   getEndpointUrl,
   invokeA2AStreaming,
   invokeAgentStreaming,
+  invokeAguiStreaming,
   listMcpTools,
   loadDevEnv,
   loadProjectConfig,
@@ -343,12 +344,19 @@ export function useDevServer(options: {
               onStatus: setA2aStatus,
               headers: options.headers,
             })
-          : invokeAgentStreaming({
-              port: actualPort,
-              message,
-              logger: loggerRef.current ?? undefined,
-              headers: options.headers,
-            });
+          : protocol === 'AGUI'
+            ? invokeAguiStreaming({
+                port: actualPort,
+                message,
+                logger: loggerRef.current ?? undefined,
+                headers: options.headers,
+              })
+            : invokeAgentStreaming({
+                port: actualPort,
+                message,
+                logger: loggerRef.current ?? undefined,
+                headers: options.headers,
+              });
 
       for await (const chunk of streamFn) {
         responseContent += chunk;

@@ -247,6 +247,13 @@ export const registerDev = (program: Command) => {
             await handleMcpInvoke(invokePort, invokePrompt, opts.tool, opts.input, headers);
           } else if (protocol === 'A2A') {
             await invokeA2ADevServer(invokePort, invokePrompt, headers);
+          } else if (protocol === 'AGUI') {
+            // AGUI uses invokeForProtocol which sends the correct RunAgentInput body
+            const { invokeForProtocol } = await import('../../operations/dev');
+            for await (const chunk of invokeForProtocol('AGUI', { port: invokePort, message: invokePrompt, headers })) {
+              process.stdout.write(chunk);
+            }
+            process.stdout.write('\n');
           } else {
             await invokeDevServer(invokePort, invokePrompt, opts.stream ?? false, headers);
           }
