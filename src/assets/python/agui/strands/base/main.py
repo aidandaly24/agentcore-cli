@@ -1,6 +1,8 @@
 import os
 
-os.environ["OTEL_SDK_DISABLED"] = "true"
+# Suppress OpenTelemetry warnings during local development; remove for production
+if os.getenv("LOCAL_DEV") == "1":
+    os.environ["OTEL_SDK_DISABLED"] = "true"
 
 import uvicorn
 from strands import Agent, tool

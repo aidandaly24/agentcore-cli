@@ -21,20 +21,39 @@ import { describe, expect, it } from 'vitest';
 
 describe('AguiEventType enum', () => {
   it('contains all expected event types', () => {
+    // Verify total count to catch accidental additions/removals
+    const enumValues = Object.values(AguiEventType);
+    expect(enumValues).toHaveLength(28);
+
+    // Spot-check representative values from each category
     expect(AguiEventType.RUN_STARTED).toBe('RUN_STARTED');
     expect(AguiEventType.RUN_FINISHED).toBe('RUN_FINISHED');
     expect(AguiEventType.RUN_ERROR).toBe('RUN_ERROR');
+    expect(AguiEventType.STEP_STARTED).toBe('STEP_STARTED');
+    expect(AguiEventType.STEP_FINISHED).toBe('STEP_FINISHED');
     expect(AguiEventType.TEXT_MESSAGE_START).toBe('TEXT_MESSAGE_START');
     expect(AguiEventType.TEXT_MESSAGE_CONTENT).toBe('TEXT_MESSAGE_CONTENT');
     expect(AguiEventType.TEXT_MESSAGE_END).toBe('TEXT_MESSAGE_END');
+    expect(AguiEventType.TEXT_MESSAGE_CHUNK).toBe('TEXT_MESSAGE_CHUNK');
     expect(AguiEventType.TOOL_CALL_START).toBe('TOOL_CALL_START');
     expect(AguiEventType.TOOL_CALL_ARGS).toBe('TOOL_CALL_ARGS');
     expect(AguiEventType.TOOL_CALL_END).toBe('TOOL_CALL_END');
     expect(AguiEventType.TOOL_CALL_RESULT).toBe('TOOL_CALL_RESULT');
+    expect(AguiEventType.TOOL_CALL_CHUNK).toBe('TOOL_CALL_CHUNK');
     expect(AguiEventType.STATE_SNAPSHOT).toBe('STATE_SNAPSHOT');
     expect(AguiEventType.STATE_DELTA).toBe('STATE_DELTA');
+    expect(AguiEventType.MESSAGES_SNAPSHOT).toBe('MESSAGES_SNAPSHOT');
+    expect(AguiEventType.ACTIVITY_SNAPSHOT).toBe('ACTIVITY_SNAPSHOT');
+    expect(AguiEventType.ACTIVITY_DELTA).toBe('ACTIVITY_DELTA');
+    expect(AguiEventType.REASONING_START).toBe('REASONING_START');
+    expect(AguiEventType.REASONING_MESSAGE_START).toBe('REASONING_MESSAGE_START');
     expect(AguiEventType.REASONING_MESSAGE_CONTENT).toBe('REASONING_MESSAGE_CONTENT');
+    expect(AguiEventType.REASONING_MESSAGE_END).toBe('REASONING_MESSAGE_END');
+    expect(AguiEventType.REASONING_END).toBe('REASONING_END');
+    expect(AguiEventType.REASONING_ENCRYPTED_VALUE).toBe('REASONING_ENCRYPTED_VALUE');
+    expect(AguiEventType.RAW).toBe('RAW');
     expect(AguiEventType.CUSTOM).toBe('CUSTOM');
+    expect(AguiEventType.META_EVENT).toBe('META_EVENT');
   });
 });
 

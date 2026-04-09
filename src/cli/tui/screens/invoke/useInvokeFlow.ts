@@ -27,7 +27,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 /** Structured message part for rich AGUI event rendering */
 export type MessagePart =
   | { kind: 'text'; text: string }
-  | { kind: 'tool_call'; name: string; args: string; result?: string }
+  | { kind: 'tool_call'; id: string; name: string; args: string; result?: string }
   | { kind: 'reasoning'; text: string }
   | { kind: 'error'; message: string; code?: string };
 
@@ -350,39 +350,49 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
           }
 
           const parts: MessagePart[] = [];
-          let currentToolCall: { name: string; args: string } | null = null;
+          let currentToolCall: { id: string; name: string; args: string } | null = null;
 
           for await (const event of aguiResult.stream) {
             if (event.type === AguiEventType.TEXT_MESSAGE_CONTENT) {
               const delta = (event as { delta: string }).delta;
               streamingContentRef.current += delta;
-              // Accumulate text part
+              // Accumulate text part — replace instead of mutate for React state safety
               const lastPart = parts[parts.length - 1];
               if (lastPart?.kind === 'text') {
-                lastPart.text += delta;
+                parts[parts.length - 1] = { ...lastPart, text: lastPart.text + delta };
               } else {
                 parts.push({ kind: 'text', text: delta });
               }
             } else if (event.type === AguiEventType.TOOL_CALL_START) {
-              const tc = event as { toolCallName: string };
-              currentToolCall = { name: tc.toolCallName, args: '' };
+              const tc = event as { toolCallId: string; toolCallName: string };
+              currentToolCall = { id: tc.toolCallId, name: tc.toolCallName, args: '' };
             } else if (event.type === AguiEventType.TOOL_CALL_ARGS && currentToolCall) {
               currentToolCall.args += (event as { delta: string }).delta;
             } else if (event.type === AguiEventType.TOOL_CALL_END && currentToolCall) {
-              parts.push({ kind: 'tool_call', name: currentToolCall.name, args: currentToolCall.args });
+              parts.push({
+                kind: 'tool_call',
+                id: currentToolCall.id,
+                name: currentToolCall.name,
+                args: currentToolCall.args,
+              });
               currentToolCall = null;
             } else if (event.type === AguiEventType.TOOL_CALL_RESULT) {
-              const result = event as { content: unknown };
-              const lastToolPart = [...parts].reverse().find(p => p.kind === 'tool_call');
-              if (lastToolPart?.kind === 'tool_call') {
-                lastToolPart.result =
-                  typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+              const result = event as { toolCallId: string; content: unknown };
+              const idx = parts.findIndex(p => p.kind === 'tool_call' && p.id === result.toolCallId);
+              if (idx >= 0) {
+                const toolPart = parts[idx]!;
+                if (toolPart.kind === 'tool_call') {
+                  parts[idx] = {
+                    ...toolPart,
+                    result: typeof result.content === 'string' ? result.content : JSON.stringify(result.content),
+                  };
+                }
               }
             } else if (event.type === AguiEventType.REASONING_MESSAGE_CONTENT) {
               const delta = (event as { delta: string }).delta;
               const lastPart = parts[parts.length - 1];
               if (lastPart?.kind === 'reasoning') {
-                lastPart.text += delta;
+                parts[parts.length - 1] = { ...lastPart, text: lastPart.text + delta };
               } else {
                 parts.push({ kind: 'reasoning', text: delta });
               }

@@ -1,10 +1,12 @@
 import { ConfigIO } from '../../../lib';
 import type { AgentCoreProjectSpec, AwsDeploymentTargets, DeployedState } from '../../../schema';
 import {
+  buildAguiRunInput,
   executeBashCommand,
   invokeA2ARuntime,
   invokeAgentRuntime,
   invokeAgentRuntimeStreaming,
+  invokeAguiRuntime,
   mcpCallTool,
   mcpInitSession,
   mcpListTools,
@@ -324,7 +326,6 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
   // AGUI protocol handling — send RunAgentInput via InvokeAgentRuntime, stream text
   if (agentSpec.protocol === 'AGUI') {
     try {
-      const { invokeAguiRuntime, buildAguiRunInput } = await import('../../aws');
       const aguiInput = buildAguiRunInput(options.prompt, options.sessionId);
       const aguiResult = await invokeAguiRuntime(
         {

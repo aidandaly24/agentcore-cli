@@ -12,6 +12,7 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
   const maxRetries = 5;
   const baseDelay = 500;
   let lastError: Error | null = null;
+  let streaming = false;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -75,7 +76,8 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
             try {
               const event = JSON.parse(jsonStr) as { type?: string; delta?: string; message?: string };
 
-              if (event.type === 'TEXT_MESSAGE_CONTENT' && event.delta) {
+              if ((event.type === 'TEXT_MESSAGE_CONTENT' || event.type === 'TEXT_MESSAGE_CHUNK') && event.delta) {
+                streaming = true;
                 yield event.delta;
                 yieldedContent = true;
               } else if (event.type === 'RUN_ERROR') {
@@ -105,6 +107,11 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
       }
 
       lastError = err instanceof Error ? err : new Error(String(err));
+
+      // Don't retry once streaming has started — would produce duplicate output
+      if (streaming) {
+        throw lastError;
+      }
 
       if (isConnectionError(lastError)) {
         const delay = baseDelay * Math.pow(2, attempt);

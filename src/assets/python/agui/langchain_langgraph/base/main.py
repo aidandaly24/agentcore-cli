@@ -1,5 +1,6 @@
 import os
 
+# Enable LangGraph FastAPI mode (must be set before langgraph imports)
 os.environ["LANGGRAPH_FAST_API"] = "true"
 
 import uvicorn
@@ -52,7 +53,6 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -62,7 +62,7 @@ add_langgraph_fastapi_endpoint(app=app, agent=agent, path="/invocations")
 
 @app.get("/ping")
 async def ping():
-    return {"status": "ok"}
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":

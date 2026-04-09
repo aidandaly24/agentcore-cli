@@ -7,7 +7,7 @@ load_model()
 
 agent = LlmAgent(
     name="{{ name }}",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction="You are a helpful assistant.",
     tools=[AGUIToolset()],
 )

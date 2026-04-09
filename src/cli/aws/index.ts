@@ -69,7 +69,17 @@ export {
   type AguiToolCallResult,
   type AguiStateSnapshot,
   type AguiStateDelta,
+  type AguiStepStarted,
+  type AguiStepFinished,
+  type AguiMessagesSnapshot,
+  type AguiActivitySnapshot,
+  type AguiActivityDelta,
+  type AguiReasoningStart,
+  type AguiReasoningMessageStart,
   type AguiReasoningMessageContent,
+  type AguiReasoningMessageEnd,
+  type AguiReasoningEnd,
+  type AguiRawEvent,
   type AguiCustomEvent,
 } from './agui-types';
 export { invokeAguiRuntime, type AguiInvokeOptions, type AguiStreamingInvokeResult } from './agentcore';

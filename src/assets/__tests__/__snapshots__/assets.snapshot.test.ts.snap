@@ -2016,7 +2016,7 @@ load_model()
 
 agent = LlmAgent(
     name="{{ name }}",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     instruction="You are a helpful assistant.",
     tools=[AGUIToolset()],
 )
@@ -2106,6 +2106,7 @@ dependencies = [
     "ag-ui-adk >= 0.6.0",
     "ag-ui-protocol >= 0.1.10",
     "aws-opentelemetry-distro",
+    "bedrock-agentcore >= 1.0.3",
     "fastapi >= 0.115.12",
     "google-adk >= 1.16.0",
     "google-genai >= 1.0.0",
@@ -2191,6 +2192,7 @@ Thumbs.db
 exports[`Assets Directory Snapshots > Python framework assets > python/python/agui/langchain_langgraph/base/main.py should match snapshot 1`] = `
 "import os
 
+# Enable LangGraph FastAPI mode (must be set before langgraph imports)
 os.environ["LANGGRAPH_FAST_API"] = "true"
 
 import uvicorn
@@ -2243,7 +2245,6 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -2253,7 +2254,7 @@ add_langgraph_fastapi_endpoint(app=app, agent=agent, path="/invocations")
 
 @app.get("/ping")
 async def ping():
-    return {"status": "ok"}
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":
@@ -2412,9 +2413,10 @@ dependencies = [
     {{/if}}{{#if (eq modelProvider "Gemini")}}"langchain-google-genai >= 2.0.0",
     {{/if}}{{#if (eq modelProvider "OpenAI")}}"langchain-openai >= 0.2.0",
     {{/if}}"aws-opentelemetry-distro",
+    "bedrock-agentcore >= 1.0.3",
     "botocore[crt] >= 1.35.0",
     "langgraph >= 0.3.25",
-    "langchain >= 1.2.0",
+    "langchain >= 0.3.0",
     "langchain-core >= 0.3.0",
     "fastapi >= 0.115.12",
     "uvicorn >= 0.34.3",
@@ -2499,7 +2501,9 @@ Thumbs.db
 exports[`Assets Directory Snapshots > Python framework assets > python/python/agui/strands/base/main.py should match snapshot 1`] = `
 "import os
 
-os.environ["OTEL_SDK_DISABLED"] = "true"
+# Suppress OpenTelemetry warnings during local development; remove for production
+if os.getenv("LOCAL_DEV") == "1":
+    os.environ["OTEL_SDK_DISABLED"] = "true"
 
 import uvicorn
 from strands import Agent, tool
@@ -2699,8 +2703,8 @@ dependencies = [
     {{/if}}"ag-ui-strands >= 0.1.3",
     "ag-ui-protocol >= 0.1.10",
     "aws-opentelemetry-distro",
-    {{#if hasMemory}}"bedrock-agentcore >= 1.0.3",
-    {{/if}}"botocore[crt] >= 1.35.0",
+    "bedrock-agentcore >= 1.0.3",
+    "botocore[crt] >= 1.35.0",
     "fastapi >= 0.115.12",
     {{#if (eq modelProvider "Gemini")}}"google-genai >= 1.0.0",
     {{/if}}{{#if (eq modelProvider "OpenAI")}}"openai >= 1.0.0",

@@ -984,9 +984,11 @@ export function parseA2AResponse(text: string): string {
 export interface AguiInvokeOptions {
   region: string;
   runtimeArn: string;
+  sessionId?: string;
   userId?: string;
   logger?: SSELogger;
   headers?: Record<string, string>;
+  /** Bearer token for CUSTOM_JWT auth — not yet supported for AGUI, will throw if provided */
   bearerToken?: string;
 }
 
@@ -1006,7 +1008,11 @@ export async function invokeAguiRuntime(
   options: AguiInvokeOptions,
   input: import('./agui-types').AguiRunInput
 ): Promise<AguiStreamingInvokeResult> {
-  const { parseAguiEvent, AguiEventType } = await import('./agui-types');
+  const { parseAguiEvent } = await import('./agui-types');
+
+  if (options.bearerToken) {
+    throw new Error('Bearer token auth is not yet supported for AGUI. Use SigV4 credentials.');
+  }
 
   const client = createAgentCoreClient(options.region, options.headers);
 
@@ -1015,7 +1021,7 @@ export async function invokeAguiRuntime(
     payload: new TextEncoder().encode(JSON.stringify(input)),
     contentType: 'application/json',
     accept: 'text/event-stream',
-    runtimeSessionId: undefined,
+    runtimeSessionId: options.sessionId,
     runtimeUserId: options.userId ?? DEFAULT_RUNTIME_USER_ID,
   });
 
@@ -1074,8 +1080,12 @@ export async function invokeAguiRuntime(
     }
   })();
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional: suppress unhandled rejection; errors surface when consumer reads
-  readLoop.catch(() => {});
+  let readLoopError: Error | undefined;
+  readLoop.catch((err: unknown) => {
+    readLoopError = err instanceof Error ? err : new Error(String(err));
+    aguiStreamDone = true;
+    notifyWaiters();
+  });
 
   async function* aguiEventStream(): AsyncGenerator<import('./agui-types').AguiEvent, void, unknown> {
     let idx = 0;
@@ -1083,6 +1093,7 @@ export async function invokeAguiRuntime(
       if (idx < aguiEvents.length) {
         yield aguiEvents[idx++]!;
       } else if (aguiStreamDone) {
+        if (readLoopError) throw readLoopError;
         return;
       } else {
         await new Promise<void>(resolve => waiters.push(resolve));
@@ -1095,12 +1106,14 @@ export async function invokeAguiRuntime(
     while (true) {
       if (idx < aguiEvents.length) {
         const event = aguiEvents[idx++]!;
-        if (event.type === AguiEventType.TEXT_MESSAGE_CONTENT) {
-          yield event.delta;
-        } else if (event.type === AguiEventType.RUN_ERROR) {
-          yield `Error: ${event.message}`;
+        const type = event.type as string;
+        if (type === 'TEXT_MESSAGE_CONTENT' || type === 'TEXT_MESSAGE_CHUNK') {
+          yield (event as unknown as import('./agui-types').AguiTextMessageContent).delta;
+        } else if (type === 'RUN_ERROR') {
+          yield `Error: ${(event as unknown as import('./agui-types').AguiRunError).message}`;
         }
       } else if (aguiStreamDone) {
+        if (readLoopError) throw readLoopError;
         return;
       } else {
         await new Promise<void>(resolve => waiters.push(resolve));
