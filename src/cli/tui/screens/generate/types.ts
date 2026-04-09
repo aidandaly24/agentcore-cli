@@ -116,7 +116,7 @@ export const PROTOCOL_OPTIONS = [
   { id: 'HTTP', title: 'HTTP', description: 'Standard HTTP agent (default)' },
   { id: 'MCP', title: 'MCP', description: 'Model Context Protocol tool server' },
   { id: 'A2A', title: 'A2A', description: 'Agent-to-Agent protocol' },
-  { id: 'AGUI', title: 'AGUI', description: 'AG-UI agent-to-user interaction protocol' },
+  { id: 'AGUI', title: 'AGUI', description: 'Stream rich agent events to frontends (AG-UI)' },
 ] as const;
 
 export const SDK_OPTIONS = [
