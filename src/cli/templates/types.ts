@@ -64,7 +64,7 @@ export interface AgentRenderConfig {
   gatewayProviders: GatewayProviderRenderConfig[];
   /** Unique auth types across all gateways (for conditional imports) */
   gatewayAuthTypes: string[];
-  /** Protocol (HTTP, MCP, A2A). Defaults to HTTP. */
+  /** Protocol (HTTP, MCP, A2A, AGUI). Defaults to HTTP. */
   protocol?: ProtocolMode;
   /** Custom Dockerfile name — when set, the template Dockerfile is not scaffolded */
   dockerfile?: string;
