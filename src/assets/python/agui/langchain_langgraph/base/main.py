@@ -31,7 +31,6 @@ class AgentState(MessagesState):
 def chat_node(state: AgentState):
     bound_model = model.bind_tools(
         [*state.get("tools", []), add_numbers],
-        parallel_tool_calls=False,
     )
     response = bound_model.invoke(state["messages"])
     return {"messages": [response]}

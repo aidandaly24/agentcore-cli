@@ -11,7 +11,6 @@ requires-python = ">=3.10"
 dependencies = [
     "ag-ui-adk >= 0.6.0",
     "ag-ui-protocol >= 0.1.10",
-    "aws-opentelemetry-distro",
     "bedrock-agentcore >= 1.0.3",
     "fastapi >= 0.115.12",
     "google-adk >= 1.16.0",
