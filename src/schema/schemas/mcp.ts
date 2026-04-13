@@ -38,7 +38,14 @@ export const OutboundAuthSchema = z
     credentialName: z.string().min(1).optional(),
     scopes: z.array(z.string()).optional(),
     grantType: OAuthGrantTypeSchema.optional(),
-    defaultReturnUrl: z.string().url().optional(),
+    defaultReturnUrl: z
+      .string()
+      .url()
+      .refine(url => url.startsWith('https://') || url.startsWith('http://localhost'), {
+        message: 'defaultReturnUrl must use HTTPS (http://localhost allowed for development)',
+      })
+      .optional(),
+    customParameters: z.record(z.string().min(1), z.string().min(1)).optional(),
   })
   .strict();
 
@@ -567,6 +574,13 @@ export const AgentCoreGatewayTargetSchema = z
         code: z.ZodIssueCode.custom,
         message: 'defaultReturnUrl is only valid when grantType is AUTHORIZATION_CODE',
         path: ['outboundAuth', 'defaultReturnUrl'],
+      });
+    }
+    if (data.outboundAuth?.customParameters && data.outboundAuth.type !== 'OAUTH') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'customParameters is only valid when outbound auth type is OAUTH',
+        path: ['outboundAuth', 'customParameters'],
       });
     }
   });

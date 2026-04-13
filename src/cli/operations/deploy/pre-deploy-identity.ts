@@ -1,5 +1,5 @@
 import { SecureCredentials, readEnvFile } from '../../../lib';
-import type { AgentCoreProjectSpec, Credential } from '../../../schema';
+import type { AgentCoreGateway, AgentCoreProjectSpec, Credential } from '../../../schema';
 import { getCredentialProvider } from '../../aws';
 import { isNoCredentialsError } from '../../errors';
 import { getAwsLoginGuidance } from '../../external-requirements/checks';
@@ -13,7 +13,13 @@ import {
   updateApiKeyProvider,
   updateOAuth2Provider,
 } from '../identity';
-import { BedrockAgentCoreControlClient, GetTokenVaultCommand } from '@aws-sdk/client-bedrock-agentcore-control';
+import {
+  BedrockAgentCoreControlClient,
+  CreateWorkloadIdentityCommand,
+  GetTokenVaultCommand,
+  GetWorkloadIdentityCommand,
+  UpdateWorkloadIdentityCommand,
+} from '@aws-sdk/client-bedrock-agentcore-control';
 import { CreateKeyCommand, KMSClient } from '@aws-sdk/client-kms';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -395,5 +401,117 @@ async function setupSingleOAuth2Provider(
       errorMessage = error instanceof Error ? error.message : String(error);
     }
     return { providerName: credential.name, status: 'error', error: errorMessage };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Workload Identity Setup (3LO / Authorization Code)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type WorkloadIdentitySetupResult =
+  | { status: 'created'; workloadIdentityArn: string }
+  | { status: 'updated'; workloadIdentityArn: string }
+  | { status: 'skipped' }
+  | { status: 'error'; error: string };
+
+export interface SetupWorkloadIdentityOptions {
+  projectName: string;
+  gateways: AgentCoreGateway[];
+  region: string;
+}
+
+/**
+ * Collect all defaultReturnUrl values from 3LO (AUTHORIZATION_CODE) targets across all gateways.
+ */
+export function collect3LOReturnUrls(gateways: AgentCoreGateway[]): string[] {
+  const urls: string[] = [];
+  for (const gateway of gateways) {
+    for (const target of gateway.targets) {
+      if (target.outboundAuth?.grantType === 'AUTHORIZATION_CODE' && target.outboundAuth.defaultReturnUrl) {
+        urls.push(target.outboundAuth.defaultReturnUrl);
+      }
+    }
+  }
+  return [...new Set(urls)];
+}
+
+/**
+ * Check if any gateway targets use 3LO (AUTHORIZATION_CODE) grant type.
+ */
+export function has3LOTargets(gateways: AgentCoreGateway[]): boolean {
+  return gateways.some(g => g.targets.some(t => t.outboundAuth?.grantType === 'AUTHORIZATION_CODE'));
+}
+
+/**
+ * Set up a workload identity for 3LO targets.
+ * Creates or updates the workload identity with allowedResourceOauth2ReturnUrls
+ * collected from all gateway targets using AUTHORIZATION_CODE grant type.
+ */
+export async function setupWorkloadIdentity(
+  options: SetupWorkloadIdentityOptions
+): Promise<WorkloadIdentitySetupResult> {
+  const { projectName, gateways, region } = options;
+
+  const returnUrls = collect3LOReturnUrls(gateways);
+  if (returnUrls.length === 0) {
+    return { status: 'skipped' };
+  }
+
+  const credentials = getCredentialProvider();
+  const client = new BedrockAgentCoreControlClient({ region, credentials });
+
+  try {
+    // Check if workload identity already exists
+    let exists = false;
+    try {
+      await client.send(new GetWorkloadIdentityCommand({ name: projectName }));
+      exists = true;
+    } catch (error: unknown) {
+      const errorName = error instanceof Error ? error.name : undefined;
+      if (errorName === 'AccessDeniedException') {
+        return { status: 'error', error: 'Access denied when checking workload identity. Verify IAM permissions.' };
+      }
+      if (errorName !== 'ResourceNotFoundException') {
+        throw error;
+      }
+    }
+
+    if (exists) {
+      const response = await client.send(
+        new UpdateWorkloadIdentityCommand({
+          name: projectName,
+          allowedResourceOauth2ReturnUrls: returnUrls,
+        })
+      );
+      if (!response.workloadIdentityArn) {
+        return { status: 'error', error: 'UpdateWorkloadIdentity response missing workloadIdentityArn' };
+      }
+      return {
+        status: 'updated',
+        workloadIdentityArn: response.workloadIdentityArn,
+      };
+    }
+
+    const response = await client.send(
+      new CreateWorkloadIdentityCommand({
+        name: projectName,
+        allowedResourceOauth2ReturnUrls: returnUrls,
+      })
+    );
+    if (!response.workloadIdentityArn) {
+      return { status: 'error', error: 'CreateWorkloadIdentity response missing workloadIdentityArn' };
+    }
+    return {
+      status: 'created',
+      workloadIdentityArn: response.workloadIdentityArn,
+    };
+  } catch (error) {
+    let errorMessage: string;
+    if (isNoCredentialsError(error)) {
+      errorMessage = `AWS credentials not found. ${await getAwsLoginGuidance()}`;
+    } else {
+      errorMessage = error instanceof Error ? error.message : String(error);
+    }
+    return { status: 'error', error: errorMessage };
   }
 }

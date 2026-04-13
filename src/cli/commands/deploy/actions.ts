@@ -22,12 +22,14 @@ import {
   checkBootstrapNeeded,
   checkStackDeployability,
   getAllCredentials,
+  has3LOTargets,
   hasIdentityApiProviders,
   hasIdentityOAuthProviders,
   performStackTeardown,
   setupApiKeyProviders,
   setupOAuth2Providers,
   setupTransactionSearch,
+  setupWorkloadIdentity,
   synthesizeCdk,
   validateProject,
 } from '../../operations/deploy';
@@ -200,6 +202,22 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
             callbackUrl: result.callbackUrl,
           };
         }
+      }
+      endStep('success');
+    }
+
+    // Set up workload identity for 3LO targets if needed
+    if (has3LOTargets(context.projectSpec.agentCoreGateways)) {
+      startStep('Creating workload identity...');
+      const wiResult = await setupWorkloadIdentity({
+        projectName: context.projectSpec.name,
+        gateways: context.projectSpec.agentCoreGateways,
+        region: target.region,
+      });
+      if (wiResult.status === 'error') {
+        endStep('error', wiResult.error);
+        logger.finalize(false);
+        return { success: false, error: wiResult.error, logPath: logger.getRelativeLogPath() };
       }
       endStep('success');
     }

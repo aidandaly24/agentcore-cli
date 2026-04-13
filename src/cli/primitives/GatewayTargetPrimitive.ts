@@ -271,7 +271,10 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
         'OAuth discovery URL — creates credential inline (for oauth auth) [non-interactive]'
       )
       .option('--oauth-scopes <scopes>', 'OAuth scopes, comma-separated (for oauth auth) [non-interactive]')
-      .option('--grant-type <type>', 'OAuth grant type: client-credentials (default) or authorization-code [non-interactive]')
+      .option(
+        '--grant-type <type>',
+        'OAuth grant type: client-credentials (default) or authorization-code [non-interactive]'
+      )
       .option('--default-return-url <url>', 'Default return URL for authorization code flow [non-interactive]')
       .option('--rest-api-id <id>', 'REST API ID (for api-gateway type) [non-interactive]')
       .option('--stage <stage>', 'Deployment stage (for api-gateway type) [non-interactive]')
@@ -398,6 +401,8 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
                       ...(mappedAuthType === 'OAUTH' && cliOptions.defaultReturnUrl
                         ? { defaultReturnUrl: cliOptions.defaultReturnUrl }
                         : {}),
+                      // TODO: Wire customParameters through CLI (e.g. --custom-params key=value)
+                      // when a creation flow needs to produce AUTHORIZATION_CODE targets with custom token params.
                     },
                   }
                 : {}),

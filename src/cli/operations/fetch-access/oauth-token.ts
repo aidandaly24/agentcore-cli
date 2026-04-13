@@ -1,9 +1,17 @@
 import { readEnvFile } from '../../../lib/utils/env';
 import type { DeployedState } from '../../../schema';
+import { getCredentialProvider } from '../../aws';
 import {
   computeDefaultCredentialEnvVarName,
   computeManagedOAuthCredentialName,
 } from '../../primitives/credential-utils';
+import {
+  BedrockAgentCoreClient,
+  GetResourceOauth2TokenCommand,
+  GetWorkloadAccessTokenCommand,
+} from '@aws-sdk/client-bedrock-agentcore';
+import { spawn } from 'node:child_process';
+import { platform } from 'node:os';
 
 export interface OAuthTokenResult {
   token: string;
@@ -87,14 +95,17 @@ export async function fetchOAuthToken(opts: {
   if (!tokenEndpoint) {
     throw new Error(`OIDC discovery response missing 'token_endpoint' field (${discoveryUrl})`);
   }
+  if (!tokenEndpoint.startsWith('https://')) {
+    throw new Error(`Token endpoint must use HTTPS. Got: ${tokenEndpoint}`);
+  }
 
-  // Detect 3-legged OAuth (authorization code flow) — not supported
+  // Detect 3-legged OAuth (authorization code flow) — redirect to 3LO flow
   const supportedGrants = discoveryDoc.grant_types_supported;
   if (supportedGrants && !supportedGrants.includes('client_credentials')) {
     throw new Error(
       `This OAuth provider does not support the client_credentials grant type. ` +
         `Supported grants: ${supportedGrants.join(', ')}. ` +
-        `Authorization code flows (3-legged OAuth) requiring browser login are not yet supported.`
+        `For authorization code (3LO) targets, use \`agentcore fetch access --gateway <name> --target <target>\` instead.`
     );
   }
 
@@ -171,4 +182,182 @@ function resolveClientId(
   }
 
   return undefined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3LO (Authorization Code / USER_FEDERATION) Token Flow
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_POLL_INTERVAL_MS = 5_000;
+const DEFAULT_POLL_TIMEOUT_MS = 600_000;
+
+export interface Fetch3LOTokenOptions {
+  workloadName: string;
+  credentialProviderName: string;
+  scopes: string[];
+  resourceOauth2ReturnUrl?: string;
+  customParameters?: Record<string, string>;
+  region: string;
+  pollIntervalMs?: number;
+  pollTimeoutMs?: number;
+  /** Called when the authorization URL is available. Defaults to printing to console. */
+  onAuthUrl?: (url: string) => void;
+}
+
+/**
+ * Perform a 3LO (Authorization Code) OAuth token fetch using the USER_FEDERATION flow.
+ *
+ * 1. Gets a workload access token
+ * 2. Initiates the auth flow via GetResourceOauth2Token
+ * 3. Opens the browser with the authorization URL
+ * 4. Polls until the user completes authentication and the token is returned
+ */
+export async function fetch3LOTargetToken(opts: Fetch3LOTokenOptions): Promise<OAuthTokenResult> {
+  const {
+    workloadName,
+    credentialProviderName,
+    scopes,
+    resourceOauth2ReturnUrl,
+    customParameters,
+    region,
+    pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+    pollTimeoutMs = DEFAULT_POLL_TIMEOUT_MS,
+    onAuthUrl = defaultOnAuthUrl,
+  } = opts;
+
+  const credentials = getCredentialProvider();
+  const client = new BedrockAgentCoreClient({ region, credentials });
+
+  // Step 1: Get workload access token
+  const workloadTokenResponse = await client.send(new GetWorkloadAccessTokenCommand({ workloadName }));
+  const workloadIdentityToken = workloadTokenResponse.workloadAccessToken;
+  if (!workloadIdentityToken) {
+    throw new Error('Failed to obtain workload access token.');
+  }
+
+  // Step 2: Initiate USER_FEDERATION flow
+  const initResponse = await client.send(
+    new GetResourceOauth2TokenCommand({
+      workloadIdentityToken,
+      resourceCredentialProviderName: credentialProviderName,
+      scopes,
+      oauth2Flow: 'USER_FEDERATION',
+      ...(resourceOauth2ReturnUrl && { resourceOauth2ReturnUrl }),
+      ...(customParameters && Object.keys(customParameters).length > 0 && { customParameters }),
+    })
+  );
+
+  // If token is returned immediately (cached session), return it
+  if (initResponse.accessToken) {
+    return { token: initResponse.accessToken };
+  }
+
+  if (!initResponse.authorizationUrl || !initResponse.sessionUri) {
+    const missing = [!initResponse.authorizationUrl && 'authorizationUrl', !initResponse.sessionUri && 'sessionUri']
+      .filter(Boolean)
+      .join(' and ');
+    throw new Error(`Expected ${missing} from USER_FEDERATION flow, but not returned.`);
+  }
+
+  // Step 3: Present authorization URL to user
+  const authUrl = initResponse.authorizationUrl;
+  const sessionUri = initResponse.sessionUri;
+
+  onAuthUrl(authUrl);
+  tryOpenBrowser(authUrl);
+
+  // Step 4: Poll for token
+  const MAX_TRANSIENT_RETRIES = 3;
+  let consecutiveErrors = 0;
+  const startTime = Date.now();
+  while (Date.now() - startTime < pollTimeoutMs) {
+    try {
+      const pollResponse = await client.send(
+        new GetResourceOauth2TokenCommand({
+          workloadIdentityToken,
+          resourceCredentialProviderName: credentialProviderName,
+          scopes,
+          oauth2Flow: 'USER_FEDERATION',
+          sessionUri,
+        })
+      );
+
+      consecutiveErrors = 0;
+
+      if (pollResponse.accessToken) {
+        return { token: pollResponse.accessToken };
+      }
+
+      if (pollResponse.sessionStatus === 'FAILED') {
+        throw new Error('Authorization flow failed. The user may have denied access or the session expired.');
+      }
+    } catch (error) {
+      // Re-throw intentional errors (sessionStatus === 'FAILED' above)
+      if (error instanceof Error && error.message.startsWith('Authorization flow failed')) {
+        throw error;
+      }
+
+      // Detect workload token expiry or permanent auth failures
+      const errorName = (error as { name?: string }).name;
+      if (errorName === 'UnauthorizedException') {
+        throw new Error(
+          'Workload access token expired during the authorization flow. ' +
+            'Please try again — the token is valid for a limited duration.'
+        );
+      }
+      if (errorName === 'AccessDeniedException') {
+        throw new Error(
+          'Access denied during the authorization flow. ' +
+            'Verify IAM permissions for GetResourceOauth2Token and GetWorkloadAccessToken.'
+        );
+      }
+
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_TRANSIENT_RETRIES) {
+        throw new Error(
+          `Polling failed after ${MAX_TRANSIENT_RETRIES} consecutive errors. ` +
+            `Last error: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    await sleep(pollIntervalMs);
+  }
+
+  throw new Error(
+    `Authorization flow timed out after ${pollTimeoutMs / 1000} seconds. ` +
+      'Please try again and complete the browser authentication promptly.'
+  );
+}
+
+function defaultOnAuthUrl(url: string): void {
+  console.log('\n  Please authenticate in your browser:');
+  console.log(`  ${url}\n`);
+}
+
+function tryOpenBrowser(url: string): void {
+  try {
+    const os = platform();
+    let cmd: string;
+    let args: string[];
+    if (os === 'darwin') {
+      cmd = 'open';
+      args = [url];
+    } else if (os === 'win32') {
+      cmd = 'cmd';
+      args = ['/c', 'start', '', url];
+    } else {
+      cmd = 'xdg-open';
+      args = [url];
+    }
+    const child = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+    child.on('error', _err => undefined); // Suppress async spawn errors
+    child.unref();
+  } catch {
+    // Best-effort — user can copy the URL manually
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

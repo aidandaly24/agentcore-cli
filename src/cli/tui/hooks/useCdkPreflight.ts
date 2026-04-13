@@ -14,10 +14,12 @@ import {
   checkStackDeployability,
   formatError,
   getAllCredentials,
+  has3LOTargets,
   hasIdentityApiProviders,
   hasIdentityOAuthProviders,
   setupApiKeyProviders,
   setupOAuth2Providers,
+  setupWorkloadIdentity,
   synthesizeCdk,
   validateProject,
 } from '../../operations/deploy';
@@ -106,6 +108,7 @@ const LABEL_SYNTH = 'Synthesize CloudFormation';
 const LABEL_STACK_STATUS = 'Check stack status';
 const LABEL_API_KEY = 'Set up API key providers';
 const LABEL_OAUTH = 'Set up OAuth providers';
+const LABEL_WORKLOAD_IDENTITY = 'Set up workload identity';
 
 const IDENTITY_STEP: Step = { label: LABEL_API_KEY, status: 'pending' };
 const BOOTSTRAP_STEP: Step = { label: 'Bootstrap AWS environment', status: 'pending' };
@@ -589,11 +592,13 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
       // Insert identity steps before synthesize in the step list
       const hasApiKeys = hasIdentityApiProviders(context.projectSpec);
       const hasOAuth = hasIdentityOAuthProviders(context.projectSpec);
+      const has3LO = has3LOTargets(context.projectSpec.agentCoreGateways);
       setSteps(prev => {
         const synthIndex = prev.findIndex(s => s.label === LABEL_SYNTH);
         const identitySteps: Step[] = [];
         if (hasApiKeys) identitySteps.push({ ...IDENTITY_STEP, status: 'running' });
         if (hasOAuth) identitySteps.push({ label: LABEL_OAUTH, status: hasApiKeys ? 'pending' : 'running' });
+        if (has3LO) identitySteps.push({ label: LABEL_WORKLOAD_IDENTITY, status: 'pending' });
         return [...prev.slice(0, synthIndex), ...identitySteps, ...prev.slice(synthIndex)];
       });
 
@@ -727,6 +732,26 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
 
           logger.endStep('success');
           updateStepByLabel(LABEL_OAUTH, { status: 'success' });
+        }
+
+        // Set up workload identity for 3LO targets if needed
+        if (has3LOTargets(context.projectSpec.agentCoreGateways)) {
+          updateStepByLabel(LABEL_WORKLOAD_IDENTITY, { status: 'running' });
+          logger.startStep('Set up workload identity');
+          const wiResult = await setupWorkloadIdentity({
+            projectName: context.projectSpec.name,
+            gateways: context.projectSpec.agentCoreGateways,
+            region: context.awsTargets[0]!.region,
+          });
+          if (wiResult.status === 'error') {
+            logger.endStep('error', wiResult.error);
+            updateStepByLabel(LABEL_WORKLOAD_IDENTITY, { status: 'error', error: wiResult.error });
+            setPhase('error');
+            isRunningRef.current = false;
+            return;
+          }
+          logger.endStep('success');
+          updateStepByLabel(LABEL_WORKLOAD_IDENTITY, { status: 'success' });
         }
 
         // Write partial deployed state with credential ARNs before CDK synth
