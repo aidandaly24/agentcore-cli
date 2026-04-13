@@ -238,16 +238,41 @@ agentcore add memory \
   --expiry 30
 ```
 
-| Flag                                 | Description                                                                 |
-| ------------------------------------ | --------------------------------------------------------------------------- |
-| `--name <name>`                      | Memory name                                                                 |
-| `--strategies <types>`               | Comma-separated: `SEMANTIC`, `SUMMARIZATION`, `USER_PREFERENCE`, `EPISODIC` |
-| `--expiry <days>`                    | Event expiry duration in days (default: 30, min: 7, max: 365)               |
-| `--delivery-type <type>`             | Delivery target type (default: `kinesis`)                                   |
-| `--data-stream-arn <arn>`            | Kinesis data stream ARN for memory record streaming                         |
-| `--stream-content-level <level>`     | `FULL_CONTENT` (default) or `METADATA_ONLY`                                 |
-| `--stream-delivery-resources <json>` | Stream delivery config as JSON (advanced, overrides flat flags)             |
-| `--json`                             | JSON output                                                                 |
+| Flag                                 | Description                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `--name <name>`                      | Memory name                                                                         |
+| `--strategies <types>`               | Comma-separated: `SEMANTIC`, `SUMMARIZATION`, `USER_PREFERENCE`, `EPISODIC`         |
+| `--expiry <days>`                    | Event expiry duration in days (default: 30, min: 7, max: 365)                       |
+| `--delivery-type <type>`             | Delivery target type (default: `kinesis`)                                           |
+| `--data-stream-arn <arn>`            | Kinesis data stream ARN for memory record streaming                                 |
+| `--stream-content-level <level>`     | `FULL_CONTENT` (default) or `METADATA_ONLY`                                         |
+| `--stream-delivery-resources <json>` | Stream delivery config as JSON (advanced, overrides flat flags). See example below. |
+| `--json`                             | JSON output                                                                         |
+
+<details>
+<summary><code>--stream-delivery-resources</code> JSON example</summary>
+
+```json
+{
+  "resources": [
+    {
+      "kinesis": {
+        "dataStreamArn": "arn:aws:kinesis:us-west-2:123456789012:stream/my-stream",
+        "contentConfigurations": [
+          {
+            "type": "MEMORY_RECORDS",
+            "level": "FULL_CONTENT"
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+`level` can be `FULL_CONTENT` (default) or `METADATA_ONLY`. Currently only Kinesis is supported as a delivery type.
+
+</details>
 
 ### add gateway
 

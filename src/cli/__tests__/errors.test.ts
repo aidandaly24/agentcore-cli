@@ -12,7 +12,9 @@ describe('errors', () => {
   describe('AgentAlreadyExistsError', () => {
     it('has correct message with agent name', () => {
       const err = new AgentAlreadyExistsError('my-agent');
-      expect(err.message).toBe('An agent named "my-agent" already exists in the schema.');
+      expect(err.message).toBe(
+        'An agent named "my-agent" already exists. To update its configuration, edit agentcore/agentcore.json directly.'
+      );
     });
 
     it('has correct name', () => {

@@ -168,7 +168,7 @@ export class MemoryPrimitive extends BasePrimitive<AddMemoryOptions, RemovableMe
       )
       .option(
         '--stream-delivery-resources <json>',
-        'Stream delivery config as JSON string (advanced, overrides flat flags) [non-interactive]'
+        'Stream delivery config as JSON string (advanced, overrides flat flags). Example: \'{"resources":[{"kinesis":{"dataStreamArn":"arn:aws:kinesis:REGION:ACCOUNT:stream/NAME","contentConfigurations":[{"type":"MEMORY_RECORDS","level":"FULL_CONTENT"}]}}]}\' See docs/memory.md for details. [non-interactive]'
       )
       .option('--json', 'Output as JSON [non-interactive]')
       .action(

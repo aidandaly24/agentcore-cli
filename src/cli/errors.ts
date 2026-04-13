@@ -3,7 +3,9 @@
  */
 export class AgentAlreadyExistsError extends Error {
   constructor(agentName: string) {
-    super(`An agent named "${agentName}" already exists in the schema.`);
+    super(
+      `An agent named "${agentName}" already exists. To update its configuration, edit agentcore/agentcore.json directly.`
+    );
     this.name = 'AgentAlreadyExistsError';
   }
 }
