@@ -8,7 +8,7 @@ import {
 import {
   BedrockAgentCoreClient,
   GetResourceOauth2TokenCommand,
-  GetWorkloadAccessTokenCommand,
+  GetWorkloadAccessTokenForUserIdCommand,
 } from '@aws-sdk/client-bedrock-agentcore';
 import { spawn } from 'node:child_process';
 import { platform } from 'node:os';
@@ -198,6 +198,8 @@ export interface Fetch3LOTokenOptions {
   resourceOauth2ReturnUrl?: string;
   customParameters?: Record<string, string>;
   region: string;
+  /** User identifier for the 3LO session. Defaults to 'cli-user'. */
+  userId?: string;
   pollIntervalMs?: number;
   pollTimeoutMs?: number;
   /** Called when the authorization URL is available. Defaults to printing to console. */
@@ -228,8 +230,15 @@ export async function fetch3LOTargetToken(opts: Fetch3LOTokenOptions): Promise<O
   const credentials = getCredentialProvider();
   const client = new BedrockAgentCoreClient({ region, credentials });
 
-  // Step 1: Get workload access token
-  const workloadTokenResponse = await client.send(new GetWorkloadAccessTokenCommand({ workloadName }));
+  // Step 1: Get user-scoped workload access token.
+  // USER_FEDERATION flow requires a token obtained via GetWorkloadAccessTokenForUserId
+  // (not GetWorkloadAccessToken, which is for machine-to-machine only).
+  const workloadTokenResponse = await client.send(
+    new GetWorkloadAccessTokenForUserIdCommand({
+      workloadName,
+      userId: opts.userId ?? 'cli-user',
+    })
+  );
   const workloadIdentityToken = workloadTokenResponse.workloadAccessToken;
   if (!workloadIdentityToken) {
     throw new Error('Failed to obtain workload access token.');
