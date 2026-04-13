@@ -21,7 +21,7 @@ export async function handleFetchAccess(options: FetchAccessOptions): Promise<Fe
 
 async function handleFetchGatewayAccess(options: FetchAccessOptions): Promise<FetchAccessResult> {
   if (!options.name) {
-    const gateways = await listGateways({ deployTarget: options.target });
+    const gateways = await listGateways({ deployTarget: options.deployTarget });
     if (gateways.length === 0) {
       return { success: false, error: 'No deployed gateways found. Run `agentcore deploy` first.' };
     }
@@ -33,7 +33,8 @@ async function handleFetchGatewayAccess(options: FetchAccessOptions): Promise<Fe
   }
 
   const result = await fetchGatewayToken(options.name, {
-    deployTarget: options.target,
+    deployTarget: options.deployTarget,
+    gatewayTarget: options.gatewayTarget,
     identityName: options.identityName,
   });
   return { success: true, result };
@@ -47,7 +48,7 @@ async function handleFetchAgentAccess(options: FetchAccessOptions): Promise<Fetc
   let tokenResult: OAuthTokenResult;
   try {
     tokenResult = await fetchRuntimeToken(options.name, {
-      deployTarget: options.target,
+      deployTarget: options.deployTarget,
       identityName: options.identityName,
     });
   } catch (err) {

@@ -1,10 +1,15 @@
 import { ConfigIO } from '../../../lib';
-import { fetchOAuthToken } from './oauth-token';
+import { fetch3LOTargetToken, fetchOAuthToken } from './oauth-token';
 import type { TokenFetchResult } from './types';
 
 export async function fetchGatewayToken(
   gatewayName: string,
-  options: { configIO?: ConfigIO; deployTarget?: string; identityName?: string } = {}
+  options: {
+    configIO?: ConfigIO;
+    deployTarget?: string;
+    gatewayTarget?: string;
+    identityName?: string;
+  } = {}
 ): Promise<TokenFetchResult> {
   const configIO = options.configIO ?? new ConfigIO();
 
@@ -16,10 +21,10 @@ export async function fetchGatewayToken(
     throw new Error('No deployed targets found. Run `agentcore deploy` first.');
   }
 
-  const targetName = options.deployTarget ?? targetNames[0]!;
-  const target = deployedState.targets[targetName];
+  const deployTarget = options.deployTarget ?? targetNames[0]!;
+  const target = deployedState.targets[deployTarget];
   if (!target) {
-    throw new Error(`Deployment target '${targetName}' not found. Available targets: ${targetNames.join(', ')}`);
+    throw new Error(`Deployment target '${deployTarget}' not found. Available targets: ${targetNames.join(', ')}`);
   }
 
   const gatewaySpec = projectSpec.agentCoreGateways.find(g => g.name === gatewayName);
@@ -57,7 +62,7 @@ export async function fetchGatewayToken(
     };
   }
 
-  // CUSTOM_JWT: perform OAuth client_credentials flow
+  // CUSTOM_JWT auth — check if the requested target uses 3LO (AUTHORIZATION_CODE)
   const jwtConfig = gatewaySpec.authorizerConfiguration?.customJwtAuthorizer;
   if (!jwtConfig) {
     throw new Error(
@@ -65,11 +70,49 @@ export async function fetchGatewayToken(
     );
   }
 
+  // If a specific gateway target is requested, check if it uses AUTHORIZATION_CODE
+  if (options.gatewayTarget) {
+    const targetSpec = gatewaySpec.targets.find(t => t.name === options.gatewayTarget);
+    if (!targetSpec) {
+      const available = gatewaySpec.targets.map(t => t.name);
+      throw new Error(
+        `Gateway target '${options.gatewayTarget}' not found. Available targets: ${available.join(', ') || 'none'}`
+      );
+    }
+
+    if (targetSpec.outboundAuth?.grantType === 'AUTHORIZATION_CODE') {
+      const credentialName = targetSpec.outboundAuth.credentialName;
+      if (!credentialName) {
+        throw new Error(`Gateway target '${options.gatewayTarget}' has AUTHORIZATION_CODE but no credentialName.`);
+      }
+
+      const awsTargets = await configIO.readAWSDeploymentTargets();
+      const awsTarget = awsTargets.find(t => t.name === deployTarget);
+      const region = awsTarget?.region ?? process.env.AWS_REGION ?? 'us-east-1';
+
+      const tokenResult = await fetch3LOTargetToken({
+        workloadName: projectSpec.name,
+        credentialProviderName: credentialName,
+        scopes: targetSpec.outboundAuth.scopes ?? [],
+        resourceOauth2ReturnUrl: targetSpec.outboundAuth.defaultReturnUrl,
+        region,
+      });
+
+      return {
+        url: gatewayUrl,
+        authType: 'CUSTOM_JWT',
+        token: tokenResult.token,
+        expiresIn: tokenResult.expiresIn,
+      };
+    }
+  }
+
+  // Default: client_credentials flow
   const result = await fetchOAuthToken({
     resourceName: gatewayName,
     jwtConfig,
     deployedState,
-    targetName,
+    targetName: deployTarget,
     credentials: projectSpec.credentials,
     credentialName: options.identityName,
   });

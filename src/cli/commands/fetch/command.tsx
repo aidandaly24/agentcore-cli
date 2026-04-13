@@ -15,7 +15,8 @@ export const registerFetch = (program: Command) => {
     .description('Fetch access info (URL, token, auth guidance) for a deployed gateway or agent.')
     .option('--name <resource>', 'Gateway or agent name [non-interactive]')
     .option('--type <type>', 'Resource type: gateway (default) or agent [non-interactive]', 'gateway')
-    .option('--target <target>', 'Deployment target [non-interactive]')
+    .option('--deploy-target <target>', 'Deployment target (e.g. dev, staging) [non-interactive]')
+    .option('--gateway-target <target>', 'Gateway target name for 3LO token fetch [non-interactive]')
     .option('--identity-name <name>', 'Identity credential name for token fetch [non-interactive]')
     .option('--json', 'Output as JSON [non-interactive]')
     .action(async (cliOptions: Record<string, unknown>) => {
