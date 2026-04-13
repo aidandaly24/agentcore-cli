@@ -335,6 +335,70 @@ function defaultOnAuthUrl(url: string): void {
   console.log(`  ${url}\n`);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Pre-deploy 3LO Authorization
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface Authorize3LOCredentialsOptions {
+  projectName: string;
+  gateways: import('../../../schema').AgentCoreGateway[];
+  deployedCredentials: Record<string, { credentialProviderArn: string }>;
+  region: string;
+}
+
+/**
+ * Pre-authorize 3LO (AUTHORIZATION_CODE) credentials during deploy.
+ *
+ * The BedrockAgentCore service validates OAuth credentials during GatewayTarget
+ * creation. For AUTHORIZATION_CODE targets, this requires a valid token in the
+ * token vault. This function runs the browser-based auth flow for each unique
+ * 3LO credential so the token vault is populated before CDK deploy.
+ */
+export async function authorize3LOCredentials(opts: Authorize3LOCredentialsOptions): Promise<void> {
+  const { projectName, gateways, deployedCredentials, region } = opts;
+
+  // Collect unique 3LO credential names across all gateways
+  const seen = new Set<string>();
+  const targets3LO: { credentialName: string; scopes: string[]; returnUrl?: string }[] = [];
+
+  for (const gateway of gateways) {
+    for (const target of gateway.targets) {
+      if (
+        target.outboundAuth?.grantType === 'AUTHORIZATION_CODE' &&
+        target.outboundAuth.credentialName &&
+        !seen.has(target.outboundAuth.credentialName)
+      ) {
+        seen.add(target.outboundAuth.credentialName);
+        targets3LO.push({
+          credentialName: target.outboundAuth.credentialName,
+          scopes: target.outboundAuth.scopes ?? [],
+          returnUrl: target.outboundAuth.defaultReturnUrl,
+        });
+      }
+    }
+  }
+
+  if (targets3LO.length === 0) return;
+
+  for (const target of targets3LO) {
+    const cred = deployedCredentials[target.credentialName];
+    if (!cred) {
+      throw new Error(
+        `Credential "${target.credentialName}" not found in deployed state. ` +
+          'Ensure OAuth credentials are set up before 3LO authorization.'
+      );
+    }
+
+    await fetch3LOTargetToken({
+      workloadName: projectName,
+      credentialProviderName: target.credentialName,
+      scopes: target.scopes,
+      resourceOauth2ReturnUrl: target.returnUrl,
+      region,
+    });
+  }
+}
+
 function tryOpenBrowser(url: string): void {
   try {
     const os = platform();

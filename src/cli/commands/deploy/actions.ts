@@ -206,7 +206,9 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
       endStep('success');
     }
 
-    // Set up workload identity for 3LO targets if needed
+    // Set up workload identity for 3LO targets if needed.
+    // Must happen before CDK deploy so the service can validate the OAuth credential
+    // during CfnGatewayTarget creation.
     if (has3LOTargets(context.projectSpec.agentCoreGateways)) {
       startStep('Creating workload identity...');
       const wiResult = await setupWorkloadIdentity({
@@ -220,6 +222,25 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
         return { success: false, error: wiResult.error, logPath: logger.getRelativeLogPath() };
       }
       endStep('success');
+
+      // Pre-authorize 3LO credentials so the token vault has a valid token
+      // when CloudFormation creates the GatewayTarget.
+      startStep('Authorizing 3LO credentials...');
+      try {
+        const { authorize3LOCredentials } = await import('../../operations/fetch-access/oauth-token');
+        await authorize3LOCredentials({
+          projectName: context.projectSpec.name,
+          gateways: context.projectSpec.agentCoreGateways,
+          deployedCredentials,
+          region: target.region,
+        });
+        endStep('success');
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        endStep('error', msg);
+        logger.finalize(false);
+        return { success: false, error: `3LO authorization failed: ${msg}`, logPath: logger.getRelativeLogPath() };
+      }
     }
 
     // Write credential ARNs to deployed state before CDK synth so the template can read them

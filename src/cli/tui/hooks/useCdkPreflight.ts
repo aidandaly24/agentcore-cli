@@ -752,6 +752,24 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
           }
           logger.endStep('success');
           updateStepByLabel(LABEL_WORKLOAD_IDENTITY, { status: 'success' });
+
+          // Pre-authorize 3LO credentials
+          try {
+            const { authorize3LOCredentials } = await import('../../operations/fetch-access/oauth-token');
+            await authorize3LOCredentials({
+              projectName: context.projectSpec.name,
+              gateways: context.projectSpec.agentCoreGateways,
+              deployedCredentials,
+              region: context.awsTargets[0]!.region,
+            });
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.endStep('error', msg);
+            updateStepByLabel(LABEL_WORKLOAD_IDENTITY, { status: 'error', error: msg });
+            setPhase('error');
+            isRunningRef.current = false;
+            return;
+          }
         }
 
         // Write partial deployed state with credential ARNs before CDK synth

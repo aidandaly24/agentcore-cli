@@ -1,5 +1,6 @@
 import { SecureCredentials, readEnvFile } from '../../../lib';
 import type { AgentCoreGateway, AgentCoreProjectSpec, Credential } from '../../../schema';
+import { vendorRequiresDiscoveryUrl } from '../../../schema/constants';
 import { getCredentialProvider } from '../../aws';
 import { isNoCredentialsError } from '../../errors';
 import { getAwsLoginGuidance } from '../../external-requirements/checks';
@@ -349,7 +350,9 @@ async function setupSingleOAuth2Provider(
 
   // Imported OAuth providers may not have a discoveryUrl (provider already exists in Identity service).
   // Skip create/update since we can't build a valid config without it.
-  if (!credential.discoveryUrl) {
+  // Named/Included providers (Google, Cognito, Okta, etc.) don't require discoveryUrl — they use
+  // issuer/authorizationEndpoint/tokenEndpoint instead.
+  if (!credential.discoveryUrl && vendorRequiresDiscoveryUrl(credential.vendor)) {
     return {
       providerName: credential.name,
       status: 'skipped',
