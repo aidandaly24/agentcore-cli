@@ -55,6 +55,11 @@ const validGatewayOptionsNone: AddGatewayOptions = {
   authorizerType: 'NONE',
 };
 
+const validGatewayOptionsAwsIam: AddGatewayOptions = {
+  name: 'test-gateway',
+  authorizerType: 'AWS_IAM',
+};
+
 const validGatewayOptionsJwt: AddGatewayOptions = {
   name: 'test-gateway',
   authorizerType: 'CUSTOM_JWT',
@@ -218,6 +223,12 @@ describe('validate', () => {
       expect(result.error?.includes('Invalid authorizer type')).toBeTruthy();
     });
 
+    // AC10b: AWS_IAM is a valid authorizerType
+    it('accepts AWS_IAM as a valid authorizerType', () => {
+      const result = validateAddGatewayOptions(validGatewayOptionsAwsIam);
+      expect(result.valid).toBe(true);
+    });
+
     // AC11: CUSTOM_JWT requires discoveryUrl; at least one of allowedAudience/allowedClients/allowedScopes
     it('returns error for CUSTOM_JWT missing required fields', () => {
       // discoveryUrl is always required
@@ -343,6 +354,7 @@ describe('validate', () => {
     // AC14: Valid options pass
     it('passes for valid options', () => {
       expect(validateAddGatewayOptions(validGatewayOptionsNone)).toEqual({ valid: true });
+      expect(validateAddGatewayOptions(validGatewayOptionsAwsIam)).toEqual({ valid: true });
       expect(validateAddGatewayOptions(validGatewayOptionsJwt)).toEqual({ valid: true });
     });
 
