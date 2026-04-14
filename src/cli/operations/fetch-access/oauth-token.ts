@@ -7,10 +7,12 @@ import {
 } from '../../primitives/credential-utils';
 import {
   BedrockAgentCoreClient,
+  CompleteResourceTokenAuthCommand,
   GetResourceOauth2TokenCommand,
   GetWorkloadAccessTokenForUserIdCommand,
 } from '@aws-sdk/client-bedrock-agentcore';
 import { spawn } from 'node:child_process';
+import { type Server, createServer } from 'node:http';
 import { platform } from 'node:os';
 
 export interface OAuthTokenResult {
@@ -268,14 +270,68 @@ export async function fetch3LOTargetToken(opts: Fetch3LOTokenOptions): Promise<O
     throw new Error(`Expected ${missing} from USER_FEDERATION flow, but not returned.`);
   }
 
-  // Step 3: Present authorization URL to user
+  // Step 3: Start local callback server, present auth URL, wait for redirect
   const authUrl = initResponse.authorizationUrl;
   const sessionUri = initResponse.sessionUri;
 
-  onAuthUrl(authUrl);
-  tryOpenBrowser(authUrl);
+  // Parse the return URL to determine port and path for the local server
+  const returnUrl = resourceOauth2ReturnUrl ? new URL(resourceOauth2ReturnUrl) : undefined;
+  const callbackPort = returnUrl ? parseInt(returnUrl.port || '3000', 10) : 3000;
+  const callbackPath = returnUrl?.pathname ?? '/callback';
 
-  // Step 4: Poll for token
+  // Start a temporary local HTTP server to receive the OAuth redirect
+  const callbackSessionId = await new Promise<string>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      server.close();
+      reject(
+        new Error(
+          `Authorization flow timed out after ${pollTimeoutMs / 1000} seconds. ` +
+            'Please try again and complete the browser authentication promptly.'
+        )
+      );
+    }, pollTimeoutMs);
+
+    const server: Server = createServer((req, res) => {
+      const reqUrl = new URL(req.url ?? '/', `http://localhost:${callbackPort}`);
+      if (reqUrl.pathname === callbackPath) {
+        const sid = reqUrl.searchParams.get('session_id');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(
+          '<html><body><h2>Authorization complete</h2>' +
+            '<p>You can close this window and return to the terminal.</p></body></html>'
+        );
+        clearTimeout(timeout);
+        server.close();
+        if (sid) {
+          resolve(sid);
+        } else {
+          reject(new Error('OAuth callback received but missing session_id parameter.'));
+        }
+      }
+    });
+
+    server.listen(callbackPort, '127.0.0.1', () => {
+      onAuthUrl(authUrl);
+      tryOpenBrowser(authUrl);
+    });
+
+    server.on('error', err => {
+      clearTimeout(timeout);
+      reject(new Error(`Failed to start local callback server on port ${callbackPort}: ${err.message}`));
+    });
+  });
+
+  // Step 4: Complete the session binding (URL Session Binding).
+  // This tells the service the user who started the flow is the one who completed consent.
+  // Without this call, the session stays IN_PROGRESS indefinitely.
+  await client.send(
+    new CompleteResourceTokenAuthCommand({
+      sessionUri: callbackSessionId || sessionUri,
+      userIdentifier: { userId: opts.userId ?? 'cli-user' },
+    })
+  );
+
+  // Step 5: Poll for the access token now that the session is completed
   const MAX_TRANSIENT_RETRIES = 3;
   let consecutiveErrors = 0;
   const startTime = Date.now();
@@ -287,7 +343,7 @@ export async function fetch3LOTargetToken(opts: Fetch3LOTokenOptions): Promise<O
           resourceCredentialProviderName: credentialProviderName,
           scopes,
           oauth2Flow: 'USER_FEDERATION',
-          sessionUri,
+          sessionUri: callbackSessionId || sessionUri,
         })
       );
 
@@ -301,12 +357,10 @@ export async function fetch3LOTargetToken(opts: Fetch3LOTokenOptions): Promise<O
         throw new Error('Authorization flow failed. The user may have denied access or the session expired.');
       }
     } catch (error) {
-      // Re-throw intentional errors (sessionStatus === 'FAILED' above)
       if (error instanceof Error && error.message.startsWith('Authorization flow failed')) {
         throw error;
       }
 
-      // Detect workload token expiry or permanent auth failures
       const errorName = (error as { name?: string }).name;
       if (errorName === 'UnauthorizedException') {
         throw new Error(
