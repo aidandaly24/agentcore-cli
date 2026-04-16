@@ -53,6 +53,9 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
       const decoder = new TextDecoder();
       let buffer = '';
       let yieldedContent = false;
+      const toolCalls: { name: string; args: string }[] = [];
+      let activeToolName = '';
+      let activeToolArgs = '';
 
       try {
         while (true) {
@@ -74,22 +77,51 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
             if (!jsonStr) continue;
 
             try {
-              const event = JSON.parse(jsonStr) as { type?: string; delta?: string; message?: string };
+              const event = JSON.parse(jsonStr) as {
+                type?: string;
+                delta?: string;
+                message?: string;
+                toolCallName?: string;
+                toolCallId?: string;
+                content?: string;
+              };
 
               if ((event.type === 'TEXT_MESSAGE_CONTENT' || event.type === 'TEXT_MESSAGE_CHUNK') && event.delta) {
                 streaming = true;
                 yield event.delta;
                 yieldedContent = true;
+              } else if (event.type === 'TOOL_CALL_START' && event.toolCallName) {
+                activeToolName = event.toolCallName;
+                activeToolArgs = '';
+              } else if (event.type === 'TOOL_CALL_ARGS' && event.delta) {
+                activeToolArgs += event.delta;
+              } else if (event.type === 'TOOL_CALL_END') {
+                if (activeToolName) {
+                  toolCalls.push({ name: activeToolName, args: activeToolArgs });
+                }
+                activeToolName = '';
+                activeToolArgs = '';
+              } else if (event.type === 'TOOL_CALL_RESULT') {
+                const lastCall = toolCalls[toolCalls.length - 1];
+                if (lastCall && event.content) {
+                  lastCall.args = `${lastCall.args} → ${event.content}`;
+                }
               } else if (event.type === 'RUN_ERROR') {
                 yield `Error: ${event.message ?? 'Unknown AGUI error'}`;
                 return;
               }
             } catch {
-              // Non-JSON data line — yield raw
               yield jsonStr;
               yieldedContent = true;
             }
           }
+        }
+
+        if (!yieldedContent && toolCalls.length > 0) {
+          for (const tc of toolCalls) {
+            yield `[Tool: ${tc.name}(${tc.args})]\n`;
+          }
+          yieldedContent = true;
         }
 
         if (!yieldedContent) {

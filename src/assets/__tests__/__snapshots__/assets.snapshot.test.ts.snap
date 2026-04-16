@@ -2193,16 +2193,16 @@ Thumbs.db
 exports[`Assets Directory Snapshots > Python framework assets > python/python/agui/langchain_langgraph/base/main.py should match snapshot 1`] = `
 "import os
 
-# Enable LangGraph FastAPI mode (must be set before langgraph imports)
 os.environ["LANGGRAPH_FAST_API"] = "true"
 
 import uvicorn
 from typing import Any, List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import MessagesState
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.tools import tool
 from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
 from model.load import load_model
@@ -2214,6 +2214,7 @@ def add_numbers(a: int, b: int) -> int:
     return a + b
 
 
+backend_tools = [add_numbers]
 model = load_model()
 
 
@@ -2223,7 +2224,7 @@ class AgentState(MessagesState):
 
 def chat_node(state: AgentState):
     bound_model = model.bind_tools(
-        [*state.get("tools", []), add_numbers],
+        [*state.get("tools", []), *backend_tools],
     )
     response = bound_model.invoke(state["messages"])
     return {"messages": [response]}
@@ -2231,8 +2232,10 @@ def chat_node(state: AgentState):
 
 builder = StateGraph(AgentState)
 builder.add_node("chat", chat_node)
-builder.set_entry_point("chat")
-builder.set_finish_point("chat")
+builder.add_node("tools", ToolNode(tools=backend_tools))
+builder.add_edge(START, "chat")
+builder.add_conditional_edges("chat", tools_condition)
+builder.add_edge("tools", "chat")
 graph = builder.compile(checkpointer=MemorySaver())
 
 agent = LangGraphAgent(
