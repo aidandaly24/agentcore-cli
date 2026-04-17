@@ -9,11 +9,14 @@ import type {
   AgentCoreProjectSpec as _AgentCoreProjectSpec,
 } from '../../../../schema';
 import {
+  AguiEventType,
   DEFAULT_RUNTIME_USER_ID,
   type McpToolDef,
+  buildAguiRunInput,
   executeBashCommand,
   invokeA2ARuntime,
   invokeAgentRuntimeStreaming,
+  invokeAguiRuntime,
   mcpCallTool,
   mcpListTools,
 } from '../../../aws';
@@ -322,7 +325,6 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
 
       // AGUI: structured event streaming with rich rendering
       if (agent.protocol === 'AGUI') {
-        const { invokeAguiRuntime, buildAguiRunInput, AguiEventType } = await import('../../../aws');
         const aguiInput = buildAguiRunInput(prompt, sessionId ?? undefined);
 
         setMessages(prev => [...prev, { role: 'user', content: prompt }, { role: 'assistant', content: '' }]);

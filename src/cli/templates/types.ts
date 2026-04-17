@@ -70,4 +70,6 @@ export interface AgentRenderConfig {
   dockerfile?: string;
   /** Session storage mount path — when set, file read/write tools are included */
   sessionStorageMountPath?: string;
+  /** Whether to wrap entrypoint with opentelemetry-instrument. Defaults to true. */
+  enableOtel?: boolean;
 }

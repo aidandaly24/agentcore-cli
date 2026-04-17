@@ -124,7 +124,7 @@ export async function* invokeAgentStreaming(
           fullResponse += decoded;
 
           // Process complete lines from buffer
-          const lines = buffer.split('\n');
+          const lines = buffer.split(/\r?\n/);
           buffer = lines.pop() ?? '';
 
           for (const line of lines) {

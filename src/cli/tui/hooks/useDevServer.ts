@@ -76,6 +76,9 @@ export function useDevServer(options: {
   const [a2aAgentCard, setA2aAgentCard] = useState<A2AAgentCard | null>(null);
   const [a2aStatus, setA2aStatus] = useState<string | null>(null);
 
+  // AGUI state — persistent threadId per dev session for multi-turn conversations
+  const aguiThreadIdRef = useRef<string>(crypto.randomUUID());
+
   const serverRef = useRef<DevServer | null>(null);
   const loggerRef = useRef<DevLogger | null>(null);
   const logsRef = useRef<LogEntry[]>([]);
@@ -350,6 +353,7 @@ export function useDevServer(options: {
                 message,
                 logger: loggerRef.current ?? undefined,
                 headers: options.headers,
+                threadId: aguiThreadIdRef.current,
               })
             : invokeAgentStreaming({
                 port: actualPort,
@@ -518,6 +522,7 @@ export function useDevServer(options: {
   const clearConversation = () => {
     setConversation([]);
     setStreamingResponse(null);
+    aguiThreadIdRef.current = crypto.randomUUID();
   };
 
   const showMcpHint = () => {

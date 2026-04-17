@@ -1,12 +1,9 @@
+import { parseAguiSSEStream } from '../../aws/agui-parser';
+import { AguiEventType } from '../../aws/agui-types';
 import { ConnectionError, type InvokeStreamingOptions, ServerError } from './invoke-types';
 import { isConnectionError, sleep } from './utils';
 import { randomUUID } from 'crypto';
 
-/**
- * Invokes an AGUI agent on the local dev server and streams text content.
- * Sends a RunAgentInput body (not {prompt: string}) and parses AGUI SSE events,
- * yielding only TEXT_MESSAGE_CONTENT deltas as text chunks.
- */
 export async function* invokeAguiStreaming(options: InvokeStreamingOptions): AsyncGenerator<string, void, unknown> {
   const { port, message: msg, logger, headers: customHeaders } = options;
   const maxRetries = 5;
@@ -16,9 +13,8 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Construct RunAgentInput body (AGUI format, not {prompt: string})
       const body = {
-        threadId: randomUUID(),
+        threadId: options.threadId ?? randomUUID(),
         runId: randomUUID(),
         messages: [{ id: randomUUID(), role: 'user', content: msg }],
         tools: [],
@@ -49,86 +45,74 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
         return;
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      const { eventStream } = parseAguiSSEStream({
+        reader: res.body.getReader(),
+        logger,
+        singleConsumer: true,
+      });
+
       let yieldedContent = false;
       const toolCalls: { name: string; args: string }[] = [];
       let activeToolName = '';
       let activeToolArgs = '';
 
-      try {
-        while (true) {
-          const result = await reader.read();
-          if (result.done) break;
-
-          buffer += decoder.decode(result.value as Uint8Array, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-
-            if (logger && line.trim()) {
-              logger.logSSEEvent(line);
-            }
-
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr) continue;
-
-            try {
-              const event = JSON.parse(jsonStr) as {
-                type?: string;
-                delta?: string;
-                message?: string;
-                toolCallName?: string;
-                toolCallId?: string;
-                content?: string;
-              };
-
-              if ((event.type === 'TEXT_MESSAGE_CONTENT' || event.type === 'TEXT_MESSAGE_CHUNK') && event.delta) {
-                streaming = true;
-                yield event.delta;
-                yieldedContent = true;
-              } else if (event.type === 'TOOL_CALL_START' && event.toolCallName) {
-                activeToolName = event.toolCallName;
-                activeToolArgs = '';
-              } else if (event.type === 'TOOL_CALL_ARGS' && event.delta) {
-                activeToolArgs += event.delta;
-              } else if (event.type === 'TOOL_CALL_END') {
-                if (activeToolName) {
-                  toolCalls.push({ name: activeToolName, args: activeToolArgs });
-                }
-                activeToolName = '';
-                activeToolArgs = '';
-              } else if (event.type === 'TOOL_CALL_RESULT') {
-                const lastCall = toolCalls[toolCalls.length - 1];
-                if (lastCall && event.content) {
-                  lastCall.args = `${lastCall.args} → ${event.content}`;
-                }
-              } else if (event.type === 'RUN_ERROR') {
-                yield `Error: ${event.message ?? 'Unknown AGUI error'}`;
-                return;
-              }
-            } catch {
-              yield jsonStr;
+      for await (const event of eventStream) {
+        switch (event.type) {
+          case AguiEventType.TEXT_MESSAGE_CONTENT:
+          case AguiEventType.TEXT_MESSAGE_CHUNK: {
+            const delta = (event as { delta?: string }).delta;
+            if (delta) {
+              streaming = true;
+              yield delta;
               yieldedContent = true;
             }
+            break;
           }
-        }
-
-        if (!yieldedContent && toolCalls.length > 0) {
-          for (const tc of toolCalls) {
-            yield `[Tool: ${tc.name}(${tc.args})]\n`;
+          case AguiEventType.TOOL_CALL_START: {
+            activeToolName = 'toolCallName' in event ? event.toolCallName : '';
+            activeToolArgs = '';
+            break;
           }
-          yieldedContent = true;
+          case AguiEventType.TOOL_CALL_ARGS: {
+            const delta = 'delta' in event ? event.delta : undefined;
+            if (delta) activeToolArgs += delta;
+            break;
+          }
+          case AguiEventType.TOOL_CALL_END: {
+            if (activeToolName) {
+              toolCalls.push({ name: activeToolName, args: activeToolArgs });
+            }
+            activeToolName = '';
+            activeToolArgs = '';
+            break;
+          }
+          case AguiEventType.TOOL_CALL_RESULT: {
+            const content = 'content' in event ? event.content : undefined;
+            const matching = toolCalls.find(tc => tc.name === activeToolName) ?? toolCalls[toolCalls.length - 1];
+            if (matching && content) {
+              matching.args = `${matching.args} → ${typeof content === 'string' ? content : JSON.stringify(content)}`;
+            }
+            break;
+          }
+          case AguiEventType.RUN_ERROR: {
+            const message = 'message' in event ? event.message : 'Unknown AGUI error';
+            yield `Error: ${message}`;
+            return;
+          }
+          default:
+            break;
         }
+      }
 
-        if (!yieldedContent) {
-          yield '(no content in AGUI response)';
+      if (!yieldedContent && toolCalls.length > 0) {
+        for (const tc of toolCalls) {
+          yield `[Tool: ${tc.name}(${tc.args})]\n`;
         }
-      } finally {
-        reader.releaseLock();
+        yieldedContent = true;
+      }
+
+      if (!yieldedContent) {
+        yield '(no content in AGUI response)';
       }
 
       return;
@@ -140,7 +124,6 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
 
       lastError = err instanceof Error ? err : new Error(String(err));
 
-      // Don't retry once streaming has started — would produce duplicate output
       if (streaming) {
         throw lastError;
       }

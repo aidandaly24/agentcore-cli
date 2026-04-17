@@ -6,13 +6,15 @@ import uvicorn
 from typing import Any, List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from langgraph.graph import StateGraph, END, START
+from langgraph.graph import StateGraph, START
 from langgraph.graph.message import MessagesState
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.tools import tool
+from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 from ag_ui_langgraph import LangGraphAgent, add_langgraph_fastapi_endpoint
 from model.load import load_model
+
+LangchainInstrumentor().instrument()
 
 
 @tool
@@ -43,7 +45,7 @@ builder.add_node("tools", ToolNode(tools=backend_tools))
 builder.add_edge(START, "chat")
 builder.add_conditional_edges("chat", tools_condition)
 builder.add_edge("tools", "chat")
-graph = builder.compile(checkpointer=MemorySaver())
+graph = builder.compile()
 
 agent = LangGraphAgent(
     name="{{ name }}",

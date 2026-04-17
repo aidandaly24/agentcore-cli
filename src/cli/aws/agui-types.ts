@@ -233,6 +233,34 @@ export interface AguiReasoningEnd extends AguiBaseEvent {
 }
 
 // ============================================================================
+// Additional Text / Tool Chunk Events
+// ============================================================================
+
+export interface AguiTextMessageChunk extends AguiBaseEvent {
+  type: AguiEventType.TEXT_MESSAGE_CHUNK;
+  messageId: string;
+  role?: string;
+  delta?: string;
+  content?: string;
+}
+
+export interface AguiToolCallChunk extends AguiBaseEvent {
+  type: AguiEventType.TOOL_CALL_CHUNK;
+  toolCallId: string;
+  delta?: string;
+}
+
+// ============================================================================
+// Additional Reasoning Events
+// ============================================================================
+
+export interface AguiReasoningEncryptedValue extends AguiBaseEvent {
+  type: AguiEventType.REASONING_ENCRYPTED_VALUE;
+  messageId: string;
+  data: string;
+}
+
+// ============================================================================
 // Special Events
 // ============================================================================
 
@@ -244,6 +272,12 @@ export interface AguiRawEvent extends AguiBaseEvent {
 
 export interface AguiCustomEvent extends AguiBaseEvent {
   type: AguiEventType.CUSTOM;
+  name: string;
+  value: unknown;
+}
+
+export interface AguiMetaEvent extends AguiBaseEvent {
+  type: AguiEventType.META_EVENT;
   name: string;
   value: unknown;
 }
@@ -261,10 +295,12 @@ export type AguiEvent =
   | AguiTextMessageStart
   | AguiTextMessageContent
   | AguiTextMessageEnd
+  | AguiTextMessageChunk
   | AguiToolCallStart
   | AguiToolCallArgs
   | AguiToolCallEnd
   | AguiToolCallResult
+  | AguiToolCallChunk
   | AguiStateSnapshot
   | AguiStateDelta
   | AguiMessagesSnapshot
@@ -275,8 +311,10 @@ export type AguiEvent =
   | AguiReasoningMessageContent
   | AguiReasoningMessageEnd
   | AguiReasoningEnd
+  | AguiReasoningEncryptedValue
   | AguiRawEvent
-  | AguiCustomEvent;
+  | AguiCustomEvent
+  | AguiMetaEvent;
 
 // ============================================================================
 // RunAgentInput (request body for AGUI invocations)

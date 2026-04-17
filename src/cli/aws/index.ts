@@ -79,7 +79,11 @@ export {
   type AguiReasoningMessageContent,
   type AguiReasoningMessageEnd,
   type AguiReasoningEnd,
+  type AguiReasoningEncryptedValue,
   type AguiRawEvent,
   type AguiCustomEvent,
+  type AguiTextMessageChunk,
+  type AguiToolCallChunk,
+  type AguiMetaEvent,
 } from './agui-types';
 export { invokeAguiRuntime, type AguiInvokeOptions, type AguiStreamingInvokeResult } from './agentcore';

@@ -1,5 +1,6 @@
 import { parseJsonRpcResponse } from '../../lib/utils/json-rpc';
 import { getCredentialProvider } from './account';
+import { parseAguiSSEStream } from './agui-parser';
 import {
   BedrockAgentCoreClient,
   EvaluateCommand,
@@ -1008,8 +1009,6 @@ export async function invokeAguiRuntime(
   options: AguiInvokeOptions,
   input: import('./agui-types').AguiRunInput
 ): Promise<AguiStreamingInvokeResult> {
-  const { parseAguiEvent } = await import('./agui-types');
-
   if (options.bearerToken) {
     throw new Error('Bearer token auth is not yet supported for AGUI. Use SigV4 credentials.');
   }
@@ -1034,96 +1033,15 @@ export async function invokeAguiRuntime(
 
   const webStream = response.response.transformToWebStream();
   const reader = webStream.getReader();
-  const decoder = new TextDecoder();
 
-  // Shared state for the event pump
-  const aguiEvents: import('./agui-types').AguiEvent[] = [];
-  const waiters: (() => void)[] = [];
-  let aguiStreamDone = false;
-
-  function notifyWaiters() {
-    for (const w of waiters.splice(0)) w();
-  }
-
-  // Background reader that parses SSE lines into typed events
-  const readLoop = (async () => {
-    let buffer = '';
-    try {
-      while (true) {
-        const result = await reader.read();
-        if (result.done) break;
-
-        buffer += decoder.decode(result.value as Uint8Array, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (options.logger && line.trim()) {
-            options.logger.logSSEEvent(line);
-          }
-          const event = parseAguiEvent(line);
-          if (event) {
-            aguiEvents.push(event);
-            notifyWaiters();
-          }
-        }
-      }
-      if (buffer.trim()) {
-        if (options.logger) options.logger.logSSEEvent(buffer);
-        const event = parseAguiEvent(buffer);
-        if (event) aguiEvents.push(event);
-      }
-    } finally {
-      reader.releaseLock();
-      aguiStreamDone = true;
-      notifyWaiters();
-    }
-  })();
-
-  let readLoopError: Error | undefined;
-  readLoop.catch((err: unknown) => {
-    readLoopError = err instanceof Error ? err : new Error(String(err));
-    aguiStreamDone = true;
-    notifyWaiters();
+  const { eventStream, textStream } = parseAguiSSEStream({
+    reader,
+    logger: options.logger,
   });
 
-  async function* aguiEventStream(): AsyncGenerator<import('./agui-types').AguiEvent, void, unknown> {
-    let idx = 0;
-    while (true) {
-      if (idx < aguiEvents.length) {
-        yield aguiEvents[idx++]!;
-      } else if (aguiStreamDone) {
-        if (readLoopError) throw readLoopError;
-        return;
-      } else {
-        await new Promise<void>(resolve => waiters.push(resolve));
-      }
-    }
-  }
-
-  async function* aguiTextStream(): AsyncGenerator<string, void, unknown> {
-    let idx = 0;
-    while (true) {
-      if (idx < aguiEvents.length) {
-        const event = aguiEvents[idx++]!;
-        const type = event.type as string;
-        if (type === 'TEXT_MESSAGE_CONTENT' || type === 'TEXT_MESSAGE_CHUNK') {
-          yield (event as unknown as import('./agui-types').AguiTextMessageContent).delta;
-        } else if (type === 'RUN_ERROR') {
-          yield `Error: ${(event as unknown as import('./agui-types').AguiRunError).message}`;
-        }
-      } else if (aguiStreamDone) {
-        if (readLoopError) throw readLoopError;
-        return;
-      } else {
-        await new Promise<void>(resolve => waiters.push(resolve));
-      }
-    }
-  }
-
   return {
-    stream: aguiEventStream(),
-    textStream: aguiTextStream(),
+    stream: eventStream,
+    textStream: textStream!,
     sessionId,
   };
 }
