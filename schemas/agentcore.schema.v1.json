@@ -142,7 +142,7 @@
           },
           "protocol": {
             "type": "string",
-            "enum": ["HTTP", "MCP", "A2A", "AGUI"]
+            "enum": ["HTTP", "MCP", "A2A"]
           },
           "requestHeaderAllowlist": {
             "maxItems": 20,
