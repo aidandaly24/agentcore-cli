@@ -40,4 +40,4 @@ agui_agent = StrandsAgent(agent=agent, name="{{ name }}", description="A helpful
 app = create_strands_app(agui_agent, path="/invocations", ping_path="/ping")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))
