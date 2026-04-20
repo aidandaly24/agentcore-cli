@@ -52,7 +52,8 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
       });
 
       let yieldedContent = false;
-      const toolCalls: { name: string; args: string }[] = [];
+      const toolCalls: { id: string; name: string; args: string }[] = [];
+      let activeToolId = '';
       let activeToolName = '';
       let activeToolArgs = '';
 
@@ -69,6 +70,7 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
             break;
           }
           case AguiEventType.TOOL_CALL_START: {
+            activeToolId = 'toolCallId' in event ? event.toolCallId : '';
             activeToolName = 'toolCallName' in event ? event.toolCallName : '';
             activeToolArgs = '';
             break;
@@ -80,15 +82,17 @@ export async function* invokeAguiStreaming(options: InvokeStreamingOptions): Asy
           }
           case AguiEventType.TOOL_CALL_END: {
             if (activeToolName) {
-              toolCalls.push({ name: activeToolName, args: activeToolArgs });
+              toolCalls.push({ id: activeToolId, name: activeToolName, args: activeToolArgs });
             }
+            activeToolId = '';
             activeToolName = '';
             activeToolArgs = '';
             break;
           }
           case AguiEventType.TOOL_CALL_RESULT: {
             const content = 'content' in event ? event.content : undefined;
-            const matching = toolCalls.find(tc => tc.name === activeToolName) ?? toolCalls[toolCalls.length - 1];
+            const toolCallId = 'toolCallId' in event ? event.toolCallId : '';
+            const matching = toolCalls.find(tc => tc.id === toolCallId);
             if (matching && content) {
               matching.args = `${matching.args} → ${typeof content === 'string' ? content : JSON.stringify(content)}`;
             }
