@@ -36,8 +36,8 @@ import { buildAuthorizerConfigFromJwtConfig, createManagedOAuthCredential } from
 import { computeDefaultCredentialEnvVarName } from './credential-utils';
 import type { AddResult, AddScreenComponent, RemovableResource } from './types';
 import type { Command } from '@commander-js/extra-typings';
-import { mkdirSync } from 'fs';
-import { dirname, join } from 'path';
+import { copyFileSync, existsSync, mkdirSync } from 'fs';
+import { basename, dirname, join, resolve } from 'path';
 
 /**
  * Options for adding an agent resource.
@@ -46,6 +46,7 @@ export interface AddAgentOptions extends VpcOptions {
   name: string;
   type: 'create' | 'byo' | 'import';
   buildType: BuildType;
+  dockerfile?: string;
   language: TargetLanguage;
   framework: SDKFramework;
   modelProvider: ModelProvider;
@@ -207,6 +208,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
       )
       .option('--type <type>', 'Agent type: create, byo, or import [non-interactive]', 'create')
       .option('--build <type>', 'Build type: CodeZip or Container (default: CodeZip) [non-interactive]')
+      .option('--container <path>', 'Path to custom Dockerfile (requires --build Container) [non-interactive]')
       .option('--language <lang>', 'Language: Python (create), or Python/TypeScript/Other (BYO) [non-interactive]')
       .option('--framework <fw>', 'Framework: Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents [non-interactive]')
       .option('--model-provider <provider>', 'Model provider: Bedrock, Anthropic, OpenAI, Gemini [non-interactive]')
@@ -276,6 +278,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
             name: cliOptions.name!,
             type: cliOptions.type ?? 'create',
             buildType: (cliOptions.build as BuildType) ?? 'CodeZip',
+            dockerfile: cliOptions.container,
             language: cliOptions.language!,
             framework: cliOptions.framework!,
             modelProvider: cliOptions.modelProvider!,
@@ -359,6 +362,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
     const generateConfig: GenerateConfig = {
       projectName: options.name,
       buildType: options.buildType,
+      ...(options.dockerfile && { dockerfile: options.dockerfile }),
       sdk: options.framework,
       modelProvider: options.modelProvider,
       memory: options.memory!,
@@ -430,6 +434,16 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
     const renderer = createRenderer(renderConfig);
     await renderer.render({ outputDir: projectRoot });
 
+    if (generateConfig.dockerfile?.includes('/')) {
+      const sourcePath = resolve(projectRoot, generateConfig.dockerfile);
+      if (!existsSync(sourcePath)) {
+        return { success: false, error: `Dockerfile not found at ${sourcePath}` };
+      }
+      const filename = basename(sourcePath);
+      copyFileSync(sourcePath, join(agentPath, filename));
+      generateConfig.dockerfile = filename;
+    }
+
     // Write agent to project config
     if (strategy) {
       await writeAgentToProject(generateConfig, { configBaseDir, credentialStrategy: strategy });
@@ -484,6 +498,16 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
     const codeDir = join(projectRoot, codeLocation.replace(/\/$/, ''));
     mkdirSync(codeDir, { recursive: true });
 
+    let dockerfileName = options.dockerfile;
+    if (dockerfileName?.includes('/')) {
+      const sourcePath = resolve(projectRoot, dockerfileName);
+      if (!existsSync(sourcePath)) {
+        return { success: false, error: `Dockerfile not found at ${sourcePath}` };
+      }
+      dockerfileName = basename(sourcePath);
+      copyFileSync(sourcePath, join(codeDir, dockerfileName));
+    }
+
     const project = await configIO.readProjectSpec();
 
     const protocol = options.protocol ?? 'HTTP';
@@ -524,6 +548,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
     const agent: AgentEnvSpec = {
       name: options.name,
       build: options.buildType,
+      ...(dockerfileName && { dockerfile: dockerfileName }),
       entrypoint: (options.entrypoint ?? 'main.py') as FilePath,
       codeLocation: codeLocation as DirectoryPath,
       runtimeVersion: 'PYTHON_3_13',

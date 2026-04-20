@@ -14,6 +14,7 @@ export interface AddAgentOptions extends VpcOptions {
   name?: string;
   type?: 'create' | 'byo' | 'import';
   build?: string;
+  container?: string;
   language?: TargetLanguage;
   framework?: SDKFramework;
   modelProvider?: ModelProvider;

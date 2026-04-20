@@ -107,6 +107,21 @@ export function validateAddAgentOptions(options: AddAgentOptions): ValidationRes
     }
   }
 
+  // Validate --container flag
+  if (options.container) {
+    if (options.build !== 'Container') {
+      return { valid: false, error: '--container requires --build Container' };
+    }
+    if (options.container.includes('/')) {
+      const configRoot = findConfigRoot();
+      const projectRoot = configRoot ? dirname(configRoot) : process.cwd();
+      const resolvedPath = isAbsolute(options.container) ? options.container : join(projectRoot, options.container);
+      if (!existsSync(resolvedPath)) {
+        return { valid: false, error: `Dockerfile not found: ${options.container} (resolved to ${resolvedPath})` };
+      }
+    }
+  }
+
   // Validate and normalize protocol
   const protocol = options.protocol ?? 'HTTP';
   const protocolResult = ProtocolModeSchema.safeParse(protocol);
