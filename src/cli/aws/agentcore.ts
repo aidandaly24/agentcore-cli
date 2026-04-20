@@ -1039,9 +1039,13 @@ export async function invokeAguiRuntime(
     logger: options.logger,
   });
 
+  if (!textStream) {
+    throw new Error('AGUI parser created in single-consumer mode — textStream unavailable');
+  }
+
   return {
     stream: eventStream,
-    textStream: textStream!,
+    textStream,
     sessionId,
   };
 }

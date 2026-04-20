@@ -65,7 +65,11 @@ export function parseAguiSSEStream(options: ParseAguiSSEOptions): AguiSSEStreams
         if (event) events.push(event);
       }
     } finally {
-      reader.releaseLock();
+      try {
+        reader.releaseLock();
+      } catch {
+        // already released
+      }
       done = true;
       notify();
     }
