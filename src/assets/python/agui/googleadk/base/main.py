@@ -1,6 +1,10 @@
+import os
 import uvicorn
 from google.adk.agents import LlmAgent
 from ag_ui_adk import ADKAgent, AGUIToolset, create_adk_app
+from model.load import load_model
+
+load_model()
 
 agent = LlmAgent(
     name="{{ name }}",
