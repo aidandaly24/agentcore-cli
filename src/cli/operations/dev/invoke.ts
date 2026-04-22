@@ -1,4 +1,5 @@
 import { invokeA2AStreaming } from './invoke-a2a';
+import { invokeAguiStreaming } from './invoke-agui';
 import { ConnectionError, type InvokeStreamingOptions, type SSELogger, ServerError } from './invoke-types';
 import { isConnectionError, sleep } from './utils';
 
@@ -224,11 +225,9 @@ export async function* invokeForProtocol(
     case 'A2A':
       yield* invokeA2AStreaming(options);
       break;
-    case 'AGUI': {
-      const { invokeAguiStreaming } = await import('./invoke-agui');
+    case 'AGUI':
       yield* invokeAguiStreaming(options);
       break;
-    }
     default:
       yield* invokeAgentStreaming(options);
   }
