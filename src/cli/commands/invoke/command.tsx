@@ -92,9 +92,15 @@ export const registerInvoke = (program: Command) => {
     .command('invoke')
     .alias('i')
     .description(COMMAND_DESCRIPTIONS.invoke)
-    .argument('[prompt]', 'Prompt to send to the agent [non-interactive]')
+    .argument(
+      '[prompt]',
+      'Prompt to send to the agent. Also accepts piped stdin when no prompt is provided and stdin is not a TTY [non-interactive]'
+    )
     .option('--prompt <text>', 'Prompt to send to the agent [non-interactive]')
-    .option('--prompt-file <path>', 'Read the prompt from a file [non-interactive]')
+    .option(
+      '--prompt-file <path>',
+      'Read the prompt from a file (for long or structured payloads that exceed shell arg limits) [non-interactive]'
+    )
     .option('--runtime <name>', 'Select specific runtime [non-interactive]')
     .option('--target <name>', 'Select deployment target [non-interactive]')
     .option('--session-id <id>', 'Use specific session ID for conversation continuity')
