@@ -2,6 +2,8 @@ export interface InvokeOptions {
   agentName?: string;
   targetName?: string;
   prompt?: string;
+  /** Path to a file containing the prompt (alternative to --prompt / positional) */
+  promptFile?: string;
   sessionId?: string;
   userId?: string;
   json?: boolean;
