@@ -3417,21 +3417,39 @@ agent = Agent(
 )
 
 
-# Session and Runner
-async def setup_session_and_runner(user_id, session_id):
-    ensure_credentials_loaded()
-    session_service = InMemorySessionService()
-    session = await session_service.create_session(
+# Module-level session service and runner (preserves history across invocations)
+_session_service = InMemorySessionService()
+_runner = None
+
+
+def get_or_create_runner():
+    global _runner
+    if _runner is None:
+        ensure_credentials_loaded()
+        _runner = Runner(
+            agent=agent,
+            app_name=APP_NAME,
+            session_service=_session_service,
+        )
+    return _runner
+
+
+async def get_or_create_session(user_id, session_id):
+    session = await _session_service.get_session(
         app_name=APP_NAME, user_id=user_id, session_id=session_id
     )
-    runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
-    return session, runner
+    if session is None:
+        session = await _session_service.create_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+    return session
 
 
 # Agent Interaction
 async def call_agent_async(query, user_id, session_id):
     content = types.Content(role="user", parts=[types.Part(text=query)])
-    session, runner = await setup_session_and_runner(user_id, session_id)
+    runner = get_or_create_runner()
+    session = await get_or_create_session(user_id, session_id)
     events = runner.run_async(
         user_id=user_id, session_id=session.id, new_message=content
     )
@@ -3718,6 +3736,7 @@ exports[`Assets Directory Snapshots > Python framework assets > python/python/ht
 from typing import Any
 
 from langchain_core.messages import HumanMessage{{#if hasConfigBundle}}, SystemMessage{{/if}}
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import create_react_agent
 from langchain.tools import tool
 {{#if hasConfigBundle}}
@@ -3764,6 +3783,9 @@ def add_numbers(a: int, b: int) -> int:
 
 # Define a collection of tools used by the model
 tools = [add_numbers]
+
+# Module-level checkpointer preserves conversation history across invocations
+_checkpointer = InMemorySaver()
 
 {{#if sessionStorageMountPath}}
 SESSION_STORAGE_PATH = "{{sessionStorageMountPath}}"
@@ -3857,29 +3879,44 @@ async def invoke(payload, context):
     if mcp_client:
         mcp_tools = await mcp_client.get_tools()
 
-    # Define the agent using create_react_agent
+    # Define the agent using create_react_agent (checkpointer is shared across invocations)
 {{#if hasConfigBundle}}
-    graph = create_react_agent(get_or_create_model(), tools=mcp_tools + tools, prompt=DEFAULT_SYSTEM_PROMPT)
+    graph = create_react_agent(
+        get_or_create_model(),
+        tools=mcp_tools + tools,
+        prompt=DEFAULT_SYSTEM_PROMPT,
+        checkpointer=_checkpointer,
+    )
     callback = ConfigBundleCallback()
 
     # Process the user prompt
     prompt = payload.get("prompt", "What can you help me with?")
+    session_id = getattr(context, "session_id", "default-session")
     log.info(f"Agent input: {prompt}")
 
-    # Run the agent with config bundle callback
+    # Run the agent with config bundle callback (checkpointer auto-loads/saves history per session)
     result = await graph.ainvoke(
         {"messages": [HumanMessage(content=prompt)]},
-        config={"callbacks": [callback]},
+        config={"callbacks": [callback], "configurable": {"thread_id": session_id}},
     )
 {{else}}
-    graph = create_react_agent(get_or_create_model(), tools=mcp_tools + tools, prompt=DEFAULT_SYSTEM_PROMPT)
+    graph = create_react_agent(
+        get_or_create_model(),
+        tools=mcp_tools + tools,
+        prompt=DEFAULT_SYSTEM_PROMPT,
+        checkpointer=_checkpointer,
+    )
 
     # Process the user prompt
     prompt = payload.get("prompt", "What can you help me with?")
+    session_id = getattr(context, "session_id", "default-session")
     log.info(f"Agent input: {prompt}")
 
-    # Run the agent
-    result = await graph.ainvoke({"messages": [HumanMessage(content=prompt)]})
+    # Run the agent (checkpointer auto-loads/saves history per session)
+    result = await graph.ainvoke(
+        {"messages": [HumanMessage(content=prompt)]},
+        config={"configurable": {"thread_id": session_id}},
+    )
 {{/if}}
 
     # Return result
@@ -4242,7 +4279,8 @@ Thumbs.db
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/http/openaiagents/base/main.py should match snapshot 1`] = `
 "import os
-from agents import Agent, Runner, function_tool
+from functools import lru_cache
+from agents import Agent, Runner, SQLiteSession, function_tool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
 {{#if hasGateway}}
@@ -4340,8 +4378,14 @@ You have persistent storage at {{sessionStorageMountPath}}. Use file tools to re
 {{/if}}
 """
 
+
+@lru_cache(maxsize=128)
+def get_session(session_id):
+    return SQLiteSession(session_id)
+
+
 # Define the agent execution
-async def main(query):
+async def main(query, session):
     ensure_credentials_loaded()
     try:
         {{#if hasGateway}}
@@ -4353,7 +4397,7 @@ async def main(query):
                 mcp_servers=mcp_servers,
                 tools=tools
             )
-            result = await Runner.run(agent, query)
+            result = await Runner.run(agent, query, session=session)
             return result
         else:
             agent = Agent(
@@ -4363,7 +4407,7 @@ async def main(query):
                 mcp_servers=[],
                 tools=tools
             )
-            result = await Runner.run(agent, query)
+            result = await Runner.run(agent, query, session=session)
             return result
         {{else}}
         if mcp_servers:
@@ -4376,7 +4420,7 @@ async def main(query):
                     mcp_servers=active_servers,
                     tools=tools
                 )
-                result = await Runner.run(agent, query)
+                result = await Runner.run(agent, query, session=session)
                 return result
         else:
             agent = Agent(
@@ -4386,7 +4430,7 @@ async def main(query):
                 mcp_servers=[],
                 tools=tools
             )
-            result = await Runner.run(agent, query)
+            result = await Runner.run(agent, query, session=session)
             return result
         {{/if}}
     except Exception as e:
@@ -4400,9 +4444,11 @@ async def invoke(payload, context):
 
     # Process the user prompt
     prompt = payload.get("prompt", "What can you help me with?")
+    session_id = getattr(context, "session_id", "default-session")
+    session = get_session(session_id)
 
-    # Run the agent
-    result = await main(prompt)
+    # Run the agent (session automatically loads/saves conversation history)
+    result = await main(prompt, session)
 
     # Return result
     return {"result": result.final_output}
@@ -4655,7 +4701,8 @@ Thumbs.db"
 `;
 
 exports[`Assets Directory Snapshots > Python framework assets > python/python/http/strands/base/main.py should match snapshot 1`] = `
-"from typing import Any
+"from functools import lru_cache
+from typing import Any
 
 from strands import Agent, tool
 {{#if hasConfigBundle}}
@@ -4830,17 +4877,13 @@ def create_agent():
         hooks=[ConfigBundleHook()],
     )
 {{else}}
-_agent = None
-
-def get_or_create_agent():
-    global _agent
-    if _agent is None:
-        _agent = Agent(
-            model=load_model(),
-            system_prompt=DEFAULT_SYSTEM_PROMPT,
-            tools=tools
-        )
-    return _agent
+@lru_cache(maxsize=128)
+def get_or_create_agent(session_id):
+    return Agent(
+        model=load_model(),
+        system_prompt=DEFAULT_SYSTEM_PROMPT,
+        tools=tools
+    )
 {{/if}}
 {{/if}}
 
@@ -4857,7 +4900,8 @@ async def invoke(payload, context):
 {{#if hasConfigBundle}}
     agent = create_agent()
 {{else}}
-    agent = get_or_create_agent()
+    session_id = getattr(context, 'session_id', 'default-session')
+    agent = get_or_create_agent(session_id)
 {{/if}}
 {{/if}}
 

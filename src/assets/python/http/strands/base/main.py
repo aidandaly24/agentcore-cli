@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Any
 
 from strands import Agent, tool
@@ -173,17 +174,13 @@ def create_agent():
         hooks=[ConfigBundleHook()],
     )
 {{else}}
-_agent = None
-
-def get_or_create_agent():
-    global _agent
-    if _agent is None:
-        _agent = Agent(
-            model=load_model(),
-            system_prompt=DEFAULT_SYSTEM_PROMPT,
-            tools=tools
-        )
-    return _agent
+@lru_cache(maxsize=128)
+def get_or_create_agent(session_id):
+    return Agent(
+        model=load_model(),
+        system_prompt=DEFAULT_SYSTEM_PROMPT,
+        tools=tools
+    )
 {{/if}}
 {{/if}}
 
@@ -200,7 +197,8 @@ async def invoke(payload, context):
 {{#if hasConfigBundle}}
     agent = create_agent()
 {{else}}
-    agent = get_or_create_agent()
+    session_id = getattr(context, 'session_id', 'default-session')
+    agent = get_or_create_agent(session_id)
 {{/if}}
 {{/if}}
 
