@@ -507,6 +507,7 @@ describe('resolveConfigBundleComponentKeys', () => {
       configBundles,
       httpGateways: [],
       datasets: [],
+      interceptors: [],
       abTests: [],
       harnesses: [],
     };

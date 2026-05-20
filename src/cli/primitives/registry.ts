@@ -9,6 +9,7 @@ import { EvaluatorPrimitive } from './EvaluatorPrimitive';
 import { GatewayPrimitive } from './GatewayPrimitive';
 import { GatewayTargetPrimitive } from './GatewayTargetPrimitive';
 import { HarnessPrimitive } from './HarnessPrimitive';
+import { InterceptorPrimitive } from './InterceptorPrimitive';
 import { MemoryPrimitive } from './MemoryPrimitive';
 import { OnlineEvalConfigPrimitive } from './OnlineEvalConfigPrimitive';
 import { PolicyEnginePrimitive } from './PolicyEnginePrimitive';
@@ -33,6 +34,7 @@ export const policyPrimitive = new PolicyPrimitive();
 export const configBundlePrimitive = new ConfigBundlePrimitive();
 export const abTestPrimitive = new ABTestPrimitive();
 export const runtimeEndpointPrimitive = new RuntimeEndpointPrimitive();
+export const interceptorPrimitive = new InterceptorPrimitive();
 
 /**
  * All primitives in display order.
@@ -52,6 +54,7 @@ export const ALL_PRIMITIVES: BasePrimitive<unknown, RemovableResource>[] = [
   configBundlePrimitive,
   abTestPrimitive,
   runtimeEndpointPrimitive,
+  interceptorPrimitive,
 ];
 
 /**

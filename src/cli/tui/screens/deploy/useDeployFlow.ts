@@ -8,6 +8,7 @@ import {
   parseDatasetOutputs,
   parseEvaluatorOutputs,
   parseGatewayOutputs,
+  parseInterceptorOutputs,
   parseMemoryOutputs,
   parseOnlineEvalOutputs,
   parsePolicyEngineOutputs,
@@ -319,6 +320,13 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     const datasetNames = (ctx.projectSpec.datasets ?? []).map((d: { name: string }) => d.name);
     const datasets = parseDatasetOutputs(outputs, datasetNames);
 
+    // Parse interceptor outputs
+    const interceptorSpecs = (ctx.projectSpec.interceptors ?? []).map(i => ({
+      name: i.name,
+      mode: i.config.managed ? ('managed' as const) : ('external' as const),
+    }));
+    const interceptors = parseInterceptorOutputs(outputs, interceptorSpecs);
+
     // Expose outputs to UI
     setStackOutputs(outputs);
 
@@ -370,6 +378,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
       policies,
       datasets,
       harnesses: deployedHarnesses,
+      interceptors,
     });
 
     try {

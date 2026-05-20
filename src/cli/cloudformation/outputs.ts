@@ -3,6 +3,7 @@ import type {
   DatasetDeployedState,
   DeployedState,
   EvaluatorDeployedState,
+  InterceptorDeployedState,
   MemoryDeployedState,
   OnlineEvalDeployedState,
   PolicyDeployedState,
@@ -245,6 +246,57 @@ export function parseEvaluatorOutputs(
 }
 
 /**
+ * Parse stack outputs into deployed state for Lambda interceptors.
+ *
+ * Output key pattern: Interceptor{PascalName}(Arn|Mode|RoleArn|FunctionName)Output{Hash}
+ *
+ * Per Phase 1 wiring, the CDK construct emits:
+ *   - Arn (always)
+ *   - Mode (always — `managed` | `external`)
+ *   - RoleArn (managed only)
+ *   - FunctionName (managed only)
+ *
+ * The CLI consumes these into `targets[X].resources.mcp.interceptors[name]`.
+ */
+export function parseInterceptorOutputs(
+  outputs: StackOutputs,
+  interceptorSpecs: { name: string; mode: 'managed' | 'external' }[]
+): Record<string, InterceptorDeployedState> {
+  const interceptors: Record<string, InterceptorDeployedState> = {};
+  const outputKeys = Object.keys(outputs);
+
+  for (const spec of interceptorSpecs) {
+    const pascal = toPascalId('Interceptor', spec.name);
+    const arnPrefix = `${pascal}ArnOutput`;
+    const modePrefix = `${pascal}ModeOutput`;
+    const roleArnPrefix = `${pascal}RoleArnOutput`;
+    const fnNamePrefix = `${pascal}FunctionNameOutput`;
+
+    const arnKey = outputKeys.find(k => k.startsWith(arnPrefix));
+    const modeKey = outputKeys.find(k => k.startsWith(modePrefix));
+
+    if (!arnKey || !modeKey) continue;
+
+    const mode = outputs[modeKey] === 'managed' ? 'managed' : 'external';
+    const state: InterceptorDeployedState = {
+      mode,
+      interceptorArn: outputs[arnKey]!,
+    };
+
+    if (mode === 'managed') {
+      const roleArnKey = outputKeys.find(k => k.startsWith(roleArnPrefix));
+      const fnNameKey = outputKeys.find(k => k.startsWith(fnNamePrefix));
+      if (roleArnKey) state.interceptorRoleArn = outputs[roleArnKey];
+      if (fnNameKey) state.interceptorFunctionName = outputs[fnNameKey];
+    }
+
+    interceptors[spec.name] = state;
+  }
+
+  return interceptors;
+}
+
+/**
  * Parse stack outputs into deployed state for online evaluation configs.
  *
  * Output key pattern: ApplicationOnlineEval{PascalName}(Id|Arn)Output{Hash}
@@ -434,6 +486,8 @@ export interface BuildDeployedStateOptions {
     }
   >;
   datasets?: Record<string, DatasetDeployedState>;
+  /** Interceptor states keyed by interceptor name. Stored under mcp.interceptors. */
+  interceptors?: Record<string, InterceptorDeployedState>;
 }
 
 /**
@@ -456,6 +510,7 @@ export function buildDeployedState(opts: BuildDeployedStateOptions): DeployedSta
     runtimeEndpoints,
     harnesses,
     datasets,
+    interceptors,
   } = opts;
   const targetState: TargetDeployedState = {
     resources: {
@@ -468,10 +523,15 @@ export function buildDeployedState(opts: BuildDeployedStateOptions): DeployedSta
     },
   };
 
-  // Add MCP state if gateways exist
-  if (Object.keys(gateways).length > 0) {
+  // Add MCP state if gateways or interceptors exist. Both nest under `mcp`
+  // because interceptors attach to gateways logically (and the deployed-state
+  // schema reflects that hierarchy).
+  const hasGateways = Object.keys(gateways).length > 0;
+  const hasInterceptors = interceptors && Object.keys(interceptors).length > 0;
+  if (hasGateways || hasInterceptors) {
     targetState.resources!.mcp = {
-      gateways,
+      ...(hasGateways && { gateways }),
+      ...(hasInterceptors && { interceptors }),
     };
   }
 

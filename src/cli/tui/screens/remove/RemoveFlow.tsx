@@ -99,6 +99,7 @@ type FlowState =
   | { name: 'ab-test-success'; testName: string; logFilePath?: string }
   | { name: 'runtime-endpoint-success'; endpointName: string; logFilePath?: string }
   | { name: 'remove-all' }
+  | { name: 'interceptor-placeholder' }
   | { name: 'error'; message: string };
 
 interface RemoveFlowProps {
@@ -119,6 +120,7 @@ interface RemoveFlowProps {
     | 'memory'
     | 'credential'
     | 'evaluator'
+    | 'interceptor'
     | 'online-eval'
     | 'policy-engine'
     | 'policy'
@@ -157,6 +159,12 @@ export function RemoveFlow({
         return { name: 'select-evaluator' };
       case 'dataset':
         return { name: 'select-dataset' };
+      case 'interceptor':
+        // Interceptor TUI add/remove screens land in a follow-up sub-section.
+        // Surface a placeholder state so we can show a guided message instead
+        // of silently dropping the user (and any --name argument) into the
+        // generic resource picker, which doesn't list interceptor.
+        return { name: 'interceptor-placeholder' };
       case 'online-eval':
         return { name: 'select-online-eval' };
       case 'policy-engine':
@@ -1632,6 +1640,23 @@ export function RemoveFlow({
   // Remove all screen
   if (flow.name === 'remove-all') {
     return <RemoveAllScreen isInteractive={isInteractive} onExit={onExit} onNavigate={onNavigate} />;
+  }
+
+  // Interceptor placeholder — full TUI removal screen lands in a follow-up.
+  // Show a guided message rather than silently dropping the user (and any
+  // --name argument) into the unified picker that doesn't list interceptor.
+  if (flow.name === 'interceptor-placeholder') {
+    return (
+      <ErrorPrompt
+        message="Interactive interceptor removal is not yet available."
+        detail={
+          'Use the non-interactive form: ' +
+          '`agentcore remove interceptor --name <n> --yes` — see `agentcore remove interceptor --help`.'
+        }
+        onBack={() => setFlow({ name: 'select' })}
+        onExit={onExit}
+      />
+    );
   }
 
   // Error screen

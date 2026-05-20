@@ -77,13 +77,21 @@ async function main() {
   // Gateway fields are stored in agentcore.json but may not yet be on the
   // AgentCoreProjectSpec type from @aws/agentcore-cdk, so we read them
   // dynamically and cast the resulting object.
+  //
+  // Interceptors live at root in agentcore.json (\`interceptors[]\`). The CDK
+  // package's AgentCoreMcpSpec carries them in the same MCP-scoped object as
+  // gateways/runtimes, so we copy the field across at this boundary. Empty
+  // arrays are normalized to undefined to keep CDK synth clean when no
+  // interceptors are defined.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const specAny = spec as any;
-  const mcpSpec = specAny.agentCoreGateways?.length
+  const hasMcp = specAny.agentCoreGateways?.length || specAny.interceptors?.length;
+  const mcpSpec = hasMcp
     ? {
-        agentCoreGateways: specAny.agentCoreGateways,
+        agentCoreGateways: specAny.agentCoreGateways ?? [],
         mcpRuntimeTools: specAny.mcpRuntimeTools,
         unassignedTargets: specAny.unassignedTargets,
+        interceptors: specAny.interceptors?.length ? specAny.interceptors : undefined,
       }
     : undefined;
 
@@ -362,15 +370,25 @@ export class AgentCoreStack extends Stack {
     }
     this.application = new AgentCoreApplication(this, 'Application', appProps as any);
 
-    // Create AgentCoreMcp if there are gateways configured
-    if (mcpSpec?.agentCoreGateways && mcpSpec.agentCoreGateways.length > 0) {
-      new AgentCoreMcp(this, 'Mcp', {
-        projectName: spec.name,
-        mcpSpec,
-        agentCoreApplication: this.application,
-        credentials,
-        projectTags: spec.tags,
-      });
+    // Create AgentCoreMcp if there are gateways or interceptors configured.
+    // Interceptors are MCP-scoped via the gatewayName reference, so they
+    // never appear without gateways under valid schema, but the OR guard
+    // here is defensive — it prevents interceptors from silently vanishing
+    // if the spec ever reaches synth in a partially-validated state.
+    if (mcpSpec) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the bundled CDK type may not yet declare interceptors
+      const interceptorsAny = (mcpSpec as any).interceptors;
+      const hasGateways = mcpSpec.agentCoreGateways && mcpSpec.agentCoreGateways.length > 0;
+      const hasInterceptors = interceptorsAny && interceptorsAny.length > 0;
+      if (hasGateways || hasInterceptors) {
+        new AgentCoreMcp(this, 'Mcp', {
+          projectName: spec.name,
+          mcpSpec,
+          agentCoreApplication: this.application,
+          credentials,
+          projectTags: spec.tags,
+        });
+      }
     }
 
     // Stack-level output
@@ -419,8 +437,8 @@ exports[`Assets Directory Snapshots > CDK assets > cdk/cdk/package.json should m
     "typescript": "~5.9.3"
   },
   "dependencies": {
-    "@aws/agentcore-cdk": "^0.1.0-alpha.19",
-    "aws-cdk-lib": "^2.248.0",
+    "@aws/agentcore-cdk": "^0.1.0-alpha.29",
+    "aws-cdk-lib": "^2.252.0",
     "constructs": "^10.0.0"
   }
 }
@@ -449,6 +467,7 @@ test('AgentCoreStack synthesizes with empty spec', () => {
       mcpRuntimeTools: [],
       unassignedTargets: [],
       datasets: [],
+      interceptors: [],
     },
   });
   const template = Template.fromStack(stack);
@@ -517,6 +536,30 @@ exports[`Assets Directory Snapshots > File listing > should match the expected f
   "evaluators/python-lambda/lambda_function.py",
   "evaluators/python-lambda/pyproject.toml",
   "harness/invoke.py.template",
+  "interceptors/node-lambda/jwt-scope-authorizer/README.md",
+  "interceptors/node-lambda/jwt-scope-authorizer/execution-role-policy.json",
+  "interceptors/node-lambda/jwt-scope-authorizer/index.mjs",
+  "interceptors/node-lambda/jwt-scope-authorizer/package.json",
+  "interceptors/node-lambda/pass-through/README.md",
+  "interceptors/node-lambda/pass-through/execution-role-policy.json",
+  "interceptors/node-lambda/pass-through/index.mjs",
+  "interceptors/node-lambda/pass-through/package.json",
+  "interceptors/node-lambda/tools-list-filter/README.md",
+  "interceptors/node-lambda/tools-list-filter/execution-role-policy.json",
+  "interceptors/node-lambda/tools-list-filter/index.mjs",
+  "interceptors/node-lambda/tools-list-filter/package.json",
+  "interceptors/python-lambda/jwt-scope-authorizer/README.md",
+  "interceptors/python-lambda/jwt-scope-authorizer/execution-role-policy.json",
+  "interceptors/python-lambda/jwt-scope-authorizer/handler.py",
+  "interceptors/python-lambda/jwt-scope-authorizer/pyproject.toml",
+  "interceptors/python-lambda/pass-through/README.md",
+  "interceptors/python-lambda/pass-through/execution-role-policy.json",
+  "interceptors/python-lambda/pass-through/handler.py",
+  "interceptors/python-lambda/pass-through/pyproject.toml",
+  "interceptors/python-lambda/tools-list-filter/README.md",
+  "interceptors/python-lambda/tools-list-filter/execution-role-policy.json",
+  "interceptors/python-lambda/tools-list-filter/handler.py",
+  "interceptors/python-lambda/tools-list-filter/pyproject.toml",
   "mcp/python-lambda/README.md",
   "mcp/python-lambda/handler.py",
   "mcp/python-lambda/pyproject.toml",

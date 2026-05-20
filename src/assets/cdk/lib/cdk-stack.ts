@@ -63,15 +63,25 @@ export class AgentCoreStack extends Stack {
     }
     this.application = new AgentCoreApplication(this, 'Application', appProps as any);
 
-    // Create AgentCoreMcp if there are gateways configured
-    if (mcpSpec?.agentCoreGateways && mcpSpec.agentCoreGateways.length > 0) {
-      new AgentCoreMcp(this, 'Mcp', {
-        projectName: spec.name,
-        mcpSpec,
-        agentCoreApplication: this.application,
-        credentials,
-        projectTags: spec.tags,
-      });
+    // Create AgentCoreMcp if there are gateways or interceptors configured.
+    // Interceptors are MCP-scoped via the gatewayName reference, so they
+    // never appear without gateways under valid schema, but the OR guard
+    // here is defensive — it prevents interceptors from silently vanishing
+    // if the spec ever reaches synth in a partially-validated state.
+    if (mcpSpec) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the bundled CDK type may not yet declare interceptors
+      const interceptorsAny = (mcpSpec as any).interceptors;
+      const hasGateways = mcpSpec.agentCoreGateways && mcpSpec.agentCoreGateways.length > 0;
+      const hasInterceptors = interceptorsAny && interceptorsAny.length > 0;
+      if (hasGateways || hasInterceptors) {
+        new AgentCoreMcp(this, 'Mcp', {
+          projectName: spec.name,
+          mcpSpec,
+          agentCoreApplication: this.application,
+          credentials,
+          projectTags: spec.tags,
+        });
+      }
     }
 
     // Stack-level output

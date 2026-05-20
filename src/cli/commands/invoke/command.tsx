@@ -2,11 +2,12 @@ import { ValidationError, serializeResult } from '../../../lib';
 import { COMMAND_DESCRIPTIONS } from '../../constants';
 import { getErrorMessage } from '../../errors';
 import { isPreviewEnabled } from '../../feature-flags';
-import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
+import { runCliCommand, withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { renderTUI } from '../../tui';
 import { requireProject, requireTTY } from '../../tui/guards';
 import { parseHeaderFlags } from '../shared/header-utils';
 import { type InvokeContext, handleHarnessInvokeByArn, handleInvoke, loadInvokeConfig } from './action';
+import { type InvokeInterceptorOptions, handleInvokeInterceptor } from './interceptor';
 import { resolvePrompt } from './resolve-prompt';
 import type { InvokeOptions, InvokeResult } from './types';
 import { computeInvokeAttrs } from './utils';
@@ -352,4 +353,38 @@ export const registerInvoke = (program: Command) => {
       }
     }
   );
+
+  // ── agentcore invoke interceptor ──────────────────────────────────────────
+  // Subcommand for managed Lambda interceptors. External interceptors
+  // short-circuit via the shared mode-check helper. Commander matches
+  // registered subcommand names before treating positional args as the
+  // runtime prompt, so `agentcore invoke "say hello"` continues to route to
+  // the existing root-level handler unaffected.
+  invokeCmd
+    .command('interceptor')
+    .description('Invoke a Lambda interceptor (managed mode only)')
+    .option('--name <name>', 'Interceptor name (required)')
+    .option('--target <name>', 'Deployment target (defaults to first target)')
+    .option('--payload <json>', 'Inline JSON payload')
+    .option('--payload-file <path>', 'Path to a JSON file containing the payload')
+    .option('--json', 'Output as JSON')
+    .action(async (cliOptions: InvokeInterceptorOptions) => {
+      requireProject();
+      try {
+        await runCliCommand('invoke.interceptor', !!cliOptions.json, async () => {
+          const r = await handleInvokeInterceptor(cliOptions);
+          if (!r.success) {
+            throw r.error;
+          }
+          return { mode: 'managed' as const, has_payload_file: !!cliOptions.payloadFile };
+        });
+      } catch (error) {
+        if (cliOptions.json) {
+          console.log(JSON.stringify({ success: false, error: getErrorMessage(error) }));
+        } else {
+          render(<Text color="red">{getErrorMessage(error)}</Text>);
+        }
+        process.exit(1);
+      }
+    });
 };

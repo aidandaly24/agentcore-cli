@@ -20,6 +20,7 @@ import {
 } from './primitives/evaluator';
 import { HarnessNameSchema } from './primitives/harness';
 import { HttpGatewaySchema } from './primitives/http-gateway';
+import { type InterceptionPoint, type Interceptor, InterceptorSchema } from './primitives/interceptor';
 import {
   DEFAULT_EPISODIC_REFLECTION_NAMESPACES,
   DEFAULT_EPISODIC_REFLECTION_NAMESPACE_TEMPLATES,
@@ -93,6 +94,27 @@ export {
   HarnessToolTypeSchema,
   HarnessModelProviderSchema,
 } from './primitives/harness';
+
+export type {
+  ExternalInterceptorConfig,
+  InterceptionPoint,
+  Interceptor,
+  InterceptorConfig,
+  InterceptorRuntime,
+  InterceptorTemplate,
+  ManagedInterceptorConfig,
+} from './primitives/interceptor';
+export {
+  ExternalInterceptorConfigSchema,
+  InterceptionPointSchema,
+  InterceptorConfigSchema,
+  InterceptorNameSchema,
+  InterceptorRuntimeSchema,
+  InterceptorSchema,
+  InterceptorTemplateSchema,
+  ManagedInterceptorConfigSchema,
+  LAMBDA_ARN_PATTERN as INTERCEPTOR_LAMBDA_ARN_PATTERN,
+} from './primitives/interceptor';
 
 // ============================================================================
 // ManagedBy Schema
@@ -475,6 +497,26 @@ export const AgentCoreProjectSpecSchema = z
           seen.add(dataset.name);
         }
       }),
+
+    /**
+     * Lambda interceptors attached to gateways. Optional (not `.default([])`)
+     * so an `agentcore.json` that doesn't use interceptors stays sparse across
+     * CLI round-trips — matches the `datasets` convention. Consumers read it
+     * with `?? []`.
+     */
+    interceptors: z
+      .array(InterceptorSchema)
+      .optional()
+      .superRefine((val, ctx) => {
+        if (!val) return;
+        const seen = new Set<string>();
+        for (const interceptor of val) {
+          if (seen.has(interceptor.name)) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate interceptor name: ${interceptor.name}` });
+          }
+          seen.add(interceptor.name);
+        }
+      }),
   })
   .strict()
   .superRefine((spec, ctx) => {
@@ -563,6 +605,54 @@ export const AgentCoreProjectSpecSchema = z
             code: z.ZodIssueCode.custom,
             message: `HTTP gateway "${gw.name}" target "${target.name}" references qualifier "${target.qualifier}" which is not an endpoint on runtime "${target.runtimeRef}"`,
           });
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Interceptor cross-references and cardinality
+    //
+    // Each interceptor names the gateway it attaches to. Per gateway, the
+    // service caps interceptors at 2 (1 REQUEST + 1 RESPONSE), with no
+    // duplicate interception points.
+    // ─────────────────────────────────────────────────────────────────────
+    const gatewayNames = new Set(spec.agentCoreGateways.map(g => g.name));
+    const interceptorsByGateway = new Map<string, Interceptor[]>();
+
+    for (const interceptor of spec.interceptors ?? []) {
+      if (!gatewayNames.has(interceptor.gatewayName)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Interceptor "${interceptor.name}" references unknown gateway "${interceptor.gatewayName}"`,
+          path: ['interceptors'],
+        });
+        continue;
+      }
+      const list = interceptorsByGateway.get(interceptor.gatewayName) ?? [];
+      list.push(interceptor);
+      interceptorsByGateway.set(interceptor.gatewayName, list);
+    }
+
+    for (const [gw, list] of interceptorsByGateway) {
+      if (list.length > 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Gateway "${gw}" has ${list.length} interceptors. Maximum is 2 (1 REQUEST + 1 RESPONSE).`,
+          path: ['interceptors'],
+        });
+      }
+
+      const seenPoints = new Set<InterceptionPoint>();
+      for (const i of list) {
+        for (const p of i.interceptionPoints) {
+          if (seenPoints.has(p)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Gateway "${gw}" already has an interceptor at point ${p}.`,
+              path: ['interceptors'],
+            });
+          }
+          seenPoints.add(p);
         }
       }
     }

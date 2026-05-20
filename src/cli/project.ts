@@ -23,6 +23,7 @@ export function createDefaultProjectSpec(projectName: string): AgentCoreProjectS
     abTests: [],
     httpGateways: [],
     datasets: [],
+    interceptors: [],
     tags: {
       'agentcore:created-by': 'agentcore-cli',
       'agentcore:project-name': projectName,

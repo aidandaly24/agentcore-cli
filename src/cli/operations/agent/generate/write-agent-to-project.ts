@@ -76,6 +76,7 @@ export async function writeAgentToProject(config: GenerateConfig, options?: Writ
       httpGateways: [],
       harnesses: [],
       datasets: [],
+      interceptors: [],
     };
 
     await configIO.writeProjectSpec(project);

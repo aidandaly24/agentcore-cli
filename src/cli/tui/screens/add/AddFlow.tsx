@@ -40,6 +40,7 @@ type FlowState =
   | { name: 'config-bundle-wizard' }
   | { name: 'ab-test-wizard' }
   | { name: 'runtime-endpoint-wizard' }
+  | { name: 'interceptor-wizard' }
   | {
       name: 'agent-create-success';
       agentName: string;
@@ -199,6 +200,8 @@ function getInitialFlowState(resource?: AddResourceType): FlowState {
       return { name: 'config-bundle-wizard' };
     case 'ab-test':
       return { name: 'ab-test-wizard' };
+    case 'interceptor':
+      return { name: 'interceptor-wizard' };
     default:
       return { name: 'select' };
   }
@@ -260,6 +263,9 @@ export function AddFlow(props: AddFlowProps) {
         break;
       case 'runtime-endpoint':
         setFlow({ name: 'runtime-endpoint-wizard' });
+        break;
+      case 'interceptor':
+        setFlow({ name: 'interceptor-wizard' });
         break;
     }
   }, []);
@@ -560,6 +566,25 @@ export function AddFlow(props: AddFlowProps) {
         onBack={() => setFlow({ name: 'select' })}
         onDev={props.onDev}
         onDeploy={props.onDeploy}
+      />
+    );
+  }
+
+  if (flow.name === 'interceptor-wizard') {
+    // The full interactive wizard lands in a follow-up sub-section.
+    // Today, the action handler in InterceptorPrimitive routes here only when
+    // `agentcore add interceptor` is invoked with no flags AND a TTY exists;
+    // surface a guided message that points the user at the non-interactive
+    // CLI flags so they're not blocked.
+    return (
+      <ErrorPrompt
+        message="Interactive interceptor wizard is not yet available."
+        detail={
+          'Run `agentcore add interceptor --name <n> --gateway <g> --interception-points REQUEST[,RESPONSE] [--template ...] [--runtime ...]` ' +
+          'or `--lambda-arn <arn>` for external mode. See `agentcore add interceptor --help`.'
+        }
+        onBack={() => setFlow({ name: 'select' })}
+        onExit={props.onExit}
       />
     );
   }

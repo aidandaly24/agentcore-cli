@@ -11,6 +11,7 @@ import {
   parseDatasetOutputs,
   parseEvaluatorOutputs,
   parseGatewayOutputs,
+  parseInterceptorOutputs,
   parseMemoryOutputs,
   parseOnlineEvalOutputs,
   parsePolicyEngineOutputs,
@@ -504,6 +505,15 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     const datasetNames = (context.projectSpec.datasets ?? []).map(d => d.name);
     const datasets = parseDatasetOutputs(outputs, datasetNames);
 
+    // Parse interceptor outputs. Mode is read directly from the project spec
+    // (CDK echoes it as a CFN output too, but we already know it locally and
+    // skipping the round-trip keeps the parser simple).
+    const interceptorSpecs = (context.projectSpec.interceptors ?? []).map(i => ({
+      name: i.name,
+      mode: i.config.managed ? ('managed' as const) : ('external' as const),
+    }));
+    const interceptors = parseInterceptorOutputs(outputs, interceptorSpecs);
+
     endStep('success');
 
     // Post-CDK: deploy imperative resources (harness) — preview mode only
@@ -572,6 +582,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
       harnesses: deployedHarnesses,
       runtimeEndpoints,
       datasets,
+      interceptors,
     });
 
     if (deployHash) {

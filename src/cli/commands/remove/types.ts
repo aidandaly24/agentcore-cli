@@ -9,6 +9,7 @@ export type ResourceType =
   | 'memory'
   | 'credential'
   | 'evaluator'
+  | 'interceptor'
   | 'online-eval'
   | 'policy-engine'
   | 'policy'

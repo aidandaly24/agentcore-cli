@@ -8,6 +8,7 @@ import {
   findConfigRoot,
 } from '../../../lib';
 import type { Result } from '../../../lib/result';
+import { validateInterceptors } from '../../operations/deploy/preflight';
 
 export interface ValidateOptions {
   directory?: string;
@@ -32,15 +33,17 @@ export async function handleValidate(options: ValidateOptions): Promise<Result> 
   const configIO = new ConfigIO({ baseDir: configRoot });
 
   // Validate project spec (agentcore.json)
+  let projectSpec;
   try {
-    await configIO.readProjectSpec();
+    projectSpec = await configIO.readProjectSpec();
   } catch (err) {
     return { success: false, error: new Error(formatError(err, 'agentcore.json'), { cause: err }) };
   }
 
   // Validate AWS targets (aws-targets.json)
+  let awsTargets;
   try {
-    await configIO.readAWSDeploymentTargets();
+    awsTargets = await configIO.readAWSDeploymentTargets();
   } catch (err) {
     return { success: false, error: new Error(formatError(err, 'aws-targets.json'), { cause: err }) };
   }
@@ -52,6 +55,14 @@ export async function handleValidate(options: ValidateOptions): Promise<Result> 
     } catch (err) {
       return { success: false, error: new Error(formatError(err, '.cli/state.json'), { cause: err }) };
     }
+  }
+
+  // Run interceptor preflight: codeLocation existence + cross-account WARN.
+  // Mirrors the deploy path so `validate` is a real pre-check, not just a Zod parse.
+  try {
+    await validateInterceptors(projectSpec, awsTargets, configRoot);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
 
   return { success: true };

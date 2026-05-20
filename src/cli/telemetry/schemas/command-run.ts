@@ -97,6 +97,21 @@ const AddPolicyAttrs = safeSchema({
   policy_validation_mode: PolicyValidationMode,
 });
 
+const InterceptorMode = z.enum(['managed', 'external']);
+const InterceptorRuntime = z.enum(['python3.12', 'nodejs22.x']);
+const InterceptorTemplate = z.enum(['pass-through', 'jwt-scope-authorizer', 'tools-list-filter']);
+
+const AddInterceptorAttrs = safeSchema({
+  mode: InterceptorMode,
+  runtime: InterceptorRuntime,
+  template: InterceptorTemplate,
+  has_cross_account_warning: z.boolean(),
+});
+
+const LogsInterceptorAttrs = safeSchema({ mode: InterceptorMode, has_follow: z.boolean() });
+
+const InvokeInterceptorAttrs = safeSchema({ mode: InterceptorMode, has_payload_file: z.boolean() });
+
 const DeployAttrs = safeSchema({
   runtime_count: Count,
   harness_count: Count,
@@ -172,12 +187,15 @@ export const COMMAND_SCHEMAS = {
   'add.policy-engine': AddPolicyEngineAttrs,
   'add.policy': AddPolicyAttrs,
   'add.runtime-endpoint': NoAttrs,
+  'add.interceptor': AddInterceptorAttrs,
   deploy: DeployAttrs,
   dev: DevAttrs,
   invoke: InvokeAttrs,
   status: StatusAttrs,
   logs: LogsAttrs,
   'logs.evals': LogsEvalsAttrs,
+  'logs.interceptor': LogsInterceptorAttrs,
+  'invoke.interceptor': InvokeInterceptorAttrs,
   'run.eval': RunEvalAttrs,
   'fetch.access': FetchAccessAttrs,
   feedback: FeedbackAttrs,
@@ -215,6 +233,9 @@ export const COMMAND_SCHEMAS = {
   'dataset.download': NoAttrs,
   'dataset.publish-version': NoAttrs,
   'dataset.remove-version': NoAttrs,
+  'remove.interceptor': NoAttrs,
+  'telemetry.disable': NoAttrs,
+  'telemetry.enable': NoAttrs,
   'telemetry.status': NoAttrs,
 } as const satisfies Record<string, z.ZodObject<z.ZodRawShape>>;
 
