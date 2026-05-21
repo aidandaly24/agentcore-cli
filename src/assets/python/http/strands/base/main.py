@@ -165,8 +165,12 @@ def agent_factory():
     return get_or_create_agent
 get_or_create_agent = agent_factory()
 {{else}}
+# Caches up to 128 active sessions; LRU eviction silently resets history for
+# the oldest session. For production use, replace with a durable session store
+# (e.g. Strands FileSessionManager).
 {{#if hasConfigBundle}}
-def create_agent():
+@lru_cache(maxsize=128)
+def get_or_create_agent(session_id):
     return Agent(
         model=load_model(),
         system_prompt=DEFAULT_SYSTEM_PROMPT,
@@ -194,12 +198,8 @@ async def invoke(payload, context):
     user_id = getattr(context, 'user_id', 'default-user')
     agent = get_or_create_agent(session_id, user_id)
 {{else}}
-{{#if hasConfigBundle}}
-    agent = create_agent()
-{{else}}
     session_id = getattr(context, 'session_id', 'default-session')
     agent = get_or_create_agent(session_id)
-{{/if}}
 {{/if}}
 
     # Execute and format response

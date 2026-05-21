@@ -99,6 +99,9 @@ You have persistent storage at {{sessionStorageMountPath}}. Use file tools to re
 """
 
 
+# Caches up to 128 active sessions; LRU eviction silently resets history for
+# the oldest session. For production use, replace with a durable session store
+# (e.g. SQLiteSession with a file path).
 @lru_cache(maxsize=128)
 def get_session(session_id):
     return SQLiteSession(session_id)
