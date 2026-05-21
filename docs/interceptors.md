@@ -161,12 +161,3 @@ agentcore deploy
 
 Managed-mode removal also deletes the scaffolded `app/<name>/` directory. External-mode removal touches only the JSON
 entry. The next `deploy` reconciles the gateway via CloudFormation — no imperative `UpdateGateway` calls.
-
-## Limitations / out of scope (P0)
-
-- PII-redaction template (requires customer-specific patterns).
-- Audit-logging template (OpenSearch / S3 wiring).
-- Provisioned concurrency.
-- Multi-gateway shared interceptor pools.
-- Console UX parity.
-- Streaming-aware first-invocation guard as active code (shipped commented-in).
