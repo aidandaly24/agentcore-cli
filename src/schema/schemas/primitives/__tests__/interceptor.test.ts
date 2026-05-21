@@ -6,7 +6,7 @@ import { InterceptorSchema } from '../interceptor';
 import { describe, expect, it } from 'vitest';
 
 describe('InterceptorSchema', () => {
-  it('accepts a managed entry with required defaults applied', () => {
+  it('accepts a managed entry with optional fields omitted (defaults applied at consumption time)', () => {
     const r = InterceptorSchema.safeParse({
       name: 'auth-check',
       gatewayName: 'my-gw',
@@ -15,10 +15,14 @@ describe('InterceptorSchema', () => {
     });
     expect(r.success).toBe(true);
     if (r.success) {
-      // Defaults apply
-      expect(r.data.passRequestHeaders).toBe(true);
-      expect(r.data.config.managed?.runtime).toBe('python3.12');
-      expect(r.data.config.managed?.timeoutSeconds).toBe(30);
+      // Schema parse keeps user-edited JSON sparse — defaults are NOT injected here.
+      // Consumers (CDK constructs, primitive add flows) apply defaults via
+      // `?? INTERCEPTOR_DEFAULTS.X` at use time. See INTERCEPTOR_DEFAULTS in
+      // schema/schemas/primitives/interceptor.ts.
+      expect(r.data.passRequestHeaders).toBeUndefined();
+      expect(r.data.config.managed?.runtime).toBeUndefined();
+      expect(r.data.config.managed?.timeoutSeconds).toBeUndefined();
+      expect(r.data.config.managed?.entrypoint).toBeUndefined();
     }
   });
 

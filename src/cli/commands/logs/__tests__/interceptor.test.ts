@@ -93,7 +93,7 @@ describe('handleLogsInterceptor', () => {
     const r = await handleLogsInterceptor({ name: 'auth' });
     expect(r.success).toBe(false);
     if (!r.success) {
-      expect(r.error.message).toMatch(/interceptorFunctionName/);
+      expect(r.error.message).toMatch(/has no Lambda function/);
       expect(r.error.message).toMatch(/agentcore deploy/);
     }
   });

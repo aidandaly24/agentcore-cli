@@ -68,7 +68,7 @@ describe('lookupInterceptor', () => {
 
   it('throws ResourceNotFoundError when name is missing', async () => {
     mockReadDeployedState.mockResolvedValue(deployedState({}));
-    await expect(lookupInterceptor('nope')).rejects.toThrow(/not found in deployed-state/);
+    await expect(lookupInterceptor('nope')).rejects.toThrow(/is not deployed/);
   });
 });
 
