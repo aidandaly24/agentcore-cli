@@ -3,4 +3,5 @@ src/assets/**/*.md
 .github/scripts/prompts/
 src/assets/**/*.ts
 src/assets/**/*.json
+src/assets/**/*.mjs
 src/assets/**/*.template
