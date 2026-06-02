@@ -83,7 +83,7 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
           // The user will see the original render error, not a recovery error.
           try {
             const project = await this.readProjectSpec();
-            project.interceptors = project.interceptors.filter(i => i.name !== options.name);
+            project.interceptors = (project.interceptors ?? []).filter(i => i.name !== options.name);
             await this.writeProjectSpec(project);
           } catch {
             // Best-effort rollback — surface the original render error regardless.
@@ -101,6 +101,7 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
   async remove(interceptorName: string): Promise<Result> {
     try {
       const project = await this.readProjectSpec();
+      project.interceptors ??= [];
 
       const index = project.interceptors.findIndex(i => i.name === interceptorName);
       if (index === -1) {
@@ -134,6 +135,7 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
 
   async previewRemove(interceptorName: string): Promise<RemovalPreview> {
     const project = await this.readProjectSpec();
+    project.interceptors ??= [];
 
     const interceptor = project.interceptors.find(i => i.name === interceptorName);
     if (!interceptor) {
@@ -172,13 +174,13 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
   async getRemovable(): Promise<RemovableInterceptor[]> {
     if (!findConfigRoot()) return [];
     const project = await this.readProjectSpec();
-    return project.interceptors.map(i => ({ name: i.name }));
+    return (project.interceptors ?? []).map(i => ({ name: i.name }));
   }
 
   async getAllNames(): Promise<string[]> {
     if (!findConfigRoot()) return [];
     const project = await this.readProjectSpec();
-    return project.interceptors.map(i => i.name);
+    return (project.interceptors ?? []).map(i => i.name);
   }
 
   registerCommands(addCmd: Command, removeCmd: Command): void {
@@ -381,6 +383,7 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
    */
   private async createInterceptor(options: AddInterceptorOptions): Promise<Interceptor> {
     const project = await this.readProjectSpec();
+    project.interceptors ??= [];
 
     this.checkDuplicate(project.interceptors, options.name);
 

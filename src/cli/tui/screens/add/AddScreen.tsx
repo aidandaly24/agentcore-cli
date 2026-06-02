@@ -11,6 +11,7 @@ export type AddResourceType =
   | 'online-eval'
   | 'gateway'
   | 'gateway-target'
+  | 'interceptor'
   | 'runtime-endpoint'
   | 'policy'
   | 'config-bundle'
