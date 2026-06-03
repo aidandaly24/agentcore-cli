@@ -1,5 +1,6 @@
 import { resolveUIDistDir } from '../web-server.js';
-import fs, { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import fs from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
