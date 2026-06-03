@@ -8,9 +8,9 @@
  * preserved while the account ID itself is obscured.
  *
  * Used by:
- *   - The cross-account interceptor preflight warning
- *   - `agentcore status` rendering for interceptor ARNs
- *   - Telemetry attributes that carry interceptor ARNs
+ *   - The cross-account interceptor preflight warning (preflight.ts)
+ *   - logs/invoke interceptor external-mode remediation messages
+ *     (interceptor-mode-check.ts)
  *
  * Idempotent on already-masked input.
  */

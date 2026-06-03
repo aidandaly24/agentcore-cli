@@ -10,6 +10,7 @@ import {
   useRemovableGateways,
   useRemovableHarnesses,
   useRemovableIdentities,
+  useRemovableInterceptors,
   useRemovableMemories,
   useRemovableOnlineEvalConfigs,
   useRemovablePolicies,
@@ -25,6 +26,7 @@ import {
   useRemoveGatewayTarget,
   useRemoveHarness,
   useRemoveIdentity,
+  useRemoveInterceptor,
   useRemoveMemory,
   useRemoveOnlineEvalConfig,
   useRemovePolicy,
@@ -41,6 +43,7 @@ import { RemoveEvaluatorScreen } from './RemoveEvaluatorScreen';
 import { RemoveGatewayScreen } from './RemoveGatewayScreen';
 import { RemoveGatewayTargetScreen } from './RemoveGatewayTargetScreen';
 import { RemoveIdentityScreen } from './RemoveIdentityScreen';
+import { RemoveInterceptorScreen } from './RemoveInterceptorScreen';
 import { RemoveMemoryScreen } from './RemoveMemoryScreen';
 import { RemoveOnlineEvalScreen } from './RemoveOnlineEvalScreen';
 import { RemovePolicyEngineScreen } from './RemovePolicyEngineScreen';
@@ -61,6 +64,7 @@ type FlowState =
   | { name: 'select-memory' }
   | { name: 'select-identity' }
   | { name: 'select-evaluator' }
+  | { name: 'select-interceptor' }
   | { name: 'select-dataset' }
   | { name: 'select-online-eval' }
   | { name: 'select-policy-engine' }
@@ -76,6 +80,7 @@ type FlowState =
   | { name: 'confirm-memory'; memoryName: string; preview: RemovalPreview }
   | { name: 'confirm-identity'; identityName: string; preview: RemovalPreview }
   | { name: 'confirm-evaluator'; evaluatorName: string; preview: RemovalPreview }
+  | { name: 'confirm-interceptor'; interceptorName: string; preview: RemovalPreview }
   | { name: 'confirm-dataset'; datasetName: string; preview: RemovalPreview }
   | { name: 'confirm-online-eval'; configName: string; preview: RemovalPreview }
   | { name: 'confirm-policy-engine'; engineName: string; preview: RemovalPreview }
@@ -91,6 +96,7 @@ type FlowState =
   | { name: 'memory-success'; memoryName: string; logFilePath?: string }
   | { name: 'identity-success'; identityName: string; logFilePath?: string }
   | { name: 'evaluator-success'; evaluatorName: string; logFilePath?: string }
+  | { name: 'interceptor-success'; interceptorName: string; logFilePath?: string }
   | { name: 'dataset-success'; datasetName: string; logFilePath?: string }
   | { name: 'online-eval-success'; configName: string; logFilePath?: string }
   | { name: 'policy-engine-success'; engineName: string; logFilePath?: string }
@@ -99,7 +105,6 @@ type FlowState =
   | { name: 'ab-test-success'; testName: string; logFilePath?: string }
   | { name: 'runtime-endpoint-success'; endpointName: string; logFilePath?: string }
   | { name: 'remove-all' }
-  | { name: 'interceptor-placeholder' }
   | { name: 'error'; message: string };
 
 interface RemoveFlowProps {
@@ -157,14 +162,10 @@ export function RemoveFlow({
         return { name: 'select-identity' };
       case 'evaluator':
         return { name: 'select-evaluator' };
+      case 'interceptor':
+        return { name: 'select-interceptor' };
       case 'dataset':
         return { name: 'select-dataset' };
-      case 'interceptor':
-        // Interceptor TUI add/remove screens land in a follow-up sub-section.
-        // Surface a placeholder state so we can show a guided message instead
-        // of silently dropping the user (and any --name argument) into the
-        // generic resource picker, which doesn't list interceptor.
-        return { name: 'interceptor-placeholder' };
       case 'online-eval':
         return { name: 'select-online-eval' };
       case 'policy-engine':
@@ -193,6 +194,7 @@ export function RemoveFlow({
   const { memories, isLoading: isLoadingMemories, refresh: refreshMemories } = useRemovableMemories();
   const { identities, isLoading: isLoadingIdentities, refresh: refreshIdentities } = useRemovableIdentities();
   const { evaluators, isLoading: isLoadingEvaluators, refresh: refreshEvaluators } = useRemovableEvaluators();
+  const { interceptors, isLoading: isLoadingInterceptors, refresh: refreshInterceptors } = useRemovableInterceptors();
   const { datasets, isLoading: isLoadingDatasets, refresh: refreshDatasets } = useRemovableDatasets();
   const {
     onlineEvalConfigs,
@@ -226,6 +228,7 @@ export function RemoveFlow({
     isLoadingMemories ||
     isLoadingIdentities ||
     isLoadingEvaluators ||
+    isLoadingInterceptors ||
     isLoadingDatasets ||
     isLoadingOnlineEvals ||
     isLoadingPolicyEngines ||
@@ -242,6 +245,7 @@ export function RemoveFlow({
     loadMemoryPreview,
     loadIdentityPreview,
     loadEvaluatorPreview,
+    loadInterceptorPreview,
     loadDatasetPreview,
     loadOnlineEvalPreview,
     loadPolicyEnginePreview,
@@ -260,6 +264,7 @@ export function RemoveFlow({
   const { remove: removeMemoryOp, reset: resetRemoveMemory } = useRemoveMemory();
   const { remove: removeIdentityOp, reset: resetRemoveIdentity } = useRemoveIdentity();
   const { remove: removeEvaluatorOp, reset: resetRemoveEvaluator } = useRemoveEvaluator();
+  const { remove: removeInterceptorOp, reset: resetRemoveInterceptor } = useRemoveInterceptor();
   const { remove: removeDatasetOp, reset: resetRemoveDataset } = useRemoveDataset();
   const { remove: removeOnlineEvalOp, reset: resetRemoveOnlineEval } = useRemoveOnlineEvalConfig();
   const { remove: removePolicyEngineOp, reset: resetRemovePolicyEngine } = useRemovePolicyEngine();
@@ -295,6 +300,7 @@ export function RemoveFlow({
         'memory-success',
         'identity-success',
         'evaluator-success',
+        'interceptor-success',
         'dataset-success',
         'online-eval-success',
         'policy-engine-success',
@@ -334,6 +340,9 @@ export function RemoveFlow({
         break;
       case 'evaluator':
         setFlow({ name: 'select-evaluator' });
+        break;
+      case 'interceptor':
+        setFlow({ name: 'select-interceptor' });
         break;
       case 'dataset':
         setFlow({ name: 'select-dataset' });
@@ -517,6 +526,28 @@ export function RemoveFlow({
       }
     },
     [loadEvaluatorPreview, force, removeEvaluatorOp]
+  );
+
+  const handleSelectInterceptor = useCallback(
+    async (interceptorName: string) => {
+      const result = await loadInterceptorPreview(interceptorName);
+      if (result.ok) {
+        if (force) {
+          setFlow({ name: 'loading', message: `Removing interceptor ${interceptorName}...` });
+          const removeResult = await removeInterceptorOp(interceptorName, result.preview);
+          if (removeResult.success) {
+            setFlow({ name: 'interceptor-success', interceptorName });
+          } else {
+            setFlow({ name: 'error', message: removeResult.error.message });
+          }
+        } else {
+          setFlow({ name: 'confirm-interceptor', interceptorName, preview: result.preview });
+        }
+      } else {
+        setFlow({ name: 'error', message: result.error });
+      }
+    },
+    [loadInterceptorPreview, force, removeInterceptorOp]
   );
 
   const handleSelectDataset = useCallback(
@@ -703,6 +734,9 @@ export function RemoveFlow({
         case 'evaluator':
           void handleSelectEvaluator(initialResourceName);
           break;
+        case 'interceptor':
+          void handleSelectInterceptor(initialResourceName);
+          break;
         case 'online-eval':
           void handleSelectOnlineEval(initialResourceName);
           break;
@@ -735,6 +769,7 @@ export function RemoveFlow({
     handleSelectMemory,
     handleSelectIdentity,
     handleSelectEvaluator,
+    handleSelectInterceptor,
     handleSelectDataset,
     handleSelectOnlineEval,
     handleSelectPolicyEngine,
@@ -855,6 +890,22 @@ export function RemoveFlow({
       setResultReady(true);
     },
     [removeEvaluatorOp]
+  );
+
+  const handleConfirmInterceptor = useCallback(
+    async (interceptorName: string, preview: RemovalPreview) => {
+      pendingResultRef.current = null;
+      setResultReady(false);
+      setFlow({ name: 'loading', message: `Removing interceptor ${interceptorName}...` });
+      const result = await removeInterceptorOp(interceptorName, preview);
+      if (result.success) {
+        pendingResultRef.current = { name: 'interceptor-success', interceptorName, logFilePath: result.logFilePath };
+      } else {
+        pendingResultRef.current = { name: 'error', message: result.error.message };
+      }
+      setResultReady(true);
+    },
+    [removeInterceptorOp]
   );
 
   const handleConfirmDataset = useCallback(
@@ -978,6 +1029,7 @@ export function RemoveFlow({
     resetRemoveMemory();
     resetRemoveIdentity();
     resetRemoveEvaluator();
+    resetRemoveInterceptor();
     resetRemoveDataset();
     resetRemoveOnlineEval();
     resetRemovePolicyEngine();
@@ -994,6 +1046,7 @@ export function RemoveFlow({
     resetRemoveMemory,
     resetRemoveIdentity,
     resetRemoveEvaluator,
+    resetRemoveInterceptor,
     resetRemoveDataset,
     resetRemoveOnlineEval,
     resetRemovePolicyEngine,
@@ -1012,6 +1065,7 @@ export function RemoveFlow({
       refreshMemories(),
       refreshIdentities(),
       refreshEvaluators(),
+      refreshInterceptors(),
       refreshDatasets(),
       refreshOnlineEvals(),
       refreshPolicyEngines(),
@@ -1027,6 +1081,7 @@ export function RemoveFlow({
     refreshMemories,
     refreshIdentities,
     refreshEvaluators,
+    refreshInterceptors,
     refreshDatasets,
     refreshOnlineEvals,
     refreshPolicyEngines,
@@ -1051,6 +1106,7 @@ export function RemoveFlow({
         memoryCount={memories.length}
         credentialCount={identities.length}
         evaluatorCount={evaluators.length}
+        interceptorCount={interceptors.length}
         onlineEvalCount={onlineEvalConfigs.length}
         policyEngineCount={policyEngines.length}
         policyCount={policies.length}
@@ -1161,6 +1217,19 @@ export function RemoveFlow({
       <RemoveEvaluatorScreen
         evaluators={evaluators}
         onSelect={(name: string) => void handleSelectEvaluator(name)}
+        onExit={() => setFlow({ name: 'select' })}
+      />
+    );
+  }
+
+  if (flow.name === 'select-interceptor') {
+    if (initialResourceName && isLoading) {
+      return null;
+    }
+    return (
+      <RemoveInterceptorScreen
+        interceptors={interceptors}
+        onSelect={(name: string) => void handleSelectInterceptor(name)}
         onExit={() => setFlow({ name: 'select' })}
       />
     );
@@ -1331,6 +1400,17 @@ export function RemoveFlow({
         preview={flow.preview}
         onConfirm={() => void handleConfirmEvaluator(flow.evaluatorName, flow.preview)}
         onCancel={() => setFlow({ name: 'select-evaluator' })}
+      />
+    );
+  }
+
+  if (flow.name === 'confirm-interceptor') {
+    return (
+      <RemoveConfirmScreen
+        title={`Remove Interceptor: ${flow.interceptorName}`}
+        preview={flow.preview}
+        onConfirm={() => void handleConfirmInterceptor(flow.interceptorName, flow.preview)}
+        onCancel={() => setFlow({ name: 'select-interceptor' })}
       />
     );
   }
@@ -1525,6 +1605,22 @@ export function RemoveFlow({
     );
   }
 
+  if (flow.name === 'interceptor-success') {
+    return (
+      <RemoveSuccessScreen
+        isInteractive={isInteractive}
+        message={`Removed interceptor: ${flow.interceptorName}`}
+        detail="Interceptor removed from agentcore.json. Deploy with `agentcore deploy` to apply changes."
+        logFilePath={flow.logFilePath}
+        onRemoveAnother={() => {
+          resetAll();
+          void refreshAll().then(() => setFlow({ name: 'select' }));
+        }}
+        onExit={onExit}
+      />
+    );
+  }
+
   if (flow.name === 'dataset-success') {
     return (
       <RemoveSuccessScreen
@@ -1640,23 +1736,6 @@ export function RemoveFlow({
   // Remove all screen
   if (flow.name === 'remove-all') {
     return <RemoveAllScreen isInteractive={isInteractive} onExit={onExit} onNavigate={onNavigate} />;
-  }
-
-  // Interceptor placeholder — full TUI removal screen lands in a follow-up.
-  // Show a guided message rather than silently dropping the user (and any
-  // --name argument) into the unified picker that doesn't list interceptor.
-  if (flow.name === 'interceptor-placeholder') {
-    return (
-      <ErrorPrompt
-        message="Interactive interceptor removal is not yet available."
-        detail={
-          'Use the non-interactive form: ' +
-          '`agentcore remove interceptor --name <n> --yes` — see `agentcore remove interceptor --help`.'
-        }
-        onBack={() => setFlow({ name: 'select' })}
-        onExit={onExit}
-      />
-    );
   }
 
   // Error screen

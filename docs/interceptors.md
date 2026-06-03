@@ -32,6 +32,19 @@ agentcore add interceptor \
 agentcore deploy
 ```
 
+Managed interceptors can attach extra IAM permissions to their execution role with `--additional-policies` (a
+comma-separated list of JSON policy-document file paths relative to the interceptor's code directory, or managed-policy
+ARNs):
+
+```bash
+agentcore add interceptor \
+  --name auth-check \
+  --gateway my-gateway \
+  --interception-points REQUEST \
+  --template jwt-scope-authorizer \
+  --additional-policies execution-role-policy.json,arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess
+```
+
 ## Quick start — external (BYO ARN)
 
 ```bash
@@ -43,6 +56,30 @@ agentcore add interceptor \
 ```
 
 The CLI does not scaffold any code; the only artifact is the JSON entry in `agentcore.json`.
+
+## Interactive (TUI)
+
+Running `agentcore add interceptor` with no flags (in a TTY) launches the interactive wizard. It is also reachable from
+the top-level `agentcore add` menu under **Interceptor**. The wizard collects the same fields as the flags above:
+
+```
+name → gateway → interception points → mode
+  ├─ managed:  template → runtime → advanced → confirm
+  └─ external: Lambda ARN → confirm
+```
+
+The **Advanced** step is a multi-select for the optional managed-mode settings — pick only the ones you need and the
+wizard injects just those sub-steps:
+
+| Advanced setting        | Sub-step                                          | Default  |
+| ----------------------- | ------------------------------------------------- | -------- |
+| Lambda timeout          | Timeout in seconds (1–300)                        | `30`     |
+| Additional IAM policies | Comma-separated policy file paths or managed ARNs | _(none)_ |
+| Pass request headers    | Yes / No                                          | `Yes`    |
+
+Removal is also interactive: `agentcore remove interceptor` (or the **Interceptor** entry in `agentcore remove`) lists
+your interceptors, previews exactly what will change — including the scaffolded `app/<name>/` directory for managed mode
+— and confirms before writing.
 
 ## Dual-point on a single Lambda
 
@@ -85,6 +122,9 @@ agentcore invoke interceptor --name auth-check --payload-file ./test-event.json
 
 For external interceptors, both verbs print a copy-pasteable `aws` CLI remediation and exit non-zero — the CLI doesn't
 own those Lambdas.
+
+`agentcore status` lists interceptors under their own section, showing deployment state (`deployed`, `local-only`,
+`pending-removal`) alongside mode and interception points (e.g. `managed — REQUEST+RESPONSE`).
 
 ## Cross-account external interceptors
 

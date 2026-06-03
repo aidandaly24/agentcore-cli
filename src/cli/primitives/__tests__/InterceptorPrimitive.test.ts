@@ -36,6 +36,14 @@ vi.mock('../../templates/InterceptorRenderer', () => ({
   renderInterceptorTemplate: renderInterceptorTemplateMock,
 }));
 
+// Run the action callback inline (no telemetry, no process.exit) so command
+// parsing — comma splitting and cross-flag rejection — can be asserted directly.
+vi.mock('../../telemetry/cli-command-run.js', () => ({
+  runCliCommand: async (_command: string, _json: boolean, fn: () => Promise<unknown>) => {
+    await fn();
+  },
+}));
+
 vi.mock('node:fs', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return { ...actual, existsSync: vi.fn(() => false) };
@@ -274,6 +282,67 @@ describe('InterceptorPrimitive', () => {
       );
       const preview = await primitive.previewRemove('central-auth');
       expect(preview.directoriesToDelete).toEqual([]);
+    });
+  });
+
+  describe('add interceptor command (--additional-policies)', () => {
+    async function runAdd(args: string[]) {
+      const { Command } = await import('@commander-js/extra-typings');
+      const program = new Command();
+      program.exitOverride();
+      const addCmd = program.command('add');
+      const removeCmd = program.command('remove');
+      primitive.registerCommands(addCmd, removeCmd);
+      await program.parseAsync(['add', 'interceptor', ...args], { from: 'user' });
+    }
+
+    it('parses comma-separated --additional-policies into config.managed.additionalPolicies', async () => {
+      mockReadProjectSpec.mockResolvedValue(makeProject());
+      await runAdd([
+        '--name',
+        'auth-check',
+        '--gateway',
+        'my-gw',
+        '--interception-points',
+        'REQUEST',
+        '--additional-policies',
+        'execution-role-policy.json, arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess',
+      ]);
+
+      const written = mockWriteProjectSpec.mock.calls[0]?.[0];
+      const added = written?.interceptors?.find((i: { name: string }) => i.name === 'auth-check');
+      expect(added.config.managed.additionalPolicies).toEqual([
+        'execution-role-policy.json',
+        'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess',
+      ]);
+    });
+
+    it('omits additionalPolicies from agentcore.json when not provided', async () => {
+      mockReadProjectSpec.mockResolvedValue(makeProject());
+      await runAdd(['--name', 'auth-check', '--gateway', 'my-gw', '--interception-points', 'REQUEST']);
+
+      const written = mockWriteProjectSpec.mock.calls[0]?.[0];
+      const added = written?.interceptors?.find((i: { name: string }) => i.name === 'auth-check');
+      expect(added.config.managed).not.toHaveProperty('additionalPolicies');
+    });
+
+    it('rejects --additional-policies with --lambda-arn (external mode)', async () => {
+      mockReadProjectSpec.mockResolvedValue(makeProject());
+      await expect(
+        runAdd([
+          '--name',
+          'central-auth',
+          '--gateway',
+          'my-gw',
+          '--interception-points',
+          'REQUEST',
+          '--lambda-arn',
+          'arn:aws:lambda:us-east-1:111111111111:function:central-auth',
+          '--additional-policies',
+          'execution-role-policy.json',
+        ])
+      ).rejects.toThrow('--additional-policies cannot be used with --lambda-arn');
+      expect(mockWriteProjectSpec).not.toHaveBeenCalled();
     });
   });
 

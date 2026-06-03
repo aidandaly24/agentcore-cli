@@ -25,6 +25,7 @@ const ICONS = {
   dataset: '▤',
   harness: '⬢',
   'runtime-endpoint': '◉',
+  interceptor: '⇄',
 } as const;
 
 interface ResourceGraphProps {

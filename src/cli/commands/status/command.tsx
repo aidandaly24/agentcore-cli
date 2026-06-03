@@ -19,6 +19,7 @@ const VALID_RESOURCE_TYPES = [
   'memory',
   'credential',
   'gateway',
+  'interceptor',
   'evaluator',
   'online-eval',
   'policy-engine',
@@ -162,6 +163,7 @@ export const registerStatus = (program: Command) => {
         const credentials = filtered.filter(r => r.resourceType === 'credential');
         const memories = filtered.filter(r => r.resourceType === 'memory');
         const gateways = filtered.filter(r => r.resourceType === 'gateway');
+        const interceptors = filtered.filter(r => r.resourceType === 'interceptor');
         const evaluators = filtered.filter(r => r.resourceType === 'evaluator');
         const onlineEvals = filtered.filter(r => r.resourceType === 'online-eval');
         const policyEngines = filtered.filter(r => r.resourceType === 'policy-engine');
@@ -262,6 +264,15 @@ export const registerStatus = (program: Command) => {
               <Box flexDirection="column" marginTop={1}>
                 <Text bold>Gateways</Text>
                 {gateways.map(entry => (
+                  <ResourceEntry key={`${entry.resourceType}-${entry.name}`} entry={entry} />
+                ))}
+              </Box>
+            )}
+
+            {interceptors.length > 0 && (
+              <Box flexDirection="column" marginTop={1}>
+                <Text bold>Interceptors</Text>
+                {interceptors.map(entry => (
                   <ResourceEntry key={`${entry.resourceType}-${entry.name}`} entry={entry} />
                 ))}
               </Box>

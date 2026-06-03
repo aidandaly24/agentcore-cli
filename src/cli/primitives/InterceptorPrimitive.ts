@@ -25,7 +25,15 @@ export interface AddInterceptorOptions {
   interceptionPoints: InterceptionPoint[];
   passRequestHeaders?: boolean;
   config:
-    | { managed: { codeLocation: string; entrypoint?: string; timeoutSeconds?: number; runtime?: InterceptorRuntime } }
+    | {
+        managed: {
+          codeLocation: string;
+          entrypoint?: string;
+          timeoutSeconds?: number;
+          runtime?: InterceptorRuntime;
+          additionalPolicies?: string[];
+        };
+      }
     | { external: { lambdaArn: string } };
 }
 
@@ -197,6 +205,10 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
       .option('--template <name>', '[Managed] Template: pass-through, jwt-scope-authorizer, tools-list-filter')
       .option('--runtime <runtime>', '[Managed] Lambda runtime: python3.12 (default) or nodejs22.x')
       .option('--timeout <seconds>', '[Managed] Lambda timeout in seconds, 1-300 (default: 30)')
+      .option(
+        '--additional-policies <list>',
+        '[Managed] Comma-separated IAM policy file paths (relative to the interceptor code dir) or managed-policy ARNs'
+      )
       .option('--no-pass-request-headers', 'Disable passing request headers to the interceptor')
       .option('--json', 'Output as JSON [non-interactive]')
       .action(
@@ -208,6 +220,7 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
           template?: string;
           runtime?: string;
           timeout?: string;
+          additionalPolicies?: string;
           passRequestHeaders?: boolean;
           json?: boolean;
         }) => {
@@ -232,6 +245,7 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
                 if (cliOptions.template) fail('--template cannot be used with --lambda-arn');
                 if (cliOptions.runtime) fail('--runtime cannot be used with --lambda-arn');
                 if (cliOptions.timeout) fail('--timeout cannot be used with --lambda-arn');
+                if (cliOptions.additionalPolicies) fail('--additional-policies cannot be used with --lambda-arn');
               }
 
               const points = cliOptions
@@ -296,6 +310,12 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
 
                 const entrypoint = runtime === 'python3.12' ? DEFAULT_PYTHON_ENTRYPOINT : DEFAULT_NODE_ENTRYPOINT;
 
+                const parsedPolicies = cliOptions.additionalPolicies
+                  ?.split(',')
+                  .map(s => s.trim())
+                  .filter(Boolean);
+                const additionalPolicies = parsedPolicies && parsedPolicies.length > 0 ? parsedPolicies : undefined;
+
                 result = await this.addWithTemplate(
                   {
                     name: cliOptions.name!,
@@ -308,6 +328,7 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
                         entrypoint,
                         timeoutSeconds,
                         runtime,
+                        ...(additionalPolicies && { additionalPolicies }),
                       },
                     },
                   },
@@ -418,6 +439,9 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
                 entrypoint: options.config.managed.entrypoint ?? DEFAULT_PYTHON_ENTRYPOINT,
                 timeoutSeconds: options.config.managed.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS,
                 runtime: options.config.managed.runtime ?? 'python3.12',
+                ...(options.config.managed.additionalPolicies && {
+                  additionalPolicies: options.config.managed.additionalPolicies,
+                }),
               },
             }
           : { external: options.config.external },

@@ -9,6 +9,7 @@ export type RemoveResourceType =
   | 'memory'
   | 'credential'
   | 'evaluator'
+  | 'interceptor'
   | 'online-eval'
   | 'policy-engine'
   | 'policy'
@@ -28,6 +29,7 @@ const REMOVE_RESOURCES: { id: RemoveResourceType; title: string; description: st
   { id: 'memory', title: 'Memory', description: 'Remove a memory provider' },
   { id: 'credential', title: 'Credential', description: 'Remove a credential' },
   { id: 'evaluator', title: 'Evaluator', description: 'Remove a custom evaluator' },
+  { id: 'interceptor', title: 'Interceptor', description: 'Remove a Lambda interceptor' },
   { id: 'online-eval', title: 'Online Eval Config', description: 'Remove an online eval config' },
   { id: 'policy-engine', title: 'Policy Engine', description: 'Remove a policy engine' },
   { id: 'policy', title: 'Policy', description: 'Remove a policy from a policy engine' },
@@ -57,6 +59,8 @@ interface RemoveScreenProps {
   credentialCount: number;
   /** Number of evaluators available for removal */
   evaluatorCount: number;
+  /** Number of interceptors available for removal */
+  interceptorCount: number;
   /** Number of online eval configs available for removal */
   onlineEvalCount: number;
   /** Number of policy engines available for removal */
@@ -83,6 +87,7 @@ export function RemoveScreen({
   memoryCount,
   credentialCount,
   evaluatorCount,
+  interceptorCount,
   onlineEvalCount,
   policyEngineCount,
   policyCount,
@@ -137,6 +142,12 @@ export function RemoveScreen({
           if (evaluatorCount === 0) {
             disabled = true;
             description = 'No evaluators to remove';
+          }
+          break;
+        case 'interceptor':
+          if (interceptorCount === 0) {
+            disabled = true;
+            description = 'No interceptors to remove';
           }
           break;
         case 'online-eval':
@@ -196,6 +207,7 @@ export function RemoveScreen({
     memoryCount,
     credentialCount,
     evaluatorCount,
+    interceptorCount,
     onlineEvalCount,
     policyEngineCount,
     policyCount,

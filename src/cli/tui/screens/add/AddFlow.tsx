@@ -13,6 +13,7 @@ import { AddDatasetFlow } from '../dataset';
 import { AddEvaluatorFlow } from '../evaluator';
 import { AddHarnessFlow } from '../harness/AddHarnessFlow';
 import { AddIdentityFlow } from '../identity';
+import { AddInterceptorFlow } from '../interceptor';
 import { AddGatewayFlow, AddGatewayTargetFlow } from '../mcp';
 import { AddMemoryFlow } from '../memory/AddMemoryFlow';
 import { AddOnlineEvalFlow } from '../online-eval';
@@ -571,20 +572,13 @@ export function AddFlow(props: AddFlowProps) {
   }
 
   if (flow.name === 'interceptor-wizard') {
-    // The full interactive wizard lands in a follow-up sub-section.
-    // Today, the action handler in InterceptorPrimitive routes here only when
-    // `agentcore add interceptor` is invoked with no flags AND a TTY exists;
-    // surface a guided message that points the user at the non-interactive
-    // CLI flags so they're not blocked.
     return (
-      <ErrorPrompt
-        message="Interactive interceptor wizard is not yet available."
-        detail={
-          'Run `agentcore add interceptor --name <n> --gateway <g> --interception-points REQUEST[,RESPONSE] [--template ...] [--runtime ...]` ' +
-          'or `--lambda-arn <arn>` for external mode. See `agentcore add interceptor --help`.'
-        }
-        onBack={() => setFlow({ name: 'select' })}
+      <AddInterceptorFlow
+        isInteractive={props.isInteractive}
         onExit={props.onExit}
+        onBack={() => setFlow({ name: 'select' })}
+        onDev={props.onDev}
+        onDeploy={props.onDeploy}
       />
     );
   }

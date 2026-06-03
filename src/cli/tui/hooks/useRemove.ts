@@ -16,6 +16,7 @@ import {
   gatewayPrimitive,
   gatewayTargetPrimitive,
   harnessPrimitive,
+  interceptorPrimitive,
   memoryPrimitive,
   onlineEvalConfigPrimitive,
   policyEnginePrimitive,
@@ -158,6 +159,11 @@ export function useRemovableDatasets() {
   return { datasets, ...rest };
 }
 
+export function useRemovableInterceptors() {
+  const { items: interceptors, ...rest } = useRemovableResources(() => interceptorPrimitive.getRemovable());
+  return { interceptors, ...rest };
+}
+
 export function useRemovableOnlineEvalConfigs() {
   const { items: onlineEvalConfigs, ...rest } = useRemovableResources(() => onlineEvalConfigPrimitive.getRemovable());
   return { onlineEvalConfigs, ...rest };
@@ -261,6 +267,10 @@ export function useRemovalPreview() {
     (name: string) => loadPreview(n => evaluatorPrimitive.previewRemove(n), name),
     [loadPreview]
   );
+  const loadInterceptorPreview = useCallback(
+    (name: string) => loadPreview(n => interceptorPrimitive.previewRemove(n), name),
+    [loadPreview]
+  );
   const loadDatasetPreview = useCallback(
     (name: string) => loadPreview(n => datasetPrimitive.previewRemove(n), name),
     [loadPreview]
@@ -305,6 +315,7 @@ export function useRemovalPreview() {
     loadMemoryPreview,
     loadIdentityPreview,
     loadEvaluatorPreview,
+    loadInterceptorPreview,
     loadDatasetPreview,
     loadOnlineEvalPreview,
     loadPolicyEnginePreview,
@@ -379,6 +390,14 @@ export function useRemoveEvaluator() {
   return useRemoveResource(
     (name: string) => evaluatorPrimitive.remove(name),
     'evaluator',
+    name => name
+  );
+}
+
+export function useRemoveInterceptor() {
+  return useRemoveResource(
+    (name: string) => interceptorPrimitive.remove(name),
+    'interceptor',
     name => name
   );
 }
