@@ -8,7 +8,7 @@
  *   - account IDs in user-visible output go through maskAccountId
  */
 import { validateInterceptors } from '../preflight';
-import { mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -156,6 +156,78 @@ describe('validateInterceptors', () => {
     ]);
     const sameAccountTarget = { ...baseTarget, name: 'lambda-account', account: '111111111111' } as typeof baseTarget;
     await expect(validateInterceptors(project, [baseTarget, sameAccountTarget], configRoot)).resolves.toBeUndefined();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  /** Scaffold a managed interceptor's handler file with the given source. */
+  function writeHandler(codeLocation: string, file: string, source: string) {
+    const dir = join(tmp, codeLocation);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, file), source);
+  }
+
+  it('warns when passRequestHeaders is disabled but the handler reads headers', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    writeHandler(
+      'app/auth-check/',
+      'handler.py',
+      'def lambda_handler(event, ctx):\n    return event["mcp"]["gatewayRequest"]["headers"]["authorization"]\n'
+    );
+    const project = projectWithInterceptors([
+      {
+        name: 'auth-check',
+        gatewayName: 'my-gw',
+        interceptionPoints: ['REQUEST'],
+        passRequestHeaders: false,
+        config: {
+          managed: { codeLocation: 'app/auth-check/', entrypoint: 'handler.lambda_handler', runtime: 'python3.12' },
+        },
+      },
+    ]);
+    await expect(validateInterceptors(project, [baseTarget], configRoot)).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0]![0] as string).toMatch(/passRequestHeaders disabled.*reads request headers/s);
+  });
+
+  it('does NOT warn when passRequestHeaders is disabled and the handler ignores headers', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    writeHandler(
+      'app/noop/',
+      'handler.py',
+      'def lambda_handler(event, ctx):\n    return {"interceptorOutputVersion": "1.0", "mcp": {}}\n'
+    );
+    const project = projectWithInterceptors([
+      {
+        name: 'noop',
+        gatewayName: 'my-gw',
+        interceptionPoints: ['REQUEST'],
+        passRequestHeaders: false,
+        config: { managed: { codeLocation: 'app/noop/', entrypoint: 'handler.lambda_handler', runtime: 'python3.12' } },
+      },
+    ]);
+    await expect(validateInterceptors(project, [baseTarget], configRoot)).resolves.toBeUndefined();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('does NOT warn when the handler reads headers but passRequestHeaders is enabled', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    writeHandler(
+      'app/auth-on/',
+      'handler.py',
+      'def lambda_handler(event, ctx):\n    return event["mcp"]["gatewayRequest"]["headers"]["authorization"]\n'
+    );
+    const project = projectWithInterceptors([
+      {
+        name: 'auth-on',
+        gatewayName: 'my-gw',
+        interceptionPoints: ['REQUEST'],
+        passRequestHeaders: true,
+        config: {
+          managed: { codeLocation: 'app/auth-on/', entrypoint: 'handler.lambda_handler', runtime: 'python3.12' },
+        },
+      },
+    ]);
+    await expect(validateInterceptors(project, [baseTarget], configRoot)).resolves.toBeUndefined();
     expect(warnSpy).not.toHaveBeenCalled();
   });
 });

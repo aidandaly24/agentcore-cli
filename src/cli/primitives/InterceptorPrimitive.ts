@@ -209,7 +209,10 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
         '--additional-policies <list>',
         '[Managed] Comma-separated IAM policy file paths (relative to the interceptor code dir) or managed-policy ARNs'
       )
-      .option('--no-pass-request-headers', 'Disable passing request headers to the interceptor')
+      .option(
+        '--no-pass-request-headers',
+        "Don't forward the caller's request headers to the interceptor. Headers carry the caller's Authorization token; disable only if the handler doesn't read headers (header-reading templates like jwt-scope-authorizer will break)."
+      )
       .option('--json', 'Output as JSON [non-interactive]')
       .action(
         async (cliOptions: {

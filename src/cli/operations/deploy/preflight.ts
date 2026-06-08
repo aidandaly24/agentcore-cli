@@ -244,6 +244,26 @@ export async function validateInterceptors(
     throw new Error(errors.join('\n'));
   }
 
+  // Header coupling: a managed interceptor whose handler reads request headers
+  // (e.g. the jwt-scope-authorizer template) silently receives empty headers
+  // when passRequestHeaders is disabled, breaking the handler with no runtime
+  // error. We can't key off the template (the spec doesn't record it), so we
+  // grep the handler source for header access and warn only on a real conflict.
+  for (const interceptor of interceptors) {
+    if (!interceptor.config.managed) continue;
+    if (interceptor.passRequestHeaders !== false) continue;
+
+    const handlerPath = resolveInterceptorHandlerPath(projectRoot, interceptor.config.managed);
+    if (!handlerPath || !readsRequestHeaders(handlerPath)) continue;
+
+    console.warn(
+      `WARNING: Interceptor "${interceptor.name}" has passRequestHeaders disabled, but its\n` +
+        `handler reads request headers. With headers disabled the handler receives an empty\n` +
+        `headers map, so any header-based logic (e.g. reading the Authorization token) will\n` +
+        `silently no-op. Set passRequestHeaders to true (or omit it) if the handler needs headers.`
+    );
+  }
+
   // External-mode cross-account: warn (don't fail) once per interceptor whose
   // ARN account differs from any deploy target. Iterating per-target inside
   // would emit duplicate warnings for multi-target projects; the warning is
@@ -280,6 +300,44 @@ export async function validateInterceptors(
         `    --action lambda:InvokeFunction \\\n` +
         `    --principal <gateway-role-arn-from-deployed-state>`
     );
+  }
+}
+
+/**
+ * Resolve the on-disk path to a managed interceptor's handler source file.
+ *
+ * The entrypoint is `<module>.<function>` (e.g. `handler.lambda_handler` for
+ * Python, `index.handler` for Node). We resolve `<module>` against the code
+ * directory, trying the runtime-appropriate extensions. Returns undefined if
+ * no candidate exists.
+ */
+function resolveInterceptorHandlerPath(
+  projectRoot: string,
+  managed: { codeLocation: string; entrypoint?: string; runtime?: string }
+): string | undefined {
+  const moduleName = (managed.entrypoint ?? 'handler.lambda_handler').split('.')[0];
+  if (!moduleName) return undefined;
+  const codeDir = path.join(projectRoot, managed.codeLocation);
+  const exts = managed.runtime === 'nodejs22.x' ? ['.mjs', '.js', '.cjs', '.ts'] : ['.py'];
+  for (const ext of exts) {
+    const candidate = path.join(codeDir, `${moduleName}${ext}`);
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Heuristic: does an interceptor handler read inbound request headers? Matches
+ * the `headers`/`authorization` access the header-reading templates use. A
+ * false negative just suppresses the advisory warning (deploy still proceeds),
+ * so a loose match is acceptable.
+ */
+function readsRequestHeaders(handlerPath: string): boolean {
+  try {
+    const source = readFileSync(handlerPath, 'utf-8').toLowerCase();
+    return source.includes('headers') || source.includes('authorization');
+  } catch {
+    return false;
   }
 }
 

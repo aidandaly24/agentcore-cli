@@ -192,6 +192,31 @@ Run the snippet once in the Lambda's account, before sending traffic through the
 
 `config.managed` and `config.external` are mutually exclusive (exactly one must be set).
 
+### Fields
+
+| Field                | Required | Default | Meaning                                                                                                                |
+| -------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `name`               | yes      | —       | Interceptor name (≤24 chars; used in the Lambda function name).                                                        |
+| `gatewayName`        | yes      | —       | The gateway this interceptor attaches to.                                                                              |
+| `interceptionPoints` | yes      | —       | `["REQUEST"]`, `["RESPONSE"]`, or both. Max 1 interceptor per point per gateway (2 per gateway).                       |
+| `passRequestHeaders` | no       | `true`  | Whether the gateway forwards the **inbound request's HTTP headers** to your interceptor. See below.                    |
+| `config.managed`     | one of   | —       | CLI scaffolds and deploys the Lambda. `codeLocation`, `entrypoint`, `timeoutSeconds`, `runtime`, `additionalPolicies`. |
+| `config.external`    | one of   | —       | You supply an existing Lambda `lambdaArn`; the CLI wires it without scaffolding code.                                  |
+
+#### `passRequestHeaders` — read this before disabling it
+
+The inbound request's headers include the **caller's `Authorization` token**. `passRequestHeaders` controls whether the
+gateway copies those headers into the event your interceptor receives:
+
+- `true` (default): your handler can read request headers (e.g. `event.mcp.gatewayRequest.headers.authorization`).
+- `false`: the gateway sends an **empty** headers map; your handler cannot see the caller's headers or token.
+
+> **Disabling headers silently breaks header-reading interceptors.** If your handler reads headers — including the
+> built-in **`jwt-scope-authorizer`** template, whose entire job is to read the `Authorization` token — setting
+> `passRequestHeaders: false` (or passing `--no-pass-request-headers`) makes it receive empty headers and silently
+> no-op, with no runtime error. Only disable header forwarding for interceptors that genuinely do not read headers.
+> `agentcore deploy` warns if it detects a header-reading handler with `passRequestHeaders` disabled.
+
 ## Removal
 
 ```bash
