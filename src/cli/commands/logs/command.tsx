@@ -2,9 +2,10 @@ import { COMMAND_DESCRIPTIONS } from '../../constants';
 import { getErrorMessage } from '../../errors';
 import { handleLogsEval } from '../../operations/eval';
 import type { LogsEvalOptions } from '../../operations/eval';
-import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
+import { runCliCommand, withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { requireProject } from '../../tui/guards';
 import { handleLogs } from './action';
+import { type LogsInterceptorOptions, handleLogsInterceptor } from './interceptor';
 import type { LogsOptions } from './types';
 import type { Command } from '@commander-js/extra-typings';
 import { Text, render } from 'ink';
@@ -71,6 +72,36 @@ export const registerLogs = (program: Command) => {
         }
       } catch (error) {
         render(<Text color="red">Error: {getErrorMessage(error)}</Text>);
+        process.exit(1);
+      }
+    });
+
+  logsCmd
+    .command('interceptor')
+    .description('Stream or search Lambda interceptor logs (managed mode only)')
+    .option('--name <name>', 'Interceptor name (required)')
+    .option('--target <name>', 'Deployment target (defaults to first target)')
+    .option('--since <time>', 'Start time (e.g. "1h", "30m", "2d", ISO 8601)')
+    .option('--until <time>', 'End time (e.g. "now", ISO 8601)')
+    .option('-n, --limit <count>', 'Maximum number of log lines')
+    .option('-f, --follow', 'Stream logs in real-time (default when no --since/--until)')
+    .option('--json', 'Output as JSON Lines')
+    .action(async (cliOptions: LogsInterceptorOptions) => {
+      requireProject();
+
+      try {
+        // mode here is always 'managed' on success (external short-circuits
+        // via the structured ValidationError before the success path).
+        // Telemetry surface kept consistent with sibling events.
+        await runCliCommand('logs.interceptor', !!cliOptions.json, async () => {
+          const r = await handleLogsInterceptor(cliOptions);
+          if (!r.success) {
+            throw r.error;
+          }
+          return { mode: 'managed' as const, has_follow: !!cliOptions.follow };
+        });
+      } catch (error) {
+        render(<Text color="red">{getErrorMessage(error)}</Text>);
         process.exit(1);
       }
     });

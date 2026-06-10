@@ -1,0 +1,13 @@
+{
+  "name": "{{ Name }}",
+  "version": "0.1.0",
+  "description": "AgentCore Gateway Interceptor — tools/list filter",
+  "type": "module",
+  "main": "index.mjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "bedrock-agentcore": ">=0.3.0"
+  }
+}

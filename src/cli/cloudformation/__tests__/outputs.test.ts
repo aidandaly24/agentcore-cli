@@ -213,6 +213,26 @@ describe('parseGatewayOutputs', () => {
     expect(result).toEqual({});
   });
 
+  it('parses a RoleArn output without corrupting gatewayArn (regex ordering)', () => {
+    const outputs = {
+      GatewayMyGatewayIdOutput3E11FAB4: 'gw-123',
+      GatewayMyGatewayArnOutput3E11FAB4: 'arn:aws:bedrock:us-east-1:123:gateway/gw-123',
+      GatewayMyGatewayRoleArnOutput3E11FAB4: 'arn:aws:iam::123:role/gw-exec-role',
+    };
+    const gatewaySpecs = { 'my-gateway': {} };
+
+    const result = parseGatewayOutputs(outputs, gatewaySpecs);
+
+    // The RoleArn key must NOT spawn a phantom `my-gatewayRole` entry, and the
+    // real gateway ARN must remain intact.
+    expect(Object.keys(result)).toEqual(['my-gateway']);
+    expect(result['my-gateway']).toEqual({
+      gatewayId: 'gw-123',
+      gatewayArn: 'arn:aws:bedrock:us-east-1:123:gateway/gw-123',
+      gatewayRoleArn: 'arn:aws:iam::123:role/gw-exec-role',
+    });
+  });
+
   it('maps multiple gateways correctly', () => {
     const outputs = {
       GatewayFirstGatewayArnOutput123: 'arn:first',

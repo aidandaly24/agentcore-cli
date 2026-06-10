@@ -14,6 +14,7 @@ import {
   computePaymentCredentialEnvVarNames,
   computeStripePrivyCredentialEnvVarNames,
 } from '../../primitives/credential-utils';
+import { validateInterceptors } from '../../operations/deploy/preflight';
 import { existsSync } from 'fs';
 import { join } from 'path';
 
@@ -166,8 +167,9 @@ export async function handleValidate(options: ValidateOptions): Promise<Result> 
   }
 
   // Validate AWS targets (aws-targets.json)
+  let awsTargets;
   try {
-    await configIO.readAWSDeploymentTargets();
+    awsTargets = await configIO.readAWSDeploymentTargets();
   } catch (err) {
     return { success: false, error: new Error(formatError(err, 'aws-targets.json'), { cause: err }) };
   }
@@ -179,6 +181,14 @@ export async function handleValidate(options: ValidateOptions): Promise<Result> 
     } catch (err) {
       return { success: false, error: new Error(formatError(err, '.cli/state.json'), { cause: err }) };
     }
+  }
+
+  // Run interceptor preflight: codeLocation existence + cross-account WARN.
+  // Mirrors the deploy path so `validate` is a real pre-check, not just a Zod parse.
+  try {
+    await validateInterceptors(projectSpec, awsTargets, configRoot);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
   }
 
   return { success: true };

@@ -19,12 +19,14 @@ const defaultProject: AgentCoreProjectSpec = {
   harnesses: [],
   datasets: [],
   payments: [],
+  interceptors: [],
 };
 
-const { mockConfigExists, mockReadProjectSpec, mockWriteProjectSpec } = vi.hoisted(() => ({
+const { mockConfigExists, mockReadProjectSpec, mockWriteProjectSpec, mockRm } = vi.hoisted(() => ({
   mockConfigExists: vi.fn().mockReturnValue(true),
   mockReadProjectSpec: vi.fn(),
   mockWriteProjectSpec: vi.fn().mockResolvedValue(undefined),
+  mockRm: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../lib', () => {
@@ -45,7 +47,23 @@ vi.mock('../../../lib', () => {
         this.name = 'ResourceNotFoundError';
       }
     },
+    ConflictError: class extends Error {
+      constructor(m: string) {
+        super(m);
+        this.name = 'ConflictError';
+      }
+    },
   };
+});
+
+vi.mock('node:fs', async () => {
+  const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return { ...actual, existsSync: vi.fn(() => true) };
+});
+
+vi.mock('node:fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+  return { ...actual, rm: mockRm };
 });
 
 /** Extract the first gateway written to writeProjectSpec. */
@@ -158,6 +176,72 @@ describe('GatewayPrimitive', () => {
 
       const gw = getWrittenGateway();
       expect(gw.exceptionLevel).toBe('NONE');
+    });
+  });
+
+  describe('remove with attached interceptors', () => {
+    const projectWithInterceptors = (deleteReady = true) => ({
+      ...defaultProject,
+      agentCoreGateways: [{ name: 'my-gw', targets: [] }],
+      interceptors: [
+        {
+          name: 'auth',
+          gatewayName: 'my-gw',
+          interceptionPoints: ['REQUEST'],
+          config: { managed: { codeLocation: 'app/auth/' } },
+        },
+        {
+          name: 'ext',
+          gatewayName: 'my-gw',
+          interceptionPoints: ['RESPONSE'],
+          config: { external: { lambdaArn: 'arn:aws:lambda:us-east-1:111111111111:function:ext' } },
+        },
+        ...(deleteReady ? [] : []),
+      ],
+    });
+
+    it('blocks removal by default with a ConflictError naming the interceptors', async () => {
+      mockReadProjectSpec.mockResolvedValue(projectWithInterceptors());
+      const result = await primitive.remove('my-gw');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.name).toBe('ConflictError');
+        expect(result.error.message).toMatch(/attached interceptor/);
+        expect(result.error.message).toMatch(/auth, ext/);
+        expect(result.error.message).toMatch(/--delete-interceptors/);
+      }
+      expect(mockWriteProjectSpec).not.toHaveBeenCalled();
+    });
+
+    it('cascades removal with --delete-interceptors: drops entries + deletes managed dirs', async () => {
+      mockReadProjectSpec.mockResolvedValue(projectWithInterceptors());
+      const result = await primitive.remove('my-gw', { deleteInterceptors: true });
+      expect(result.success).toBe(true);
+
+      const written = mockWriteProjectSpec.mock.calls[0]![0] as AgentCoreProjectSpec;
+      expect(written.agentCoreGateways).toHaveLength(0);
+      expect(written.interceptors).toHaveLength(0);
+      // Only the managed interceptor has a scaffolded dir to delete (external has none).
+      expect(mockRm).toHaveBeenCalledTimes(1);
+      expect(mockRm).toHaveBeenCalledWith(expect.stringContaining('app/auth'), expect.anything());
+    });
+
+    it('removes a gateway with no interceptors without blocking', async () => {
+      mockReadProjectSpec.mockResolvedValue({
+        ...defaultProject,
+        agentCoreGateways: [{ name: 'lonely-gw', targets: [] }],
+        interceptors: [],
+      });
+      const result = await primitive.remove('lonely-gw');
+      expect(result.success).toBe(true);
+    });
+
+    it('previewRemove lists attached interceptors and their directories', async () => {
+      mockReadProjectSpec.mockResolvedValue(projectWithInterceptors());
+      const preview = await primitive.previewRemove('my-gw');
+      expect(preview.summary.some(s => s.includes('attached interceptor'))).toBe(true);
+      expect(preview.summary.some(s => s.includes('auth, ext'))).toBe(true);
+      expect(preview.directoriesToDelete).toContain('app/auth/');
     });
   });
 });

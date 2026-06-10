@@ -11,6 +11,7 @@ import {
   parseDatasetOutputs,
   parseEvaluatorOutputs,
   parseGatewayOutputs,
+  parseInterceptorOutputs,
   parseMemoryOutputs,
   parseOnlineEvalOutputs,
   parsePaymentOutputs,
@@ -25,6 +26,7 @@ import {
   assertEnvFileExists,
   bootstrapEnvironment,
   buildCdkProject,
+  buildCrossAccountInterceptorWarnings,
   checkBootstrapNeeded,
   checkStackDeployability,
   ensureDefaultDeploymentTarget,
@@ -589,6 +591,15 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     }));
     const payments = paymentSpecs.length > 0 ? parsePaymentOutputs(outputs, paymentSpecs) : undefined;
 
+    // Parse interceptor outputs. Mode is read directly from the project spec
+    // (CDK echoes it as a CFN output too, but we already know it locally and
+    // skipping the round-trip keeps the parser simple).
+    const interceptorSpecs = (context.projectSpec.interceptors ?? []).map(i => ({
+      name: i.name,
+      mode: i.config.managed ? ('managed' as const) : ('external' as const),
+    }));
+    const interceptors = parseInterceptorOutputs(outputs, interceptorSpecs);
+
     endStep('success');
 
     // Post-CDK: deploy imperative resources (harness) — preview mode only
@@ -658,6 +669,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
       runtimeEndpoints,
       datasets,
       payments,
+      interceptors,
     });
 
     if (deployHash) {
@@ -706,6 +718,14 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     endStep('success');
 
     const postDeployWarnings: string[] = [];
+
+    // Post-deploy: cross-account external interceptors need a resource-based
+    // policy on their Lambda. Emit the actionable `add-permission` snippet here
+    // (not at preflight) so it can interpolate the now-resolved gateway role ARN.
+    const gatewayRoleArns = Object.fromEntries(Object.entries(gateways).map(([name, g]) => [name, g.gatewayRoleArn]));
+    postDeployWarnings.push(
+      ...buildCrossAccountInterceptorWarnings(context.projectSpec, context.awsTargets, gatewayRoleArns)
+    );
 
     // Post-deploy: Enable online eval configs that have enableOnCreate (CFN deploys them as DISABLED).
     // Only enable configs that are newly deployed — skip configs that already existed before this

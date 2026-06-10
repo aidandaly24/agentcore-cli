@@ -1,12 +1,14 @@
 import { ConfigIO, DOCKERFILE_NAME, getDockerfilePath, requireConfigRoot, resolveCodeLocation } from '../../../lib';
 import { ValidationError } from '../../../lib/errors/types';
 import type { AgentCoreProjectSpec, AwsDeploymentTarget } from '../../../schema';
-import { validateAwsCredentials } from '../../aws/account';
+import { getCredentialProvider, validateAwsCredentials } from '../../aws/account';
+import { accountIdFromArn, maskAccountId } from '../../aws/mask';
 import { LocalCdkProject } from '../../cdk/local-cdk-project';
 import { CdkToolkitWrapper, createCdkToolkitWrapper, silentIoHost } from '../../cdk/toolkit-lib';
 import { checkBootstrapStatus, checkStacksStatus, formatCdkEnvironment } from '../../cloudformation';
 import { cleanupStaleLockFiles } from '../../tui/utils';
 import type { IIoHost } from '@aws-cdk/toolkit-lib';
+import { GetFunctionCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { existsSync, readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
@@ -128,10 +130,22 @@ export async function validateProject(): Promise<PreflightContext> {
   // Validate Container agents have Dockerfiles
   validateContainerAgents(projectSpec, configRoot);
 
+  // Validate Lambda interceptors:
+  //   - cardinality is enforced by superRefine, but this re-checks for safety
+  //   - managed-mode codeLocation must exist on disk
+  //   - external-mode cross-account is a WARNING (not an error) so legitimate
+  //     centralized-auth / multi-account interceptor patterns don't fail deploy
+  await validateInterceptors(projectSpec, awsTargets, configRoot);
+
   // Validate AWS credentials before proceeding with build/synth.
   // Skip for teardown deploys — callers validate after teardown confirmation.
   if (!isTeardownDeploy) {
     await validateAwsCredentials();
+    // Best-effort `lambda:GetFunction` preflight for `lambda-function-arn`
+    // gateway targets. WARNs on any failure but never blocks deploy. Runs
+    // after credentials are validated so we know the SDK call has a chance
+    // of succeeding.
+    await validateGatewayTargetLambdas(projectSpec);
   }
 
   return { projectSpec, awsTargets, cdkProject, isTeardownDeploy };
@@ -185,6 +199,242 @@ function validateHttpGatewayNames(projectSpec: AgentCoreProjectSpec): void {
       }
     }
   }
+}
+
+/**
+ * Validates Lambda interceptors before deploy.
+ *
+ * Cardinality / unique-point / gateway-name reference are already enforced via
+ * superRefine on `agentcore-project.ts`; this function focuses on the checks
+ * that need filesystem or AWS context (codeLocation existence, cross-account
+ * detection).
+ *
+ * Cross-account behavior intentionally WARNS rather than errors — see Decision
+ * #8 in the DevEx doc. The user's gateway role can be granted
+ * `lambda:InvokeFunction` on a foreign ARN; what fails is the first invocation
+ * until the foreign Lambda has a matching resource-based policy. We emit the
+ * `aws lambda add-permission` snippet so the user can resolve the manual step
+ * out-of-band.
+ *
+ * Account IDs in printed output go through `maskAccountId()` per Decision #18.
+ */
+// eslint-disable-next-line @typescript-eslint/require-await -- kept async so callers can await; future preflight checks (e.g. ARN reachability) will use AWS SDK calls
+export async function validateInterceptors(
+  projectSpec: AgentCoreProjectSpec,
+  awsTargets: AwsDeploymentTarget[],
+  configRoot: string
+): Promise<void> {
+  const interceptors = projectSpec.interceptors ?? [];
+  if (interceptors.length === 0) return;
+
+  const errors: string[] = [];
+  const projectRoot = path.dirname(configRoot);
+
+  // Managed-mode codeLocation must exist.
+  for (const interceptor of interceptors) {
+    if (interceptor.config.managed) {
+      const codeDir = path.join(projectRoot, interceptor.config.managed.codeLocation);
+      if (!existsSync(codeDir)) {
+        errors.push(
+          `Interceptor "${interceptor.name}": codeLocation "${interceptor.config.managed.codeLocation}" not found. ` +
+            `Run \`agentcore add interceptor\` to scaffold it, or fix the path in agentcore.json.`
+        );
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(errors.join('\n'));
+  }
+
+  // Header coupling: a managed interceptor whose handler reads request headers
+  // (e.g. the jwt-scope-authorizer template) silently receives empty headers
+  // when passRequestHeaders is disabled, breaking the handler with no runtime
+  // error. We can't key off the template (the spec doesn't record it), so we
+  // grep the handler source for header access and warn only on a real conflict.
+  for (const interceptor of interceptors) {
+    if (!interceptor.config.managed) continue;
+    if (interceptor.passRequestHeaders !== false) continue;
+
+    const handlerPath = resolveInterceptorHandlerPath(projectRoot, interceptor.config.managed);
+    if (!handlerPath || !readsRequestHeaders(handlerPath)) continue;
+
+    console.warn(
+      `WARNING: Interceptor "${interceptor.name}" has passRequestHeaders disabled, but its\n` +
+        `handler reads request headers. With headers disabled the handler receives an empty\n` +
+        `headers map, so any header-based logic (e.g. reading the Authorization token) will\n` +
+        `silently no-op. Set passRequestHeaders to true (or omit it) if the handler needs headers.`
+    );
+  }
+
+  // External-mode cross-account: a concise heads-up at preflight. The full
+  // copy-paste `add-permission` snippet is emitted post-deploy (see
+  // buildCrossAccountInterceptorWarnings), where the resolved gateway role ARN
+  // — the snippet's `--principal` — actually exists. Warn once per interceptor
+  // whose ARN account differs from every deploy target.
+  const warned = new Set<string>();
+  for (const interceptor of interceptors) {
+    const ext = interceptor.config.external;
+    if (!ext) continue;
+    const lambdaAccountId = accountIdFromArn(ext.lambdaArn);
+    if (!lambdaAccountId) continue;
+
+    // Cross-account = no deploy target shares the Lambda's account. If even
+    // one deploy target is same-account, the IAM grant works in that target
+    // and the warning would be incorrect noise.
+    const crossAccount = awsTargets.length > 0 && awsTargets.every(t => t.account !== lambdaAccountId);
+    if (!crossAccount || warned.has(interceptor.name)) continue;
+    warned.add(interceptor.name);
+
+    console.warn(
+      `WARNING: Cross-account interceptor "${interceptor.name}" (Lambda: ${maskAccountId(ext.lambdaArn)}).\n` +
+        `The first invocation will fail until you add a resource-based policy to the Lambda. ` +
+        `After deploy, the CLI prints the exact \`aws lambda add-permission\` command with the resolved gateway role ARN.`
+    );
+  }
+}
+
+/**
+ * Build post-deploy cross-account interceptor warnings.
+ *
+ * Emitted after deploy because the gateway execution role ARN — the
+ * `--principal` for the foreign Lambda's resource-based policy — only exists in
+ * deployed-state once the gateway is created. Returns one actionable snippet
+ * per cross-account external interceptor. The gateway role ARN is the
+ * customer's OWN account and is printed unmasked (it must be copy-pasteable);
+ * the foreign Lambda ARN is masked.
+ */
+export function buildCrossAccountInterceptorWarnings(
+  projectSpec: AgentCoreProjectSpec,
+  awsTargets: AwsDeploymentTarget[],
+  gatewayRoleArns: Record<string, string | undefined>
+): string[] {
+  const warnings: string[] = [];
+  for (const interceptor of projectSpec.interceptors ?? []) {
+    const ext = interceptor.config.external;
+    if (!ext) continue;
+    const lambdaAccountId = accountIdFromArn(ext.lambdaArn);
+    if (!lambdaAccountId) continue;
+
+    const crossAccount = awsTargets.length > 0 && awsTargets.every(t => t.account !== lambdaAccountId);
+    if (!crossAccount) continue;
+
+    const roleArn = gatewayRoleArns[interceptor.gatewayName];
+    const principal = roleArn ?? '<gateway-role-arn (see deployed-state.json)>';
+
+    warnings.push(
+      `Cross-account interceptor "${interceptor.name}" needs a resource-based policy on its Lambda.\n` +
+        `  Lambda: ${maskAccountId(ext.lambdaArn)}\n` +
+        `Run this in the Lambda's account before sending traffic through the gateway:\n` +
+        `\n` +
+        `  aws lambda add-permission \\\n` +
+        `    --function-name ${maskAccountId(ext.lambdaArn)} \\\n` +
+        `    --statement-id GatewayInterceptorInvoke \\\n` +
+        `    --action lambda:InvokeFunction \\\n` +
+        `    --principal ${principal}`
+    );
+  }
+  return warnings;
+}
+
+/**
+ * Resolve the on-disk path to a managed interceptor's handler source file.
+ *
+ * The entrypoint is `<module>.<function>` (e.g. `handler.lambda_handler` for
+ * Python, `index.handler` for Node). We resolve `<module>` against the code
+ * directory, trying the runtime-appropriate extensions. Returns undefined if
+ * no candidate exists.
+ */
+function resolveInterceptorHandlerPath(
+  projectRoot: string,
+  managed: { codeLocation: string; entrypoint?: string; runtime?: string }
+): string | undefined {
+  const moduleName = (managed.entrypoint ?? 'handler.lambda_handler').split('.')[0];
+  if (!moduleName) return undefined;
+  const codeDir = path.join(projectRoot, managed.codeLocation);
+  const exts = managed.runtime === 'nodejs22.x' ? ['.mjs', '.js', '.cjs', '.ts'] : ['.py'];
+  for (const ext of exts) {
+    const candidate = path.join(codeDir, `${moduleName}${ext}`);
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Heuristic: does an interceptor handler read inbound request headers? Matches
+ * the `headers`/`authorization` access the header-reading templates use. A
+ * false negative just suppresses the advisory warning (deploy still proceeds),
+ * so a loose match is acceptable.
+ */
+function readsRequestHeaders(handlerPath: string): boolean {
+  try {
+    const source = readFileSync(handlerPath, 'utf-8').toLowerCase();
+    return source.includes('headers') || source.includes('authorization');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Best-effort preflight for `lambda-function-arn` gateway targets: tries
+ * `lambda:GetFunction` for each target ARN. On any failure (NotFound, 403,
+ * throttle, network) emits a WARN with the masked ARN and the underlying
+ * reason, then continues — deploy proceeds and CloudFormation may still roll
+ * back if the Lambda is genuinely missing. Without this, a typo'd ARN
+ * surfaces only as a CFN ROLLBACK_COMPLETE that requires manual stack
+ * deletion before retry.
+ *
+ * Cross-account ARNs intentionally hit the same WARN path: we cannot
+ * distinguish "doesn't exist" from "you don't have permission to read it",
+ * so we don't try to. The user gets enough information to decide whether to
+ * proceed.
+ *
+ * The check uses the ARN's region (not the deploy target's region) because
+ * Lambda ARNs encode their region and `GetFunction` is region-scoped.
+ */
+export async function validateGatewayTargetLambdas(projectSpec: AgentCoreProjectSpec): Promise<void> {
+  const gateways = projectSpec.agentCoreGateways ?? [];
+  if (gateways.length === 0) return;
+
+  const credentials = getCredentialProvider();
+  const clientsByRegion = new Map<string, LambdaClient>();
+
+  for (const gateway of gateways) {
+    for (const target of gateway.targets ?? []) {
+      const arn = target.lambdaFunctionArn?.lambdaArn;
+      if (!arn) continue;
+
+      const region = regionFromLambdaArn(arn);
+      if (!region) continue;
+
+      let client = clientsByRegion.get(region);
+      if (!client) {
+        client = new LambdaClient({ region, credentials });
+        clientsByRegion.set(region, client);
+      }
+
+      try {
+        await client.send(new GetFunctionCommand({ FunctionName: arn }));
+      } catch (err) {
+        const reason = err instanceof Error ? (err.name ?? err.message) : String(err);
+
+        console.warn(
+          `WARNING: Could not verify Lambda target "${target.name}" exists.\n` +
+            `  ARN:    ${maskAccountId(arn)}\n` +
+            `  Reason: ${reason}\n` +
+            `\n` +
+            `Deploy will continue. If the ARN is wrong, the stack will roll back\n` +
+            `and you'll need to \`aws cloudformation delete-stack\` before retrying.`
+        );
+      }
+    }
+  }
+}
+
+/** Extracts the region segment from a Lambda ARN (`arn:aws:lambda:<region>:...`). */
+function regionFromLambdaArn(arn: string): string | undefined {
+  const parts = arn.split(':');
+  return parts.length >= 4 ? parts[3] : undefined;
 }
 
 /**

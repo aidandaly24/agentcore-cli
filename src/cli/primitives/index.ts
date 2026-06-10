@@ -11,6 +11,8 @@ export { EvaluatorPrimitive } from './EvaluatorPrimitive';
 export { OnlineEvalConfigPrimitive } from './OnlineEvalConfigPrimitive';
 export { GatewayPrimitive } from './GatewayPrimitive';
 export { GatewayTargetPrimitive } from './GatewayTargetPrimitive';
+export { InterceptorPrimitive } from './InterceptorPrimitive';
+export type { AddInterceptorOptions, RemovableInterceptor } from './InterceptorPrimitive';
 export { RuntimeEndpointPrimitive } from './RuntimeEndpointPrimitive';
 export type { AddRuntimeEndpointOptions, RemovableRuntimeEndpoint } from './RuntimeEndpointPrimitive';
 export {
@@ -24,6 +26,7 @@ export {
   onlineEvalConfigPrimitive,
   gatewayPrimitive,
   gatewayTargetPrimitive,
+  interceptorPrimitive,
   configBundlePrimitive,
   abTestPrimitive,
   runtimeEndpointPrimitive,

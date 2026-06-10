@@ -26,6 +26,7 @@ const ICONS = {
   harness: '⬢',
   'runtime-endpoint': '◉',
   payment: '₿',
+  interceptor: '⇄',
 } as const;
 
 interface ResourceGraphProps {

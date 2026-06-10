@@ -306,7 +306,7 @@ export class GatewayTargetPrimitive extends BasePrimitive<AddGatewayTargetOption
       .option('--lambda-arn <arn>', 'Lambda function ARN (for lambda-function-arn type) [non-interactive]')
       .option(
         '--tool-schema-file <path>',
-        'Tool schema JSON file path (for lambda-function-arn type) [non-interactive]'
+        'Path to a JSON file containing an array of MCP tool definitions (NOT wrapped in {"tools":[]}); for lambda-function-arn type [non-interactive]'
       )
       .option('--json', 'Output as JSON [non-interactive]')
       .action(async (rawOptions: Record<string, string | boolean | undefined>) => {

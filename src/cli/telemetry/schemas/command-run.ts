@@ -97,6 +97,19 @@ const AddPolicyAttrs = safeSchema({
   policy_validation_mode: PolicyValidationMode,
 });
 
+const InterceptorMode = z.enum(['managed', 'external']);
+const InterceptorRuntime = z.enum(['python3.12', 'nodejs22.x']);
+const InterceptorTemplate = z.enum(['pass-through', 'jwt-scope-authorizer', 'tools-list-filter']);
+
+const AddInterceptorAttrs = safeSchema({
+  mode: InterceptorMode,
+  runtime: InterceptorRuntime,
+  template: InterceptorTemplate,
+  has_cross_account_warning: z.boolean(),
+});
+
+const LogsInterceptorAttrs = safeSchema({ mode: InterceptorMode, has_follow: z.boolean() });
+
 const DeployAttrs = safeSchema({
   runtime_count: Count,
   harness_count: Count,
@@ -187,6 +200,7 @@ export const COMMAND_SCHEMAS = {
   'add.runtime-endpoint': NoAttrs,
   'add.payment-manager': NoAttrs,
   'add.payment-connector': NoAttrs,
+  'add.interceptor': AddInterceptorAttrs,
   deploy: DeployAttrs,
 
   // dev / invoke / exec
@@ -198,6 +212,7 @@ export const COMMAND_SCHEMAS = {
   status: StatusAttrs,
   logs: LogsAttrs,
   'logs.evals': LogsEvalsAttrs,
+  'logs.interceptor': LogsInterceptorAttrs,
   'run.eval': RunEvalAttrs,
   'fetch.access': FetchAccessAttrs,
   feedback: FeedbackAttrs,
@@ -237,6 +252,7 @@ export const COMMAND_SCHEMAS = {
   'dataset.remove-version': NoAttrs,
   'remove.payment-manager': NoAttrs,
   'remove.payment-connector': NoAttrs,
+  'remove.interceptor': NoAttrs,
   'telemetry.disable': NoAttrs,
   'telemetry.enable': NoAttrs,
   'telemetry.status': NoAttrs,

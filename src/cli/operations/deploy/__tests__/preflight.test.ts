@@ -54,6 +54,9 @@ vi.mock('../../../cdk/local-cdk-project.js', () => ({
 
 vi.mock('../../../aws/account.js', () => ({
   validateAwsCredentials: mockValidateAwsCredentials,
+  // Stub for validateGatewayTargetLambdas — never reached in these tests because
+  // none of the fixtures have lambda-function-arn gateway targets.
+  getCredentialProvider: () => () => Promise.resolve({ accessKeyId: 'x', secretAccessKey: 'x' }),
 }));
 
 describe('validateProject', () => {

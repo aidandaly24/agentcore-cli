@@ -31,16 +31,21 @@ async function main() {
   // The vended CDK project compiles against the published @aws/agentcore-cdk
   // schema type, which may lag the CLI's own AgentCoreProjectSpec (e.g. payments,
   // harnesses, gateway fields). Cast once so those fields are reachable.
+  //
+  // Interceptors live at root in agentcore.json (`interceptors[]`). The CDK
+  // package's AgentCoreMcpSpec carries them in the same MCP-scoped object as
+  // gateways/runtimes, so we copy the field across at this boundary. Empty
+  // arrays are normalized to undefined to keep CDK synth clean when no
+  // interceptors are defined.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const specAny = spec as any;
-
-  // Extract MCP configuration from project spec.
-  // Gateway fields are stored in agentcore.json but may not yet be on the
-  const mcpSpec = specAny.agentCoreGateways?.length
+  const hasMcp = specAny.agentCoreGateways?.length || specAny.interceptors?.length;
+  const mcpSpec = hasMcp
     ? {
-        agentCoreGateways: specAny.agentCoreGateways,
+        agentCoreGateways: specAny.agentCoreGateways ?? [],
         mcpRuntimeTools: specAny.mcpRuntimeTools,
         unassignedTargets: specAny.unassignedTargets,
+        interceptors: specAny.interceptors?.length ? specAny.interceptors : undefined,
       }
     : undefined;
 

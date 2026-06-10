@@ -66,6 +66,7 @@ describe('resolveAgentContext', () => {
       harnesses: [],
       datasets: [],
       payments: [],
+      interceptors: [],
     },
     deployedState: {
       targets: {
@@ -133,6 +134,7 @@ describe('resolveAgentContext', () => {
         harnesses: [],
         datasets: [],
         payments: [],
+        interceptors: [],
       },
     });
     const result = resolveAgentContext(context, {});
@@ -180,6 +182,7 @@ describe('resolveAgentContext', () => {
         harnesses: [],
         datasets: [],
         payments: [],
+        interceptors: [],
       },
       deployedState: {
         targets: {
@@ -237,6 +240,7 @@ describe('resolveAgentContext', () => {
         harnesses: [],
         datasets: [],
         payments: [],
+        interceptors: [],
       },
     });
     const result = resolveAgentContext(context, {});

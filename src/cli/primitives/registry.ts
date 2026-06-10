@@ -9,6 +9,7 @@ import { EvaluatorPrimitive } from './EvaluatorPrimitive';
 import { GatewayPrimitive } from './GatewayPrimitive';
 import { GatewayTargetPrimitive } from './GatewayTargetPrimitive';
 import { HarnessPrimitive } from './HarnessPrimitive';
+import { InterceptorPrimitive } from './InterceptorPrimitive';
 import { MemoryPrimitive } from './MemoryPrimitive';
 import { OnlineEvalConfigPrimitive } from './OnlineEvalConfigPrimitive';
 import { PaymentConnectorPrimitive } from './PaymentConnectorPrimitive';
@@ -37,6 +38,7 @@ export const abTestPrimitive = new ABTestPrimitive();
 export const runtimeEndpointPrimitive = new RuntimeEndpointPrimitive();
 export const paymentManagerPrimitive = new PaymentManagerPrimitive();
 export const paymentConnectorPrimitive = new PaymentConnectorPrimitive();
+export const interceptorPrimitive = new InterceptorPrimitive();
 
 /**
  * All primitives in display order.
@@ -58,6 +60,7 @@ export const ALL_PRIMITIVES: BasePrimitive<unknown, RemovableResource>[] = [
   runtimeEndpointPrimitive,
   paymentManagerPrimitive,
   paymentConnectorPrimitive,
+  interceptorPrimitive,
 ];
 
 /**

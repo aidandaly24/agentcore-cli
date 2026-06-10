@@ -26,6 +26,7 @@ function makeConfigBundleProject(testName = 'myTest') {
     name: 'TestProject',
     runtimes: [],
     httpGateways: [],
+    interceptors: [],
     onlineEvalConfigs: [],
     abTests: [
       {

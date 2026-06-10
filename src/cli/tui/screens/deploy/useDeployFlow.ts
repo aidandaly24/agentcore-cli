@@ -8,6 +8,7 @@ import {
   parseDatasetOutputs,
   parseEvaluatorOutputs,
   parseGatewayOutputs,
+  parseInterceptorOutputs,
   parseMemoryOutputs,
   parseOnlineEvalOutputs,
   parsePaymentOutputs,
@@ -19,6 +20,7 @@ import { getErrorMessage, isChangesetInProgressError, isExpiredTokenError } from
 import { isPreviewEnabled } from '../../../feature-flags';
 import { ExecLogger } from '../../../logging';
 import {
+  buildCrossAccountInterceptorWarnings,
   cleanupPaymentCredentialProviders,
   performStackTeardown,
   setupTransactionSearch,
@@ -268,7 +270,10 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     }
 
     // Parse gateway outputs from CDK stack
-    let gateways: Record<string, { gatewayId: string; gatewayArn: string }> = {};
+    let gateways: Record<
+      string,
+      { gatewayId: string; gatewayArn: string; gatewayUrl?: string; gatewayRoleArn?: string }
+    > = {};
     try {
       const projectForGateways = await configIO.readProjectSpec();
       const gatewaySpecs =
@@ -323,6 +328,13 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     // Parse dataset outputs
     const datasetNames = (ctx.projectSpec.datasets ?? []).map((d: { name: string }) => d.name);
     const datasets = parseDatasetOutputs(outputs, datasetNames);
+
+    // Parse interceptor outputs
+    const interceptorSpecs = (ctx.projectSpec.interceptors ?? []).map(i => ({
+      name: i.name,
+      mode: i.config.managed ? ('managed' as const) : ('external' as const),
+    }));
+    const interceptors = parseInterceptorOutputs(outputs, interceptorSpecs);
 
     // Expose outputs to UI
     setStackOutputs(outputs);
@@ -400,6 +412,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
       datasets,
       harnesses: deployedHarnesses,
       payments,
+      interceptors,
     });
 
     try {
@@ -413,6 +426,15 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     }
 
     await configIO.writeDeployedState(deployedState);
+
+    // Post-deploy: cross-account external interceptors need a resource-based
+    // policy on their Lambda. Emit the actionable snippet with the resolved
+    // gateway role ARN (now available in the parsed gateway outputs).
+    const gatewayRoleArns = Object.fromEntries(Object.entries(gateways).map(([name, g]) => [name, g.gatewayRoleArn]));
+    const crossAccountWarnings = buildCrossAccountInterceptorWarnings(ctx.projectSpec, ctx.awsTargets, gatewayRoleArns);
+    if (crossAccountWarnings.length > 0) {
+      setPostDeployWarnings(prev => [...prev, ...crossAccountWarnings]);
+    }
 
     // Post-deploy: Sync dataset examples from local JSONL to service DRAFT.
     const datasetSpecs = ctx.projectSpec.datasets ?? [];

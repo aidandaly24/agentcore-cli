@@ -291,6 +291,82 @@ describe('computeResourceStatuses', () => {
     expect(gwEntry!.identifier).toBe('gw-456');
   });
 
+  it('marks interceptor as deployed when in both local project and deployed state', () => {
+    const project = {
+      ...baseProject,
+      interceptors: [
+        {
+          name: 'my-interceptor',
+          gatewayName: 'my-gateway',
+          interceptionPoints: ['REQUEST', 'RESPONSE'],
+          config: { managed: { codeLocation: 'interceptors/my-interceptor' } },
+        },
+      ],
+    } as unknown as AgentCoreProjectSpec;
+
+    const resources: DeployedResourceState = {
+      mcp: {
+        interceptors: {
+          'my-interceptor': {
+            mode: 'managed',
+            interceptorArn: 'arn:aws:lambda:us-east-1:123456789:function:my-interceptor',
+          },
+        },
+      },
+    };
+
+    const result = computeResourceStatuses(project, resources);
+    const interceptorEntry = result.find(r => r.resourceType === 'interceptor' && r.name === 'my-interceptor');
+
+    expect(interceptorEntry).toBeDefined();
+    expect(interceptorEntry!.deploymentState).toBe('deployed');
+    expect(interceptorEntry!.identifier).toBe('arn:aws:lambda:us-east-1:123456789:function:my-interceptor');
+    expect(interceptorEntry!.detail).toBe('managed — REQUEST+RESPONSE');
+    expect(interceptorEntry!.parentName).toBe('my-gateway');
+  });
+
+  it('marks interceptor as local-only when not in deployed state', () => {
+    const project = {
+      ...baseProject,
+      interceptors: [
+        {
+          name: 'my-interceptor',
+          gatewayName: 'my-gateway',
+          interceptionPoints: ['REQUEST'],
+          config: { external: { lambdaArn: 'arn:aws:lambda:us-east-1:123456789:function:ext-fn' } },
+        },
+      ],
+    } as unknown as AgentCoreProjectSpec;
+
+    const result = computeResourceStatuses(project, undefined);
+    const interceptorEntry = result.find(r => r.resourceType === 'interceptor' && r.name === 'my-interceptor');
+
+    expect(interceptorEntry).toBeDefined();
+    expect(interceptorEntry!.deploymentState).toBe('local-only');
+    expect(interceptorEntry!.detail).toBe('external — REQUEST');
+    expect(interceptorEntry!.parentName).toBe('my-gateway');
+  });
+
+  it('marks interceptor as pending-removal when in deployed state but not in local project', () => {
+    const resources: DeployedResourceState = {
+      mcp: {
+        interceptors: {
+          'removed-interceptor': {
+            mode: 'managed',
+            interceptorArn: 'arn:aws:lambda:us-east-1:123456789:function:removed-interceptor',
+          },
+        },
+      },
+    };
+
+    const result = computeResourceStatuses(baseProject, resources);
+    const interceptorEntry = result.find(r => r.resourceType === 'interceptor' && r.name === 'removed-interceptor');
+
+    expect(interceptorEntry).toBeDefined();
+    expect(interceptorEntry!.deploymentState).toBe('pending-removal');
+    expect(interceptorEntry!.identifier).toBe('arn:aws:lambda:us-east-1:123456789:function:removed-interceptor');
+  });
+
   it('marks evaluator as deployed when in both local and deployed state', () => {
     const project = {
       ...baseProject,

@@ -118,3 +118,23 @@ export {
   PaymentProviderSchema,
   PaymentAuthorizerTypeSchema,
 } from './payment';
+export type {
+  ExternalInterceptorConfig,
+  InterceptionPoint,
+  Interceptor,
+  InterceptorConfig,
+  InterceptorRuntime,
+  InterceptorTemplate,
+  ManagedInterceptorConfig,
+} from './interceptor';
+export {
+  ExternalInterceptorConfigSchema,
+  InterceptionPointSchema,
+  InterceptorConfigSchema,
+  InterceptorNameSchema,
+  InterceptorRuntimeSchema,
+  InterceptorSchema,
+  InterceptorTemplateSchema,
+  LAMBDA_ARN_PATTERN,
+  ManagedInterceptorConfigSchema,
+} from './interceptor';

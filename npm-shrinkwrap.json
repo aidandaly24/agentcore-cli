@@ -1,12 +1,12 @@
 {
   "name": "@aws/agentcore",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@aws/agentcore",
-      "version": "0.18.0",
+      "version": "0.19.0",
       "hasInstallScript": true,
       "license": "Apache-2.0",
       "dependencies": {
@@ -21,6 +21,7 @@
         "@aws-sdk/client-cloudformation": "^3.893.0",
         "@aws-sdk/client-cloudwatch-logs": "^3.893.0",
         "@aws-sdk/client-efs": "^3.1049.0",
+        "@aws-sdk/client-lambda": "^3.893.0",
         "@aws-sdk/client-resource-groups-tagging-api": "^3.893.0",
         "@aws-sdk/client-s3": "^3.1012.0",
         "@aws-sdk/client-s3files": "^3.1049.0",

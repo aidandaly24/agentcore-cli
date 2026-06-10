@@ -1,5 +1,6 @@
 export {
   validateProject,
+  buildCrossAccountInterceptorWarnings,
   buildCdkProject,
   synthesizeCdk,
   checkStackDeployability,

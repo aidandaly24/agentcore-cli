@@ -136,7 +136,7 @@ export async function performStackTeardown(targetName: string): Promise<Result> 
       }
       if (region) {
         const projectSpec = await configIO.readProjectSpec();
-        const emptySpec = { ...projectSpec, abTests: [], httpGateways: [] };
+        const emptySpec = { ...projectSpec, abTests: [], httpGateways: [], interceptors: [] };
 
         if (resources.abTests) {
           const abResult = await deleteOrphanedABTests({

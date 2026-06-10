@@ -3,6 +3,7 @@ import type {
   DatasetDeployedState,
   DeployedState,
   EvaluatorDeployedState,
+  InterceptorDeployedState,
   MemoryDeployedState,
   OnlineEvalDeployedState,
   PaymentDeployedState,
@@ -50,15 +51,21 @@ export async function getStackOutputs(region: string, stackName: string): Promis
 export function parseGatewayOutputs(
   outputs: StackOutputs,
   gatewaySpecs: Record<string, unknown>
-): Record<string, { gatewayId: string; gatewayArn: string; gatewayUrl?: string }> {
-  const gateways: Record<string, { gatewayId: string; gatewayArn: string; gatewayUrl?: string }> = {};
+): Record<string, { gatewayId: string; gatewayArn: string; gatewayUrl?: string; gatewayRoleArn?: string }> {
+  const gateways: Record<
+    string,
+    { gatewayId: string; gatewayArn: string; gatewayUrl?: string; gatewayRoleArn?: string }
+  > = {};
 
   // Map PascalCase gateway names to original names for lookup
   const gatewayNames = Object.keys(gatewaySpecs);
   const gatewayIdMap = new Map(gatewayNames.map(name => [toPascalId(name), name]));
 
-  // Match pattern: Gateway{Name}{Type}Output{Hash}
-  const outputPattern = /^Gateway(.+?)(Id|Arn|Url)Output/;
+  // Match pattern: Gateway{Name}{Type}Output{Hash}. `RoleArn` MUST precede
+  // `Arn` in the alternation: the lazy `(.+?)` would otherwise stop at the
+  // `Arn` of `...RoleArnOutput` and mis-capture the name as `<name>Role`,
+  // corrupting gatewayArn.
+  const outputPattern = /^Gateway(.+?)(Id|RoleArn|Arn|Url)Output/;
 
   for (const [key, value] of Object.entries(outputs)) {
     const match = outputPattern.exec(key);
@@ -75,6 +82,8 @@ export function parseGatewayOutputs(
 
     if (outputType === 'Id') {
       gateways[gatewayName].gatewayId = value;
+    } else if (outputType === 'RoleArn') {
+      gateways[gatewayName].gatewayRoleArn = value;
     } else if (outputType === 'Arn') {
       gateways[gatewayName].gatewayArn = value;
     } else if (outputType === 'Url') {
@@ -243,6 +252,57 @@ export function parseEvaluatorOutputs(
   }
 
   return evaluators;
+}
+
+/**
+ * Parse stack outputs into deployed state for Lambda interceptors.
+ *
+ * Output key pattern: Interceptor{PascalName}(Arn|Mode|RoleArn|FunctionName)Output{Hash}
+ *
+ * Per Phase 1 wiring, the CDK construct emits:
+ *   - Arn (always)
+ *   - Mode (always — `managed` | `external`)
+ *   - RoleArn (managed only)
+ *   - FunctionName (managed only)
+ *
+ * The CLI consumes these into `targets[X].resources.mcp.interceptors[name]`.
+ */
+export function parseInterceptorOutputs(
+  outputs: StackOutputs,
+  interceptorSpecs: { name: string; mode: 'managed' | 'external' }[]
+): Record<string, InterceptorDeployedState> {
+  const interceptors: Record<string, InterceptorDeployedState> = {};
+  const outputKeys = Object.keys(outputs);
+
+  for (const spec of interceptorSpecs) {
+    const pascal = toPascalId('Interceptor', spec.name);
+    const arnPrefix = `${pascal}ArnOutput`;
+    const modePrefix = `${pascal}ModeOutput`;
+    const roleArnPrefix = `${pascal}RoleArnOutput`;
+    const fnNamePrefix = `${pascal}FunctionNameOutput`;
+
+    const arnKey = outputKeys.find(k => k.startsWith(arnPrefix));
+    const modeKey = outputKeys.find(k => k.startsWith(modePrefix));
+
+    if (!arnKey || !modeKey) continue;
+
+    const mode = outputs[modeKey] === 'managed' ? 'managed' : 'external';
+    const state: InterceptorDeployedState = {
+      mode,
+      interceptorArn: outputs[arnKey]!,
+    };
+
+    if (mode === 'managed') {
+      const roleArnKey = outputKeys.find(k => k.startsWith(roleArnPrefix));
+      const fnNameKey = outputKeys.find(k => k.startsWith(fnNamePrefix));
+      if (roleArnKey) state.interceptorRoleArn = outputs[roleArnKey];
+      if (fnNameKey) state.interceptorFunctionName = outputs[fnNameKey];
+    }
+
+    interceptors[spec.name] = state;
+  }
+
+  return interceptors;
 }
 
 /**
@@ -479,7 +539,7 @@ export interface BuildDeployedStateOptions {
   targetName: string;
   stackName: string;
   agents: Record<string, AgentCoreDeployedState>;
-  gateways: Record<string, { gatewayId: string; gatewayArn: string; gatewayUrl?: string }>;
+  gateways: Record<string, { gatewayId: string; gatewayArn: string; gatewayUrl?: string; gatewayRoleArn?: string }>;
   existingState?: DeployedState;
   identityKmsKeyArn?: string;
   credentials?: Record<string, { credentialProviderArn: string; clientSecretArn?: string; callbackUrl?: string }>;
@@ -503,6 +563,8 @@ export interface BuildDeployedStateOptions {
   >;
   datasets?: Record<string, DatasetDeployedState>;
   payments?: Record<string, PaymentDeployedState>;
+  /** Interceptor states keyed by interceptor name. Stored under mcp.interceptors. */
+  interceptors?: Record<string, InterceptorDeployedState>;
 }
 
 /**
@@ -526,6 +588,7 @@ export function buildDeployedState(opts: BuildDeployedStateOptions): DeployedSta
     harnesses,
     datasets,
     payments,
+    interceptors,
   } = opts;
   const targetState: TargetDeployedState = {
     resources: {
@@ -538,10 +601,29 @@ export function buildDeployedState(opts: BuildDeployedStateOptions): DeployedSta
     },
   };
 
-  // Add MCP state if gateways exist
-  if (Object.keys(gateways).length > 0) {
+  // Add MCP state if gateways or interceptors exist. Both nest under `mcp`
+  // because interceptors attach to gateways logically (and the deployed-state
+  // schema reflects that hierarchy).
+  const hasGateways = Object.keys(gateways).length > 0;
+  const hasInterceptors = interceptors && Object.keys(interceptors).length > 0;
+  if (hasGateways || hasInterceptors) {
+    // Map the parser's `gatewayRoleArn` to the deployed-state `roleArn` field
+    // (matching the HttpGateway convention). The role ARN is the cross-account
+    // interceptor `--principal`, surfaced to the user post-deploy.
+    const gatewaysState = Object.fromEntries(
+      Object.entries(gateways).map(([name, g]) => [
+        name,
+        {
+          gatewayId: g.gatewayId,
+          gatewayArn: g.gatewayArn,
+          ...(g.gatewayUrl !== undefined && { gatewayUrl: g.gatewayUrl }),
+          ...(g.gatewayRoleArn !== undefined && { roleArn: g.gatewayRoleArn }),
+        },
+      ])
+    );
     targetState.resources!.mcp = {
-      gateways,
+      ...(hasGateways && { gateways: gatewaysState }),
+      ...(hasInterceptors && { interceptors }),
     };
   }
 

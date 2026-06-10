@@ -84,6 +84,7 @@ async function handleRemoveAll(options: RemoveAllOptions): Promise<RemoveResult>
       harnesses: [],
       datasets: [],
       payments: [],
+      interceptors: [],
     });
 
     // Preserve aws-targets.json and deployed-state.json so that

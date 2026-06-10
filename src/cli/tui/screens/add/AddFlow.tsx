@@ -13,6 +13,7 @@ import { AddDatasetFlow } from '../dataset';
 import { AddEvaluatorFlow } from '../evaluator';
 import { AddHarnessFlow } from '../harness/AddHarnessFlow';
 import { AddIdentityFlow } from '../identity';
+import { AddInterceptorFlow } from '../interceptor';
 import { AddGatewayFlow, AddGatewayTargetFlow } from '../mcp';
 import { AddMemoryFlow } from '../memory/AddMemoryFlow';
 import { AddOnlineEvalFlow } from '../online-eval';
@@ -43,6 +44,7 @@ type FlowState =
   | { name: 'runtime-endpoint-wizard' }
   | { name: 'payment-manager-wizard' }
   | { name: 'payment-connector-wizard' }
+  | { name: 'interceptor-wizard' }
   | {
       name: 'agent-create-success';
       agentName: string;
@@ -206,6 +208,8 @@ function getInitialFlowState(resource?: AddResourceType): FlowState {
       return { name: 'payment-manager-wizard' };
     case 'payment-connector':
       return { name: 'payment-connector-wizard' };
+    case 'interceptor':
+      return { name: 'interceptor-wizard' };
     default:
       return { name: 'select' };
   }
@@ -273,6 +277,9 @@ export function AddFlow(props: AddFlowProps) {
         break;
       case 'payment-connector':
         setFlow({ name: 'payment-connector-wizard' });
+        break;
+      case 'interceptor':
+        setFlow({ name: 'interceptor-wizard' });
         break;
     }
   }, []);
@@ -597,6 +604,18 @@ export function AddFlow(props: AddFlowProps) {
       <AddPaymentFlow
         isInteractive={props.isInteractive}
         initialAction="connector"
+        onExit={props.onExit}
+        onBack={() => setFlow({ name: 'select' })}
+        onDev={props.onDev}
+        onDeploy={props.onDeploy}
+      />
+    );
+  }
+
+  if (flow.name === 'interceptor-wizard') {
+    return (
+      <AddInterceptorFlow
+        isInteractive={props.isInteractive}
         onExit={props.onExit}
         onBack={() => setFlow({ name: 'select' })}
         onDev={props.onDev}

@@ -19,6 +19,7 @@ export interface ResourceStatusEntry {
     | 'memory'
     | 'credential'
     | 'gateway'
+    | 'interceptor'
     | 'evaluator'
     | 'online-eval'
     | 'policy-engine'
@@ -191,6 +192,15 @@ export function computeResourceStatuses(
     },
   });
 
+  const interceptors = diffResourceSet({
+    resourceType: 'interceptor',
+    localItems: project.interceptors ?? [],
+    deployedRecord: resources?.mcp?.interceptors ?? {},
+    getIdentifier: deployed => deployed.interceptorArn,
+    getLocalDetail: item => `${item.config.managed ? 'managed' : 'external'} — ${item.interceptionPoints.join('+')}`,
+    getParentName: item => item.gatewayName,
+  });
+
   const evaluators = diffResourceSet({
     resourceType: 'evaluator',
     localItems: project.evaluators ?? [],
@@ -325,6 +335,7 @@ export function computeResourceStatuses(
     ...credentials,
     ...memories,
     ...gateways,
+    ...interceptors,
     ...evaluators,
     ...onlineEvalConfigs,
     ...policyEngines,

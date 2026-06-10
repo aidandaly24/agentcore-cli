@@ -91,12 +91,23 @@ agentcore invoke
 
 ### Resource Management
 
-| Command  | Description                                          |
-| -------- | ---------------------------------------------------- |
-| `add`    | Add agents, memory, credentials, evaluators, targets |
-| `remove` | Remove resources from project                        |
+| Command  | Description                                                        |
+| -------- | ------------------------------------------------------------------ |
+| `add`    | Add agents, memory, credentials, evaluators, targets, interceptors |
+| `remove` | Remove resources from project                                      |
 
 > **Note**: Run `agentcore deploy` after `add` or `remove` to update resources in AWS.
+
+#### Interceptors
+
+| Command                         | Description                                                         |
+| ------------------------------- | ------------------------------------------------------------------- |
+| `add interceptor`               | Add a Lambda interceptor (managed scaffold or BYO ARN) to a gateway |
+| `remove interceptor`            | Remove an interceptor                                               |
+| `logs interceptor --name <n>`   | Tail or search managed interceptor CloudWatch logs                  |
+| `invoke interceptor --name <n>` | Invoke a managed interceptor with a synthetic payload               |
+
+See [docs/interceptors.md](docs/interceptors.md) for templates, schema, and the cross-account behavior.
 
 ### Observability
 

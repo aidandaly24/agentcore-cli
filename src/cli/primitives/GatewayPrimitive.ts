@@ -1,4 +1,11 @@
-import { ResourceNotFoundError, ValidationError, findConfigRoot, serializeResult, toError } from '../../lib';
+import {
+  ConflictError,
+  ResourceNotFoundError,
+  ValidationError,
+  findConfigRoot,
+  serializeResult,
+  toError,
+} from '../../lib';
 import type { Result } from '../../lib/result';
 import type {
   AgentCoreGateway,
@@ -22,6 +29,9 @@ import { buildAuthorizerConfigFromJwtConfig, createManagedOAuthCredential } from
 import { SOURCE_CODE_NOTE } from './constants';
 import type { AddResult, AddScreenComponent, RemovableResource } from './types';
 import type { Command } from '@commander-js/extra-typings';
+import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 /**
  * Options for adding a gateway resource (CLI-level).
@@ -72,7 +82,7 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
     }
   }
 
-  async remove(gatewayName: string): Promise<Result> {
+  async remove(gatewayName: string, options: { deleteInterceptors?: boolean } = {}): Promise<Result> {
     try {
       const project = await this.readProjectSpec();
       const mcpSpec = extractMcpSpec(project);
@@ -82,8 +92,43 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
         return { success: false, error: new ResourceNotFoundError(`Gateway "${gatewayName}" not found.`) };
       }
 
+      // Interceptors reference their gateway by name; orphaning them would fail
+      // the project schema's referential-integrity check and block all future
+      // deploys. Block by default (force the user to act), or cascade-remove
+      // the attached interceptors and their scaffolded code when opted in.
+      const attached = (project.interceptors ?? []).filter(i => i.gatewayName === gatewayName);
+      if (attached.length > 0 && !options.deleteInterceptors) {
+        const names = attached.map(i => i.name).join(', ');
+        return {
+          success: false,
+          error: new ConflictError(
+            `Gateway "${gatewayName}" has ${attached.length} attached interceptor(s): ${names}. ` +
+              `Remove them first, or re-run with --delete-interceptors to remove them with the gateway.`
+          ),
+        };
+      }
+
       const newMcpSpec = this.computeRemovedGatewayMcpSpec(mcpSpec, gatewayName);
-      await this.writeProjectSpec({ ...project, ...newMcpSpec });
+      const remainingInterceptors = (project.interceptors ?? []).filter(i => i.gatewayName !== gatewayName);
+      await this.writeProjectSpec({ ...project, ...newMcpSpec, interceptors: remainingInterceptors });
+
+      // Delete scaffolded code for cascaded managed interceptors. Best-effort:
+      // the spec is already written, so a dir-delete failure leaves only a
+      // stale directory, not an inconsistent project.
+      if (options.deleteInterceptors) {
+        const configRoot = findConfigRoot();
+        if (configRoot) {
+          const projectRoot = dirname(configRoot);
+          for (const interceptor of attached) {
+            const codeLocation = interceptor.config.managed?.codeLocation;
+            if (!codeLocation) continue;
+            const codeDir = join(projectRoot, codeLocation);
+            if (existsSync(codeDir)) {
+              await rm(codeDir, { recursive: true, force: true });
+            }
+          }
+        }
+      }
 
       return { success: true };
     } catch (err) {
@@ -102,19 +147,35 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
 
     const summary: string[] = [`Removing gateway: ${gatewayName}`];
     const schemaChanges: SchemaChange[] = [];
+    const directoriesToDelete: string[] = [];
 
     if (gateway.targets.length > 0) {
       summary.push(`Note: ${gateway.targets.length} target(s) behind this gateway will become unassigned`);
     }
 
+    const attached = (project.interceptors ?? []).filter(i => i.gatewayName === gatewayName);
+    if (attached.length > 0) {
+      summary.push(
+        `Note: ${attached.length} attached interceptor(s) will be removed with this gateway: ${attached.map(i => i.name).join(', ')}`
+      );
+      for (const interceptor of attached) {
+        const codeLocation = interceptor.config.managed?.codeLocation;
+        if (codeLocation) {
+          directoriesToDelete.push(codeLocation);
+          summary.push(`Will delete directory: ${codeLocation}`);
+        }
+      }
+    }
+
     const afterMcpSpec = this.computeRemovedGatewayMcpSpec(mcpSpec, gatewayName);
+    const remainingInterceptors = (project.interceptors ?? []).filter(i => i.gatewayName !== gatewayName);
     schemaChanges.push({
       file: 'agentcore/agentcore.json',
       before: project,
-      after: { ...project, ...afterMcpSpec },
+      after: { ...project, ...afterMcpSpec, interceptors: remainingInterceptors },
     });
 
-    return { summary, directoriesToDelete: [], schemaChanges };
+    return { summary, directoriesToDelete, schemaChanges };
   }
 
   async getRemovable(): Promise<RemovableResource[]> {
@@ -248,8 +309,9 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
       .description('Remove a gateway from the project')
       .option('--name <name>', 'Name of resource to remove [non-interactive]')
       .option('-y, --yes', 'Skip confirmation prompt [non-interactive]')
+      .option('--delete-interceptors', 'Also remove interceptors attached to this gateway (and their scaffolded code)')
       .option('--json', 'Output as JSON [non-interactive]')
-      .action(async (cliOptions: { name?: string; yes?: boolean; json?: boolean }) => {
+      .action(async (cliOptions: { name?: string; yes?: boolean; deleteInterceptors?: boolean; json?: boolean }) => {
         try {
           if (!findConfigRoot()) {
             console.error('No agentcore project found. Run `agentcore create` first.');
@@ -262,7 +324,9 @@ export class GatewayPrimitive extends BasePrimitive<AddGatewayOptions, Removable
               process.exit(1);
             }
 
-            const result = await withCommandRunTelemetry('remove.gateway', {}, () => this.remove(cliOptions.name!));
+            const result = await withCommandRunTelemetry('remove.gateway', {}, () =>
+              this.remove(cliOptions.name!, { deleteInterceptors: cliOptions.deleteInterceptors })
+            );
             console.log(
               JSON.stringify({
                 success: result.success,

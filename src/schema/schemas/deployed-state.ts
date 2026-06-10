@@ -39,6 +39,10 @@ export const GatewayDeployedStateSchema = z.object({
   gatewayId: z.string().min(1),
   gatewayArn: z.string().min(1),
   gatewayUrl: z.string().optional(),
+  // Gateway execution role ARN. The gateway invokes interceptor Lambdas using
+  // this role's identity, so it is the `--principal` for a cross-account
+  // external interceptor's resource-based policy.
+  roleArn: z.string().optional(),
 });
 
 export type GatewayDeployedState = z.infer<typeof GatewayDeployedStateSchema>;
@@ -67,6 +71,24 @@ export const McpLambdaDeployedStateSchema = z.object({
 export type McpLambdaDeployedState = z.infer<typeof McpLambdaDeployedStateSchema>;
 
 // ============================================================================
+// Interceptor Deployed State
+//
+// Stored under `targets[X].resources.mcp.interceptors[name]`. `mode` is
+// echoed from the project spec so destroy / verb gating can act without a
+// re-read of agentcore.json. Managed entries carry the role + function name
+// so `agentcore logs interceptor` can act without round-tripping.
+// ============================================================================
+
+export const InterceptorDeployedStateSchema = z.object({
+  mode: z.enum(['managed', 'external']),
+  interceptorArn: z.string().min(1),
+  interceptorRoleArn: z.string().optional(),
+  interceptorFunctionName: z.string().optional(),
+});
+
+export type InterceptorDeployedState = z.infer<typeof InterceptorDeployedStateSchema>;
+
+// ============================================================================
 // MCP Deployed State Container
 // ============================================================================
 
@@ -74,6 +96,7 @@ export const McpDeployedStateSchema = z.object({
   gateways: z.record(z.string(), GatewayDeployedStateSchema).optional(),
   runtimes: z.record(z.string(), McpRuntimeDeployedStateSchema).optional(),
   lambdas: z.record(z.string(), McpLambdaDeployedStateSchema).optional(),
+  interceptors: z.record(z.string(), InterceptorDeployedStateSchema).optional(),
 });
 
 export type McpDeployedState = z.infer<typeof McpDeployedStateSchema>;

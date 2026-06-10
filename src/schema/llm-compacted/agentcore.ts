@@ -29,6 +29,7 @@ interface AgentCoreProjectSpec {
   /** @internal Auto-managed by AB test creation. Do not configure directly. */
   httpGateways: HttpGateway[]; // Unique by name — HTTP gateways bound to a runtime
   datasets: DatasetSpec[]; // Unique by name — datasets for Dataset Management
+  interceptors?: Interceptor[]; // Unique by name — Lambda interceptors attached to gateways (max 2 per gateway)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,6 +39,41 @@ interface AgentCoreProjectSpec {
 interface DatasetSpec {
   name: string; // @regex ^[a-zA-Z][a-zA-Z0-9_]{0,47}$ @max 48
   description?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAMBDA INTERCEPTOR
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Interceptor {
+  name: string; // @regex ^[a-zA-Z][a-zA-Z0-9-]{0,23}$ @max 24
+  gatewayName: string; // must reference an existing agentCoreGateways[].name
+  /** REQUEST = before target invocation, RESPONSE = after target returns. Max 2 entries; values must be unique. */
+  interceptionPoints: ('REQUEST' | 'RESPONSE')[];
+  /** Forward the caller's request headers (incl. Authorization) to the interceptor. */
+  passRequestHeaders?: boolean; // default true
+  config: InterceptorConfig;
+  tags?: Record<string, string>;
+}
+
+/** Mutually exclusive — exactly one of `managed` or `external`. */
+interface InterceptorConfig {
+  managed?: ManagedInterceptorConfig;
+  external?: ExternalInterceptorConfig;
+}
+
+interface ManagedInterceptorConfig {
+  codeLocation: string; // relative dir under the project root, e.g. app/<name>/
+  entrypoint?: string; // default 'handler.lambda_handler' (python) / 'index.handler' (node)
+  timeoutSeconds?: number; // default 30, range 1-300
+  runtime?: 'python3.12' | 'nodejs22.x'; // default 'python3.12'
+  /** File paths (relative to codeLocation) or managed-policy ARNs. */
+  additionalPolicies?: string[];
+}
+
+interface ExternalInterceptorConfig {
+  /** @regex ^arn:[^:]+:lambda:[a-z0-9-]+:\d{12}:function:[a-zA-Z0-9_-]+$ — unqualified ARN, no :VERSION/:ALIAS */
+  lambdaArn: string; // @max 170
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

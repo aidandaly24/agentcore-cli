@@ -61,6 +61,26 @@ const DYNAMIC_REQUIRE_PACKAGES = [
 
 const DEPS_DIR = '_deps';
 
+const NODE_ENTRY_EXTS = ['.mjs', '.cjs', '.ts', '.js'];
+
+/**
+ * Pick the source file to feed to esbuild. The Lambda handler string
+ * (e.g. `index.handler` or `main.lambda_handler`) names the JS module
+ * before the dot — we resolve that against the supported extensions
+ * inside `srcDir`. Agents that pre-date this change may not set
+ * `entrypoint`, so we fall back to legacy `main.ts`.
+ */
+function resolveNodeEntryFile(srcDir: string, entrypoint: string | undefined): string {
+  const moduleName = entrypoint?.split('.')[0];
+  if (moduleName) {
+    for (const ext of NODE_ENTRY_EXTS) {
+      const candidate = join(srcDir, `${moduleName}${ext}`);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return join(srcDir, 'main.ts');
+}
+
 function copyDynamicDeps(srcDir: string, stagingDir: string): void {
   const srcNodeModules = join(srcDir, 'node_modules');
   if (!existsSync(srcNodeModules)) return;
@@ -92,7 +112,7 @@ export class NodeCodeZipPackager implements RuntimePackager {
 
     await ensureDirClean(stagingDir);
 
-    const entryFile = join(srcDir, 'main.ts');
+    const entryFile = resolveNodeEntryFile(srcDir, spec.entrypoint);
     const runtimeVersion = spec.runtimeVersion;
     const nodeTarget = `node${extractNodeVersion(runtimeVersion)}`;
     const cjsBanner =
@@ -146,7 +166,7 @@ export class NodeCodeZipPackagerSync implements CodeZipPackager {
 
     ensureDirCleanSync(stagingDir);
 
-    const entryFile = join(srcDir, 'main.ts');
+    const entryFile = resolveNodeEntryFile(srcDir, config.entrypoint);
     const nodeTarget = `node${extractNodeVersion(runtimeVersion)}`;
     const cjsBanner =
       'const importMetaUrl = require("url").pathToFileURL(__filename).href;' +
