@@ -40,13 +40,19 @@ export type InterceptorTemplate = z.infer<typeof InterceptorTemplateSchema>;
  * the schema sparse and let consumers (CDK constructs, primitive add flows)
  * apply defaults at use time via `?? INTERCEPTOR_DEFAULTS.X`.
  */
-export const ManagedInterceptorConfigSchema = z.object({
-  codeLocation: z.string().min(1),
-  entrypoint: z.string().min(1).optional(),
-  timeoutSeconds: z.number().int().min(1).max(300).optional(),
-  runtime: InterceptorRuntimeSchema.optional(),
-  additionalPolicies: z.array(z.string().min(1)).optional(),
-});
+export const ManagedInterceptorConfigSchema = z
+  .object({
+    codeLocation: z.string().min(1),
+    // Capped so a typo'd handler can't sail past validation; a real entrypoint
+    // (`module.exportedFn`) is short. Bound it to keep error messages sane.
+    entrypoint: z.string().min(1).max(128).optional(),
+    timeoutSeconds: z.number().int().min(1).max(300).optional(),
+    runtime: InterceptorRuntimeSchema.optional(),
+    additionalPolicies: z.array(z.string().min(1)).optional(),
+  })
+  // Strict so a mistyped field (e.g. `timeout` for `timeoutSeconds`) is a clear
+  // error, not silently dropped — which would deploy the Lambda misconfigured.
+  .strict();
 
 /**
  * Effective defaults consumers apply when these fields are absent in the
@@ -90,15 +96,19 @@ export type ManagedInterceptorConfig = z.infer<typeof ManagedInterceptorConfigSc
  */
 export const LAMBDA_ARN_PATTERN = /^arn:[^:]+:lambda:[a-z0-9-]+:\d{12}:function:[a-zA-Z0-9_-]+$/;
 
-export const ExternalInterceptorConfigSchema = z.object({
-  lambdaArn: z
-    .string()
-    .min(1)
-    // CFN service contract caps lambda ARNs at 170 chars
-    // (aws-properties-bedrockagentcore-gateway-lambdainterceptorconfiguration).
-    .max(170, 'Lambda ARN must be 170 characters or fewer')
-    .regex(LAMBDA_ARN_PATTERN, 'Must be a valid unqualified Lambda function ARN (no :VERSION or :ALIAS suffix)'),
-});
+export const ExternalInterceptorConfigSchema = z
+  .object({
+    lambdaArn: z
+      .string()
+      .min(1)
+      // CFN service contract caps lambda ARNs at 170 chars
+      // (aws-properties-bedrockagentcore-gateway-lambdainterceptorconfiguration).
+      .max(170, 'Lambda ARN must be 170 characters or fewer')
+      .regex(LAMBDA_ARN_PATTERN, 'Must be a valid unqualified Lambda function ARN (no :VERSION or :ALIAS suffix)'),
+  })
+  // Strict: an unknown key here (e.g. a managed-only field on an external
+  // interceptor) is a mistake, not something to silently discard.
+  .strict();
 
 export type ExternalInterceptorConfig = z.infer<typeof ExternalInterceptorConfigSchema>;
 
@@ -141,7 +151,7 @@ export const InterceptorSchema = z
     // `<file>.<exportedFn>` handler (e.g. `index.handler`). Without this guard
     // the mismatch only surfaces as handler-not-found at every invocation.
     const managed = data.config.managed;
-    if (managed?.runtime === 'nodejs22.x' && managed.entrypoint?.endsWith('.lambda_handler')) {
+    if (managed?.runtime === 'nodejs22.x' && managed.entrypoint?.toLowerCase().endsWith('.lambda_handler')) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:

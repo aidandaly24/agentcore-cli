@@ -132,6 +132,7 @@ export function ResourceGraph({ project, mcp, agentName, resourceStatuses }: Res
   const evaluators = project.evaluators ?? [];
   const onlineEvalConfigs = project.onlineEvalConfigs ?? [];
   const gateways = mcp?.agentCoreGateways ?? [];
+  const interceptors = project.interceptors ?? [];
   const mcpRuntimeTools = mcp?.mcpRuntimeTools ?? [];
   const unassignedTargets = mcp?.unassignedTargets ?? [];
   const policyEngines = project.policyEngines ?? [];
@@ -168,6 +169,7 @@ export function ResourceGraph({ project, mcp, agentName, resourceStatuses }: Res
     evaluators.length > 0 ||
     onlineEvalConfigs.length > 0 ||
     gateways.length > 0 ||
+    interceptors.length > 0 ||
     policyEngines.length > 0 ||
     mcpRuntimeTools.length > 0 ||
     unassignedTargets.length > 0 ||
@@ -459,6 +461,29 @@ export function ResourceGraph({ project, mcp, agentName, resourceStatuses }: Res
                     </Text>
                   );
                 })}
+                {interceptors
+                  .filter(i => i.gatewayName === gateway.name)
+                  .map(interceptor => {
+                    const icEntry = statusMap.get(`interceptor:${interceptor.name}`);
+                    const mode = interceptor.config.external ? 'external' : 'managed';
+                    const points = interceptor.interceptionPoints.join('+');
+                    return (
+                      <Text key={interceptor.name}>
+                        {'    '}
+                        <Text color="yellow">{ICONS.interceptor}</Text> {interceptor.name}
+                        <Text color="gray">
+                          {' '}
+                          [{mode} — {points}]
+                        </Text>
+                        {icEntry?.deploymentState && (
+                          <Text color={DEPLOYMENT_STATE_COLORS[icEntry.deploymentState]}>
+                            {' '}
+                            [{DEPLOYMENT_STATE_LABELS[icEntry.deploymentState]}]
+                          </Text>
+                        )}
+                      </Text>
+                    );
+                  })}
               </Box>
             );
           })}

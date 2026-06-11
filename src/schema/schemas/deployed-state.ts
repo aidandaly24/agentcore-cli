@@ -84,6 +84,10 @@ export const InterceptorDeployedStateSchema = z.object({
   interceptorArn: z.string().min(1),
   interceptorRoleArn: z.string().optional(),
   interceptorFunctionName: z.string().optional(),
+  // Owning gateway, echoed from the spec so a pending-removal entry (gone from
+  // agentcore.json but still deployed) can still report which gateway it was
+  // attached to in `status --json`.
+  gatewayName: z.string().optional(),
 });
 
 export type InterceptorDeployedState = z.infer<typeof InterceptorDeployedStateSchema>;

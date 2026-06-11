@@ -248,9 +248,11 @@ describe('buildCrossAccountInterceptorWarnings', () => {
     // The OWN-account gateway role ARN is printed UNMASKED (must be copy-pasteable).
     expect(warnings[0]).toContain('arn:aws:iam::603141041947:role/gw-exec');
     expect(warnings[0]).toMatch(/aws lambda add-permission/);
-    // The FOREIGN Lambda account is masked.
-    expect(warnings[0]).toMatch(/\*{4}1111/);
-    expect(warnings[0]).not.toMatch(/\b111111111111\b/);
+    // The human-readable "Lambda:" summary line masks the foreign account.
+    expect(warnings[0]).toMatch(/Lambda: arn:aws:lambda:us-east-1:\*{4}1111:function:central-auth/);
+    // …but the --function-name in the runnable command MUST be the real ARN,
+    // since the user runs it in the Lambda's own (foreign) account.
+    expect(warnings[0]).toMatch(/--function-name arn:aws:lambda:us-east-1:111111111111:function:central-auth/);
   });
 
   it('falls back to a placeholder when the gateway role ARN is unresolved', () => {

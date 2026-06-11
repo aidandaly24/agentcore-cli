@@ -45,7 +45,7 @@ def _scopes_from_payload(payload: Dict[str, Any]) -> Iterable[str]:
 
 
 @interceptor()
-def handler(event: InterceptorEvent, context) -> InterceptorResponse:
+def lambda_handler(event: InterceptorEvent, context) -> InterceptorResponse:
     headers = {k.lower(): v for k, v in (event.request.headers if event.request else {}).items()}
     authz = headers.get("authorization", "")
 

@@ -14,7 +14,7 @@ from bedrock_agentcore.gateway.interceptor import InterceptorEvent, InterceptorR
 
 
 @interceptor()
-def handler(event: InterceptorEvent, context) -> InterceptorResponse:
+def lambda_handler(event: InterceptorEvent, context) -> InterceptorResponse:
     # REQUEST point: forward the request unchanged.
     # RESPONSE point: forward the response unchanged.
     return InterceptorResponse.pass_through(event)

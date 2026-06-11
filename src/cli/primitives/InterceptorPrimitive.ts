@@ -7,6 +7,7 @@ import {
   InterceptorSchema,
   InterceptorTemplateSchema,
 } from '../../schema';
+import { accountIdFromArn } from '../aws/mask';
 import { getErrorMessage } from '../errors';
 import { setupNodeProject } from '../operations/node';
 import type { RemovalPreview, SchemaChange } from '../operations/remove/types';
@@ -14,11 +15,12 @@ import { runCliCommand } from '../telemetry/cli-command-run.js';
 import { renderInterceptorTemplate } from '../templates/InterceptorRenderer';
 import { requireTTY } from '../tui/guards/tty';
 import { BasePrimitive } from './BasePrimitive';
+import { SCAFFOLD_DELETED_NOTE, SOURCE_CODE_NOTE } from './constants';
 import type { AddResult, AddScreenComponent, RemovableResource } from './types';
 import type { Command } from '@commander-js/extra-typings';
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 export interface AddInterceptorOptions {
   name: string;
@@ -43,6 +45,9 @@ export type RemovableInterceptor = RemovableResource;
 const DEFAULT_TIMEOUT_SECONDS = 30;
 const DEFAULT_PYTHON_ENTRYPOINT = 'handler.lambda_handler';
 const DEFAULT_NODE_ENTRYPOINT = 'index.handler';
+/** Sanity bounds on --additional-policies to reject obviously-bad input early. */
+const MAX_ADDITIONAL_POLICIES = 20;
+const MAX_POLICY_ENTRY_LENGTH = 2048;
 
 /**
  * InterceptorPrimitive owns the add/remove lifecycle for Lambda Interceptors.
@@ -60,6 +65,18 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
   readonly label = 'Interceptor';
   override readonly article = 'an';
   readonly primitiveSchema = InterceptorSchema;
+
+  /** Names of managed interceptors removed this run (whose scaffold dir was deleted). */
+  private readonly removedManaged = new Set<string>();
+
+  /**
+   * Managed interceptors delete their scaffold directory on removal, so the
+   * default "source code not modified" note would be false. Report the deletion
+   * instead; external interceptors touch no code and keep the default note.
+   */
+  protected override removeNote(name: string): string {
+    return this.removedManaged.has(name) ? SCAFFOLD_DELETED_NOTE : SOURCE_CODE_NOTE;
+  }
 
   async add(
     options: AddInterceptorOptions
@@ -148,10 +165,28 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
         const configRoot = findConfigRoot();
         if (configRoot) {
           const projectRoot = dirname(configRoot);
-          const codeDir = join(projectRoot, interceptor.config.managed.codeLocation);
+          const codeDir = resolve(projectRoot, interceptor.config.managed.codeLocation);
+          // Containment guard: codeLocation comes from agentcore.json, which a
+          // user could hand-edit to `../../../something`. Only delete paths that
+          // resolve to a real subdirectory of the project root — never the root
+          // itself, and never anything outside it.
+          const rel = relative(projectRoot, codeDir);
+          const contained = rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+          if (!contained) {
+            return {
+              success: false,
+              error: new Error(
+                `Interceptor "${interceptorName}": codeLocation "${interceptor.config.managed.codeLocation}" ` +
+                  `resolves outside the project directory; refusing to delete it. Remove it manually if intended.`
+              ),
+            };
+          }
           if (existsSync(codeDir)) {
             await rm(codeDir, { recursive: true, force: true });
           }
+          // Mark so removeNote() reports the scaffold deletion rather than the
+          // default "source code not modified" note.
+          this.removedManaged.add(interceptorName);
         }
       }
 
@@ -262,9 +297,17 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
                 fail('--name, --gateway, and --interception-points are required in non-interactive mode');
               }
 
+              // Mode is chosen by the PRESENCE of --lambda-arn, not its truthiness:
+              // an empty string is still an explicit (invalid) external request, and
+              // must not silently fall through to managed mode bypassing the guards.
+              const hasLambdaArn = cliOptions.lambdaArn !== undefined;
+              if (hasLambdaArn && cliOptions.lambdaArn!.trim() === '') {
+                fail('--lambda-arn requires a non-empty Lambda function ARN');
+              }
+
               // Cross-flag rejection runs BEFORE Zod parse so error messages
               // are user-actionable (mirrors EvaluatorPrimitive.ts:226-235).
-              if (cliOptions.lambdaArn) {
+              if (hasLambdaArn) {
                 if (cliOptions.template) fail('--template cannot be used with --lambda-arn');
                 if (cliOptions.runtime) fail('--runtime cannot be used with --lambda-arn');
                 if (cliOptions.timeout) fail('--timeout cannot be used with --lambda-arn');
@@ -298,14 +341,14 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
               let template: InterceptorTemplate = 'pass-through';
               let runtime: InterceptorRuntime = 'python3.12';
 
-              if (cliOptions.lambdaArn) {
+              if (hasLambdaArn) {
                 mode = 'external';
                 result = await this.add({
                   name: cliOptions.name!,
                   gatewayName: cliOptions.gateway!,
                   interceptionPoints,
                   passRequestHeaders,
-                  config: { external: { lambdaArn: cliOptions.lambdaArn } },
+                  config: { external: { lambdaArn: cliOptions.lambdaArn! } },
                 });
               } else {
                 mode = 'managed';
@@ -326,7 +369,16 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
                   template = tRes.data!;
                 }
 
-                const timeoutSeconds = cliOptions.timeout ? parseInt(cliOptions.timeout, 10) : DEFAULT_TIMEOUT_SECONDS;
+                // Reject non-integers explicitly: parseInt('1.5') silently
+                // truncates to 1, so validate the raw string is all digits
+                // before converting.
+                let timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
+                if (cliOptions.timeout !== undefined) {
+                  if (!/^\d+$/.test(cliOptions.timeout.trim())) {
+                    fail('--timeout must be an integer in [1, 300]');
+                  }
+                  timeoutSeconds = parseInt(cliOptions.timeout, 10);
+                }
                 if (Number.isNaN(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 300) {
                   fail('--timeout must be an integer in [1, 300]');
                 }
@@ -337,6 +389,22 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
                   ?.split(',')
                   .map(s => s.trim())
                   .filter(Boolean);
+                if (parsedPolicies && parsedPolicies.length > MAX_ADDITIONAL_POLICIES) {
+                  fail(`--additional-policies accepts at most ${MAX_ADDITIONAL_POLICIES} entries.`);
+                }
+                for (const policy of parsedPolicies ?? []) {
+                  if (policy.length > MAX_POLICY_ENTRY_LENGTH) {
+                    fail(`--additional-policies entry exceeds ${MAX_POLICY_ENTRY_LENGTH} characters.`);
+                  }
+                  // A managed-policy ARN is allowed; a relative file path must not
+                  // escape the interceptor code dir.
+                  if (!policy.startsWith('arn:') && (policy.includes('..') || isAbsolute(policy))) {
+                    fail(
+                      `--additional-policies entry "${policy}" must be a managed-policy ARN or a relative ` +
+                        `path inside the interceptor directory (no "..", no absolute paths).`
+                    );
+                  }
+                }
                 const additionalPolicies = parsedPolicies && parsedPolicies.length > 0 ? parsedPolicies : undefined;
 
                 result = await this.addWithTemplate(
@@ -381,11 +449,26 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
                 );
               }
 
+              // Report the real cross-account status for external interceptors:
+              // the Lambda's account differs from every configured deploy target.
+              // Best-effort — any resolution failure falls back to false.
+              let hasCrossAccountWarning = false;
+              if (mode === 'external' && hasLambdaArn) {
+                try {
+                  const lambdaAccountId = accountIdFromArn(cliOptions.lambdaArn!);
+                  const targets = await this.configIO.resolveAWSDeploymentTargets();
+                  hasCrossAccountWarning =
+                    !!lambdaAccountId && (targets.length === 0 || targets.every(t => t.account !== lambdaAccountId));
+                } catch {
+                  // Targets unresolved (e.g. no aws-targets yet) — leave false.
+                }
+              }
+
               return {
                 mode,
                 runtime,
                 template,
-                has_cross_account_warning: false,
+                has_cross_account_warning: hasCrossAccountWarning,
               };
             });
           } else {
@@ -442,7 +525,9 @@ export class InterceptorPrimitive extends BasePrimitive<AddInterceptorOptions, R
     // Cardinality + unique-point check on the same gateway.
     const existing = project.interceptors.filter(i => i.gatewayName === options.gatewayName);
     if (existing.length >= 2) {
-      throw new Error(`Gateway "${options.gatewayName}" already has 2 interceptors. Maximum is 2 per gateway.`);
+      throw new Error(
+        `Gateway "${options.gatewayName}" already has 2 interceptors. Maximum is 2 (1 REQUEST + 1 RESPONSE).`
+      );
     }
     const usedPoints = new Set<InterceptionPoint>();
     for (const i of existing) for (const p of i.interceptionPoints) usedPoints.add(p);

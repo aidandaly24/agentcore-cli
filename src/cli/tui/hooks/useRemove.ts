@@ -368,7 +368,12 @@ export function useRemoveHarness() {
 
 export function useRemoveGateway() {
   return useRemoveResource(
-    (name: string) => gatewayPrimitive.remove(name),
+    // Cascade interceptor removal: the TUI preview (RemoveGatewayScreen →
+    // confirm) already lists the attached interceptors and the scaffold dirs
+    // that will be deleted, so confirming IS the consent. Without this flag
+    // GatewayPrimitive.remove() throws ConflictError and the TUI dead-ends with
+    // no way to remove a gateway that has interceptors attached.
+    (name: string) => gatewayPrimitive.remove(name, { deleteInterceptors: true }),
     'gateway',
     name => name
   );

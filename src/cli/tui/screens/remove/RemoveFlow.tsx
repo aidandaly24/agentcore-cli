@@ -1622,6 +1622,7 @@ export function RemoveFlow({
         isInteractive={isInteractive}
         message={`Removed gateway: ${flow.gatewayName}`}
         detail="Gateway removed from agentcore.json. Deploy with `agentcore deploy` to apply changes."
+        sourceNote="Any managed interceptor scaffold directories attached to this gateway were deleted."
         logFilePath={flow.logFilePath}
         onRemoveAnother={() => {
           resetAll();
@@ -1702,6 +1703,7 @@ export function RemoveFlow({
         isInteractive={isInteractive}
         message={`Removed interceptor: ${flow.interceptorName}`}
         detail="Interceptor removed from agentcore.json. Deploy with `agentcore deploy` to apply changes."
+        sourceNote="A managed interceptor's scaffold directory is deleted on removal; an external interceptor's code is untouched."
         logFilePath={flow.logFilePath}
         onRemoveAnother={() => {
           resetAll();

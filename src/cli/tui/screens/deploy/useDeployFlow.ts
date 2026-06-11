@@ -333,6 +333,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     const interceptorSpecs = (ctx.projectSpec.interceptors ?? []).map(i => ({
       name: i.name,
       mode: i.config.managed ? ('managed' as const) : ('external' as const),
+      gatewayName: i.gatewayName,
     }));
     const interceptors = parseInterceptorOutputs(outputs, interceptorSpecs);
 

@@ -269,7 +269,7 @@ export function parseEvaluatorOutputs(
  */
 export function parseInterceptorOutputs(
   outputs: StackOutputs,
-  interceptorSpecs: { name: string; mode: 'managed' | 'external' }[]
+  interceptorSpecs: { name: string; mode: 'managed' | 'external'; gatewayName?: string }[]
 ): Record<string, InterceptorDeployedState> {
   const interceptors: Record<string, InterceptorDeployedState> = {};
   const outputKeys = Object.keys(outputs);
@@ -290,6 +290,7 @@ export function parseInterceptorOutputs(
     const state: InterceptorDeployedState = {
       mode,
       interceptorArn: outputs[arnKey]!,
+      ...(spec.gatewayName ? { gatewayName: spec.gatewayName } : {}),
     };
 
     if (mode === 'managed') {

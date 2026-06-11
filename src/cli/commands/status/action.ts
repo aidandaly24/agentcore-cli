@@ -85,6 +85,7 @@ function diffResourceSet<TLocal extends { name: string }, TDeployed>({
   getLocalDetail,
   getDeployedKey,
   getParentName,
+  getDeployedParentName,
 }: {
   resourceType: ResourceStatusEntry['resourceType'];
   localItems: TLocal[];
@@ -93,6 +94,9 @@ function diffResourceSet<TLocal extends { name: string }, TDeployed>({
   getLocalDetail?: (item: TLocal) => string | undefined;
   getDeployedKey?: (item: TLocal) => string;
   getParentName?: (item: TLocal) => string | undefined;
+  /** Recover the parent for a pending-removal entry from the deployed record
+   *  (when the parent isn't encoded in the key as `parent/child`). */
+  getDeployedParentName?: (deployed: TDeployed) => string | undefined;
 }): ResourceStatusEntry[] {
   const entries: ResourceStatusEntry[] = [];
   const localKeys = new Set(localItems.map(item => (getDeployedKey ? getDeployedKey(item) : item.name)));
@@ -112,14 +116,17 @@ function diffResourceSet<TLocal extends { name: string }, TDeployed>({
 
   for (const [name, deployed] of Object.entries(deployedRecord)) {
     if (!localKeys.has(name)) {
-      // For pending-removal entries, try to extract parentName from composite key
+      // For pending-removal entries, recover parentName from the deployed
+      // record first (flat keys like interceptors), else from a composite
+      // `parent/child` key (policies).
       const slashIdx = name.indexOf('/');
+      const parentFromKey = getParentName && slashIdx > 0 ? name.substring(0, slashIdx) : undefined;
       entries.push({
         resourceType,
         name,
         deploymentState: 'pending-removal',
         identifier: getIdentifier(deployed),
-        parentName: getParentName && slashIdx > 0 ? name.substring(0, slashIdx) : undefined,
+        parentName: getDeployedParentName?.(deployed) ?? parentFromKey,
       });
     }
   }
@@ -199,6 +206,7 @@ export function computeResourceStatuses(
     getIdentifier: deployed => deployed.interceptorArn,
     getLocalDetail: item => `${item.config.managed ? 'managed' : 'external'} — ${item.interceptionPoints.join('+')}`,
     getParentName: item => item.gatewayName,
+    getDeployedParentName: deployed => deployed.gatewayName,
   });
 
   const evaluators = diffResourceSet({

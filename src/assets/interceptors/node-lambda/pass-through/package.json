@@ -1,5 +1,5 @@
 {
-  "name": "{{ Name }}",
+  "name": "{{ PackageName }}",
   "version": "0.1.0",
   "description": "AgentCore Gateway Interceptor — pass-through",
   "type": "module",

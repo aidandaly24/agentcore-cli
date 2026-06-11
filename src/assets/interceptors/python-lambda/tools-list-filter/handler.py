@@ -26,7 +26,7 @@ def is_authorized(tool_name: str, request_headers: Dict[str, str]) -> bool:
 
 
 @interceptor()
-def handler(event: InterceptorEvent, context) -> InterceptorResponse:
+def lambda_handler(event: InterceptorEvent, context) -> InterceptorResponse:
     response = event.response
     if response is None:
         # Defensive: should not happen at RESPONSE point.

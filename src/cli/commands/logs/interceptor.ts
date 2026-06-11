@@ -93,6 +93,15 @@ export async function handleLogsInterceptor(options: LogsInterceptorOptions): Pr
   process.on('SIGINT', onSignal);
 
   try {
+    // --follow is mutually exclusive with the search-window flags; erroring
+    // beats silently ignoring --since/--until when --follow is also passed.
+    if (options.follow && (options.since || options.until)) {
+      return {
+        success: false,
+        error: new ValidationError('--follow cannot be combined with --since/--until (live tail vs. search window).'),
+      };
+    }
+
     if (options.follow ?? (!options.since && !options.until)) {
       for await (const event of streamLogs({
         logGroupName,
@@ -112,6 +121,10 @@ export async function handleLogsInterceptor(options: LogsInterceptorOptions): Pr
     const now = Date.now();
     const startTimeMs = options.since ? parseRelativeTime(options.since, now) : now - SEARCH_DEFAULT_DURATION_MS;
     const endTimeMs = options.until ? parseRelativeTime(options.until, now) : now;
+    // Reject non-integers explicitly: parseInt('1.5') truncates to 1 silently.
+    if (options.limit !== undefined && !/^\d+$/.test(options.limit.trim())) {
+      return { success: false, error: new ValidationError('--limit must be a positive integer.') };
+    }
     const limit = options.limit ? parseInt(options.limit, 10) : undefined;
     if (limit !== undefined && (Number.isNaN(limit) || limit < 1)) {
       return { success: false, error: new ValidationError('--limit must be a positive integer.') };

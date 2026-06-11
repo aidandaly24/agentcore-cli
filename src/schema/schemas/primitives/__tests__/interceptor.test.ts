@@ -153,6 +153,41 @@ describe('InterceptorSchema', () => {
     });
     expect(r.success).toBe(true);
   });
+
+  it('rejects a nodejs22.x entrypoint whose .lambda_handler suffix is upper-cased', () => {
+    const r = InterceptorSchema.safeParse({
+      name: 'node-upper',
+      gatewayName: 'my-gw',
+      interceptionPoints: ['REQUEST'],
+      config: {
+        managed: { codeLocation: 'app/node-upper/', runtime: 'nodejs22.x', entrypoint: 'handler.LAMBDA_HANDLER' },
+      },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects an unknown field in the managed config (strict)', () => {
+    const r = InterceptorSchema.safeParse({
+      name: 'typo',
+      gatewayName: 'my-gw',
+      interceptionPoints: ['REQUEST'],
+      // `timeout` is a typo for `timeoutSeconds`; strict() must reject, not drop it.
+      config: { managed: { codeLocation: 'app/typo/', timeout: 120 } },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects an unknown field in the external config (strict)', () => {
+    const r = InterceptorSchema.safeParse({
+      name: 'ext-typo',
+      gatewayName: 'my-gw',
+      interceptionPoints: ['REQUEST'],
+      config: {
+        external: { lambdaArn: 'arn:aws:lambda:us-east-1:111111111111:function:fn', timeoutSeconds: 30 },
+      },
+    });
+    expect(r.success).toBe(false);
+  });
 });
 
 describe('resolveInterceptorEntrypoint', () => {

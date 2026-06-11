@@ -597,6 +597,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     const interceptorSpecs = (context.projectSpec.interceptors ?? []).map(i => ({
       name: i.name,
       mode: i.config.managed ? ('managed' as const) : ('external' as const),
+      gatewayName: i.gatewayName,
     }));
     const interceptors = parseInterceptorOutputs(outputs, interceptorSpecs);
 

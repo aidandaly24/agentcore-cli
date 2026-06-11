@@ -99,6 +99,16 @@ export abstract class BasePrimitive<
   protected readonly article: string = 'a';
 
   /**
+   * Post-removal note shown in CLI/TUI output. Defaults to "source code not
+   * modified" — accurate for every primitive that only edits agentcore.json.
+   * Primitives that delete code on remove (e.g. managed interceptors) override
+   * this so the note doesn't falsely claim the source is untouched.
+   */
+  protected removeNote(_name: string): string {
+    return SOURCE_CODE_NOTE;
+  }
+
+  /**
    * Register the standard remove subcommand for this primitive.
    * Handles CLI mode (--name/--yes/--json) and TUI fallback identically.
    */
@@ -134,7 +144,7 @@ export abstract class BasePrimitive<
                 resourceType: this.kind,
                 resourceName: cliOptions.name,
                 message: result.success ? `Removed ${this.label.toLowerCase()} '${cliOptions.name}'` : undefined,
-                note: result.success ? SOURCE_CODE_NOTE : undefined,
+                note: result.success ? this.removeNote(cliOptions.name) : undefined,
                 error: !result.success ? result.error.message : undefined,
               })
             );

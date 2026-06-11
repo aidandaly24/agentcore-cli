@@ -120,7 +120,7 @@ and converts any thrown error into a safe response (so the gateway never retries
 from bedrock_agentcore.gateway.interceptor import interceptor, InterceptorEvent, InterceptorResponse
 
 @interceptor()
-def handler(event: InterceptorEvent, context) -> InterceptorResponse:
+def lambda_handler(event: InterceptorEvent, context) -> InterceptorResponse:
     if not event.request.headers.get("authorization"):
         return InterceptorResponse.deny(403, {"error": "forbidden"})
     return InterceptorResponse.pass_through(event)
@@ -140,11 +140,11 @@ Test a handler with a unit test against a sample event — no deploy required:
 
 ```python
 from bedrock_agentcore.gateway.interceptor import InterceptorEvent
-from handler import handler
+from handler import lambda_handler
 
 def test_denies_missing_token():
     event = InterceptorEvent.sample_request(headers={})
-    result = handler(event.raw)
+    result = lambda_handler(event.raw, None)
     assert result["mcp"]["transformedGatewayResponse"]["statusCode"] == 403
 ```
 
@@ -289,7 +289,8 @@ Lambda's account before sending traffic through the gateway.
 The inbound request's headers include the **caller's `Authorization` token**. `passRequestHeaders` controls whether the
 gateway copies those headers into the event your interceptor receives:
 
-- `true` (default): your handler can read request headers (e.g. `event.mcp.gatewayRequest.headers.authorization`).
+- `true` (default): your handler can read request headers (with the SDK, `event.request.headers`; on the raw envelope,
+  `event.mcp.gatewayRequest.headers`).
 - `false`: the gateway sends an **empty** headers map; your handler cannot see the caller's headers or token.
 
 > **Disabling headers silently breaks header-reading interceptors.** If your handler reads headers — including the

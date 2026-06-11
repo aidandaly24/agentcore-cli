@@ -230,21 +230,45 @@ export async function validateInterceptors(
   const errors: string[] = [];
   const projectRoot = path.dirname(configRoot);
 
-  // Managed-mode codeLocation must exist.
+  // Managed-mode codeLocation must exist, and any additionalPolicies files must
+  // exist and parse as JSON — otherwise the failure surfaces as a raw ENOENT or
+  // JSON parse error deep in CDK synth with no interceptor name attached.
   for (const interceptor of interceptors) {
-    if (interceptor.config.managed) {
-      const codeDir = path.join(projectRoot, interceptor.config.managed.codeLocation);
-      if (!existsSync(codeDir)) {
+    const managed = interceptor.config.managed;
+    if (!managed) continue;
+
+    const codeDir = path.join(projectRoot, managed.codeLocation);
+    if (!existsSync(codeDir)) {
+      errors.push(
+        `Interceptor "${interceptor.name}": codeLocation "${managed.codeLocation}" not found. ` +
+          `Run \`agentcore add interceptor\` to scaffold it, or fix the path in agentcore.json.`
+      );
+      continue;
+    }
+
+    for (const policy of managed.additionalPolicies ?? []) {
+      // Managed-policy ARNs (arn:...:iam::aws:policy/...) are not files — skip.
+      if (policy.startsWith('arn:')) continue;
+      const policyPath = path.join(codeDir, policy);
+      if (!existsSync(policyPath)) {
         errors.push(
-          `Interceptor "${interceptor.name}": codeLocation "${interceptor.config.managed.codeLocation}" not found. ` +
-            `Run \`agentcore add interceptor\` to scaffold it, or fix the path in agentcore.json.`
+          `Interceptor "${interceptor.name}": additional policy file "${policy}" not found ` +
+            `(resolved to ${path.relative(projectRoot, policyPath)}).`
         );
+        continue;
+      }
+      try {
+        JSON.parse(readFileSync(policyPath, 'utf-8'));
+      } catch {
+        errors.push(`Interceptor "${interceptor.name}": additional policy file "${policy}" is not valid JSON.`);
       }
     }
   }
 
   if (errors.length > 0) {
-    throw new Error(errors.join('\n'));
+    // ValidationError (not plain Error) so telemetry classifies this as a
+    // user-fixable input problem rather than an unknown client failure.
+    throw new ValidationError(errors.join('\n'));
   }
 
   // Header coupling: a managed interceptor whose handler reads request headers
@@ -281,8 +305,10 @@ export async function validateInterceptors(
 
     // Cross-account = no deploy target shares the Lambda's account. If even
     // one deploy target is same-account, the IAM grant works in that target
-    // and the warning would be incorrect noise.
-    const crossAccount = awsTargets.length > 0 && awsTargets.every(t => t.account !== lambdaAccountId);
+    // and the warning would be incorrect noise. With NO targets resolved we
+    // can't prove same-account, so we still warn (the safe default) rather
+    // than silently swallow a genuine cross-account setup.
+    const crossAccount = awsTargets.length === 0 || awsTargets.every(t => t.account !== lambdaAccountId);
     if (!crossAccount || warned.has(interceptor.name)) continue;
     warned.add(interceptor.name);
 
@@ -316,19 +342,22 @@ export function buildCrossAccountInterceptorWarnings(
     const lambdaAccountId = accountIdFromArn(ext.lambdaArn);
     if (!lambdaAccountId) continue;
 
-    const crossAccount = awsTargets.length > 0 && awsTargets.every(t => t.account !== lambdaAccountId);
+    const crossAccount = awsTargets.length === 0 || awsTargets.every(t => t.account !== lambdaAccountId);
     if (!crossAccount) continue;
 
     const roleArn = gatewayRoleArns[interceptor.gatewayName];
     const principal = roleArn ?? '<gateway-role-arn (see deployed-state.json)>';
 
+    // The `--function-name` must be the REAL ARN: the user runs this command in
+    // the Lambda's own (foreign) account, so masking it would make the snippet
+    // non-executable. Only the human-readable summary line masks the account.
     warnings.push(
       `Cross-account interceptor "${interceptor.name}" needs a resource-based policy on its Lambda.\n` +
         `  Lambda: ${maskAccountId(ext.lambdaArn)}\n` +
         `Run this in the Lambda's account before sending traffic through the gateway:\n` +
         `\n` +
         `  aws lambda add-permission \\\n` +
-        `    --function-name ${maskAccountId(ext.lambdaArn)} \\\n` +
+        `    --function-name ${ext.lambdaArn} \\\n` +
         `    --statement-id GatewayInterceptorInvoke \\\n` +
         `    --action lambda:InvokeFunction \\\n` +
         `    --principal ${principal}`
@@ -349,10 +378,16 @@ function resolveInterceptorHandlerPath(
   projectRoot: string,
   managed: { codeLocation: string; entrypoint?: string; runtime?: string }
 ): string | undefined {
-  const moduleName = (managed.entrypoint ?? 'handler.lambda_handler').split('.')[0];
+  const isNode = managed.runtime === 'nodejs22.x';
+  // Fall back to the runtime-appropriate default entrypoint, not always the
+  // Python one — otherwise a Node interceptor with an absent entrypoint resolves
+  // to module `handler` (looking for handler.mjs), never finds index.mjs, and
+  // the header-coupling warning is silently skipped.
+  const defaultEntrypoint = isNode ? 'index.handler' : 'handler.lambda_handler';
+  const moduleName = (managed.entrypoint ?? defaultEntrypoint).split('.')[0];
   if (!moduleName) return undefined;
   const codeDir = path.join(projectRoot, managed.codeLocation);
-  const exts = managed.runtime === 'nodejs22.x' ? ['.mjs', '.js', '.cjs', '.ts'] : ['.py'];
+  const exts = isNode ? ['.mjs', '.js', '.cjs', '.ts'] : ['.py'];
   for (const ext of exts) {
     const candidate = path.join(codeDir, `${moduleName}${ext}`);
     if (existsSync(candidate)) return candidate;
