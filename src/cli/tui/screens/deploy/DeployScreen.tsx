@@ -79,6 +79,7 @@ export function DeployScreen({
     managedMemoryNotice,
     postDeployWarnings,
     postDeployHasError,
+    deployFailureDetail,
     isDiffLoading,
     requestDiff,
     hasError,
@@ -359,6 +360,7 @@ export function DeployScreen({
                 hasError={hasError}
                 hasPostDeployError={postDeployHasError}
                 postDeployWarnings={postDeployWarnings}
+                failureDetail={deployFailureDetail}
               />
             </Box>
           )}
