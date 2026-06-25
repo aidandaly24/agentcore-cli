@@ -19,6 +19,8 @@ export interface CreateHarnessProjectOptions {
   skipMemory?: boolean;
   containerUri?: string;
   dockerfilePath?: string;
+  /** Base dir a relative dockerfilePath resolves against (the invocation cwd). Defaults to `cwd`. */
+  dockerfileBaseDir?: string;
   maxIterations?: number;
   maxTokens?: number;
   timeoutSeconds?: number;
@@ -68,6 +70,7 @@ export async function createProjectWithHarness(options: CreateHarnessProjectOpti
       additionalParams: options.additionalParams,
       containerUri: options.containerUri,
       dockerfilePath: options.dockerfilePath,
+      dockerfileBaseDir: options.dockerfileBaseDir ?? cwd,
       skipMemory: options.skipMemory,
       maxIterations: options.maxIterations,
       maxTokens: options.maxTokens,

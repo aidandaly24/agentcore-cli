@@ -132,6 +132,13 @@ export interface AddHarnessOptions {
   memoryRelevanceScore?: number;
   containerUri?: string;
   dockerfilePath?: string;
+  /**
+   * Base directory a relative dockerfilePath is resolved against. During `create` this is the
+   * invocation cwd (where the user typed the relative path), since configBaseDir points at the
+   * freshly-created project subdir. Defaults to projectRoot (dirname(configBaseDir)) when omitted,
+   * preserving standalone `add harness`.
+   */
+  dockerfileBaseDir?: string;
   maxIterations?: number;
   maxTokens?: number;
   timeoutSeconds?: number;
@@ -222,9 +229,10 @@ export class HarnessPrimitive extends BasePrimitive<AddHarnessOptions, Removable
       let dockerfile: string | undefined;
       if (options.dockerfilePath) {
         const projectRoot = dirname(configBaseDir);
+        const dockerfileBaseDir = options.dockerfileBaseDir ?? projectRoot;
         const srcPath = isAbsolute(options.dockerfilePath)
           ? options.dockerfilePath
-          : resolve(projectRoot, options.dockerfilePath);
+          : resolve(dockerfileBaseDir, options.dockerfilePath);
         try {
           await access(srcPath);
         } catch {
