@@ -94,8 +94,15 @@ function buildExitMessage(
 
   // BYO code location reminder
   if (agentConfig?.agentType === 'byo') {
-    lines.push(`\x1b[33mCopy your agent code to \x1b[36m${agentConfig.codeLocation}\x1b[33m before deploying.\x1b[0m`);
-    lines.push(`\x1b[2mEnsure \x1b[36m${agentConfig.entrypoint}\x1b[2m is the entrypoint file in that folder.\x1b[0m`);
+    const vendedStub = agentConfig.language === 'Python' || agentConfig.language === 'TypeScript';
+    if (vendedStub) {
+      lines.push(
+        `\x1b[2mYour agent entrypoint is \x1b[36m${agentConfig.entrypoint}\x1b[2m in \x1b[36m${agentConfig.codeLocation}\x1b[2m. A starter was added if it didn't already exist — edit it with your agent logic.\x1b[0m`
+      );
+    } else {
+      lines.push(`\x1b[33mCopy your agent code to \x1b[36m${agentConfig.codeLocation}\x1b[33m before deploying.\x1b[0m`);
+      lines.push(`\x1b[2mEnsure \x1b[36m${agentConfig.entrypoint}\x1b[2m is the entrypoint file in that folder.\x1b[0m`);
+    }
     lines.push('');
   }
 

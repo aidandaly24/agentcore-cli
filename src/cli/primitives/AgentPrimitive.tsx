@@ -74,12 +74,13 @@ import { requireTTY } from '../tui/guards/tty';
 import type { GenerateConfig, MemoryOption } from '../tui/screens/generate/types';
 import { BasePrimitive } from './BasePrimitive';
 import { CredentialPrimitive } from './CredentialPrimitive';
+import { BYO_PYTHON_ENTRYPOINT_STUB, BYO_TYPESCRIPT_ENTRYPOINT_STUB } from './constants';
 import { buildAuthorizerConfigFromJwtConfig, createManagedOAuthCredential } from './auth-utils';
 import { computeDefaultCredentialEnvVarName } from './credential-utils';
 import type { AddResult, AddScreenComponent, RemovableResource } from './types';
 import { DescribeSubnetsCommand, EC2Client } from '@aws-sdk/client-ec2';
 import type { Command } from '@commander-js/extra-typings';
-import { mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 
 /**
@@ -671,6 +672,23 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
     const codeDir = join(projectRoot, codeLocation.replace(/\/$/, ''));
     mkdirSync(codeDir, { recursive: true });
 
+    // Vend a starter entrypoint following the AgentCore runtime contract so `agentcore dev`
+    // works out of the box. Never overwrite existing user code; skip for non-Python/TS.
+    const entrypoint = options.entrypoint ?? 'main.py';
+    const stub =
+      options.language === 'Python'
+        ? BYO_PYTHON_ENTRYPOINT_STUB
+        : options.language === 'TypeScript'
+          ? BYO_TYPESCRIPT_ENTRYPOINT_STUB
+          : undefined;
+    // Entrypoint may carry a "file.py:handler" suffix and a subdirectory path.
+    const entrypointFile = entrypoint.split(':')[0]!;
+    const entrypointPath = join(codeDir, entrypointFile);
+    if (stub && !existsSync(entrypointPath)) {
+      mkdirSync(dirname(entrypointPath), { recursive: true });
+      writeFileSync(entrypointPath, stub);
+    }
+
     const project = await configIO.readProjectSpec();
 
     const protocol = options.protocol ?? 'HTTP';
@@ -711,7 +729,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
     const agent: AgentEnvSpec = {
       name: options.name,
       build: options.buildType,
-      entrypoint: (options.entrypoint ?? 'main.py') as FilePath,
+      entrypoint: entrypoint as FilePath,
       codeLocation: codeLocation as DirectoryPath,
       runtimeVersion: DEFAULT_PYTHON_VERSION,
       protocol,
