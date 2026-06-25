@@ -13,6 +13,7 @@ import {
   createDevServer,
   fetchA2AAgentCard,
   findAvailablePort,
+  getAgentPort,
   getDevConfig,
   getEndpointUrl,
   invokeA2AStreaming,
@@ -47,6 +48,7 @@ const MAX_LOG_ENTRIES = 50;
 export function useDevServer(options: {
   workingDir: string;
   port: number;
+  portExplicit?: boolean;
   agentName?: string;
   onReady?: () => void;
   headers?: Record<string, string>;
@@ -154,7 +156,10 @@ export function useDevServer(options: {
       // A2A servers always use port 9000, MCP servers use port 8000 (framework defaults, not configurable via env)
       const isA2A = config.protocol === 'A2A';
       const isMcp = config.protocol === 'MCP';
-      const fixedPort = isA2A ? 9000 : isMcp ? 8000 : targetPort;
+      // HTTP: honor an explicit -p literally; otherwise offset by the runtime index
+      // so parallel runtimes bind distinct ports (consistent with the --logs path).
+      const httpPort = getAgentPort(project, config.agentName, targetPort, options.portExplicit);
+      const fixedPort = isA2A ? 9000 : isMcp ? 8000 : httpPort;
 
       // On restart, reuse the same port. On initial start, find an available port.
       // If restart times out waiting for port, fall back to finding a new one.
@@ -246,7 +251,9 @@ export function useDevServer(options: {
     config?.module,
     config?.directory,
     config?.isPython,
+    project,
     options.workingDir,
+    options.portExplicit,
     targetPort,
     restartTrigger,
     envVars,

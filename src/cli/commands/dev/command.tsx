@@ -171,7 +171,11 @@ export const registerDev = (program: Command) => {
     .alias('d')
     .description(COMMAND_DESCRIPTIONS.dev)
     .argument('[prompt]', 'Send a prompt to a running dev server [non-interactive]')
-    .option('-p, --port <port>', 'Port for development server', '8080')
+    .option(
+      '-p, --port <port>',
+      'Port for development server. Used as-is when set explicitly; the default is offset by the runtime index in multi-runtime projects.',
+      '8080'
+    )
     .option('-r, --runtime <name>', 'Runtime to run or invoke (required if multiple runtimes)')
     .option('-s, --stream', 'Stream response when invoking [non-interactive]')
     .option('-l, --logs', 'Run dev server with logs to stdout [non-interactive]')
@@ -188,9 +192,11 @@ export const registerDev = (program: Command) => {
     .option('-b, --no-browser', 'Use terminal TUI instead of web-based chat UI')
     .option('--no-traces', 'Disable local OTEL trace collection')
 
-    .action(async (positionalPrompt: string | undefined, opts) => {
+    .action(async (positionalPrompt: string | undefined, opts, command) => {
       try {
         const port = parseInt(opts.port, 10);
+        const portSource = command.getOptionValueSource('port');
+        const portExplicit = portSource === 'cli' || portSource === 'env';
 
         // Parse custom headers
         let headers: Record<string, string> | undefined;
@@ -259,7 +265,7 @@ export const registerDev = (program: Command) => {
               let invokePort = port;
               let targetAgent = invokeProject?.runtimes[0];
               if (opts.runtime && invokeProject) {
-                invokePort = getAgentPort(invokeProject, opts.runtime, port);
+                invokePort = getAgentPort(invokeProject, opts.runtime, port, portExplicit);
                 targetAgent = invokeProject.runtimes.find(a => a.name === opts.runtime);
               } else if (invokeProject && invokeProject.runtimes.length > 1 && !opts.runtime) {
                 const names = invokeProject.runtimes.map(a => a.name).join(', ');
@@ -399,7 +405,10 @@ export const registerDev = (program: Command) => {
 
               const isA2A = config.protocol === 'A2A';
               const isMcp = config.protocol === 'MCP';
-              const fixedPort = isA2A ? 9000 : isMcp ? 8000 : getAgentPort(project, config.agentName, port);
+              const fixedPort = isA2A ? 9000 : isMcp ? 8000 : getAgentPort(project, config.agentName, port, portExplicit);
+              if (!isA2A && !isMcp && !portExplicit && fixedPort !== port) {
+                console.log(`Port ${port} in use as base, using ${fixedPort} for ${config.agentName}`);
+              }
               const actualPort = await findAvailablePort(fixedPort);
               if ((isA2A || isMcp) && actualPort !== fixedPort) {
                 throw new ValidationError(
@@ -488,6 +497,7 @@ export const registerDev = (program: Command) => {
                     }}
                     workingDir={workingDir}
                     port={port}
+                    portExplicit={portExplicit}
                     agentName={opts.runtime}
                     headers={headers}
                     skipDeploy={opts.skipDeploy}
@@ -533,6 +543,7 @@ export const registerDev = (program: Command) => {
                     workingDir,
                     project,
                     port,
+                    portExplicit,
                     agentName: pickerResult.agentName,
                     harnessName: pickerResult.harnessName,
                     otelEnvVars,
@@ -551,6 +562,7 @@ export const registerDev = (program: Command) => {
                 workingDir,
                 project,
                 port,
+                portExplicit,
                 agentName: opts.runtime,
                 otelEnvVars,
                 collector,

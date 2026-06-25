@@ -23,6 +23,8 @@ interface DevScreenProps {
   onBack: () => void;
   workingDir?: string;
   port?: number;
+  /** Whether `port` was set explicitly via -p/--port (no index offset applied when true) */
+  portExplicit?: boolean;
   /** Pre-selected agent name (from CLI --agent flag) */
   agentName?: string;
   /** Custom headers to forward to the agent on every invocation */
@@ -249,6 +251,7 @@ export function DevScreen(props: DevScreenProps) {
   } = useDevServer({
     workingDir,
     port: props.port ?? 8080,
+    portExplicit: props.portExplicit,
     agentName: selectedAgentName,
     onReady: onServerReady,
     headers: props.headers,

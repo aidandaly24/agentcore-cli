@@ -528,8 +528,52 @@ describe('getAgentPort', () => {
       payments: [],
     };
 
+    // Default (implicit) port: offset by runtime index so parallel runtimes differ.
     expect(getAgentPort(project, 'Agent1', 8080)).toBe(8080);
     expect(getAgentPort(project, 'Agent2', 8080)).toBe(8081);
+  });
+
+  it('honors an explicit port literally with no index offset', () => {
+    const project: AgentCoreProjectSpec = {
+      name: 'TestProject',
+      version: 1,
+      managedBy: 'CDK' as const,
+      runtimes: [
+        {
+          name: 'AgentA',
+          build: 'CodeZip',
+          runtimeVersion: 'PYTHON_3_12',
+          entrypoint: filePath('main.py'),
+          codeLocation: dirPath('./agents/a'),
+          protocol: 'HTTP',
+        },
+        {
+          name: 'AgentB',
+          build: 'CodeZip',
+          runtimeVersion: 'PYTHON_3_12',
+          entrypoint: filePath('main.py'),
+          codeLocation: dirPath('./agents/b'),
+          protocol: 'HTTP',
+        },
+      ],
+      memories: [],
+      knowledgeBases: [],
+      credentials: [],
+      evaluators: [],
+      onlineEvalConfigs: [],
+      agentCoreGateways: [],
+      policyEngines: [],
+      configBundles: [],
+      abTests: [],
+      harnesses: [],
+      datasets: [],
+      payments: [],
+    };
+
+    // Explicit -p: 2nd runtime resolves to the literal value (8788), not 8789.
+    expect(getAgentPort(project, 'AgentB', 8788, true)).toBe(8788);
+    // Default -p: 2nd runtime still resolves to base + index (8789).
+    expect(getAgentPort(project, 'AgentB', 8788, false)).toBe(8789);
   });
 
   it('returns basePort when agent not found', () => {
