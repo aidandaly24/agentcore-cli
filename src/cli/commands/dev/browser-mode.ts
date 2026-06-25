@@ -15,7 +15,6 @@ import { listMemoryRecords, retrieveMemoryRecords } from '../../operations/memor
 import { loadDeployedProjectConfig, resolveAgentOrHarness } from '../../operations/resolve-agent';
 import { fetchTraceRecords, listTraces } from '../../operations/traces';
 import { LayoutProvider } from '../../tui/context';
-import { runCliDeploy } from '../deploy/progress';
 import { render } from 'ink';
 import path from 'node:path';
 import React from 'react';
@@ -133,14 +132,30 @@ export async function launchBrowserDev(): Promise<void> {
     process.exit(1);
   }
 
-  // Only auto-deploy for harness-only projects, and skip if no CDK changes
-  if (hasHarnesses && !hasRuntimes && !(await isDeploySkippable())) {
-    await runCliDeploy();
-  }
-
   const configRoot = findConfigRoot(workingDir);
   const persistTracesDir = path.join(configRoot ?? workingDir, '.cli', 'traces');
   const { collector, otelEnvVars } = await startOtelCollector(persistTracesDir);
+
+  // Only auto-deploy for harness-only projects, and skip if no CDK changes.
+  // Show deploy progress inside the alt-screen DevScreen TUI (the same path
+  // `agentcore dev` uses) instead of plain inline console output, so both
+  // entry points render identically.
+  if (hasHarnesses && !hasRuntimes && !(await isDeploySkippable())) {
+    const pickerResult = await launchTuiDevScreenWithPicker(workingDir);
+    if (pickerResult == null) {
+      return;
+    }
+    await runBrowserMode({
+      workingDir,
+      project,
+      port: 8080,
+      agentName: pickerResult.agentName,
+      harnessName: pickerResult.harnessName,
+      otelEnvVars,
+      collector,
+    });
+    return;
+  }
 
   await runBrowserMode({
     workingDir,
