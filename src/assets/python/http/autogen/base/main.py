@@ -91,23 +91,37 @@ You have access to the following mounted filesystems. Use file_read, file_write,
 {{/each}}{{/if}}
 """
 
+# Reuses one AssistantAgent per session_id so each session keeps its own
+# in-process conversation history (best-effort; resets on cold start). Caches up
+# to 128 active sessions; the oldest is evicted and its history reset.
+_agents = {}
+
+
+async def get_or_create_agent(session_id):
+    if session_id not in _agents:
+        if len(_agents) >= 128:
+            _agents.pop(next(iter(_agents)))
+        # Get MCP Tools
+        mcp_tools = await get_streamable_http_mcp_tools()
+        _agents[session_id] = AssistantAgent(
+            name="{{ name }}",
+            model_client=load_model(),
+            tools=tools + mcp_tools,
+            system_message=SYSTEM_MESSAGE,
+        )
+    return _agents[session_id]
+
+
 @app.entrypoint
 async def invoke(payload, context):
     log.info("Invoking Agent.....")
 
-    # Get MCP Tools
-    mcp_tools = await get_streamable_http_mcp_tools()
-
-    # Define an AssistantAgent with the model and tools
-    agent = AssistantAgent(
-        name="{{ name }}",
-        model_client=load_model(),
-        tools=tools + mcp_tools,
-        system_message=SYSTEM_MESSAGE,
-    )
-
     # Process the user prompt
     prompt = payload.get("prompt", "What can you help me with?")
+    session_id = getattr(context, "session_id", "default-session")
+
+    # Reuse the per-session agent (preserves conversation history)
+    agent = await get_or_create_agent(session_id)
 
     # Run the agent
     result = await agent.run(task=prompt)

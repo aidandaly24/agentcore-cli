@@ -424,50 +424,46 @@ def agent_factory():
 get_or_create_agent = agent_factory()
 {{/unless}}
 {{else}}
-{{#if hasConfigBundle}}
-def create_agent({{#if hasSkillsFetcher}}skill_plugins=None{{/if}}):
-    return Agent(
-        model=load_model(),
-        system_prompt=DEFAULT_SYSTEM_PROMPT,
-        tools=tools,
-        conversation_manager=_make_conversation_manager(),
-        {{#if hasSkillsFetcher}}
-        plugins=skill_plugins or None,
-        {{/if}}
-        hooks=[ConfigBundleHook()],
-    )
-{{else}}
 {{#unless hasPayment}}
-_agent = None
-
-def get_or_create_agent({{#if hasSkillsFetcher}}skill_plugins=None{{/if}}):
-    global _agent
-    if _agent is None:
-        _agent = Agent(
-            model=load_model(),
-            system_prompt=DEFAULT_SYSTEM_PROMPT,
-            tools=tools,
-            conversation_manager=_make_conversation_manager(),
-            {{#if hasSkillsFetcher}}
-            plugins=skill_plugins or None,
-            {{/if}}
-            {{#if hasExecutionLimits}}
-            tool_executor=SequentialToolExecutor(),
-            callback_handler=None,
-            {{/if}}
-            hooks=[
-                {{#if hasExecutionLimits}}
-                ExecutionLimitsHook(
-                    {{#if maxIterations}}max_iterations={{maxIterations}},{{/if}}
-                    {{#if maxTokens}}max_tokens={{maxTokens}},{{/if}}
-                    {{#if timeoutSeconds}}timeout_seconds={{timeoutSeconds}},{{/if}}
-                ),
+# Reuses one Agent per session_id so each session keeps its own in-process
+# conversation history (best-effort; resets on cold start). The cache is bounded
+# so a single process serving many sessions cannot leak history between them or
+# grow without limit. For durable history, attach a session manager.
+def agent_factory():
+    cache = {}
+    def get_or_create_agent(session_id{{#if hasSkillsFetcher}}, skill_plugins=None{{/if}}):
+        if session_id not in cache:
+            if len(cache) >= 128:
+                cache.pop(next(iter(cache)))
+            cache[session_id] = Agent(
+                model=load_model(),
+                system_prompt=DEFAULT_SYSTEM_PROMPT,
+                tools=tools,
+                conversation_manager=_make_conversation_manager(),
+                {{#if hasSkillsFetcher}}
+                plugins=skill_plugins or None,
                 {{/if}}
-            ],
-        )
-    return _agent
+                {{#if hasExecutionLimits}}
+                tool_executor=SequentialToolExecutor(),
+                callback_handler=None,
+                {{/if}}
+                hooks=[
+                    {{#if hasExecutionLimits}}
+                    ExecutionLimitsHook(
+                        {{#if maxIterations}}max_iterations={{maxIterations}},{{/if}}
+                        {{#if maxTokens}}max_tokens={{maxTokens}},{{/if}}
+                        {{#if timeoutSeconds}}timeout_seconds={{timeoutSeconds}},{{/if}}
+                    ),
+                    {{/if}}
+                    {{#if hasConfigBundle}}
+                    ConfigBundleHook(),
+                    {{/if}}
+                ],
+            )
+        return cache[session_id]
+    return get_or_create_agent
+get_or_create_agent = agent_factory()
 {{/unless}}
-{{/if}}
 {{/if}}
 
 
@@ -575,11 +571,8 @@ async def invoke(payload, context):
         hooks=[ConfigBundleHook()],{{/if}}
     )
 {{else}}
-{{#if hasConfigBundle}}
-    agent = create_agent({{#if hasSkillsFetcher}}_skill_plugins{{/if}})
-{{else}}
-    agent = get_or_create_agent({{#if hasSkillsFetcher}}_skill_plugins{{/if}})
-{{/if}}
+    session_id = getattr(context, 'session_id', 'default-session')
+    agent = get_or_create_agent(session_id{{#if hasSkillsFetcher}}, _skill_plugins{{/if}})
 {{/if}}
 {{/if}}
 
