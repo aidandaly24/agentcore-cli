@@ -93,17 +93,24 @@ export function redactSensitiveText(value: string): string {
   );
 }
 
-function printInvokeResult(result: InvokeResult, options: InvokeOptions): void {
+export function printInvokeResult(result: InvokeResult, options: InvokeOptions): void {
+  // Resume continuity only works when the target has memory; without it the
+  // agent is stateless per turn, so promising "To resume" would be misleading.
+  const printSession = (): void => {
+    if (!result.sessionId) return;
+    console.error(`\nSession: ${result.sessionId}`);
+    if (result.hasMemory) {
+      console.error(`To resume: agentcore invoke --session-id ${result.sessionId}`);
+    }
+  };
+
   if (options.json) {
     const serialized = serializeResult(result);
     if (typeof serialized.response === 'string') serialized.response = redactSensitiveText(serialized.response);
     if (typeof serialized.error === 'string') serialized.error = redactSensitiveText(serialized.error);
     console.log(JSON.stringify(serialized));
   } else if (options.stream) {
-    if (result.sessionId) {
-      console.error(`\nSession: ${result.sessionId}`);
-      console.error(`To resume: agentcore invoke --session-id ${result.sessionId}`);
-    }
+    printSession();
     if (result.logFilePath) {
       console.error(`Log: ${result.logFilePath}`);
     }
@@ -113,10 +120,7 @@ function printInvokeResult(result: InvokeResult, options: InvokeOptions): void {
     } else if (!result.success && result.error) {
       console.error(redactSensitiveText(result.error.message));
     }
-    if (result.sessionId) {
-      console.error(`\nSession: ${result.sessionId}`);
-      console.error(`To resume: agentcore invoke --session-id ${result.sessionId}`);
-    }
+    printSession();
     if (result.logFilePath) {
       console.error(`Log: ${result.logFilePath}`);
     }
@@ -141,7 +145,10 @@ export const registerInvoke = (program: Command) => {
     .option('--gateway <name>', 'Invoke through a gateway [non-interactive]')
     .option('--gateway-target-name <name>', 'HTTP runtime target on the gateway [non-interactive]')
     .option('--target <name>', 'Select deployment target [non-interactive]')
-    .option('--session-id <id>', 'Use specific session ID for conversation continuity')
+    .option(
+      '--session-id <id>',
+      'Use a specific session ID (groups turns; continuity requires memory — see `agentcore add memory`)'
+    )
     .option('--user-id <id>', 'User ID for runtime invocation (default: "default-user")')
     .option('--json', 'Output as JSON [non-interactive]')
     .option('--stream', 'Stream response in real-time (TUI streams by default) [non-interactive]')

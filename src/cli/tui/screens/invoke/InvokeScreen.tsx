@@ -208,12 +208,14 @@ export function InvokeScreen({
   const mcpFetchTriggeredRef = useRef(false);
 
   useEffect(() => {
-    if (sessionId && messages.length > 0) {
+    // Only promise resume when memory is configured — without it the agent is
+    // stateless per turn and re-invoking with the same session ID resumes nothing.
+    if (sessionId && messages.length > 0 && config?.hasMemory) {
       const cyan = '\x1b[36m';
       const reset = '\x1b[0m';
       setExitMessage(`To resume this session, run: ${cyan}agentcore invoke --session-id ${sessionId}${reset}`);
     }
-  }, [sessionId, messages.length]);
+  }, [sessionId, messages.length, config?.hasMemory]);
 
   // Compute auth type early so hooks can reference it
   const totalInvokables = (config?.runtimes.length ?? 0) + (config?.harnesses.length ?? 0);

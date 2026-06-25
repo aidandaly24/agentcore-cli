@@ -48,6 +48,11 @@ export async function loadInvokeConfig(configIO: ConfigIO = new ConfigIO()): Pro
 export async function handleInvoke(context: InvokeContext, options: InvokeOptions = {}): Promise<InvokeResult> {
   const { project, deployedState, awsTargets } = context;
 
+  // Session continuity only exists when memory is configured: the no-memory
+  // template is stateless per turn, so re-invoking with the same --session-id
+  // resumes nothing. Drives whether the "To resume" hint is shown downstream.
+  const hasMemory = (project.memories?.length ?? 0) > 0;
+
   // Gateway invoke: route through a deployed gateway
   if (options.gateway) {
     const targetNames = Object.keys(deployedState.targets);
@@ -669,6 +674,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
           targetName: selectedTargetName,
           response,
           sessionId: aguiResult.sessionId,
+          hasMemory,
           logFilePath: logger.logFilePath,
         };
       }
@@ -679,6 +685,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
         targetName: selectedTargetName,
         response,
         sessionId: aguiResult.sessionId,
+        hasMemory,
         logFilePath: logger.logFilePath,
       };
     } catch (err) {
@@ -733,6 +740,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
         targetName: selectedTargetName,
         response: fullResponse,
         sessionId: result.sessionId,
+        hasMemory,
         logFilePath: logger.logFilePath,
       };
     } catch (err) {
@@ -764,6 +772,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
     targetName: selectedTargetName,
     response: response.content,
     sessionId: response.sessionId,
+    hasMemory,
     logFilePath: logger.logFilePath,
   };
 }

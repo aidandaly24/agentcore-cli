@@ -250,7 +250,7 @@ export function validateDockerfileInput(value: string): true | string {
 }
 
 export const MEMORY_OPTIONS = [
-  { id: 'none', title: 'None', description: 'No memory' },
-  { id: 'shortTerm', title: 'Short-term memory', description: 'Context within a session' },
+  { id: 'none', title: 'None', description: 'No memory - each turn is a fresh, stateless session' },
+  { id: 'shortTerm', title: 'Short-term memory', description: 'Remembers prior turns within a session' },
   { id: 'longAndShortTerm', title: 'Long-term and short-term', description: 'Persists across sessions' },
 ] as const;
