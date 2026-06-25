@@ -359,21 +359,13 @@ export const registerDev = (program: Command) => {
 
             // --logs: non-interactive server mode
             if (opts.logs) {
-              // Harness-only projects need deploy then print invoke instructions
+              // Harness-only projects have no local dev server to tail logs from.
               if (supportedAgents.length === 0 && hasHarnesses) {
                 recorder.set({ agent_environment: 'harness' as const });
-                if (!opts.skipDeploy) {
-                  await runCliDeploy();
-                }
-                const harnessNames = (project.harnesses ?? []).map(h => h.name);
-                console.log('Harness dev runs against the deployed service (no local server).');
-                console.log(`If you changed the harness config, redeploy to pick up changes: agentcore deploy`);
-                console.log(`\nInvoke your harness:`);
-                for (const name of harnessNames) {
-                  console.log(`  agentcore invoke --harness ${name} "your prompt"`);
-                }
-                console.log(`\nOr use the interactive TUI: agentcore dev`);
-                return { success: true as const, blockingPromise: Promise.resolve() };
+                const firstHarness = project.harnesses?.[0]?.name ?? '<name>';
+                throw new ValidationError(
+                  `Harness projects do not support local dev. Use \`agentcore invoke --harness ${firstHarness}\` instead.`
+                );
               }
 
               if (project.runtimes.length > 1 && !opts.runtime) {
