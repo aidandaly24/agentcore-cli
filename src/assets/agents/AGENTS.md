@@ -81,7 +81,7 @@ file maps to a JSON config file and includes validation constraints as comments 
 - **GatewayTargetType**: `'lambda'` | `'mcpServer'` | `'openApiSchema'` | `'smithyModel'` | `'apiGateway'` | `'lambdaFunctionArn'` | `'connector'` (web-search, bedrock-knowledge-bases, bedrock-agentic-retrieve)
 - **ModelProvider**: `'Bedrock'` | `'Gemini'` | `'OpenAI'` | `'Anthropic'`
 - **PaymentProvider**: `'CoinbaseCDP'` | `'StripePrivy'`
-- **PolicyEnforcementMode**: `'ACTIVE'` | `'PASSIVE'`
+- **PolicyEnforcementMode**: `'ACTIVE'` | `'LOG_ONLY'`
 - **GuardrailContentFilter**: `'VIOLENCE'` | `'HATE'` | `'SEXUAL'` | `'MISCONDUCT'` | `'INSULTS'`
 
 ### Build Types
