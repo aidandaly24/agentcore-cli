@@ -367,6 +367,7 @@ export async function invokeAgentRuntimeStreaming(options: InvokeAgentRuntimeOpt
     runtimeSessionId: options.sessionId,
     runtimeUserId: options.userId ?? DEFAULT_RUNTIME_USER_ID,
     ...(options.baggage && { baggage: options.baggage }),
+    ...(options.endpoint && { qualifier: options.endpoint }),
   });
 
   const response = await client.send(command);
@@ -463,6 +464,7 @@ export async function invokeAgentRuntime(options: InvokeAgentRuntimeOptions): Pr
     runtimeSessionId: options.sessionId,
     runtimeUserId: options.userId ?? DEFAULT_RUNTIME_USER_ID,
     ...(options.baggage && { baggage: options.baggage }),
+    ...(options.endpoint && { qualifier: options.endpoint }),
   });
 
   const response = await client.send(command);

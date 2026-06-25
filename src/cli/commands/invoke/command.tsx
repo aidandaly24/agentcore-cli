@@ -1,5 +1,6 @@
 import { ValidationError, serializeResult } from '../../../lib';
-import { COMMAND_DESCRIPTIONS } from '../../constants';
+import { resolveEndpointName } from '../../aws';
+import { COMMAND_DESCRIPTIONS, DEFAULT_ENDPOINT_NAME } from '../../constants';
 import { getErrorMessage } from '../../errors';
 import { ADDITIONAL_PARAMS_JSON_ERROR } from '../../primitives/constants';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
@@ -138,6 +139,10 @@ export const registerInvoke = (program: Command) => {
       'Read the prompt from a file (for long or structured payloads that exceed shell arg limits) [non-interactive]'
     )
     .option('--runtime <name>', 'Select specific runtime [non-interactive]')
+    .option(
+      '--endpoint <name>',
+      'Target a named runtime endpoint (version alias, e.g. prod/staging). Defaults to AGENTCORE_RUNTIME_ENDPOINT env var, then DEFAULT [non-interactive]'
+    )
     .option('--gateway <name>', 'Invoke through a gateway [non-interactive]')
     .option('--gateway-target-name <name>', 'HTTP runtime target on the gateway [non-interactive]')
     .option('--target <name>', 'Select deployment target [non-interactive]')
@@ -292,6 +297,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
         prompt?: string;
         promptFile?: string;
         runtime?: string;
+        endpoint?: string;
         gateway?: string;
         gatewayTargetName?: string;
         target?: string;
@@ -365,6 +371,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
           cliOptions.gatewayTargetName ||
           cliOptions.stream ||
           cliOptions.runtime ||
+          cliOptions.endpoint ||
           cliOptions.gateway ||
           cliOptions.tool ||
           cliOptions.exec ||
@@ -415,9 +422,16 @@ Model & Runtime Overrides (harness only) [non-interactive]
                 }
               }
 
+              // Resolve the named endpoint: --endpoint flag → AGENTCORE_RUNTIME_ENDPOINT
+              // env var → DEFAULT. Leave it undefined for DEFAULT so the SigV4 qualifier
+              // is omitted (preserving the DEFAULT endpoint) rather than sent explicitly.
+              const resolvedEndpoint = resolveEndpointName(cliOptions.endpoint);
+              const endpoint = resolvedEndpoint === DEFAULT_ENDPOINT_NAME ? undefined : resolvedEndpoint;
+
               const options: InvokeOptions = {
                 prompt: resolved.prompt,
                 agentName: cliOptions.runtime,
+                endpoint,
                 gateway: cliOptions.gateway,
                 gatewayTarget: cliOptions.gatewayTargetName,
                 targetName: cliOptions.target ?? 'default',

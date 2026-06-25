@@ -289,6 +289,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
     awsTargets,
     agentName: options.agentName,
     targetName: options.targetName,
+    endpointName: options.endpoint,
     bearerToken: options.bearerToken,
     sessionId: options.sessionId,
   });
@@ -297,7 +298,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
     return { success: false, error: resolved.error };
   }
 
-  const { agentSpec, targetName: selectedTargetName, targetConfig, runtimeArn, baggage } = resolved;
+  const { agentSpec, targetName: selectedTargetName, targetConfig, runtimeArn, endpoint, baggage } = resolved;
   options = {
     ...options,
     bearerToken: resolved.bearerToken ?? options.bearerToken,
@@ -714,6 +715,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
         headers: options.headers,
         bearerToken: options.bearerToken,
         baggage,
+        endpoint,
         paymentInstrumentId: options.paymentInstrumentId,
         paymentSessionId: options.paymentSessionId,
         paymentUserId: options.paymentUserId,
@@ -751,6 +753,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
     headers: options.headers,
     bearerToken: options.bearerToken,
     baggage,
+    endpoint,
     paymentInstrumentId: options.paymentInstrumentId,
     paymentSessionId: options.paymentSessionId,
     paymentUserId: options.paymentUserId,
