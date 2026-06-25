@@ -1,7 +1,7 @@
 import { ConfigIO, DOCKERFILE_NAME, getDockerfilePath, requireConfigRoot, resolveCodeLocation } from '../../../lib';
 import { ValidationError } from '../../../lib/errors/types';
 import type { AgentCoreProjectSpec, AwsDeploymentTarget } from '../../../schema';
-import { validateAwsCredentials } from '../../aws/account';
+import { assertCallerAccountMatchesTarget, validateAwsCredentials } from '../../aws/account';
 import { LocalCdkProject } from '../../cdk/local-cdk-project';
 import { CdkToolkitWrapper, createCdkToolkitWrapper, silentIoHost } from '../../cdk/toolkit-lib';
 import { checkBootstrapStatus, checkStacksStatus, formatCdkEnvironment } from '../../cloudformation';
@@ -65,7 +65,7 @@ export function formatError(err: unknown): string {
  */
 const MAX_RUNTIME_NAME_LENGTH = 48;
 
-export async function validateProject(): Promise<PreflightContext> {
+export async function validateProject(selectedTarget?: AwsDeploymentTarget): Promise<PreflightContext> {
   // Find the agentcore config directory, walking up from cwd if needed
   const configRoot = requireConfigRoot();
   // Project root is the parent of the agentcore directory
@@ -143,6 +143,13 @@ export async function validateProject(): Promise<PreflightContext> {
   // Skip for teardown deploys — callers validate after teardown confirmation.
   if (!isTeardownDeploy) {
     await validateAwsCredentials();
+    // Fail fast on an account mismatch so a wrong-account deploy is caught here instead of as an
+    // opaque CDK assume-role/bootstrap error after build/synth/publish. The headless CLI passes the
+    // resolved target; the TUI deploys the first target, so fall back to it.
+    const target = selectedTarget ?? awsTargets[0];
+    if (target) {
+      await assertCallerAccountMatchesTarget(target);
+    }
   }
 
   return { projectSpec, awsTargets, cdkProject, isTeardownDeploy, isFirstDeploy: !hasExistingStack };
