@@ -192,6 +192,16 @@ describe('mapGenerateConfigToRenderConfig', () => {
     const result = await mapGenerateConfigToRenderConfig(config, []);
     expect(result.memoryProviders[0]!.strategies).toEqual(['SEMANTIC', 'USER_PREFERENCE', 'SUMMARIZATION', 'EPISODIC']);
   });
+
+  it('enables OTel for MCP Python and disables it for MCP TypeScript', async () => {
+    const python = await mapGenerateConfigToRenderConfig({ ...baseConfig, protocol: 'MCP', language: 'Python' }, []);
+    const typescript = await mapGenerateConfigToRenderConfig(
+      { ...baseConfig, protocol: 'MCP', language: 'TypeScript' },
+      []
+    );
+    expect(python.enableOtel).toBe(true);
+    expect(typescript.enableOtel).toBe(false);
+  });
 });
 
 describe('mapGenerateConfigToAgent protocol mode', () => {
@@ -203,6 +213,16 @@ describe('mapGenerateConfigToAgent protocol mode', () => {
     const result = mapGenerateConfigToAgent(mcpConfig);
     expect(result.protocol).toBe('MCP');
     expect(result).not.toHaveProperty('modelProvider');
+  });
+
+  it('does not force OTel off for MCP Python (schema default enables it)', () => {
+    const result = mapGenerateConfigToAgent({ ...baseConfig, protocol: 'MCP', language: 'Python' });
+    expect(result).not.toHaveProperty('instrumentation');
+  });
+
+  it('keeps OTel off for MCP TypeScript', () => {
+    const result = mapGenerateConfigToAgent({ ...baseConfig, protocol: 'MCP', language: 'TypeScript' });
+    expect(result.instrumentation).toEqual({ enableOtel: false });
   });
 
   it('sets protocol to HTTP explicitly', () => {
