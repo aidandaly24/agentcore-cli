@@ -33,6 +33,24 @@ describe('checkBootstrapStatus', () => {
     expect(result.stackStatus).toBe('CREATE_COMPLETE');
   });
 
+  it('parses bootstrapVersion from the BootstrapVersion output', async () => {
+    mockSend.mockResolvedValue({
+      Stacks: [{ StackStatus: 'CREATE_COMPLETE', Outputs: [{ OutputKey: 'BootstrapVersion', OutputValue: '18' }] }],
+    });
+
+    const result = await checkBootstrapStatus('us-east-1');
+    expect(result.bootstrapVersion).toBe(18);
+  });
+
+  it('leaves bootstrapVersion undefined when the output is absent', async () => {
+    mockSend.mockResolvedValue({
+      Stacks: [{ StackStatus: 'CREATE_COMPLETE', Outputs: [] }],
+    });
+
+    const result = await checkBootstrapStatus('us-east-1');
+    expect(result.bootstrapVersion).toBeUndefined();
+  });
+
   it('returns isBootstrapped true for UPDATE_COMPLETE', async () => {
     mockSend.mockResolvedValue({
       Stacks: [{ StackStatus: 'UPDATE_COMPLETE' }],

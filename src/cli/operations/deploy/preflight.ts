@@ -4,7 +4,7 @@ import type { AgentCoreProjectSpec, AwsDeploymentTarget } from '../../../schema'
 import { validateAwsCredentials } from '../../aws/account';
 import { LocalCdkProject } from '../../cdk/local-cdk-project';
 import { CdkToolkitWrapper, createCdkToolkitWrapper, silentIoHost } from '../../cdk/toolkit-lib';
-import { checkBootstrapStatus, checkStacksStatus, formatCdkEnvironment } from '../../cloudformation';
+import { MIN_BOOTSTRAP_VERSION, checkBootstrapStatus, checkStacksStatus, formatCdkEnvironment } from '../../cloudformation';
 import { cleanupStaleLockFiles } from '../../tui/utils';
 import type { IIoHost } from '@aws-cdk/toolkit-lib';
 import { existsSync, readFileSync } from 'node:fs';
@@ -313,7 +313,14 @@ export async function checkBootstrapNeeded(awsTargets: AwsDeploymentTarget[]): P
 
   try {
     const bootstrapStatus = await checkBootstrapStatus(target.region);
-    if (!bootstrapStatus.isBootstrapped) {
+    // Re-bootstrap when the environment is unbootstrapped, OR when it is bootstrapped at a version
+    // below what the synthesized stacks require. Re-running bootstrap upgrades the CDKToolkit stack,
+    // avoiding the cryptic toolkit-lib "Bootstrap toolkit stack version N or later is needed" failure
+    // that would otherwise surface deep inside the deploy step.
+    if (
+      !bootstrapStatus.isBootstrapped ||
+      (bootstrapStatus.bootstrapVersion !== undefined && bootstrapStatus.bootstrapVersion < MIN_BOOTSTRAP_VERSION)
+    ) {
       return { needsBootstrap: true, target };
     }
   } catch {
