@@ -161,6 +161,11 @@ export function GenerateWizardUI({
     }
   };
 
+  // On (re)entry to a select step, seed the cursor from the previously chosen value
+  // so back-navigation lands on the user's prior selection rather than the first option.
+  const selectedValueForStep = (wizard.config as unknown as Record<string, unknown>)[wizard.step];
+  const initialSelectedIndex = items.findIndex(item => item.id === selectedValueForStep);
+
   const { selectedIndex } = useListNavigation({
     items,
     onSelect: handleSelect,
@@ -168,6 +173,7 @@ export function GenerateWizardUI({
     isActive: isActive && isSelectStep && !isAdvancedStep,
     isDisabled: item => item.disabled ?? false,
     resetKey: wizard.step,
+    initialSelectedIndex: initialSelectedIndex >= 0 ? initialSelectedIndex : undefined,
   });
 
   const advancedNav = useMultiSelectNavigation({
@@ -390,7 +396,7 @@ export function GenerateWizardUI({
       {isIdleTimeoutStep && (
         <TextInput
           prompt={`Idle session timeout in seconds (${LIFECYCLE_TIMEOUT_MIN}-${LIFECYCLE_TIMEOUT_MAX}, or press Enter to skip)`}
-          initialValue=""
+          initialValue={wizard.config.idleRuntimeSessionTimeout?.toString() ?? ''}
           allowEmpty
           customValidation={value => {
             if (!value) return true;
@@ -413,7 +419,7 @@ export function GenerateWizardUI({
       {isMaxLifetimeStep && (
         <TextInput
           prompt={`Max instance lifetime in seconds (${LIFECYCLE_TIMEOUT_MIN}-${LIFECYCLE_TIMEOUT_MAX}, or press Enter to skip)`}
-          initialValue=""
+          initialValue={wizard.config.maxLifetime?.toString() ?? ''}
           allowEmpty
           customValidation={value => {
             if (!value) return true;

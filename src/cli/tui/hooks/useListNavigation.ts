@@ -20,6 +20,8 @@ interface UseListNavigationOptions<T> {
   isDisabled?: (item: T) => boolean;
   /** Optional key to reset selection when changed */
   resetKey?: string | number;
+  /** Optional index to start the cursor on (default: first enabled). Honored on mount and on resetKey change. */
+  initialSelectedIndex?: number;
 }
 
 interface UseListNavigationResult {
@@ -85,20 +87,32 @@ export function useListNavigation<T>({
   onHotkeySelect,
   isDisabled,
   resetKey,
+  initialSelectedIndex,
 }: UseListNavigationOptions<T>): UseListNavigationResult {
-  // Initialize with first enabled index (parent should ensure data is loaded before mounting)
-  const [selectedIndex, setSelectedIndex] = useState(() => {
+  // Resolve the starting index: honor initialSelectedIndex when it points to a valid,
+  // non-disabled item; otherwise fall back to the first enabled index (default: 0).
+  const resolveInitialIndex = (): number => {
+    if (
+      initialSelectedIndex !== undefined &&
+      initialSelectedIndex >= 0 &&
+      initialSelectedIndex < items.length &&
+      !isDisabled?.(items[initialSelectedIndex] as T)
+    ) {
+      return initialSelectedIndex;
+    }
     if (!isDisabled) return 0;
     const idx = items.findIndex(item => !isDisabled(item));
     return idx >= 0 ? idx : 0;
-  });
+  };
+
+  // Initialize with the resolved index (parent should ensure data is loaded before mounting)
+  const [selectedIndex, setSelectedIndex] = useState(resolveInitialIndex);
 
   // Reset selection when resetKey changes (using state sync pattern to avoid setState in effect)
   const [prevResetKey, setPrevResetKey] = useState(resetKey);
   if (resetKey !== undefined && resetKey !== prevResetKey) {
     setPrevResetKey(resetKey);
-    const idx = isDisabled ? items.findIndex(item => !isDisabled(item)) : 0;
-    setSelectedIndex(idx >= 0 ? idx : 0);
+    setSelectedIndex(resolveInitialIndex());
   }
 
   // Find next non-disabled index in given direction (delegates to standalone function)
