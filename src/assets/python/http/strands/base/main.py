@@ -1,4 +1,5 @@
 from typing import Any
+from collections import OrderedDict
 {{#if inlineFunctionTools}}
 import json
 
@@ -427,39 +428,42 @@ get_or_create_agent = agent_factory()
 {{#unless hasPayment}}
 # Reuses one Agent per session_id so each session keeps its own in-process
 # conversation history (best-effort; resets on cold start). The cache is bounded
-# so a single process serving many sessions cannot leak history between them or
-# grow without limit. For durable history, attach a session manager.
+# to 128 sessions with LRU eviction (least-recently-used is dropped and its
+# history reset) so a single process serving many sessions cannot leak history
+# between them or grow without limit. For durable history, attach a session manager.
 def agent_factory():
-    cache = {}
+    cache = OrderedDict()
     def get_or_create_agent(session_id{{#if hasSkillsFetcher}}, skill_plugins=None{{/if}}):
-        if session_id not in cache:
-            if len(cache) >= 128:
-                cache.pop(next(iter(cache)))
-            cache[session_id] = Agent(
-                model=load_model(),
-                system_prompt=DEFAULT_SYSTEM_PROMPT,
-                tools=tools,
-                conversation_manager=_make_conversation_manager(),
-                {{#if hasSkillsFetcher}}
-                plugins=skill_plugins or None,
-                {{/if}}
+        if session_id in cache:
+            cache.move_to_end(session_id)
+            return cache[session_id]
+        if len(cache) >= 128:
+            cache.popitem(last=False)
+        cache[session_id] = Agent(
+            model=load_model(),
+            system_prompt=DEFAULT_SYSTEM_PROMPT,
+            tools=tools,
+            conversation_manager=_make_conversation_manager(),
+            {{#if hasSkillsFetcher}}
+            plugins=skill_plugins or None,
+            {{/if}}
+            {{#if hasExecutionLimits}}
+            tool_executor=SequentialToolExecutor(),
+            callback_handler=None,
+            {{/if}}
+            hooks=[
                 {{#if hasExecutionLimits}}
-                tool_executor=SequentialToolExecutor(),
-                callback_handler=None,
+                ExecutionLimitsHook(
+                    {{#if maxIterations}}max_iterations={{maxIterations}},{{/if}}
+                    {{#if maxTokens}}max_tokens={{maxTokens}},{{/if}}
+                    {{#if timeoutSeconds}}timeout_seconds={{timeoutSeconds}},{{/if}}
+                ),
                 {{/if}}
-                hooks=[
-                    {{#if hasExecutionLimits}}
-                    ExecutionLimitsHook(
-                        {{#if maxIterations}}max_iterations={{maxIterations}},{{/if}}
-                        {{#if maxTokens}}max_tokens={{maxTokens}},{{/if}}
-                        {{#if timeoutSeconds}}timeout_seconds={{timeoutSeconds}},{{/if}}
-                    ),
-                    {{/if}}
-                    {{#if hasConfigBundle}}
-                    ConfigBundleHook(),
-                    {{/if}}
-                ],
-            )
+                {{#if hasConfigBundle}}
+                ConfigBundleHook(),
+                {{/if}}
+            ],
+        )
         return cache[session_id]
     return get_or_create_agent
 get_or_create_agent = agent_factory()

@@ -1,6 +1,7 @@
 {{#if needsOs}}
 import os
 {{/if}}
+from collections import OrderedDict
 from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -121,8 +122,15 @@ agent = Agent(
 )
 
 
-# Module-level session service and runner (preserves history across invocations)
+# Module-level session service and runner preserve history across invocations.
+# InMemorySessionService retains every (app_name, user_id, session_id) triple
+# forever, so we bound it to 128 active sessions with LRU eviction (the
+# least-recently-used session is deleted and its history reset) to keep a
+# long-running process from growing without limit. For durable history, swap in
+# a persistent session service (e.g. DatabaseSessionService).
+_SESSION_LIMIT = 128
 _session_service = InMemorySessionService()
+_session_keys = OrderedDict()
 _runner = None
 
 
@@ -139,6 +147,17 @@ def get_or_create_runner():
 
 
 async def get_or_create_session(user_id, session_id):
+    key = (user_id, session_id)
+    if key in _session_keys:
+        _session_keys.move_to_end(key)
+    else:
+        while len(_session_keys) >= _SESSION_LIMIT:
+            old_user_id, old_session_id = _session_keys.popitem(last=False)
+            await _session_service.delete_session(
+                app_name=APP_NAME, user_id=old_user_id, session_id=old_session_id
+            )
+        _session_keys[key] = True
+
     session = await _session_service.get_session(
         app_name=APP_NAME, user_id=user_id, session_id=session_id
     )

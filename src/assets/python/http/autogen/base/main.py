@@ -1,6 +1,7 @@
 {{#if needsOs}}
 import os
 {{/if}}
+from collections import OrderedDict
 from autogen_agentchat.agents import AssistantAgent
 from autogen_core.tools import FunctionTool
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
@@ -93,22 +94,25 @@ You have access to the following mounted filesystems. Use file_read, file_write,
 
 # Reuses one AssistantAgent per session_id so each session keeps its own
 # in-process conversation history (best-effort; resets on cold start). Caches up
-# to 128 active sessions; the oldest is evicted and its history reset.
-_agents = {}
+# to 128 active sessions with LRU eviction (least-recently-used is dropped and
+# its history reset).
+_agents = OrderedDict()
 
 
 async def get_or_create_agent(session_id):
-    if session_id not in _agents:
-        if len(_agents) >= 128:
-            _agents.pop(next(iter(_agents)))
-        # Get MCP Tools
-        mcp_tools = await get_streamable_http_mcp_tools()
-        _agents[session_id] = AssistantAgent(
-            name="{{ name }}",
-            model_client=load_model(),
-            tools=tools + mcp_tools,
-            system_message=SYSTEM_MESSAGE,
-        )
+    if session_id in _agents:
+        _agents.move_to_end(session_id)
+        return _agents[session_id]
+    if len(_agents) >= 128:
+        _agents.popitem(last=False)
+    # Get MCP Tools
+    mcp_tools = await get_streamable_http_mcp_tools()
+    _agents[session_id] = AssistantAgent(
+        name="{{ name }}",
+        model_client=load_model(),
+        tools=tools + mcp_tools,
+        system_message=SYSTEM_MESSAGE,
+    )
     return _agents[session_id]
 
 
