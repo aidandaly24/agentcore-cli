@@ -1,9 +1,36 @@
 /**
  * Converts an unknown error to a string message.
  * Handles Error instances and other thrown values consistently.
+ *
+ * Note: this intentionally returns only `err.message` and does NOT walk the
+ * cause chain. Use `formatError` when displaying an error to the user so the
+ * underlying cause (e.g. CDK synth child stderr) is surfaced.
  */
 export function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Format an error for user display. Shows the message and the full cause chain, but NOT the raw JS
+ * stack trace — dumping `err.stack` (minified dist frames) to users is noise for the common case
+ * (config/validation errors). Set AGENTCORE_DEBUG=1 to include the stack trace for debugging.
+ *
+ * Unlike `getErrorMessage`, this recurses into `err.cause`, so actionable detail attached by lower
+ * layers (e.g. the CDK toolkit wrapper preserving the synth child's stderr on `err.cause`) reaches
+ * the user instead of being dropped behind a generic top-level message.
+ */
+export function formatError(err: unknown): string {
+  if (err instanceof Error) {
+    const lines = [err.message];
+    if (err.stack && process.env.AGENTCORE_DEBUG) {
+      lines.push('', 'Stack trace:', err.stack);
+    }
+    if (err.cause) {
+      lines.push('', 'Caused by:', formatError(err.cause));
+    }
+    return lines.join('\n');
+  }
+  return String(err);
 }
 
 /**

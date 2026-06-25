@@ -5,6 +5,7 @@ import { validateAwsCredentials } from '../../aws/account';
 import { LocalCdkProject } from '../../cdk/local-cdk-project';
 import { CdkToolkitWrapper, createCdkToolkitWrapper, silentIoHost } from '../../cdk/toolkit-lib';
 import { checkBootstrapStatus, checkStacksStatus, formatCdkEnvironment } from '../../cloudformation';
+import { formatError } from '../../errors';
 import { cleanupStaleLockFiles } from '../../tui/utils';
 import type { IIoHost } from '@aws-cdk/toolkit-lib';
 import { existsSync, readFileSync } from 'node:fs';
@@ -39,24 +40,10 @@ export interface StackStatusCheckResult {
   message?: string;
 }
 
-/**
- * Format an error for user display. Shows the message and the cause chain, but NOT the raw JS stack
- * trace — dumping `err.stack` (minified dist/cli/index.mjs frames) to users is noise for the common
- * case (config/validation errors). Set AGENTCORE_DEBUG=1 to include the stack trace for debugging.
- */
-export function formatError(err: unknown): string {
-  if (err instanceof Error) {
-    const lines = [err.message];
-    if (err.stack && process.env.AGENTCORE_DEBUG) {
-      lines.push('', 'Stack trace:', err.stack);
-    }
-    if (err.cause) {
-      lines.push('', 'Caused by:', formatError(err.cause));
-    }
-    return lines.join('\n');
-  }
-  return String(err);
-}
+// Re-exported from src/cli/errors.ts so existing importers (TUI hooks, operations/deploy/index.ts,
+// preflight tests) keep their import path. Lives in errors.ts so the thin command/display layers can
+// reuse it without pulling in this heavy deploy module.
+export { formatError };
 
 /**
  * Validates the CDK project and loads configuration.

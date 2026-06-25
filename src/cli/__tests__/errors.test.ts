@@ -1,5 +1,6 @@
 import { AgentAlreadyExistsError, toError } from '../../lib';
 import {
+  formatError,
   getErrorMessage,
   isChangesetInProgressError,
   isExpiredTokenError,
@@ -36,6 +37,18 @@ describe('errors', () => {
       expect(getErrorMessage(123)).toBe('123');
       expect(getErrorMessage(null)).toBe('null');
       expect(getErrorMessage(undefined)).toBe('undefined');
+    });
+  });
+
+  describe('formatError', () => {
+    it('surfaces the cause chain that getErrorMessage drops (CDK synth stderr)', () => {
+      const causeText = 'AgentCore CDK synthesis failed: memory strategy "foo" is invalid';
+      const err = new Error('CDK synth failed: node dist/bin/cdk.js: Subprocess exited with error 1', {
+        cause: new Error(causeText),
+      });
+
+      expect(getErrorMessage(err)).not.toContain(causeText);
+      expect(formatError(err)).toContain(causeText);
     });
   });
 

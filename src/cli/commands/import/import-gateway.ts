@@ -19,7 +19,7 @@ import {
   listAllGateways,
 } from '../../aws/agentcore-control';
 import { ANSI } from '../../constants';
-import { isAccessDeniedError } from '../../errors';
+import { formatError, isAccessDeniedError } from '../../errors';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { executeCdkImportPipeline } from './import-pipeline';
 import {
@@ -746,7 +746,7 @@ export function registerImportGateway(importCmd: Command): void {
         console.log(`  agentcore fetch access  ${ANSI.dim}Get gateway URL and token${ANSI.reset}`);
         console.log('');
       } else {
-        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${result.error.message}`);
+        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${formatError(result.error)}`);
         if (result.logPath) {
           console.error(`Log: ${result.logPath}`);
         }

@@ -9,6 +9,7 @@ import {
 } from '../../aws/agentcore-control';
 import { arnPrefix } from '../../aws/partition';
 import { ANSI } from '../../constants';
+import { formatError } from '../../errors';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { failResult, findResourceInDeployedState, parseAndValidateArn } from './import-utils';
 import { executeResourceImport } from './resource-import';
@@ -219,7 +220,7 @@ export function registerImportOnlineEval(importCmd: Command): void {
         console.log(`  ID: ${result.resourceId}`);
         console.log('');
       } else {
-        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${result.error.message}`);
+        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${formatError(result.error)}`);
         if (result.logPath) {
           console.error(`Log: ${result.logPath}`);
         }

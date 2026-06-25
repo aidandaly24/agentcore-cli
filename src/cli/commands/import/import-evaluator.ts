@@ -9,6 +9,7 @@ import {
   listAllOnlineEvaluationConfigs,
 } from '../../aws/agentcore-control';
 import { ANSI } from '../../constants';
+import { formatError } from '../../errors';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { failResult, parseAndValidateArn } from './import-utils';
 import { executeResourceImport } from './resource-import';
@@ -164,7 +165,7 @@ export function registerImportEvaluator(importCmd: Command): void {
         console.log(`  ID: ${result.resourceId}`);
         console.log('');
       } else {
-        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${result.error.message}`);
+        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${formatError(result.error)}`);
         if (result.logPath) {
           console.error(`Log: ${result.logPath}`);
         }
