@@ -799,6 +799,8 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
               logger.log(`Updated API key provider: ${result.providerName}`);
             } else if (result.status === 'exists') {
               logger.log(`API key provider exists: ${result.providerName}`);
+            } else if (result.status === 'linked') {
+              logger.log(`Linked API key provider: ${result.providerName}`);
             } else if (result.status === 'skipped') {
               logger.log(`Skipped ${result.providerName}: ${result.error?.message}`);
             } else if (result.status === 'error') {
@@ -842,6 +844,8 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
               logger.log(`Created OAuth provider: ${result.providerName}`);
             } else if (result.status === 'updated') {
               logger.log(`Updated OAuth provider: ${result.providerName}`);
+            } else if (result.status === 'linked') {
+              logger.log(`Linked OAuth provider: ${result.providerName}`);
             } else if (result.status === 'skipped') {
               logger.log(`Skipped ${result.providerName}: ${result.error?.message}`);
             } else if (result.status === 'error') {
