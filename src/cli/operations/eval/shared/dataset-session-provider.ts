@@ -13,7 +13,7 @@ import type { AgentContext } from '../../invoke/resolve-agent-context';
 import { loadDatasetScenarios } from './dataset-loader';
 import { executeScenarios } from './scenario-executor';
 import type { ScenarioInvocationResult } from './scenario-executor';
-import { collectSpans, extractTraceIds } from './span-collector';
+import { SPAN_INGESTION_DELAY_MS, collectSpans, extractTraceIds } from './span-collector';
 import type { PredefinedScenario } from './types';
 import type { DocumentType } from '@smithy/types';
 
@@ -138,7 +138,7 @@ export async function runDatasetScenariosAndCollectSpans(
   const logGroup = runtimeLogGroup(agentContext.runtimeId, agentContext.endpoint);
   const sessionIds = successfulResults.map(r => r.sessionId);
 
-  onProgress?.('collect', 'Waiting for span ingestion (15s)...');
+  onProgress?.('collect', `Waiting for span ingestion (${SPAN_INGESTION_DELAY_MS / 1000}s)...`);
   const { spans: collectedSpans, timedOut } = await collectSpans({
     sessionIds,
     region: agentContext.region,

@@ -1,6 +1,14 @@
-import { collectSpans, extractTraceIds } from '../span-collector';
+import { SPAN_INGESTION_DELAY_MS, collectSpans, extractTraceIds } from '../span-collector';
 import type { DocumentType } from '@smithy/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+describe('SPAN_INGESTION_DELAY_MS progress message', () => {
+  it('renders the real wait (180s), not a stale literal', () => {
+    const message = `Waiting for span ingestion (${SPAN_INGESTION_DELAY_MS / 1000}s)...`;
+    expect(message).toContain('180s');
+    expect(message).not.toContain('15s');
+  });
+});
 
 describe('extractTraceIds', () => {
   it('extracts unique traceIds in appearance order', () => {
