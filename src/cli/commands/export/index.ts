@@ -1,6 +1,5 @@
 import { serializeResult } from '../../../lib/result';
 import { ANSI, COMMAND_DESCRIPTIONS } from '../../constants';
-import { requireTTY } from '../../tui/guards';
 import { renderTUI } from '../../tui/render';
 import { handleExportHarness } from './harness-action';
 import type { Command } from '@commander-js/extra-typings';
@@ -30,7 +29,7 @@ export function registerExport(program: Command): void {
           console.log(JSON.stringify({ success: false, error: '--name is required in non-interactive mode' }));
           process.exit(1);
         }
-        requireTTY();
+        // renderTUI() guards for an interactive terminal before rendering.
         await renderTUI({ initialRoute: { name: 'export-harness' }, actionOnBack: 'exit' });
         return;
       }
