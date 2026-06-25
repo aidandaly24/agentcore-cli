@@ -9,7 +9,7 @@
  *   - CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET (for connector creation)
  *   - CDK_TARBALL (optional — path to payment-aware CDK constructs tgz)
  */
-import { hasAwsCredentials, parseJsonOutput, prereqs, retry } from '../src/test-utils/index.js';
+import { hasAwsCredentials, parseJsonOutput, prereqs, retry, uniqueRunName, uniqueRunSuffix } from '../src/test-utils/index.js';
 import { installCdkTarball, runAgentCoreCLI, teardownE2EProject, writeAwsTargets } from './e2e-helper.js';
 import { type Logger, getLogger } from './utils/logger.js';
 import { randomUUID } from 'node:crypto';
@@ -27,8 +27,11 @@ describe.sequential('e2e: payments — create → add payment → deploy → sta
   let projectPath: string;
   let agentName: string;
   let logger: Logger;
-  const managerName = 'E2ePayMgr';
-  const connectorName = 'E2ePayConn';
+  // Payment credential-provider name is derived as `${manager}-${connector}-cdp` and is unique only per
+  // account+region. Randomize per run (like agentName/testDir below) so leftover providers from a crashed
+  // prior run or a concurrent CI pipeline don't collide on the static 'E2ePayMgr-E2ePayConn-cdp'.
+  let managerName: string;
+  let connectorName: string;
 
   beforeAll(async () => {
     logger = getLogger('payments-strands-bedrock');
@@ -39,7 +42,10 @@ describe.sequential('e2e: payments — create → add payment → deploy → sta
     testDir = join(tmpdir(), `agentcore-e2e-pay-${randomUUID()}`);
     await mkdir(testDir, { recursive: true });
 
-    agentName = `E2ePay${String(Date.now()).slice(-8)}`;
+    const runSuffix = uniqueRunSuffix();
+    agentName = `E2ePay${runSuffix}`;
+    managerName = uniqueRunName('E2ePayMgr', runSuffix);
+    connectorName = uniqueRunName('E2ePayConn', runSuffix);
 
     // Create project
     const createResult = await runAgentCoreCLI(
