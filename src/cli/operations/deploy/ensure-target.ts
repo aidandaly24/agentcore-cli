@@ -2,6 +2,19 @@ import { type ConfigIO, ConfigNotFoundError } from '../../../lib';
 import { detectAwsContext } from '../../aws';
 
 /**
+ * Actionable guidance shown when no deployment target is configured (valid AWS
+ * credentials are present, but `aws-targets.json` has no matching target).
+ * Shared by the deploy command and the export flow so the remediation steps
+ * don't diverge.
+ */
+export const NO_DEPLOYMENT_TARGET_GUIDANCE =
+  'No deployment target is configured in agentcore/aws-targets.json.\n\n' +
+  'To fix this:\n' +
+  '  1. Run `agentcore deploy` (interactive mode will prompt for account/region)\n' +
+  '  2. Or add a target to agentcore/aws-targets.json:\n' +
+  '     [{ "name": "default", "account": "<account-id>", "region": "<region>" }]';
+
+/**
  * Ensure `aws-targets.json` has at least one deployment target.
  *
  * Freshly-created projects (via `agentcore create`, interactive or not) write an

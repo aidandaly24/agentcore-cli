@@ -3,6 +3,7 @@ import { ExportHarnessError, ValidationError } from '../../../lib/errors/types';
 import { AgentNameSchema } from '../../../schema';
 import type { AgentEnvSpec, BuildType, Credential } from '../../../schema';
 import { getErrorMessage } from '../../errors';
+import { NO_DEPLOYMENT_TARGET_GUIDANCE } from '../../operations/deploy';
 import type { AttributeRecorder } from '../../telemetry/cli-command-run.js';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import type { CommandAttrs } from '../../telemetry/schemas/command-run.js';
@@ -175,12 +176,7 @@ export async function handleExportHarness(
       if (targets.length === 0) {
         context.exportNotes.push({
           category: 'No AWS deployment target configured',
-          message:
-            'aws-targets.json is empty — running `agentcore deploy` will fail with "Target \\"default\\" not found". ' +
-            'Add a deployment target first:\n\n' +
-            '  agentcore deploy  (interactive mode will prompt for account/region)\n\n' +
-            'Or edit agentcore/aws-targets.json manually:\n\n' +
-            '  [{ "name": "default", "account": "<account-id>", "region": "<region>" }]',
+          message: NO_DEPLOYMENT_TARGET_GUIDANCE,
         });
       }
 

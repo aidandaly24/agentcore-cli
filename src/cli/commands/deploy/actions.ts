@@ -36,6 +36,7 @@ import {
   hasIdentityApiProviders,
   hasIdentityOAuthProviders,
   hasManagedMemoryHarness,
+  NO_DEPLOYMENT_TARGET_GUIDANCE,
   performStackTeardown,
   setupApiKeyProviders,
   setupOAuth2Providers,
@@ -188,10 +189,16 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     const target = targets.find(t => t.name === options.target);
     if (!target) {
       endStep('error', `Target "${options.target}" not found`);
+      // A fresh project ships an empty aws-targets.json and only auto-populates a
+      // default when AWS credentials are detectable. With no credentials configured
+      // the file stays empty, so surface the actionable "no AWS credentials" guidance
+      // here instead of the cryptic "target not found". Throws when creds are absent
+      // (caught by the outer handler); a no-op when valid creds exist.
+      await validateAwsCredentials();
       logger.finalize(false);
       return {
         success: false,
-        error: new ResourceNotFoundError(`Target "${options.target}" not found in aws-targets.json`),
+        error: new ResourceNotFoundError(NO_DEPLOYMENT_TARGET_GUIDANCE),
         logPath: logger.getRelativeLogPath(),
       };
     }
