@@ -10,6 +10,7 @@ import { ConfigBundleFlow } from './screens/config-bundle-hub';
 import { CreateScreen } from './screens/create';
 import { DatasetFlow } from './screens/dataset-hub';
 import { DeployScreen } from './screens/deploy/DeployScreen';
+import { DevScreen } from './screens/dev/DevScreen';
 import { EvalHubScreen, EvalScreen } from './screens/eval';
 import { ExportHarnessFlow } from './screens/export';
 import { FetchAccessScreen } from './screens/fetch-access';
@@ -52,6 +53,7 @@ type Route =
       autoSession?: boolean;
     }
   | { name: 'logs' }
+  | { name: 'dev' }
   | { name: 'create' }
   | { name: 'add' }
   | { name: 'status' }
@@ -142,9 +144,7 @@ function AppContent({
     }
 
     if (id === 'dev') {
-      setExitAction({ type: 'dev' });
-      exit();
-      return;
+      setRoute({ name: 'dev' });
     } else if (id === 'exec') {
       setExitAction({ type: 'exec' });
       exit();
@@ -269,6 +269,21 @@ function AppContent({
 
   if (route.name === 'logs') {
     return <LogsScreen isInteractive={isInteractive} onExit={handleBack} />;
+  }
+
+  if (route.name === 'dev') {
+    // Render the dev picker in-TUI so agent-less projects get a guided error
+    // screen (Esc to go back) instead of crashing out of the TUI. When agents
+    // exist, the picker hands off to browser dev mode via the exit action.
+    return (
+      <DevScreen
+        onBack={handleBack}
+        onLaunchBrowser={() => {
+          setExitAction({ type: 'dev' });
+          exit();
+        }}
+      />
+    );
   }
 
   if (route.name === 'status') {
