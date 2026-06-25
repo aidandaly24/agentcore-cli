@@ -274,6 +274,16 @@ export function CreateScreen({ cwd, isInteractive, onExit, onNavigate }: CreateS
     onExit,
   ]);
 
+  // Esc on the create-type prompt returns to the project-name input (matching the
+  // "Esc back" footer); on every other phase it falls through to the top-level exit.
+  const handleBack = useCallback(() => {
+    if (flow.phase === 'create-type-prompt') {
+      flow.goBackToInput();
+    } else {
+      handleExit();
+    }
+  }, [flow, handleExit]);
+
   // Auto-exit when project creation completes successfully
   useEffect(() => {
     if (allSuccess) {
@@ -287,7 +297,7 @@ export function CreateScreen({ cwd, isInteractive, onExit, onNavigate }: CreateS
     onSelect: item => {
       flow.handleCreateTypeSelection(item.id as 'harness' | 'agent' | 'skip');
     },
-    onExit: handleExit,
+    onExit: handleBack,
     isActive: flow.phase === 'create-type-prompt',
   });
 
@@ -342,7 +352,7 @@ export function CreateScreen({ cwd, isInteractive, onExit, onNavigate }: CreateS
             : undefined;
 
   return (
-    <Screen title="AgentCore Create" onExit={handleExit} headerContent={headerContent} helpText={helpText}>
+    <Screen title="AgentCore Create" onExit={handleBack} headerContent={headerContent} helpText={helpText}>
       {phase === 'existing-project-error' && (
         <Box marginBottom={1} flexDirection="column">
           <Text color="red">A project already exists at this location.</Text>
