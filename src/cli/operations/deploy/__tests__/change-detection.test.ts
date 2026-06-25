@@ -1,11 +1,14 @@
 import { canSkipDeploy, computeProjectDeployHash } from '../change-detection';
 import { describe, expect, it, vi } from 'vitest';
 
+let harnessJsonContent = '{"name":"h1","model":{"provider":"bedrock","modelId":"anthropic.claude-3"}}';
+let dockerfileContent = 'FROM python:3.12';
+
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn().mockImplementation((path: string) => {
-    if (path.includes('harness.json'))
-      return Promise.resolve('{"name":"h1","model":{"provider":"bedrock","modelId":"anthropic.claude-3"}}');
+    if (path.includes('harness.json')) return Promise.resolve(harnessJsonContent);
     if (path.includes('system-prompt.md')) return Promise.resolve('You are a helpful assistant.');
+    if (path.includes('Dockerfile')) return Promise.resolve(dockerfileContent);
     return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
   }),
 }));
@@ -51,6 +54,21 @@ describe('computeProjectDeployHash', () => {
     const hash1 = await computeProjectDeployHash(io1);
     const hash2 = await computeProjectDeployHash(io2);
     expect(hash1).not.toBe(hash2);
+  });
+
+  it('returns different hash when only the referenced Dockerfile content changes', async () => {
+    harnessJsonContent = '{"name":"h1","dockerfile":"Dockerfile"}';
+    try {
+      const io = mockConfigIO({});
+      dockerfileContent = 'FROM python:3.12';
+      const hash1 = await computeProjectDeployHash(io);
+      dockerfileContent = 'FROM python:3.13';
+      const hash2 = await computeProjectDeployHash(io);
+      expect(hash1).not.toBe(hash2);
+    } finally {
+      harnessJsonContent = '{"name":"h1","model":{"provider":"bedrock","modelId":"anthropic.claude-3"}}';
+      dockerfileContent = 'FROM python:3.12';
+    }
   });
 });
 

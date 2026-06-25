@@ -23,9 +23,11 @@ export async function computeProjectDeployHash(configIO: ConfigIO): Promise<stri
 
   for (const harness of projectSpec.harnesses ?? []) {
     const harnessDir = join(projectRoot, harness.path);
+    let dockerfile: string | undefined;
     try {
       const harnessJson = await readFile(join(harnessDir, 'harness.json'), 'utf-8');
       hash.update(harnessJson);
+      dockerfile = JSON.parse(harnessJson)?.dockerfile;
     } catch {
       // harness.json missing — hash will differ from last deploy
     }
@@ -34,6 +36,14 @@ export async function computeProjectDeployHash(configIO: ConfigIO): Promise<stri
       hash.update(prompt);
     } catch {
       // no system prompt
+    }
+    if (dockerfile) {
+      try {
+        const dockerfileContent = await readFile(join(harnessDir, dockerfile), 'utf-8');
+        hash.update(dockerfileContent);
+      } catch {
+        // referenced Dockerfile missing — hash will differ from last deploy
+      }
     }
   }
 
