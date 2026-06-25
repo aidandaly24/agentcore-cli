@@ -3989,7 +3989,7 @@ async def get_or_create_session(user_id, session_id):
         _session_keys.move_to_end(key)
     else:
         while len(_session_keys) >= _SESSION_LIMIT:
-            old_user_id, old_session_id = _session_keys.popitem(last=False)
+            (old_user_id, old_session_id), _ = _session_keys.popitem(last=False)
             await _session_service.delete_session(
                 app_name=APP_NAME, user_id=old_user_id, session_id=old_session_id
             )
