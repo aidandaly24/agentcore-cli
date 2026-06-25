@@ -387,7 +387,7 @@ export type HarnessRegistryEntry = z.infer<typeof HarnessRegistryEntrySchema>;
 const BUILTIN_EVALUATOR_PREFIX = 'Builtin.';
 const ARN_PREFIX = 'arn:';
 
-export const AgentCoreProjectSpecSchema = z
+const AgentCoreProjectSpecBaseSchema = z
   .object({
     $schema: z.string().optional(),
     name: ProjectNameSchema,
@@ -711,5 +711,35 @@ export const AgentCoreProjectSpecSchema = z
       }
     }
   });
+
+/**
+ * Renames pre-v0.4.0 keys in place so old agentcore.json files keep parsing without manual edits:
+ * the top-level `agents` array became `runtimes` (PR #706) and the credential discriminator `type`
+ * became `authorizerType` (PR #709). Without this the `.strict()` top-level schema rejects `agents`
+ * with a cryptic `unknown keys (remove): "agents"` and the credential union fails on the missing
+ * `authorizerType` — see GitHub issue #719. Mirrors the legacy-aware preprocess in primitives/harness.
+ */
+function migrateLegacyProjectSpec(val: unknown): unknown {
+  if (val == null || typeof val !== 'object' || Array.isArray(val)) return val;
+  const spec = { ...(val as Record<string, unknown>) };
+  if ('agents' in spec && !('runtimes' in spec)) {
+    spec.runtimes = spec.agents;
+    delete spec.agents;
+  }
+  if (Array.isArray(spec.credentials)) {
+    spec.credentials = spec.credentials.map(cred => {
+      if (cred == null || typeof cred !== 'object' || Array.isArray(cred)) return cred;
+      const entry = cred as Record<string, unknown>;
+      if ('type' in entry && !('authorizerType' in entry)) {
+        const { type, ...rest } = entry;
+        return { authorizerType: type, ...rest };
+      }
+      return entry;
+    });
+  }
+  return spec;
+}
+
+export const AgentCoreProjectSpecSchema = z.preprocess(migrateLegacyProjectSpec, AgentCoreProjectSpecBaseSchema);
 
 export type AgentCoreProjectSpec = z.infer<typeof AgentCoreProjectSpecSchema>;

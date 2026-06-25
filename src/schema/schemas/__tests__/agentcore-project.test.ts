@@ -637,6 +637,30 @@ describe('AgentCoreProjectSpecSchema', () => {
     }
   });
 
+  it('auto-migrates pre-v0.4.0 keys (agents -> runtimes, credential type -> authorizerType)', () => {
+    const result = AgentCoreProjectSpecSchema.safeParse({
+      ...minimalProject,
+      agents: [
+        {
+          name: 'MyAgent',
+          build: 'CodeZip',
+          entrypoint: 'main.py',
+          codeLocation: './agents/my-agent',
+          runtimeVersion: 'PYTHON_3_12',
+          protocol: 'HTTP',
+        },
+      ],
+      credentials: [{ type: 'ApiKeyCredentialProvider', name: 'MyCred' }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.runtimes).toHaveLength(1);
+      expect(result.data.runtimes[0]!.name).toBe('MyAgent');
+      expect('agents' in result.data).toBe(false);
+      expect(result.data.credentials[0]!.authorizerType).toBe('ApiKeyCredentialProvider');
+    }
+  });
+
   it('rejects httpRuntime target on MCP gateway (no protocolType None)', () => {
     const result = AgentCoreProjectSpecSchema.safeParse({
       ...minimalProject,
