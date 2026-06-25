@@ -24,7 +24,7 @@ file defines a Starlette ASGI app with the Google ADK framework running within.
 
 If installation was successful, a virtual environment is already created with dependencies installed.
 
-Run `source .venv/bin/activate` before developing.
+Run `source .venv/bin/activate` (`.venv\Scripts\activate` on Windows) before developing.
 
 `agentcore dev` will start a local server on 0.0.0.0:8080.
 
