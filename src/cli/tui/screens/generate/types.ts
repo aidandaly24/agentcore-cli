@@ -67,6 +67,8 @@ export interface GenerateConfig {
   securityGroups?: string[];
   /** Allowed request headers for the runtime */
   requestHeaderAllowlist?: string[];
+  /** ARN of an existing IAM execution role to use instead of creating a CDK-managed one */
+  executionRoleArn?: string;
   /** Authorizer type for inbound requests */
   authorizerType?: RuntimeAuthorizerType;
   /** JWT config for CUSTOM_JWT authorizer */

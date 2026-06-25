@@ -140,6 +140,7 @@ export function mapGenerateConfigToAgent(config: GenerateConfig): AgentEnvSpec {
     ...(config.requestHeaderAllowlist?.length && {
       requestHeaderAllowlist: config.requestHeaderAllowlist,
     }),
+    ...(config.executionRoleArn && { executionRoleArn: config.executionRoleArn }),
     ...(config.authorizerType && { authorizerType: config.authorizerType }),
     ...(config.authorizerType === 'CUSTOM_JWT' &&
       config.jwtConfig && {
