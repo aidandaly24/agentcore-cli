@@ -4,11 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const mockCheckStacksStatus = vi.fn();
 const mockCheckBootstrapStatus = vi.fn();
 
-vi.mock('../../../cloudformation', () => ({
-  checkStacksStatus: (...args: unknown[]) => mockCheckStacksStatus(...args),
-  checkBootstrapStatus: (...args: unknown[]) => mockCheckBootstrapStatus(...args),
-  formatCdkEnvironment: vi.fn(),
-}));
+vi.mock('../../../cloudformation', async importActual => {
+  const actual = await importActual<typeof import('../../../cloudformation')>();
+  return {
+    MIN_BOOTSTRAP_VERSION: actual.MIN_BOOTSTRAP_VERSION,
+    checkStacksStatus: (...args: unknown[]) => mockCheckStacksStatus(...args),
+    checkBootstrapStatus: (...args: unknown[]) => mockCheckBootstrapStatus(...args),
+    formatCdkEnvironment: vi.fn(),
+  };
+});
 
 describe('formatError', () => {
   it('formats Error with message only', () => {
@@ -106,6 +110,26 @@ describe('checkBootstrapNeeded', () => {
 
   it('returns not needed when already bootstrapped', async () => {
     mockCheckBootstrapStatus.mockResolvedValue({ isBootstrapped: true });
+    const target = { name: 'dev', region: 'us-east-1', account: '123456789012' } as any;
+
+    const result = await checkBootstrapNeeded([target]);
+
+    expect(result.needsBootstrap).toBe(false);
+    expect(result.target).toBeNull();
+  });
+
+  it('returns needed when bootstrapped at an outdated version', async () => {
+    mockCheckBootstrapStatus.mockResolvedValue({ isBootstrapped: true, bootstrapVersion: 18 });
+    const target = { name: 'dev', region: 'us-east-1', account: '123456789012' } as any;
+
+    const result = await checkBootstrapNeeded([target]);
+
+    expect(result.needsBootstrap).toBe(true);
+    expect(result.target).toBe(target);
+  });
+
+  it('returns not needed when bootstrapped at a current version', async () => {
+    mockCheckBootstrapStatus.mockResolvedValue({ isBootstrapped: true, bootstrapVersion: 32 });
     const target = { name: 'dev', region: 'us-east-1', account: '123456789012' } as any;
 
     const result = await checkBootstrapNeeded([target]);
