@@ -1,6 +1,6 @@
 import { ConfigIO, serializeResult } from '../../../lib';
 import { COMMAND_DESCRIPTIONS } from '../../constants';
-import { getErrorMessage } from '../../errors';
+import { formatError, getErrorMessage } from '../../errors';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { renderTUI } from '../../tui';
 import { requireProject, requireTTY } from '../../tui/guards';
@@ -57,7 +57,7 @@ async function handleDeployCLI(options: DeployOptions): Promise<void> {
     if (options.json) {
       console.log(JSON.stringify(serializeResult(deployResult)));
     } else {
-      console.error(deployResult.error.message);
+      console.error(formatError(deployResult.error));
       if (deployResult.logPath) {
         console.error(`Log: ${deployResult.logPath}`);
       }

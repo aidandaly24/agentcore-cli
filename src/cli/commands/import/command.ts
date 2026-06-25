@@ -1,5 +1,6 @@
 import { ValidationError } from '../../../lib';
 import { ANSI } from '../../constants';
+import { formatError } from '../../errors';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { handleImport } from './actions';
 import { registerImportEvaluator } from './import-evaluator';
@@ -144,7 +145,7 @@ export const registerImport = (program: Command) => {
           console.log(`Log: ${result.logPath}`);
         }
       } else {
-        console.error(`\n${red}[error]${reset} Import failed: ${result.error.message}`);
+        console.error(`\n${red}[error]${reset} Import failed: ${formatError(result.error)}`);
         if (result.logPath) {
           console.error(`Log: ${result.logPath}`);
         }

@@ -2,6 +2,7 @@ import type { AgentEnvSpec } from '../../../schema';
 import type { AgentRuntimeDetail, AgentRuntimeSummary } from '../../aws/agentcore-control';
 import { getAgentRuntimeDetail, listAllAgentRuntimes } from '../../aws/agentcore-control';
 import { ANSI } from '../../constants';
+import { formatError } from '../../errors';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { copyAgentSource, failResult, parseAndValidateArn } from './import-utils';
 import { executeResourceImport } from './resource-import';
@@ -227,7 +228,7 @@ export function registerImportRuntime(importCmd: Command): void {
         console.log(`  agentcore invoke     ${ANSI.dim}Test your agent${ANSI.reset}`);
         console.log('');
       } else {
-        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${result.error.message}`);
+        console.error(`\n${ANSI.red}[error]${ANSI.reset} ${formatError(result.error)}`);
         if (result.logPath) {
           console.error(`Log: ${result.logPath}`);
         }
