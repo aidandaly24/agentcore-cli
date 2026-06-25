@@ -931,6 +931,8 @@ export interface A2AInvokeOptions {
   logger?: SSELogger;
   /** Custom headers to forward to the agent runtime */
   headers?: Record<string, string>;
+  /** Bearer token for CUSTOM_JWT auth. When provided, uses raw HTTP with Authorization header instead of SigV4. */
+  bearerToken?: string;
 }
 
 let a2aRequestId = 1;
@@ -940,8 +942,6 @@ let a2aRequestId = 1;
  * Streams text parts from the response artifacts.
  */
 export async function invokeA2ARuntime(options: A2AInvokeOptions, message: string): Promise<StreamingInvokeResult> {
-  const client = createAgentCoreClient(options.region, options.headers);
-
   const body = {
     jsonrpc: '2.0',
     id: a2aRequestId++,
@@ -956,6 +956,27 @@ export async function invokeA2ARuntime(options: A2AInvokeOptions, message: strin
   };
 
   options.logger?.logSSEEvent(`A2A request: ${JSON.stringify(body)}`);
+
+  if (options.bearerToken) {
+    const url = buildInvokeUrl(options.region, options.runtimeArn);
+    const headers = buildBearerInvokeHeaders(options, 'application/json, text/event-stream');
+
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`Invoke failed (${res.status}): ${errBody || res.statusText}`);
+    }
+
+    const text = await res.text();
+    options.logger?.logSSEEvent(`A2A response: ${text}`);
+
+    return {
+      stream: singleValueStream(parseA2AResponse(text)),
+      sessionId: res.headers.get('X-Amzn-Bedrock-AgentCore-Runtime-Session-Id') ?? undefined,
+    };
+  }
+
+  const client = createAgentCoreClient(options.region, options.headers);
 
   const command = new InvokeAgentRuntimeCommand({
     agentRuntimeArn: options.runtimeArn,

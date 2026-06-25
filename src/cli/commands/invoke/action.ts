@@ -593,6 +593,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
           userId: options.userId,
           sessionId: options.sessionId,
           headers: options.headers,
+          bearerToken: options.bearerToken,
         },
         options.prompt
       );

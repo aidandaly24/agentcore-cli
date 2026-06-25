@@ -783,6 +783,7 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
                 sessionId: sessionId ?? undefined,
                 logger,
                 headers,
+                bearerToken: bearerToken || undefined,
               },
               prompt
             )

@@ -460,6 +460,7 @@ async function handleDeployedInvocation(
         prompt,
         sessionId,
         userId,
+        bearerToken: resolved.bearerToken,
       });
     } else if (protocol === 'AGUI') {
       await handleDeployedAguiInvocation(ctx, res, origin, {
@@ -555,6 +556,7 @@ async function handleDeployedA2AInvocation(
       runtimeArn: params.runtimeArn,
       userId: params.userId,
       sessionId: params.sessionId,
+      bearerToken: params.bearerToken,
     },
     params.prompt
   );
