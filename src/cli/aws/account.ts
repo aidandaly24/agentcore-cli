@@ -1,4 +1,5 @@
-import { AwsCredentialsError } from '../../lib/errors/types.js';
+import { AwsCredentialsError, ValidationError } from '../../lib/errors/types.js';
+import type { AwsDeploymentTarget } from '../../schema';
 import { getAwsLoginGuidance } from '../external-requirements/checks';
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import { fromEnv, fromNodeProviderChain } from '@aws-sdk/credential-providers';
@@ -73,6 +74,22 @@ export async function validateAwsCredentials(): Promise<void> {
         'To fix this:\n' +
         `  1. ${guidance}\n` +
         '  2. Or set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables'
+    );
+  }
+}
+
+/**
+ * Fail fast when the active AWS credentials belong to a different account than the deployment
+ * target. Mirrors the `import` guard (import-utils.ts) so a `deploy` against the wrong account is
+ * caught in preflight instead of surfacing as an opaque CDK assume-role/bootstrap error after
+ * build/synth/publish. Skipped when no account can be detected — the existing no-credentials path
+ * handles that.
+ */
+export async function assertCallerAccountMatchesTarget(target: AwsDeploymentTarget): Promise<void> {
+  const callerAccount = await detectAccount();
+  if (callerAccount && target.account && callerAccount !== target.account) {
+    throw new ValidationError(
+      `Your AWS credentials are for account ${callerAccount}, but the target "${target.name}" is configured for account ${target.account}.\nEnsure your credentials match the deployment target.`
     );
   }
 }

@@ -1,3 +1,4 @@
+import { ValidationError } from '../../../../lib/errors/types.js';
 import { formatError, validateProject } from '../preflight.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,8 +15,9 @@ const { mockValidate } = vi.hoisted(() => ({
   mockValidate: vi.fn(),
 }));
 
-const { mockValidateAwsCredentials } = vi.hoisted(() => ({
+const { mockValidateAwsCredentials, mockDetectAccount } = vi.hoisted(() => ({
   mockValidateAwsCredentials: vi.fn(),
+  mockDetectAccount: vi.fn(),
 }));
 
 const { mockRequireConfigRoot } = vi.hoisted(() => ({
@@ -52,9 +54,23 @@ vi.mock('../../../cdk/local-cdk-project.js', () => ({
   },
 }));
 
-vi.mock('../../../aws/account.js', () => ({
-  validateAwsCredentials: mockValidateAwsCredentials,
-}));
+vi.mock('../../../aws/account.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../aws/account.js')>();
+  return {
+    ...actual,
+    validateAwsCredentials: mockValidateAwsCredentials,
+    detectAccount: mockDetectAccount,
+    // Re-derive the helper from the mocked detectAccount so the test controls the caller account.
+    assertCallerAccountMatchesTarget: async (target: { name: string; account?: string }) => {
+      const callerAccount = await mockDetectAccount();
+      if (callerAccount && target.account && callerAccount !== target.account) {
+        throw new ValidationError(
+          `Your AWS credentials are for account ${callerAccount}, but the target "${target.name}" is configured for account ${target.account}.\nEnsure your credentials match the deployment target.`
+        );
+      }
+    },
+  };
+});
 
 describe('validateProject', () => {
   afterEach(() => vi.clearAllMocks());
@@ -176,6 +192,43 @@ describe('validateProject', () => {
 
     expect(result.projectSpec.name).toBe('test-project');
     expect(result.isTeardownDeploy).toBe(false);
+  });
+
+  it('fails fast when caller account differs from the selected target account', async () => {
+    mockRequireConfigRoot.mockReturnValue('/project/agentcore');
+    mockValidate.mockReturnValue(undefined);
+    mockReadProjectSpec.mockResolvedValue({ name: 'test-project', runtimes: [{ name: 'agent' }] });
+    mockReadAWSDeploymentTargets.mockResolvedValue([]);
+    mockValidateAwsCredentials.mockResolvedValue(undefined);
+    mockDetectAccount.mockResolvedValue('111111111111');
+
+    await expect(
+      validateProject({ name: 'prod', account: '222222222222', region: 'us-east-1' } as never)
+    ).rejects.toThrow(/account 111111111111.*target "prod".*account 222222222222/s);
+  });
+
+  it('does not throw when caller account matches the selected target account', async () => {
+    mockRequireConfigRoot.mockReturnValue('/project/agentcore');
+    mockValidate.mockReturnValue(undefined);
+    mockReadProjectSpec.mockResolvedValue({ name: 'test-project', runtimes: [{ name: 'agent' }] });
+    mockReadAWSDeploymentTargets.mockResolvedValue([]);
+    mockValidateAwsCredentials.mockResolvedValue(undefined);
+    mockDetectAccount.mockResolvedValue('222222222222');
+
+    const result = await validateProject({ name: 'prod', account: '222222222222', region: 'us-east-1' } as never);
+    expect(result.projectSpec.name).toBe('test-project');
+  });
+
+  it('skips the account comparison when detectAccount returns null', async () => {
+    mockRequireConfigRoot.mockReturnValue('/project/agentcore');
+    mockValidate.mockReturnValue(undefined);
+    mockReadProjectSpec.mockResolvedValue({ name: 'test-project', runtimes: [{ name: 'agent' }] });
+    mockReadAWSDeploymentTargets.mockResolvedValue([]);
+    mockValidateAwsCredentials.mockResolvedValue(undefined);
+    mockDetectAccount.mockResolvedValue(null);
+
+    const result = await validateProject({ name: 'prod', account: '222222222222', region: 'us-east-1' } as never);
+    expect(result.projectSpec.name).toBe('test-project');
   });
 
   it('accepts gateway target name within 48 chars when prefixed with project name', async () => {

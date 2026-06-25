@@ -2,7 +2,7 @@ import { ConfigIO, ResourceNotFoundError, SecureCredentials, ValidationError, to
 import type { Result } from '../../../lib/result';
 import type { AgentCoreMcpSpec, DeployedState } from '../../../schema';
 import { applyTargetRegionToEnv } from '../../aws';
-import { validateAwsCredentials } from '../../aws/account';
+import { assertCallerAccountMatchesTarget, validateAwsCredentials } from '../../aws/account';
 import { CdkToolkitWrapper, createSwitchableIoHost } from '../../cdk/toolkit-lib';
 import type { DeployMessage, SwitchableIoHost } from '../../cdk/toolkit-lib';
 import {
@@ -212,7 +212,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
 
     // Preflight: validate project
     startStep('Validate project');
-    const context = await validateProject();
+    const context = await validateProject(target);
     endStep('success');
 
     // Warn about imperative-build orphan harnesses (preview→GA transition). These aren't
@@ -252,6 +252,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     if (context.isTeardownDeploy) {
       startStep('Validate AWS credentials');
       await validateAwsCredentials();
+      await assertCallerAccountMatchesTarget(target);
       endStep('success');
     }
 

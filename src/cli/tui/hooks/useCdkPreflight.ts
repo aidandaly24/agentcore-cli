@@ -2,7 +2,7 @@ import { ConfigIO, SecureCredentials, toError } from '../../../lib';
 import { AwsCredentialsError, UserCancellationError } from '../../../lib/errors/types';
 import type { DeployedState } from '../../../schema';
 import { applyTargetRegionToEnv } from '../../aws';
-import { validateAwsCredentials } from '../../aws/account';
+import { assertCallerAccountMatchesTarget, validateAwsCredentials } from '../../aws/account';
 import { type CdkToolkitWrapper, type SwitchableIoHost, createSwitchableIoHost } from '../../cdk/toolkit-lib';
 import { getErrorMessage, isExpiredTokenError, isNoCredentialsError } from '../../errors';
 import type { ExecLogger } from '../../logging';
@@ -442,6 +442,10 @@ export function useCdkPreflight(options: PreflightOptions): PreflightResult {
         if (preflightContext.isTeardownDeploy) {
           try {
             await validateAwsCredentials();
+            const teardownTarget = preflightContext.awsTargets[0];
+            if (teardownTarget) {
+              await assertCallerAccountMatchesTarget(teardownTarget);
+            }
           } catch (err) {
             const errorMsg = formatError(err);
             logger.endStep('error', errorMsg);
