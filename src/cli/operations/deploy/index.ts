@@ -63,7 +63,7 @@ export {
   type OnlineEvalEnableResult,
 } from './post-deploy-online-evals';
 
-export { ensureDefaultDeploymentTarget } from './ensure-target';
+export { ensureDefaultDeploymentTarget, NO_DEPLOYMENT_TARGET_GUIDANCE } from './ensure-target';
 
 // Managed-memory heads-up (shared by the CLI command + TUI deploy flow + add harness)
 export {

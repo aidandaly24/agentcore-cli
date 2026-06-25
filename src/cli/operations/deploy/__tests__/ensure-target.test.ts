@@ -1,5 +1,5 @@
 import { type ConfigIO, ConfigNotFoundError } from '../../../../lib';
-import { ensureDefaultDeploymentTarget } from '../ensure-target.js';
+import { NO_DEPLOYMENT_TARGET_GUIDANCE, ensureDefaultDeploymentTarget } from '../ensure-target.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockDetectAwsContext } = vi.hoisted(() => ({
@@ -87,5 +87,13 @@ describe('ensureDefaultDeploymentTarget', () => {
     await ensureDefaultDeploymentTarget(configIO);
 
     expect(writes[0]).toEqual([{ name: 'default', account: '123456789012', region: 'eu-west-1' }]);
+  });
+});
+
+describe('NO_DEPLOYMENT_TARGET_GUIDANCE', () => {
+  it('replaces the cryptic "target not found" string with both documented remediations', () => {
+    expect(NO_DEPLOYMENT_TARGET_GUIDANCE).not.toContain('not found in aws-targets.json');
+    expect(NO_DEPLOYMENT_TARGET_GUIDANCE).toContain('agentcore deploy');
+    expect(NO_DEPLOYMENT_TARGET_GUIDANCE).toContain('aws-targets.json');
   });
 });
