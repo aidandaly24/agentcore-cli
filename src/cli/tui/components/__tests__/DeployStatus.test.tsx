@@ -95,6 +95,21 @@ describe('DeployStatus', () => {
       expect(lastFrame()).not.toContain('Some general info');
     });
 
+    it('renders ROLLBACK statuses instead of dropping the events', () => {
+      const messages = [
+        makeResourceMsg('CloudFormation::Stack', 'ROLLBACK_IN_PROGRESS'),
+        makeResourceMsg('BedrockAgentCore::Gateway', 'UPDATE_ROLLBACK_IN_PROGRESS'),
+        makeResourceMsg('CloudFormation::Stack', 'ROLLBACK_FAILED'),
+      ];
+
+      const { lastFrame } = render(<DeployStatus messages={messages} isComplete={false} hasError={false} />);
+      const frame = lastFrame()!;
+
+      expect(frame).toContain('ROLLBACK_IN_PROGRESS');
+      expect(frame).toContain('UPDATE_ROLLBACK_IN_PROGRESS');
+      expect(frame).toContain('ROLLBACK_FAILED');
+    });
+
     it('shows only last 8 resource events', () => {
       const messages = Array.from({ length: 12 }, (_, i) =>
         makeResourceMsg(`Service::Resource${i}`, 'CREATE_COMPLETE')
