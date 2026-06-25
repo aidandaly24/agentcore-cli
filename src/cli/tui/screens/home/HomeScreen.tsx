@@ -1,6 +1,7 @@
 import { findConfigRoot } from '../../../../lib';
 import { Cursor, ScreenLayout } from '../../components';
 import { HINTS } from '../../copy';
+import { symbols } from '../../utils';
 import { Box, Text, useApp, useInput } from 'ink';
 import React from 'react';
 
@@ -28,7 +29,7 @@ function QuickStart() {
       <NoProjectMessage />
       <Box marginTop={1}>
         <Text>
-          <Text color="cyan">⚑ </Text>
+          <Text color="cyan">{symbols.flag} </Text>
           <Text dimColor>Press Enter to create a new project</Text>
         </Text>
       </Box>

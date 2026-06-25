@@ -1,3 +1,4 @@
+import { symbols } from '../utils';
 import { Box, Text } from 'ink';
 
 export interface SelectableItem {
@@ -45,7 +46,12 @@ export function SelectList<T extends SelectableItem>(props: {
 
   return (
     <Box flexDirection="column">
-      {needsScroll && viewportStart > 0 && <Text dimColor> ↑ {viewportStart} more</Text>}
+      {needsScroll && viewportStart > 0 && (
+        <Text dimColor>
+          {' '}
+          {symbols.arrowUp} {viewportStart} more
+        </Text>
+      )}
       {visibleItems.map((item, idx) => {
         const actualIndex = viewportStart + idx;
         const selected = actualIndex === selectedIndex;
@@ -54,7 +60,7 @@ export function SelectList<T extends SelectableItem>(props: {
           <Box key={item.id} marginTop={item.spaceBefore ? 1 : 0}>
             <Text wrap="wrap">
               <Text color={selected && !disabled ? 'cyan' : undefined} dimColor={disabled}>
-                {selected ? '❯' : ' '}{' '}
+                {selected ? symbols.cursor : ' '}{' '}
               </Text>
               <Text color={selected && !disabled ? 'cyan' : undefined} dimColor={disabled}>
                 {item.title}
@@ -64,7 +70,12 @@ export function SelectList<T extends SelectableItem>(props: {
           </Box>
         );
       })}
-      {needsScroll && viewportEnd < items.length && <Text dimColor> ↓ {items.length - viewportEnd} more</Text>}
+      {needsScroll && viewportEnd < items.length && (
+        <Text dimColor>
+          {' '}
+          {symbols.arrowDown} {items.length - viewportEnd} more
+        </Text>
+      )}
     </Box>
   );
 }

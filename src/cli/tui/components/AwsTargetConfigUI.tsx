@@ -3,6 +3,7 @@ import type { AgentCoreRegion as _AgentCoreRegion } from '../../../schema';
 import { useListNavigation } from '../hooks';
 import type { AwsConfigPhase, AwsTargetConfigState } from '../hooks/useAwsTargetConfig';
 import { INTERACTIVE_COLORS } from '../theme';
+import { symbols } from '../utils';
 import { Cursor } from './Cursor';
 import { SelectList } from './SelectList';
 import { TextInput } from './TextInput';
@@ -153,10 +154,10 @@ export function AwsTargetConfigUI({ config, onExit, isActive }: AwsTargetConfigU
         <Box marginTop={1} flexDirection="column">
           <Box>
             <Text color={focusedRow === 0 ? INTERACTIVE_COLORS.selection : undefined}>
-              {focusedRow === 0 ? '❯ ' : '  '}
+              {focusedRow === 0 ? `${symbols.cursor} ` : '  '}
             </Text>
             <Text bold color={focusedRow === 0 ? INTERACTIVE_COLORS.selection : 'cyan'}>
-              ▶ All Targets
+              {symbols.pointer} All Targets
             </Text>
             <Text dimColor> — Deploy to all {config.availableTargets.length} targets</Text>
           </Box>
@@ -172,8 +173,10 @@ export function AwsTargetConfigUI({ config, onExit, isActive }: AwsTargetConfigU
             const isFocused = focusedRow === i + 1;
             return (
               <Box key={i}>
-                <Text color={isFocused ? INTERACTIVE_COLORS.selection : undefined}>{isFocused ? '❯ ' : '  '}</Text>
-                <Text color={isChecked ? 'green' : 'gray'}>{isChecked ? '[✓]' : '[ ]'}</Text>
+                <Text color={isFocused ? INTERACTIVE_COLORS.selection : undefined}>
+                  {isFocused ? `${symbols.cursor} ` : '  '}
+                </Text>
+                <Text color={isChecked ? 'green' : 'gray'}>{isChecked ? symbols.checkboxOn : symbols.checkboxOff}</Text>
                 <Text color={isFocused ? INTERACTIVE_COLORS.selection : undefined}> {target.name}</Text>
                 <Text dimColor>
                   {' '}
@@ -222,7 +225,7 @@ export function AwsTargetConfigUI({ config, onExit, isActive }: AwsTargetConfigU
           ) : (
             filteredRegions.map((region, i) => (
               <Text key={region} color={i === regionIndex ? INTERACTIVE_COLORS.selection : undefined}>
-                {i === regionIndex ? '❯' : ' '} {region}
+                {i === regionIndex ? symbols.cursor : ' '} {region}
               </Text>
             ))
           )}

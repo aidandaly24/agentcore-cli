@@ -1,3 +1,4 @@
+import { symbols } from '../utils';
 import type { SelectableItem } from './SelectList';
 import { Box, Text } from 'ink';
 
@@ -39,16 +40,21 @@ export function MultiSelectList<T extends SelectableItem>(props: MultiSelectList
 
   return (
     <Box flexDirection="column">
-      {needsScroll && viewportStart > 0 && <Text dimColor> ↑ {viewportStart} more</Text>}
+      {needsScroll && viewportStart > 0 && (
+        <Text dimColor>
+          {' '}
+          {symbols.arrowUp} {viewportStart} more
+        </Text>
+      )}
       {visibleItems.map((item, idx) => {
         const actualIndex = viewportStart + idx;
         const isCursor = actualIndex === selectedIndex;
         const isChecked = selectedIds.has(item.id);
-        const checkbox = isChecked ? '[✓]' : '[ ]';
+        const checkbox = isChecked ? symbols.checkboxOn : symbols.checkboxOff;
         return (
           <Box key={item.id}>
             <Text wrap="truncate">
-              <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? '❯' : ' '} </Text>
+              <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? symbols.cursor : ' '} </Text>
               <Text color={isChecked ? 'green' : undefined}>{checkbox} </Text>
               <Text color={isCursor ? 'cyan' : undefined}>{item.title}</Text>
               {item.description && <Text dimColor> - {item.description}</Text>}
@@ -56,7 +62,12 @@ export function MultiSelectList<T extends SelectableItem>(props: MultiSelectList
           </Box>
         );
       })}
-      {needsScroll && viewportEnd < items.length && <Text dimColor> ↓ {items.length - viewportEnd} more</Text>}
+      {needsScroll && viewportEnd < items.length && (
+        <Text dimColor>
+          {' '}
+          {symbols.arrowDown} {items.length - viewportEnd} more
+        </Text>
+      )}
     </Box>
   );
 }
