@@ -110,6 +110,12 @@ export async function renderTUI(options: RenderTUIOptions = {}) {
   }
 
   await printPostCommandNotices(isFirstRun, updateCheck);
+
+  // Force a clean exit for terminal TUI flows. Ink's synchronous raw-mode teardown does not
+  // cancel the pending libuv stdin read on Windows, so the event loop stays alive until a
+  // keypress flushes it (the process hangs until the user presses Enter). The dev/exec/exec-shell
+  // re-entry branches above return before reaching here, so they are intentionally not exited.
+  process.exit(0);
 }
 
 /**
