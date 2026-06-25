@@ -11,6 +11,39 @@ import { performance } from 'perf_hooks';
 
 export type { AttributeRecorder } from './attribute-recorder.js';
 
+let postCommandFinalize: (() => Promise<void>) | undefined;
+
+/**
+ * Register work that must run after a command completes but before the process
+ * terminates (post-command notices, exit-message rendering). main() owns this
+ * because it holds the update-check promise; finalizeAndExit invokes it so that
+ * commands which call process.exit() inside their action still flush telemetry,
+ * print the audit-mode line, and show notices before exiting.
+ */
+export function registerPostCommandFinalize(fn: () => Promise<void>): void {
+  postCommandFinalize = fn;
+}
+
+/**
+ * Shut down telemetry (flushing the audit sink and printing the audit-mode
+ * line), run any registered post-command notices, then terminate the process.
+ * Centralizes the exit path so process.exit() in a command action never bypasses
+ * the finalize steps that main()'s finally block would otherwise run.
+ */
+export async function finalizeAndExit(code: number): Promise<never> {
+  try {
+    await TelemetryClientAccessor.shutdown();
+  } catch {
+    // Telemetry must never affect CLI behavior
+  }
+  try {
+    await postCommandFinalize?.();
+  } catch {
+    // Notices are best-effort — never block exit
+  }
+  return process.exit(code);
+}
+
 async function getTelemetryClient() {
   try {
     return await TelemetryClientAccessor.get();
@@ -151,16 +184,16 @@ export async function runCliCommand<C extends Command>(
     const client = await getTelemetryClient();
     if (!client) {
       await fn();
-      process.exit(0);
+      return finalizeAndExit(0);
     }
     await trackCommandRun(client, command, fn, knownAttrs);
-    process.exit(0);
+    return finalizeAndExit(0);
   } catch (error) {
     if (json) {
       console.log(JSON.stringify({ success: false, error: getErrorMessage(error) }));
     } else {
       console.error(getErrorMessage(error));
     }
-    process.exit(1);
+    return finalizeAndExit(1);
   }
 }

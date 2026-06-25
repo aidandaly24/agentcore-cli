@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/require-await */
 import { AccessDeniedError, DependencyCheckError } from '../../../lib/errors/types';
-import { withCommandRunTelemetry } from '../cli-command-run';
+import { finalizeAndExit, registerPostCommandFinalize, withCommandRunTelemetry } from '../cli-command-run';
 import { TelemetryClient } from '../client';
 import { TelemetryClientAccessor } from '../client-accessor';
+import { FileSystemSink } from '../sinks/filesystem-sink';
 import { InMemorySink } from '../sinks/in-memory-sink';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let sink: InMemorySink;
@@ -298,5 +301,38 @@ describe('withCommandRunTelemetry', () => {
         agent_protocol: 'a2a',
       });
     });
+  });
+});
+
+describe('finalizeAndExit', () => {
+  afterEach(() => {
+    registerPostCommandFinalize(async () => undefined);
+    vi.restoreAllMocks();
+  });
+
+  it('flushes the audit sink and runs post-command notices before process.exit', async () => {
+    // process.exit is mocked to throw so the test runner survives the exit-path call.
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('exit');
+    }) as never);
+
+    const logged: string[] = [];
+    const auditSink = new FileSystemSink({
+      filePath: join(tmpdir(), 'finalize-audit-test.jsonl'),
+      log: msg => logged.push(msg),
+    });
+    auditSink.record('cli.command_run', 1, { command: 'config', exit_reason: 'success' });
+    // shutdown() is the only path that emits the audit-mode line; route the accessor through it.
+    vi.spyOn(TelemetryClientAccessor, 'shutdown').mockImplementation(() => new TelemetryClient(auditSink).shutdown());
+
+    const notices = vi.fn().mockResolvedValue(undefined);
+    registerPostCommandFinalize(notices);
+
+    await expect(finalizeAndExit(0)).rejects.toThrow('exit');
+
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toContain('[audit mode]');
+    expect(notices).toHaveBeenCalledOnce();
+    expect(exit).toHaveBeenCalledWith(0);
   });
 });

@@ -90,6 +90,7 @@ export const OutboundAuthType = z.enum(['oauth', 'api-key', 'none']);
 export const PolicyEngineMode = z.enum(['log_only', 'enforce']);
 export const AgentProtocol = z.enum(['http', 'mcp', 'a2a', 'agui']);
 export const RefType = z.enum(['arn', 'name']);
+export const ConfigAction = z.enum(['get', 'list', 'set']);
 export const ResourceType = z.enum(['gateway', 'agent', 'harness']);
 export const JobType = z.enum(['recommendation', 'batch-evaluation', 'ab-test', 'insights']);
 export const RecommendationKind = z.enum(['system-prompt', 'tool-description']);
@@ -204,6 +205,7 @@ export const ATTRIBUTES = {
   policy_engine_mode: PolicyEngineMode,
   agent_protocol: AgentProtocol,
   ref_type: RefType,
+  config_action: ConfigAction,
   resource_type: ResourceType,
   job_type: JobType,
   recommendation_kind: RecommendationKind,
