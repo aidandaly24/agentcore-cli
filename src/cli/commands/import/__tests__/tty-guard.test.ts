@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // and spying on process.exit / console.error. Only the I/O boundaries are mocked:
 // the Ink renderer and the ImportFlow screen. requireProject is stubbed to a no-op
 // so the TTY guard (which runs after it) is what we exercise here.
-const mockRender = vi.fn(() => ({ clear: vi.fn(), unmount: vi.fn() }));
+const mockRender = vi.fn((..._args: unknown[]) => ({ clear: vi.fn(), unmount: vi.fn() }));
 
 vi.mock('../../../tui/guards', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../tui/guards')>();

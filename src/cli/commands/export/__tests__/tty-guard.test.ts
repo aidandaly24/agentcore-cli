@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // console.error. Only the I/O boundaries renderTUI touches are mocked: the
 // Ink renderer, telemetry, and post-command notices. The guard runs first in
 // renderTUI, so a non-TTY context exits before any of these are reached.
-const mockRender = vi.fn(() => ({ waitUntilExit: () => Promise.resolve() }));
+const mockRender = vi.fn((..._args: unknown[]) => ({ waitUntilExit: () => Promise.resolve() }));
 
 vi.mock('ink', () => ({
   render: (...args: unknown[]) => mockRender(...args),
@@ -28,9 +28,9 @@ describe('export harness TTY guard', () => {
   let program: Command;
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
+  let writeSpy: ReturnType<typeof vi.spyOn>;
   const origStdinIsTTY = process.stdin.isTTY;
   const origStdoutIsTTY = process.stdout.isTTY;
-  const origWrite = process.stdout.write;
 
   beforeEach(() => {
     program = new Command();
@@ -38,7 +38,7 @@ describe('export harness TTY guard', () => {
     registerExport(program);
 
     // Swallow the alt-screen escape sequences renderTUI writes on the TTY path.
-    process.stdout.write = vi.fn().mockReturnValue(true) as unknown as typeof process.stdout.write;
+    writeSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
       throw new Error(`process.exit(${code})`);
     });
@@ -48,7 +48,7 @@ describe('export harness TTY guard', () => {
   afterEach(() => {
     process.stdin.isTTY = origStdinIsTTY;
     process.stdout.isTTY = origStdoutIsTTY;
-    process.stdout.write = origWrite;
+    writeSpy.mockRestore();
     exitSpy.mockRestore();
     errorSpy.mockRestore();
     vi.clearAllMocks();
