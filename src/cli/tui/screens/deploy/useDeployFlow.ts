@@ -1,5 +1,7 @@
 import { ConfigIO } from '../../../../lib';
+import type { AwsDeploymentTarget } from '../../../../schema';
 import type { CdkToolkitWrapper, DeployMessage, SwitchableIoHost } from '../../../cdk/toolkit-lib';
+import { toStackName } from '../../../commands/import/import-utils';
 import {
   buildDeployedState,
   getStackOutputs,
@@ -43,6 +45,7 @@ import {
   parseStackDiff,
 } from '../../components';
 import { type MissingCredential, type PreflightContext, useCdkPreflight } from '../../hooks';
+import { StackSelectionStrategy } from '@aws-cdk/toolkit-lib';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type DeployPhase =
@@ -75,6 +78,13 @@ interface DeployFlowOptions {
   isInteractive?: boolean;
   /** Run CDK diff instead of deploy */
   diffMode?: boolean;
+  /**
+   * Targets the user chose in the multi-select picker. The vended CDK app synthesizes one stack
+   * per configured target, so without scoping the deploy runs against ALL_STACKS (every target).
+   * When set, the deploy is restricted to these targets' stacks. Empty/undefined falls back to the
+   * full assembly (single-target projects, and the pre-synthesized plan path).
+   */
+  selectedTargets?: AwsDeploymentTarget[];
 }
 
 interface DeployFlowState {
@@ -130,7 +140,7 @@ interface DeployFlowState {
 }
 
 export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState {
-  const { preSynthesized, isInteractive = false, diffMode = false } = options;
+  const { preSynthesized, isInteractive = false, diffMode = false, selectedTargets } = options;
   const skipPreflight = !!preSynthesized;
 
   // Create logger once for the entire deploy flow
@@ -146,6 +156,21 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
   const switchableIoHost = preSynthesized?.switchableIoHost ?? preflight.switchableIoHost;
   const identityKmsKeyArn = preSynthesized?.identityKmsKeyArn ?? preflight.identityKmsKeyArn;
   const allCredentials = preSynthesized?.allCredentials ?? preflight.allCredentials;
+
+  // Scope the deploy to the picker's selected targets. The vended CDK app synthesizes one stack
+  // per target, so an unscoped deploy resolves to ALL_STACKS and provisions every configured
+  // account/region — even the ones the user did not pick (see issue #1267). Mirrors CLI mode
+  // (commands/deploy/actions.ts), which patterns deploy() by toStackName(project, target).
+  // Skipped on the pre-synthesized plan path, which already targets a single stack.
+  const deployStacks = useMemo(() => {
+    if (skipPreflight) return undefined;
+    const projectName = context?.projectSpec.name;
+    if (!projectName || !selectedTargets || selectedTargets.length === 0) return undefined;
+    return {
+      strategy: StackSelectionStrategy.PATTERN_MUST_MATCH,
+      patterns: selectedTargets.map(t => toStackName(projectName, t.name)),
+    };
+  }, [skipPreflight, context?.projectSpec.name, selectedTargets]);
 
   const [preDeployDiffStep, setPreDeployDiffStep] = useState<Step>({
     label: 'Computing diff changes...',
@@ -779,8 +804,10 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
 
       try {
         // Run deploy - toolkit-lib handles CloudFormation orchestration
-        // Output goes to stdout via the switchable ioHost
-        await cdkToolkitWrapper.deploy();
+        // Output goes to stdout via the switchable ioHost.
+        // deployStacks restricts the deploy to the picker's selected targets; undefined (single
+        // target or plan path) lets the assembly's lone stack deploy as before.
+        await cdkToolkitWrapper.deploy({ stacks: deployStacks });
 
         // CDK deploy itself is done. Mark "Deploy to AWS" success and let post-deploy
         // phases (persist, hydrate KBs, auto-ingest, dataset sync, online evals,
@@ -934,6 +961,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     context?.awsTargets,
     context?.projectSpec.runtimes,
     diffMode,
+    deployStacks,
   ]);
 
   // Start diff when preflight completes (diff mode only)
