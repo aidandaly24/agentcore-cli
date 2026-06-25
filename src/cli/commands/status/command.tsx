@@ -96,6 +96,7 @@ export const registerStatus = (program: Command) => {
           error: new ValidationError(msg),
         }));
         render(<Text color="red">{msg}</Text>);
+        process.exitCode = 1;
         return;
       }
 
@@ -107,6 +108,7 @@ export const registerStatus = (program: Command) => {
           error: new ValidationError(msg),
         }));
         render(<Text color="red">{msg}</Text>);
+        process.exitCode = 1;
         return;
       }
 
