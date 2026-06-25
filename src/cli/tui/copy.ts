@@ -135,16 +135,8 @@ export const CLI_ONLY_EXAMPLES: Record<string, { description: string; examples: 
       'agentcore run insights -r MyAgent -i FailureAnalysis --wait',
     ],
   },
-  feedback: {
-    description: 'Send feedback about the AgentCore CLI to the team.',
-    examples: ['agentcore feedback', 'agentcore feedback --screenshot'],
-  },
   config: {
     description: 'Adjust global configuration settings such as telemetry opt-out status.',
     examples: ['agentcore config'],
-  },
-  insights: {
-    description: '[preview] View insights analysis jobs and results.',
-    examples: ['agentcore insights history', 'agentcore insights results --id <id>'],
   },
 };

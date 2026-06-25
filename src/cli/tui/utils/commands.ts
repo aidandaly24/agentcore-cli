@@ -1,3 +1,4 @@
+import { CLI_ONLY_EXAMPLES } from '../copy';
 import type { Command } from '@commander-js/extra-typings';
 
 export interface CommandMeta {
@@ -15,9 +16,13 @@ export interface CommandMeta {
 const HIDDEN_FROM_TUI = ['help', 'telemetry', 'promote'] as const;
 
 /**
- * Commands that are CLI-only (shown but marked as requiring CLI invocation).
+ * Single source of truth for "this top-level command cannot run interactively in
+ * the TUI". Derived from CLI_ONLY_EXAMPLES so the `cliOnly` flag (list placement)
+ * can never diverge from App.tsx's dead-end routing: a command is flagged cliOnly
+ * iff selecting it routes to the CliOnlyScreen. Multi-word keys in CLI_ONLY_EXAMPLES
+ * (e.g. 'run eval') are subcommand paths, not top-level commands, so they never match.
  */
-const CLI_ONLY_COMMANDS = ['traces', 'pause', 'resume', 'stop', 'archive'] as const;
+const CLI_ONLY_COMMANDS = new Set(Object.keys(CLI_ONLY_EXAMPLES));
 
 /**
  * Commands hidden from TUI when inside an existing project.
@@ -53,6 +58,6 @@ export function getCommandsForUI(program: Command, options: GetCommandsOptions =
         .filter(sub => !HIDDEN_SUBCOMMANDS.includes(sub.name() as (typeof HIDDEN_SUBCOMMANDS)[number]))
         .map(sub => sub.name()),
       disabled: false,
-      cliOnly: CLI_ONLY_COMMANDS.includes(cmd.name() as (typeof CLI_ONLY_COMMANDS)[number]),
+      cliOnly: CLI_ONLY_COMMANDS.has(cmd.name()),
     }));
 }

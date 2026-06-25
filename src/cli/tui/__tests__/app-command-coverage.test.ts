@@ -33,6 +33,7 @@ const ROUTED_COMMANDS = new Set([
   'config-bundle',
   'dataset',
   'batch-evaluations',
+  'feedback',
 ]);
 
 describe('TUI home screen command coverage', () => {
@@ -51,5 +52,20 @@ describe('TUI home screen command coverage', () => {
     }
 
     expect(unhandled).toEqual([]);
+  });
+
+  it('the cliOnly flag and CLI_ONLY_EXAMPLES agree for every visible command', () => {
+    const program = createProgram();
+    const commands = getCommandsForUI(program, { inProject: true });
+
+    // A command can never be in the main interactive list while routing to the
+    // cli-only dead-end: cliOnly is true iff selecting it hits CliOnlyScreen.
+    for (const cmd of commands) {
+      const hasCliOnlyExamples = cmd.id in CLI_ONLY_EXAMPLES;
+      expect(cmd.cliOnly, `${cmd.id}: cliOnly flag must match CLI_ONLY_EXAMPLES membership`).toBe(hasCliOnlyExamples);
+    }
+
+    // feedback is interactive (real FeedbackScreen), not a cli-only dead-end.
+    expect('feedback' in CLI_ONLY_EXAMPLES).toBe(false);
   });
 });
