@@ -301,6 +301,7 @@ Projects use JSON schema files in the `agentcore/` directory:
 - [Memory](docs/memory.md) - Memory strategies and sharing
 - [Gateway](docs/gateway.md) - Gateway setup, targets, and authentication
 - [Knowledge Bases](docs/knowledge-bases.md) - Managed Bedrock Knowledge Bases wired to gateways
+- [Harness](docs/harness.md) - Declarative agents and exporting them to Strands Python agents
 - [Payments](docs/payments.md) - x402-protocol microtransactions for paid tools/APIs
 - [Config Bundles](docs/config-bundles.md) - Versioned runtime configurations
 - [Container Builds](docs/container-builds.md) - Container build types and Dockerfile setup
