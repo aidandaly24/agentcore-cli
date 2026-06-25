@@ -1,5 +1,28 @@
+import { isMacOS, isWindows } from '../../../lib/utils/platform';
 import { useInput } from 'ink';
+import { spawnSync } from 'node:child_process';
 import React, { useCallback, useState } from 'react';
+
+/**
+ * Synchronously read the OS clipboard so Ctrl+V works on consoles (e.g. classic Windows conhost)
+ * that pass the raw control byte to the app instead of injecting the clipboard text themselves.
+ * Mirrors the cross-platform clipboard-write in fetch-access's useFetchAccessFlow. Returns '' on
+ * any failure (missing tool, empty clipboard) so paste is a safe no-op.
+ */
+function readClipboard(): string {
+  const [cmd, args]: [string, string[]] = isWindows
+    ? ['powershell', ['-NoProfile', '-Command', 'Get-Clipboard']]
+    : isMacOS
+      ? ['pbpaste', []]
+      : ['xclip', ['-o', '-selection', 'clipboard']];
+  let result = spawnSync(cmd, args, { encoding: 'utf8' });
+  if (result.status !== 0 && !isWindows && !isMacOS) {
+    result = spawnSync('xsel', ['-b'], { encoding: 'utf8' });
+  }
+  if (result.status !== 0 || typeof result.stdout !== 'string') return '';
+  // Windows Get-Clipboard appends a trailing newline; trim it without touching interior content.
+  return isWindows ? result.stdout.replace(/\r?\n$/, '') : result.stdout;
+}
 
 /** Find the position of the previous word boundary */
 export function findPrevWordBoundary(text: string, cursor: number): number {
@@ -144,6 +167,21 @@ export function useTextInput({
       // Ctrl+K: delete to end
       if (key.ctrl && input === 'k') {
         setState(prev => ({ text: prev.text.slice(0, prev.cursor), cursor: prev.cursor }));
+        return;
+      }
+
+      // Ctrl+V: paste from OS clipboard (consoles that drop the raw control byte instead of
+      // injecting clipboard text themselves). Insert at cursor with the same control-char filtering
+      // as the regular-character branch below.
+      if (key.ctrl && input === 'v') {
+        // eslint-disable-next-line no-control-regex
+        const pasted = readClipboard().replace(/[\x7f\x08\r]/g, '');
+        if (pasted) {
+          setState(prev => ({
+            text: prev.text.slice(0, prev.cursor) + pasted + prev.text.slice(prev.cursor),
+            cursor: prev.cursor + pasted.length,
+          }));
+        }
         return;
       }
 
