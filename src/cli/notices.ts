@@ -1,5 +1,6 @@
 import { ANSI } from './constants';
 import { resolveTelemetryPreference } from './telemetry/config';
+import { printLegacyProjectMigrationNotice } from './telemetry/legacy-project-migration';
 import { type UpdateCheckResult, printUpdateNotification } from './update-notifier';
 
 export async function printTelemetryNotice(): Promise<void> {
@@ -28,6 +29,9 @@ export async function printPostCommandNotices(
   if (isFirstRun) {
     await printTelemetryNotice();
   }
+  // Flush the pre-v0.4.0 deprecation notice (if a legacy agentcore.json was migrated this run) only
+  // now that any TUI alt-screen buffer has been restored, so the notice is actually visible.
+  printLegacyProjectMigrationNotice();
   const result = await updateCheck;
   if (result?.updateAvailable) {
     printUpdateNotification(result);

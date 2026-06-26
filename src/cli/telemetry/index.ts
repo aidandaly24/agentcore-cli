@@ -7,5 +7,6 @@ export { OtelMetricSink, type OtelMetricSinkConfig } from './sinks/otel-metric-s
 export { FileSystemSink, type FileSystemSinkConfig } from './sinks/filesystem-sink.js';
 export {
   registerLegacyProjectMigrationReporter,
+  printLegacyProjectMigrationNotice,
   resetLegacyProjectMigrationNotice,
 } from './legacy-project-migration.js';
