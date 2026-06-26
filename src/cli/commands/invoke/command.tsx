@@ -10,7 +10,7 @@ import { parseHeaderFlags } from '../shared/header-utils';
 import { type InvokeContext, handleHarnessInvokeByArn, handleInvoke, loadInvokeConfig } from './action';
 import { resolvePrompt } from './resolve-prompt';
 import type { InvokeOptions, InvokeResult } from './types';
-import { computeInvokeAttrs } from './utils';
+import { computeEndpointSource, computeInvokeAttrs } from './utils';
 import { validateInvokeOptions } from './validate';
 import type { Command } from '@commander-js/extra-typings';
 import { Text, render } from 'ink';
@@ -361,6 +361,17 @@ Model & Runtime Overrides (harness only) [non-interactive]
           stdinPiped: !process.stdin.isTTY,
         });
 
+        // Resolve the named endpoint once, before the CLI-mode gate, so the
+        // AGENTCORE_RUNTIME_ENDPOINT env-var fallback is honored in BOTH flows:
+        // --endpoint flag → env var → DEFAULT. A non-DEFAULT resolution forces
+        // CLI mode (so `AGENTCORE_RUNTIME_ENDPOINT=staging agentcore invoke` does
+        // not silently drop into the TUI and hit DEFAULT) and is also threaded
+        // into the TUI route below for interactive parity. Leave it undefined for
+        // DEFAULT so the SigV4 qualifier is omitted rather than sent explicitly.
+        const resolvedEndpoint = resolveEndpointName(cliOptions.endpoint);
+        const endpoint = resolvedEndpoint === DEFAULT_ENDPOINT_NAME ? undefined : resolvedEndpoint;
+        const endpointSource = computeEndpointSource(cliOptions.endpoint);
+
         // CLI mode if any CLI-specific options provided, prompt resolved, or prompt resolution failed
         // (follows deploy command pattern)
         if (
@@ -372,6 +383,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
           cliOptions.stream ||
           cliOptions.runtime ||
           cliOptions.endpoint ||
+          endpoint !== undefined ||
           cliOptions.gateway ||
           cliOptions.tool ||
           cliOptions.exec ||
@@ -396,6 +408,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
               hasSessionId: !!cliOptions.sessionId,
               bearerToken: cliOptions.bearerToken,
               agentProtocol: agentProtocol ?? (cliOptions.tool ? 'mcp' : undefined),
+              endpointSource,
             }),
             async (): Promise<InvokeResult> => {
               if (!resolved.success) {
@@ -421,12 +434,6 @@ Model & Runtime Overrides (harness only) [non-interactive]
                   process.exit(1);
                 }
               }
-
-              // Resolve the named endpoint: --endpoint flag → AGENTCORE_RUNTIME_ENDPOINT
-              // env var → DEFAULT. Leave it undefined for DEFAULT so the SigV4 qualifier
-              // is omitted (preserving the DEFAULT endpoint) rather than sent explicitly.
-              const resolvedEndpoint = resolveEndpointName(cliOptions.endpoint);
-              const endpoint = resolvedEndpoint === DEFAULT_ENDPOINT_NAME ? undefined : resolvedEndpoint;
 
               const options: InvokeOptions = {
                 prompt: resolved.prompt,
@@ -506,6 +513,8 @@ Model & Runtime Overrides (harness only) [non-interactive]
               name: 'invoke',
               sessionId: cliOptions.sessionId,
               userId: cliOptions.userId,
+              endpoint,
+              endpointSource,
               headers,
               bearerToken: cliOptions.bearerToken,
               paymentInstrumentId: cliOptions.paymentInstrumentId,

@@ -1,5 +1,35 @@
-import { computeInvokeAttrs } from '../utils';
-import { describe, expect, it } from 'vitest';
+import { computeEndpointSource, computeInvokeAttrs } from '../utils';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+describe('computeEndpointSource', () => {
+  const original = process.env.AGENTCORE_RUNTIME_ENDPOINT;
+
+  beforeEach(() => {
+    delete process.env.AGENTCORE_RUNTIME_ENDPOINT;
+  });
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.AGENTCORE_RUNTIME_ENDPOINT;
+    } else {
+      process.env.AGENTCORE_RUNTIME_ENDPOINT = original;
+    }
+  });
+
+  it("returns 'flag' when the --endpoint flag is set (even if the env var is also set)", () => {
+    process.env.AGENTCORE_RUNTIME_ENDPOINT = 'staging';
+    expect(computeEndpointSource('prod')).toBe('flag');
+  });
+
+  it("returns 'env' when only the env var is set", () => {
+    process.env.AGENTCORE_RUNTIME_ENDPOINT = 'staging';
+    expect(computeEndpointSource(undefined)).toBe('env');
+  });
+
+  it("returns 'default' when neither flag nor env var is set", () => {
+    expect(computeEndpointSource(undefined)).toBe('default');
+  });
+});
 
 describe('computeInvokeAttrs', () => {
   it('returns harness when harnessName is set', () => {
@@ -76,5 +106,35 @@ describe('computeInvokeAttrs', () => {
       agentProtocol: 'MCP',
     });
     expect(attrs.agent_protocol).toBe('mcp');
+  });
+
+  it("defaults endpoint_source to 'default' when omitted", () => {
+    const attrs = computeInvokeAttrs({
+      harnessCount: 0,
+      runtimeCount: 1,
+      stream: false,
+      hasSessionId: false,
+    });
+    expect(attrs.endpoint_source).toBe('default');
+  });
+
+  it('passes through the provided endpoint_source', () => {
+    const flag = computeInvokeAttrs({
+      harnessCount: 0,
+      runtimeCount: 1,
+      stream: false,
+      hasSessionId: false,
+      endpointSource: 'flag',
+    });
+    expect(flag.endpoint_source).toBe('flag');
+
+    const env = computeInvokeAttrs({
+      harnessCount: 0,
+      runtimeCount: 1,
+      stream: false,
+      hasSessionId: false,
+      endpointSource: 'env',
+    });
+    expect(env.endpoint_source).toBe('env');
   });
 });

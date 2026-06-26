@@ -12,6 +12,7 @@ import {
   CredentialType,
   DeployModeSchema,
   DevAction,
+  EndpointSource,
   EvaluatorLevel,
   EvaluatorType,
   FilterState,
@@ -137,6 +138,7 @@ const InvokeAttrs = safeSchema({
   has_session_id: z.boolean(),
   auth_type: AuthType,
   agent_protocol: AgentProtocol.optional(),
+  endpoint_source: EndpointSource,
 });
 
 const ExecAttrs = safeSchema({

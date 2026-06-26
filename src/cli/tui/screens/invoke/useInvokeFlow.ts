@@ -69,6 +69,10 @@ export interface InvokeConfig {
 export interface InvokeFlowOptions {
   initialSessionId?: string;
   initialUserId?: string;
+  /** Resolved named runtime endpoint (version alias) to target on every invocation. Undefined targets DEFAULT. */
+  initialEndpoint?: string;
+  /** Where the resolved endpoint came from, for telemetry. */
+  initialEndpointSource?: 'flag' | 'env' | 'default';
   /** Custom headers to forward to the agent runtime on every invocation */
   headers?: Record<string, string>;
   initialBearerToken?: string;
@@ -121,6 +125,8 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
   const {
     initialSessionId,
     initialUserId,
+    initialEndpoint,
+    initialEndpointSource,
     headers,
     initialBearerToken,
     isResume,
@@ -183,6 +189,7 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
           hasSessionId: !!initialSessionId,
           bearerToken: initialBearerToken,
           agentProtocol: firstProtocol,
+          endpointSource: initialEndpointSource,
         }),
         async () => {
           if (!project) {
@@ -790,6 +797,7 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
               region: config.target.region,
               runtimeArn: agent.state.runtimeArn,
               payload: prompt,
+              endpoint: initialEndpoint,
               sessionId: sessionId ?? undefined,
               userId,
               logger,
@@ -850,6 +858,7 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
       fetchMcpTools,
       getMcpInvokeOptions,
       streamHarnessInvoke,
+      initialEndpoint,
       initialPaymentInstrumentId,
       initialPaymentUserId,
     ]

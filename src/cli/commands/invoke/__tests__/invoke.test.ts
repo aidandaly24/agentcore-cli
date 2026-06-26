@@ -270,4 +270,48 @@ describe('invoke command', () => {
       expect(result.stderr).not.toContain('requires an interactive terminal');
     });
   });
+
+  // --------------------------------------------------------------------------
+  // Endpoint mode routing.
+  //
+  // The same no-TTY signature lets us prove the env-var fallback no longer
+  // silently drops into the TUI (which would invoke the DEFAULT endpoint). A
+  // non-DEFAULT resolved endpoint — whether from --endpoint or the
+  // AGENTCORE_RUNTIME_ENDPOINT env var — forces CLI mode.
+  // --------------------------------------------------------------------------
+  describe('endpoint mode routing', () => {
+    it('AGENTCORE_RUNTIME_ENDPOINT (no prompt/flag) forces CLI mode instead of silently routing to the TUI', async () => {
+      // Regression for #986/#1554: previously the env var alone never forced CLI
+      // mode, so the user dropped into the TUI and silently hit DEFAULT. Now the
+      // resolved non-DEFAULT endpoint forces CLI mode -> the action layer reports
+      // "No prompt provided" (NOT the TUI requireTTY guard).
+      const result = await runCLI(['invoke', '--json'], projectDir, {
+        env: { ...telemetry.env, AGENTCORE_RUNTIME_ENDPOINT: 'staging' },
+      });
+      expect(result.exitCode).toBe(1);
+      const json = JSON.parse(result.stdout);
+      expect(json.success).toBe(false);
+      expect(result.stderr).not.toContain('requires an interactive terminal');
+      telemetry.assertMetricEmitted({ command: 'invoke', endpoint_source: 'env' });
+    });
+
+    it('records endpoint_source=flag when --endpoint is passed', async () => {
+      // --endpoint forces CLI mode; the agent has no named endpoint configured so
+      // the action layer rejects it — but the telemetry attr is emitted regardless.
+      const result = await runCLI(['invoke', 'hi', '--endpoint', 'prod', '--json'], projectDir, {
+        env: telemetry.env,
+      });
+      expect(result.exitCode).toBe(1);
+      const json = JSON.parse(result.stdout);
+      expect(json.success).toBe(false);
+      expect(result.stderr).not.toContain('requires an interactive terminal');
+      telemetry.assertMetricEmitted({ command: 'invoke', endpoint_source: 'flag' });
+    });
+
+    it('records endpoint_source=default when neither --endpoint nor the env var is set', async () => {
+      const result = await runCLI(['invoke', 'hi', '--json'], projectDir, { env: telemetry.env });
+      expect(result.exitCode).toBe(1);
+      telemetry.assertMetricEmitted({ command: 'invoke', endpoint_source: 'default' });
+    });
+  });
 });

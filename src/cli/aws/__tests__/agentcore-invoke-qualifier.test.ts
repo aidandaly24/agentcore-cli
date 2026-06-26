@@ -26,9 +26,9 @@ vi.mock('@aws-sdk/client-bedrock-agentcore', () => {
 });
 
 vi.mock('../account.js', () => ({
-  getCredentialProvider: vi.fn().mockReturnValue(() =>
-    Promise.resolve({ accessKeyId: 'test', secretAccessKey: 'test' })
-  ),
+  getCredentialProvider: vi
+    .fn()
+    .mockReturnValue(() => Promise.resolve({ accessKeyId: 'test', secretAccessKey: 'test' })),
 }));
 
 function makeByteResponse(body: string) {
