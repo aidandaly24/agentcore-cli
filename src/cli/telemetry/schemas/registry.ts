@@ -31,7 +31,20 @@ export const METRICS = {
   'cli.command_run': {
     description: 'CLI/TUI Command Execution',
   },
+  'cli.legacy_project_migrated': {
+    description: 'A pre-v0.4.0 agentcore.json was auto-migrated to current schema keys on read',
+  },
 } as const satisfies MetricRegistry;
 
+interface LegacyProjectMigratedAttrs {
+  had_agents_key: z.infer<typeof ATTRIBUTES.had_agents_key>;
+  had_credential_type_key: z.infer<typeof ATTRIBUTES.had_credential_type_key>;
+  had_runtime_type_key: z.infer<typeof ATTRIBUTES.had_runtime_type_key>;
+}
+
 export type MetricName = keyof typeof METRICS;
-export type MetricAttrs<M extends MetricName> = M extends 'cli.command_run' ? CommandRunAttrs : never;
+export type MetricAttrs<M extends MetricName> = M extends 'cli.command_run'
+  ? CommandRunAttrs
+  : M extends 'cli.legacy_project_migrated'
+    ? LegacyProjectMigratedAttrs
+    : never;

@@ -1,6 +1,6 @@
 import { NoProjectError } from '../../../errors';
 import { ConfigNotFoundError, ConfigParseError, ConfigValidationError } from '../../../errors/types.js';
-import { ConfigIO } from '../config-io.js';
+import { ConfigIO, type LegacyProjectMigrationInfo, setLegacyProjectMigrationReporter } from '../config-io.js';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdir, rm, unlink, writeFile } from 'node:fs/promises';
@@ -157,6 +157,100 @@ describe('ConfigIO', () => {
 
       const configIO = new ConfigIO();
       await expect(configIO.readProjectSpec()).rejects.toThrow(ConfigValidationError);
+    });
+  });
+
+  describe('readProjectSpec legacy migration reporter', () => {
+    afterEach(() => {
+      setLegacyProjectMigrationReporter(undefined);
+    });
+
+    function writeProjectFixture(spec: unknown): ConfigIO {
+      const projectDir = join(testDir, `legacy-migrate-${randomUUID()}`);
+      const agentcoreDir = join(projectDir, 'agentcore');
+      mkdirSync(agentcoreDir, { recursive: true });
+      writeFileSync(join(agentcoreDir, 'agentcore.json'), JSON.stringify(spec));
+      changeWorkingDir(projectDir);
+      return new ConfigIO();
+    }
+
+    it('fires the reporter with detected legacy keys for a pre-v0.4.0 project (issue #719)', async () => {
+      const captured: LegacyProjectMigrationInfo[] = [];
+      setLegacyProjectMigrationReporter(info => captured.push(info));
+
+      const configIO = writeProjectFixture({
+        name: 'TestProject',
+        version: 1,
+        agents: [
+          {
+            type: 'AgentCoreRuntime',
+            name: 'MyAgent',
+            build: 'CodeZip',
+            entrypoint: 'main.py',
+            codeLocation: 'app/MyAgent/',
+            runtimeVersion: 'PYTHON_3_12',
+            protocol: 'HTTP',
+          },
+        ],
+        credentials: [
+          {
+            type: 'OAuthCredentialProvider',
+            name: 'my-oauth',
+            discoveryUrl: 'https://idp.example.com/.well-known/openid-configuration',
+          },
+        ],
+      });
+
+      const spec = await configIO.readProjectSpec();
+
+      expect(spec.runtimes[0]!.name).toBe('MyAgent');
+      expect(spec.credentials[0]!.authorizerType).toBe('OAuthCredentialProvider');
+      expect(captured).toHaveLength(1);
+      expect(captured[0]).toEqual({
+        hadAgentsKey: true,
+        hadCredentialTypeKey: true,
+        hadRuntimeTypeKey: true,
+      });
+    });
+
+    it('does not fire the reporter for a current-shape project', async () => {
+      const captured: LegacyProjectMigrationInfo[] = [];
+      setLegacyProjectMigrationReporter(info => captured.push(info));
+
+      const configIO = writeProjectFixture({
+        name: 'TestProject',
+        version: 1,
+        runtimes: [
+          {
+            name: 'MyAgent',
+            build: 'CodeZip',
+            entrypoint: 'main.py',
+            codeLocation: 'app/MyAgent/',
+            runtimeVersion: 'PYTHON_3_12',
+            protocol: 'HTTP',
+          },
+        ],
+        credentials: [{ authorizerType: 'ApiKeyCredentialProvider', name: 'MyCred' }],
+      });
+
+      await configIO.readProjectSpec();
+      expect(captured).toHaveLength(0);
+    });
+
+    it('a throwing reporter never breaks the read', async () => {
+      setLegacyProjectMigrationReporter(() => {
+        throw new Error('reporter boom');
+      });
+
+      const configIO = writeProjectFixture({
+        name: 'TestProject',
+        version: 1,
+        agents: [],
+        credentials: [{ type: 'ApiKeyCredentialProvider', name: 'MyCred' }],
+      });
+
+      const spec = await configIO.readProjectSpec();
+      expect(spec.credentials[0]!.authorizerType).toBe('ApiKeyCredentialProvider');
     });
   });
 

@@ -37,7 +37,7 @@ import { registerView } from './commands/view';
 import { COMMAND_DESCRIPTIONS, PACKAGE_VERSION } from './constants';
 import { printPostCommandNotices, printTelemetryNotice } from './notices';
 import { ALL_PRIMITIVES } from './primitives';
-import { TelemetryClientAccessor } from './telemetry';
+import { TelemetryClientAccessor, registerLegacyProjectMigrationReporter } from './telemetry';
 import { renderTUI, setupAltScreenCleanup } from './tui';
 import { LayoutProvider } from './tui/context';
 import { clearExitMessage, getExitMessage } from './tui/exit-message';
@@ -139,6 +139,10 @@ export function registerCommands(program: Command) {
 export const main = async (argv: string[]) => {
   // Register global cleanup handlers once at startup
   setupAltScreenCleanup();
+
+  // Observe (telemetry + one-time deprecation notice) when a pre-v0.4.0 agentcore.json
+  // is auto-migrated on read. Registered once before any command/TUI loads a project.
+  registerLegacyProjectMigrationReporter();
 
   // Generate installationId on first run and show telemetry notice. If we
   // could not persist the id, suppress the notice so it doesn't fire every run.
