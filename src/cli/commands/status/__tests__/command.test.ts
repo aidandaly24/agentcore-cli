@@ -1,5 +1,5 @@
-import { registerStatus } from '../command.js';
 import { handleProjectStatus, loadStatusConfig } from '../action.js';
+import { registerStatus } from '../command.js';
 import { Command } from '@commander-js/extra-typings';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
