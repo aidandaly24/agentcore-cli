@@ -3494,12 +3494,17 @@ async def get_or_create_agent(session_id):
         _agents.popitem(last=False)
     # Get MCP Tools
     mcp_tools = await get_streamable_http_mcp_tools()
-    _agents[session_id] = AssistantAgent(
-        name="{{ name }}",
-        model_client=load_model(),
-        tools=tools + mcp_tools,
-        system_message=SYSTEM_MESSAGE,
-    )
+    # Re-check after the await: a concurrent first-invocation for the same
+    # session_id may have built and stored the agent while we were awaiting.
+    # Don't overwrite it (that would orphan the agent the other request is using).
+    if session_id not in _agents:
+        _agents[session_id] = AssistantAgent(
+            name="{{ name }}",
+            model_client=load_model(),
+            tools=tools + mcp_tools,
+            system_message=SYSTEM_MESSAGE,
+        )
+    _agents.move_to_end(session_id)
     return _agents[session_id]
 
 
