@@ -1061,6 +1061,8 @@ export interface AguiInvokeOptions {
   headers?: Record<string, string>;
   /** Bearer token for CUSTOM_JWT auth — not yet supported for AGUI, will throw if provided */
   bearerToken?: string;
+  /** Runtime endpoint qualifier (the endpoint NAME, e.g. prod/staging). Defaults to DEFAULT when omitted. */
+  endpoint?: string;
 }
 
 export interface AguiStreamingInvokeResult {
@@ -1092,6 +1094,7 @@ export async function invokeAguiRuntime(
     accept: 'text/event-stream',
     runtimeSessionId: options.sessionId,
     runtimeUserId: options.userId ?? DEFAULT_RUNTIME_USER_ID,
+    ...(options.endpoint && { qualifier: options.endpoint }),
   });
 
   const response = await client.send(command);

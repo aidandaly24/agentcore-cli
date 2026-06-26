@@ -1,4 +1,4 @@
-import { invokeAgentRuntime, invokeAgentRuntimeStreaming } from '../agentcore.js';
+import { invokeAgentRuntime, invokeAgentRuntimeStreaming, invokeAguiRuntime } from '../agentcore.js';
 import type { InvokeAgentRuntimeOptions } from '../agentcore.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -94,6 +94,24 @@ describe('SigV4 invoke qualifier', () => {
     for await (const _ of stream) {
       // drain
     }
+    expect(commandArgs[0]).not.toHaveProperty('qualifier');
+  });
+
+  it('sets qualifier on the AGUI command when endpoint is provided', async () => {
+    mockSend.mockResolvedValue(makeStreamResponse('data: {}\n\n'));
+    await invokeAguiRuntime(
+      { region: BASE.region, runtimeArn: BASE.runtimeArn, endpoint: 'prod' },
+      { threadId: 't', runId: 'r', messages: [], tools: [], context: [], state: {}, forwardedProps: {} }
+    );
+    expect(commandArgs[0]?.qualifier).toBe('prod');
+  });
+
+  it('omits qualifier on the AGUI command when no endpoint is provided', async () => {
+    mockSend.mockResolvedValue(makeStreamResponse('data: {}\n\n'));
+    await invokeAguiRuntime(
+      { region: BASE.region, runtimeArn: BASE.runtimeArn },
+      { threadId: 't', runId: 'r', messages: [], tools: [], context: [], state: {}, forwardedProps: {} }
+    );
     expect(commandArgs[0]).not.toHaveProperty('qualifier');
   });
 });

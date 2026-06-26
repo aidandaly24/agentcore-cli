@@ -675,6 +675,7 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
               logger,
               headers,
               bearerToken: bearerToken || undefined,
+              endpoint: initialEndpoint,
             },
             aguiInput
           );

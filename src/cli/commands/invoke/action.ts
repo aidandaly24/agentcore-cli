@@ -642,6 +642,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
           logger,
           headers: options.headers,
           bearerToken: options.bearerToken,
+          endpoint,
         },
         aguiInput
       );
