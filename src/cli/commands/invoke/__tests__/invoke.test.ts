@@ -280,17 +280,21 @@ describe('invoke command', () => {
   // AGENTCORE_RUNTIME_ENDPOINT env var — forces CLI mode.
   // --------------------------------------------------------------------------
   describe('endpoint mode routing', () => {
-    it('AGENTCORE_RUNTIME_ENDPOINT (no prompt/flag) forces CLI mode instead of silently routing to the TUI', async () => {
+    it('AGENTCORE_RUNTIME_ENDPOINT (no prompt/flag/json) forces CLI mode instead of silently routing to the TUI', async () => {
       // Regression for #986/#1554: previously the env var alone never forced CLI
-      // mode, so the user dropped into the TUI and silently hit DEFAULT. Now the
-      // resolved non-DEFAULT endpoint forces CLI mode -> the action layer reports
-      // "No prompt provided" (NOT the TUI requireTTY guard).
-      const result = await runCLI(['invoke', '--json'], projectDir, {
+      // mode, so the user dropped into the TUI and silently hit DEFAULT. NO --json
+      // and NO other CLI flag here on purpose — the resolved non-DEFAULT endpoint
+      // (`endpoint !== undefined` in the gate) is the ONLY thing forcing CLI mode,
+      // so this exercises the new clause directly. CLI mode reaches the action
+      // layer, which resolves the invoke target and fails with "No deployed
+      // targets found" (this project has an agent but no deployed state). If the
+      // `endpoint !== undefined` clause were removed, this would instead route to
+      // the TUI and hit the requireTTY guard ("requires an interactive terminal").
+      const result = await runCLI(['invoke'], projectDir, {
         env: { ...telemetry.env, AGENTCORE_RUNTIME_ENDPOINT: 'staging' },
       });
       expect(result.exitCode).toBe(1);
-      const json = JSON.parse(result.stdout);
-      expect(json.success).toBe(false);
+      expect(result.stderr).toContain('No deployed targets found');
       expect(result.stderr).not.toContain('requires an interactive terminal');
       telemetry.assertMetricEmitted({ command: 'invoke', endpoint_source: 'env' });
     });
