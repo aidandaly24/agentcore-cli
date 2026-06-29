@@ -129,6 +129,9 @@ const DevAttrs = safeSchema({
   has_stream: z.boolean(),
   agent_protocol: AgentProtocol.optional(),
   invoke_count: Count,
+  // Whether -p/--port was set explicitly (vs the default). Lets us track adoption
+  // of the explicit-port-honored behavior introduced for #1079.
+  port_explicit: z.boolean().optional(),
 });
 
 const InvokeAttrs = safeSchema({

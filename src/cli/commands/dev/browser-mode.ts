@@ -104,7 +104,7 @@ export interface BrowserModeOptions {
   workingDir: string;
   project: AgentCoreProjectSpec;
   port: number;
-  /** Whether `port` was set explicitly via -p/--port (used as the agent base port instead of uiPort+1) */
+  /** Whether `port` was set explicitly via -p/--port (the selected runtime then binds it literally) */
   portExplicit?: boolean;
   agentName?: string;
   harnessName?: string;

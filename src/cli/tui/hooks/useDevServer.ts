@@ -185,6 +185,16 @@ export function useDevServer(options: {
       } else {
         port = isRestart && portFree ? actualPortRef.current : await findAvailablePort(fixedPort);
         if (!isRestart && port !== fixedPort) {
+          // An explicit -p must be honored literally; if it's taken, surface an error
+          // instead of silently rebinding (the silent-shift behavior #1079 removes).
+          if (options.portExplicit) {
+            addLog(
+              'error',
+              `Port ${fixedPort} is in use. Free it or pass a different --port (no port is chosen automatically when --port is set explicitly).`
+            );
+            setStatus('error');
+            return;
+          }
           addLog('warn', `Port ${fixedPort} in use, using ${port}`);
         }
       }

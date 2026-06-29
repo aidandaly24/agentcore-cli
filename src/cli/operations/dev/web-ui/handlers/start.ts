@@ -71,6 +71,35 @@ export async function handleStart(
 }
 
 /**
+ * Resolve the target port a web-UI-served agent should bind to.
+ *
+ * - A2A/MCP agents use their framework-fixed ports (9000 / 8000).
+ * - When `-p`/`--port` was set explicitly (`agentBasePort !== undefined`), the
+ *   *selected* runtime is honored literally (binds exactly `agentBasePort`, no
+ *   offset). All other runtimes fall back to the default `uiPort + 1 + index`
+ *   allocation, so an explicit `-p` never produces ports below the requested
+ *   value or for runtimes the user didn't ask for.
+ * - Otherwise every HTTP runtime is allocated `uiPort + 1 + index`.
+ */
+export function resolveAgentTargetPort(args: {
+  protocol: string;
+  agentName: string;
+  agentIndex: number;
+  uiPort: number;
+  agentBasePort?: number;
+  selectedAgent?: string;
+}): number {
+  const { protocol, agentName, agentIndex, uiPort, agentBasePort, selectedAgent } = args;
+  if (protocol === 'A2A') return 9000;
+  if (protocol === 'MCP') return 8000;
+  const safeIndex = agentIndex >= 0 ? agentIndex : 0;
+  if (agentBasePort !== undefined && agentName === selectedAgent) {
+    return agentBasePort;
+  }
+  return uiPort + 1 + safeIndex;
+}
+
+/**
  * Actually start an agent server. Extracted so the result
  * can be shared across concurrent requests via startingAgents.
  */
@@ -100,18 +129,17 @@ async function doStartAgent(
   const isMCP = config.protocol === 'MCP';
   const fixedPort = isA2A ? 9000 : isMCP ? 8000 : undefined;
   const isTsHttp = !config.isPython && config.protocol === 'HTTP';
-  // When -p is set explicitly, honor it for the selected runtime (no offset) so the
-  // web UI matches the --logs and TUI paths; other concurrently-served runtimes are
-  // offset relative to it. Otherwise derive HTTP ports from uiPort + 1 + index.
-  const selectedIndex = ctx.options.selectedAgent
-    ? ctx.options.agents.findIndex(a => a.name === ctx.options.selectedAgent)
-    : -1;
-  const safeAgentIndex = agentIndex >= 0 ? agentIndex : 0;
-  const targetPort =
-    fixedPort ??
-    (ctx.options.agentBasePort !== undefined
-      ? ctx.options.agentBasePort + (safeAgentIndex - (selectedIndex >= 0 ? selectedIndex : 0))
-      : ctx.options.uiPort + 1 + safeAgentIndex);
+  const targetPort = resolveAgentTargetPort({
+    protocol: config.protocol,
+    agentName,
+    agentIndex,
+    uiPort: ctx.options.uiPort,
+    agentBasePort: ctx.options.agentBasePort,
+    selectedAgent: ctx.options.selectedAgent,
+  });
+  // An explicit -p must be honored literally for the selected runtime; if it's taken,
+  // fail fast instead of silently rebinding (the silent-shift behavior #1079 removes).
+  const portIsExplicit = ctx.options.agentBasePort !== undefined && agentName === ctx.options.selectedAgent;
   const agentPort = await findAvailablePort(targetPort);
   if (fixedPort && agentPort !== fixedPort) {
     const reason = isA2A ? 'A2A agents require port 9000.' : 'MCP agents require port 8000 (FastMCP default).';
@@ -120,6 +148,14 @@ async function doStartAgent(
       name: agentName,
       port: 0,
       error: `Port ${fixedPort} is in use. ${reason}`,
+    };
+  }
+  if (portIsExplicit && agentPort !== targetPort) {
+    return {
+      success: false,
+      name: agentName,
+      port: 0,
+      error: `Port ${targetPort} is in use. Free it or pass a different --port (no port is chosen automatically when --port is set explicitly).`,
     };
   }
   if (agentPort !== targetPort) {

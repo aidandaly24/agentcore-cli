@@ -147,9 +147,11 @@ export interface WebUIOptions {
   /** Available agents (metadata only — servers are started on demand) */
   agents: AgentInfo[];
   /**
-   * Explicit agent base port from -p/--port. When set, HTTP agents bind off this
-   * value (base + index) instead of uiPort + 1 + index, so an explicit `-p` is
-   * honored in the web UI consistently with the --logs and TUI paths.
+   * Explicit agent base port from -p/--port. When set, the selected runtime
+   * ({@link selectedAgent}) is honored literally (binds exactly this value, no
+   * offset); other HTTP runtimes keep the default uiPort + 1 + index allocation.
+   * This keeps an explicit `-p` consistent with the --logs and TUI paths without
+   * remapping runtimes the user didn't ask for.
    */
   agentBasePort?: number;
   /** Deployed harnesses available for invocation (metadata only — no local server needed) */

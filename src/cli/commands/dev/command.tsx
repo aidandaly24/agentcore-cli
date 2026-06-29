@@ -322,6 +322,8 @@ export const registerDev = (program: Command) => {
             invoke_count: 0,
           },
           async recorder => {
+            recorder.set({ port_explicit: portExplicit });
+
             const project = await loadProjectConfig(workingDir);
             if (!project) {
               throw new NoProjectError();
@@ -405,18 +407,29 @@ export const registerDev = (program: Command) => {
 
               const isA2A = config.protocol === 'A2A';
               const isMcp = config.protocol === 'MCP';
+              const isHttp = !isA2A && !isMcp;
               const fixedPort = isA2A
                 ? 9000
                 : isMcp
                   ? 8000
                   : getAgentPort(project, config.agentName, port, portExplicit);
-              if (!isA2A && !isMcp && !portExplicit && fixedPort !== port) {
-                console.log(`Port ${port} in use as base, using ${fixedPort} for ${config.agentName}`);
+              if (isHttp && !portExplicit && fixedPort !== port) {
+                const idx = project.runtimes.findIndex(a => a.name === config.agentName);
+                console.log(
+                  `Runtime "${config.agentName}" is at index ${idx}; using port ${fixedPort} (pass --port ${fixedPort} to override).`
+                );
               }
               const actualPort = await findAvailablePort(fixedPort);
               if ((isA2A || isMcp) && actualPort !== fixedPort) {
                 throw new ValidationError(
                   `Port ${fixedPort} is in use. ${config.protocol} agents require port ${fixedPort}.`
+                );
+              }
+              // An explicit -p must be honored literally; if it's taken, fail fast instead of
+              // silently rebinding to a different port (the silent-shift behavior #1079 removes).
+              if (isHttp && portExplicit && actualPort !== fixedPort) {
+                throw new ValidationError(
+                  `Port ${fixedPort} is in use. Free it or pass a different --port (no port is chosen automatically when --port is set explicitly).`
                 );
               }
 
