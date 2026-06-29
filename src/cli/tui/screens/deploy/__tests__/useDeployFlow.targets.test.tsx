@@ -35,6 +35,12 @@ const fakeIoHost = {
   setVerbose: vi.fn(),
 };
 
+// Hoisted so the vi.mock factory below (hoisted above module init) can reference it, while the
+// test bodies keep a handle to assert the persist path polls the SELECTED target's stack/region.
+const { getStackOutputsSpy } = vi.hoisted(() => ({
+  getStackOutputsSpy: vi.fn().mockRejectedValue(new Error('test: skip persist')),
+}));
+
 // preflightState is mutated per-test before render so the same mock can vary phase/context.
 let preflightState: any;
 
@@ -57,7 +63,7 @@ vi.mock('../../../../cloudformation', async () => {
   const actual = await vi.importActual<any>('../../../../cloudformation');
   return {
     ...actual,
-    getStackOutputs: vi.fn().mockRejectedValue(new Error('test: skip persist')),
+    getStackOutputs: getStackOutputsSpy,
   };
 });
 
@@ -77,7 +83,7 @@ const TARGET_A = { name: 'prod-east', account: '111111111111', region: 'us-east-
 const TARGET_B = { name: 'prod-west', account: '222222222222', region: 'us-west-2' as const };
 const PROJECT_NAME = 'myproj';
 
-function makePreflight(opts: { awsTargets: any[]; projectName?: string }) {
+function makePreflight(opts: { awsTargets: any[]; projectName?: string; isFirstDeploy?: boolean }) {
   const stackNames = opts.awsTargets.map(t => toStackName(opts.projectName ?? PROJECT_NAME, t.name));
   return {
     phase: 'complete',
@@ -86,7 +92,8 @@ function makePreflight(opts: { awsTargets: any[]; projectName?: string }) {
       projectSpec: { name: opts.projectName ?? PROJECT_NAME, runtimes: [] },
       awsTargets: opts.awsTargets,
       isTeardownDeploy: false,
-      isFirstDeploy: true, // skip the pre-deploy diff branch
+      // First-deploy skips the pre-deploy diff branch; flip it off to exercise diff scoping.
+      isFirstDeploy: opts.isFirstDeploy ?? true,
     },
     cdkToolkitWrapper: fakeWrapper,
     stackNames,
@@ -132,6 +139,8 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     fakeIoHost.setOnRawMessage.mockClear();
     fakeIoHost.setOnMessage.mockClear();
     fakeIoHost.setVerbose.mockClear();
+    getStackOutputsSpy.mockClear();
+    getStackOutputsSpy.mockRejectedValue(new Error('test: skip persist'));
   });
   afterEach(() => {
     vi.clearAllTimers();
@@ -213,5 +222,41 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     expect(deploySpy).toHaveBeenCalledTimes(1);
     const arg = deploySpy.mock.calls[0]![0];
     expect(arg.stacks).toBeUndefined();
+  });
+
+  it('persist polls the SELECTED target stack/region, not awsTargets[0]/stackNames[0]', async () => {
+    // [A, B] project, user picks B (the non-first target). The persist step must resolve outputs
+    // from B's stack in B's region — pre-fix it polled A's stack in A's region (never deployed),
+    // failing the poll and writing deployed-state under the wrong target name.
+    preflightState = makePreflight({ awsTargets: [TARGET_A, TARGET_B] });
+
+    const { unmount } = render(<Harness selectedTargets={[TARGET_B]} />);
+    await flush();
+    unmount();
+
+    expect(getStackOutputsSpy).toHaveBeenCalled();
+    const [region, stackName] = getStackOutputsSpy.mock.calls[0]!;
+    expect(region).toBe(TARGET_B.region);
+    expect(stackName).toBe(toStackName(PROJECT_NAME, TARGET_B.name));
+    // Regression: must never poll A's (the first configured target's) stack/region.
+    expect(region).not.toBe(TARGET_A.region);
+    expect(stackName).not.toBe(toStackName(PROJECT_NAME, TARGET_A.name));
+  });
+
+  it('scopes the pre-deploy diff to the selected target stack (not ALL_STACKS)', async () => {
+    // isFirstDeploy=false enables the pre-deploy diff branch. Picking B must diff only B's stack.
+    preflightState = makePreflight({ awsTargets: [TARGET_A, TARGET_B], isFirstDeploy: false });
+
+    const { unmount } = render(<Harness selectedTargets={[TARGET_B]} />);
+    await flush();
+    unmount();
+
+    expect(diffSpy).toHaveBeenCalled();
+    const diffArg = diffSpy.mock.calls[0]![0];
+    expect(diffArg).toBeDefined();
+    expect(diffArg.stacks).toBeDefined();
+    expect(diffArg.stacks.strategy).toBe(StackSelectionStrategy.PATTERN_MUST_MATCH);
+    expect(diffArg.stacks.patterns).toEqual([toStackName(PROJECT_NAME, TARGET_B.name)]);
+    expect(diffArg.stacks.patterns).not.toContain(toStackName(PROJECT_NAME, TARGET_A.name));
   });
 });

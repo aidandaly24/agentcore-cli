@@ -172,6 +172,19 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     };
   }, [skipPreflight, context?.projectSpec.name, selectedTargets]);
 
+  // The target whose stack the post-deploy bookkeeping (persist state, teardown, transaction
+  // search) operates on. The deploy is now scoped to the picker selection, so this MUST track the
+  // deployed target rather than blindly using `awsTargets[0]`: when a multi-target project's user
+  // picks a non-first target, `awsTargets[0]`/`stackNames[0]` point at a stack that was never
+  // deployed, so persist would poll the wrong stack and write deployed-state under the wrong target
+  // (see issue #1267). Falls back to the resolved context target for the plan path (no picker) and
+  // when nothing was selected. The TUI persists a single target; if the user picked several, we
+  // bookkeep the first selected one (the same target whose outputs we poll below).
+  const activeTarget = useMemo(
+    () => selectedTargets?.[0] ?? context?.awsTargets[0],
+    [selectedTargets, context?.awsTargets]
+  );
+
   const [preDeployDiffStep, setPreDeployDiffStep] = useState<Step>({
     label: 'Computing diff changes...',
     status: 'pending',
@@ -267,7 +280,8 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
       switchableIoHost?.setVerbose(true);
 
       try {
-        await cdkToolkitWrapper.diff();
+        // Scope the diff to the picker selection so it mirrors what will deploy (issue #1267).
+        await cdkToolkitWrapper.diff({ stacks: deployStacks });
       } catch {
         setDiffSummaries([{ stackName: 'Error', sections: [], hasSecurityChanges: false, totalChanges: 0 }]);
       } finally {
@@ -279,7 +293,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     };
 
     void run();
-  }, [cdkToolkitWrapper, diffSummaries.length, switchableIoHost, logger]);
+  }, [cdkToolkitWrapper, diffSummaries.length, switchableIoHost, logger, deployStacks]);
 
   /**
    * Persist deployed state after successful deployment.
@@ -287,8 +301,13 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
    */
   const persistDeployedState = useCallback(async () => {
     const ctx = context;
-    const currentStackName = stackNames[0];
-    const target = ctx?.awsTargets[0];
+    const target = activeTarget;
+    // Persist against the deployed target's stack, not stackNames[0]. For a multi-target project
+    // where the user picked a non-first target, stackNames[0] is a sibling stack that was never
+    // deployed — polling it would fail and we'd write deployed-state under the wrong target name.
+    // The plan path (no project name / no picker) still falls back to the lone synthesized stack.
+    const projectName = ctx?.projectSpec.name;
+    const currentStackName = projectName && target ? toStackName(projectName, target.name) : stackNames[0];
 
     if (!ctx || !currentStackName || !target) return;
 
@@ -700,7 +719,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     if (allStatuses.length > 0) {
       setTargetStatuses(allStatuses);
     }
-  }, [context, stackNames, logger, identityKmsKeyArn, allCredentials]);
+  }, [context, stackNames, activeTarget, logger, identityKmsKeyArn, allCredentials]);
 
   // Start deploy when preflight completes OR when shouldStartDeploy is set
   useEffect(() => {
@@ -744,7 +763,9 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
         });
         switchableIoHost?.setVerbose(true);
         try {
-          await cdkToolkitWrapper.diff();
+          // Scope the pre-deploy diff to the same stacks the deploy will touch (issue #1267),
+          // so a single-target pick doesn't diff every configured target's stack.
+          await cdkToolkitWrapper.diff({ stacks: deployStacks });
         } catch {
           // Diff failure is non-fatal — deploy will proceed
         } finally {
@@ -828,15 +849,15 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
           // After deploying the empty spec, destroy the stack entirely.
           // Harnesses are part of the CloudFormation stack, so stack destroy handles them.
           // Clean up imperative payment credential providers before stack teardown.
-          const targetName = context.awsTargets[0]?.name;
+          // Tear down the deployed target (the picker selection), not blindly awsTargets[0].
+          const targetName = activeTarget?.name;
           if (targetName) {
             try {
               const configIO = new ConfigIO();
               const deployedState = await configIO.readDeployedState();
               const existingPayments = deployedState?.targets?.[targetName]?.resources?.payments;
-              if (existingPayments && Object.keys(existingPayments).length > 0) {
-                const target = context.awsTargets[0]!;
-                await cleanupPaymentCredentialProviders({ region: target.region, payments: existingPayments });
+              if (existingPayments && Object.keys(existingPayments).length > 0 && activeTarget) {
+                await cleanupPaymentCredentialProviders({ region: activeTarget.region, payments: existingPayments });
               }
             } catch {
               // Best-effort: continue with teardown even if credential cleanup fails
@@ -866,9 +887,10 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
           }
 
           // Post-deploy: Enable CloudWatch Transaction Search (non-blocking, silent)
+          // Wire it in the deployed target's account/region (the picker selection), not awsTargets[0].
           const agentNames = context?.projectSpec.runtimes?.map((a: { name: string }) => a.name) ?? [];
-          const targetRegion = context?.awsTargets[0]?.region;
-          const targetAccount = context?.awsTargets[0]?.account;
+          const targetRegion = activeTarget?.region;
+          const targetAccount = activeTarget?.account;
           const hasGateways = (context?.projectSpec.agentCoreGateways?.length ?? 0) > 0;
           const hasPythonAgent =
             context?.projectSpec.runtimes?.some(
@@ -960,6 +982,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     context?.isTeardownDeploy,
     context?.awsTargets,
     context?.projectSpec.runtimes,
+    activeTarget,
     diffMode,
     deployStacks,
   ]);
@@ -1007,7 +1030,8 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
       switchableIoHost?.setVerbose(true);
 
       try {
-        await cdkToolkitWrapper.diff();
+        // Scope the standalone diff to the picker selection (issue #1267).
+        await cdkToolkitWrapper.diff({ stacks: deployStacks });
         logger.endStep('success');
         logger.finalize(true);
         setDiffStep(prev => ({ ...prev, status: 'success' }));
@@ -1045,6 +1069,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     skipPreflight,
     shouldStartDeploy,
     switchableIoHost,
+    deployStacks,
   ]);
 
   // Finalize logger and dispose toolkit when preflight fails
