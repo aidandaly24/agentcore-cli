@@ -1,5 +1,5 @@
-import type { TargetDeployedState } from '../../../schema';
-import { mergeDeployedGateways } from '../deployed-gateways';
+import type { DeployedState, TargetDeployedState } from '../../../schema';
+import { findDeployedGateway, firstDeployedGateway, mergeDeployedGateways } from '../deployed-gateways';
 import { describe, expect, it } from 'vitest';
 
 const mcpGw = { gatewayId: 'mcp-id', gatewayArn: 'arn:mcp' };
@@ -26,5 +26,39 @@ describe('mergeDeployedGateways', () => {
   it('returns an empty record when no gateways are deployed', () => {
     expect(mergeDeployedGateways({ resources: {} })).toEqual({});
     expect(mergeDeployedGateways({})).toEqual({});
+  });
+});
+
+describe('findDeployedGateway', () => {
+  const state: DeployedState = {
+    targets: {
+      t1: { resources: { mcp: { gateways: { 'mcp-gw': mcpGw } } } },
+      t2: { resources: { gateways: { 'http-gw': httpGw } } },
+    },
+  };
+
+  it('finds a named MCP gateway across targets', () => {
+    expect(findDeployedGateway(state, 'mcp-gw')).toEqual(mcpGw);
+  });
+
+  it('finds a named HTTP gateway across targets', () => {
+    expect(findDeployedGateway(state, 'http-gw')).toEqual(httpGw);
+  });
+
+  it('returns undefined when the named gateway is absent', () => {
+    expect(findDeployedGateway(state, 'missing')).toBeUndefined();
+    expect(findDeployedGateway({ targets: {} }, 'anything')).toBeUndefined();
+  });
+});
+
+describe('firstDeployedGateway', () => {
+  it('returns the first gateway found across targets', () => {
+    const state: DeployedState = { targets: { t1: { resources: { gateways: { 'http-gw': httpGw } } } } };
+    expect(firstDeployedGateway(state)).toEqual(httpGw);
+  });
+
+  it('returns undefined when no gateways are deployed', () => {
+    expect(firstDeployedGateway({ targets: { t1: { resources: {} } } })).toBeUndefined();
+    expect(firstDeployedGateway({ targets: {} })).toBeUndefined();
   });
 });

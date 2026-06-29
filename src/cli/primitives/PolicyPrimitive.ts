@@ -19,7 +19,7 @@ import {
 } from '../tui/screens/policy/types';
 import { BasePrimitive } from './BasePrimitive';
 import { SOURCE_CODE_NOTE } from './constants';
-import { mergeDeployedGateways } from './deployed-gateways';
+import { findDeployedGateway, firstDeployedGateway } from './deployed-gateways';
 import type { AddResult, AddScreenComponent, RemovableResource } from './types';
 import type { Command } from '@commander-js/extra-typings';
 import { existsSync, readFileSync } from 'fs';
@@ -79,24 +79,16 @@ export class PolicyPrimitive extends BasePrimitive<AddPolicyOptions, RemovablePo
 
       if (options.generate && !statement) {
         const deployedState = await this.configIO.readDeployedState();
-        let engineId: string | undefined;
-        let gatewayArn: string | undefined;
 
+        let engineId: string | undefined;
         for (const target of Object.values(deployedState.targets)) {
           engineId ??= target.resources?.policyEngines?.[options.engine]?.policyEngineId;
-          const gateways = mergeDeployedGateways(target);
-          if (options.gateway) {
-            const gw = gateways[options.gateway];
-            if (gw?.gatewayArn) {
-              gatewayArn = gw.gatewayArn;
-            }
-          } else if (!gatewayArn) {
-            const firstGateway = Object.values(gateways)[0];
-            if (firstGateway?.gatewayArn) {
-              gatewayArn = firstGateway.gatewayArn;
-            }
-          }
         }
+
+        const gateway = options.gateway
+          ? findDeployedGateway(deployedState, options.gateway)
+          : firstDeployedGateway(deployedState);
+        const gatewayArn = gateway?.gatewayArn;
 
         if (!engineId) {
           return {
@@ -428,25 +420,17 @@ export class PolicyPrimitive extends BasePrimitive<AddPolicyOptions, RemovablePo
                 if (cliOptions.gateway) {
                   try {
                     const deployedState = await this.configIO.readDeployedState();
-                    for (const target of Object.values(deployedState.targets)) {
-                      const gateways = mergeDeployedGateways(target);
-                      const gw = gateways[cliOptions.gateway];
-                      if (gw?.gatewayArn) {
-                        resolvedGatewayArn = gw.gatewayArn;
-                        if (!resolvedTargetName) {
-                          const gwTargets = gw.targets;
-                          if (gwTargets) {
-                            const targetNames = Object.keys(gwTargets);
-                            if (targetNames.length === 1) {
-                              resolvedTargetName = targetNames[0];
-                            } else if (targetNames.length > 1) {
-                              throw new ValidationError(
-                                `Multiple targets found on gateway "${cliOptions.gateway}": ${targetNames.join(', ')}. Use --target <name> to specify one.`
-                              );
-                            }
-                          }
+                    const gateway = findDeployedGateway(deployedState, cliOptions.gateway);
+                    if (gateway?.gatewayArn) {
+                      resolvedGatewayArn = gateway.gatewayArn;
+                      if (!resolvedTargetName) {
+                        const targetNames = Object.keys(gateway.targets ?? {});
+                        if (targetNames.length > 1) {
+                          throw new ValidationError(
+                            `Multiple targets found on gateway "${cliOptions.gateway}": ${targetNames.join(', ')}. Use --target <name> to specify one.`
+                          );
                         }
-                        break;
+                        resolvedTargetName = targetNames[0];
                       }
                     }
                   } catch (e) {

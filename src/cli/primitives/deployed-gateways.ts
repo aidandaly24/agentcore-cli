@@ -1,4 +1,4 @@
-import type { GatewayDeployedState, TargetDeployedState } from '../../schema';
+import type { DeployedState, GatewayDeployedState, TargetDeployedState } from '../../schema';
 
 /**
  * Resolve every deployed gateway on a target, regardless of where it was stored.
@@ -12,4 +12,22 @@ import type { GatewayDeployedState, TargetDeployedState } from '../../schema';
  */
 export function mergeDeployedGateways(target: TargetDeployedState): Record<string, GatewayDeployedState> {
   return { ...(target.resources?.mcp?.gateways ?? {}), ...(target.resources?.gateways ?? {}) };
+}
+
+/** Find a deployed gateway by name across all targets, searching both storage locations. */
+export function findDeployedGateway(state: DeployedState, name: string): GatewayDeployedState | undefined {
+  for (const target of Object.values(state.targets)) {
+    const gateway = mergeDeployedGateways(target)[name];
+    if (gateway) return gateway;
+  }
+  return undefined;
+}
+
+/** The first deployed gateway across all targets, searching both storage locations. */
+export function firstDeployedGateway(state: DeployedState): GatewayDeployedState | undefined {
+  for (const target of Object.values(state.targets)) {
+    const [gateway] = Object.values(mergeDeployedGateways(target));
+    if (gateway) return gateway;
+  }
+  return undefined;
 }
