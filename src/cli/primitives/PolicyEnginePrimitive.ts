@@ -9,6 +9,7 @@ import { AttachMode, standardize } from '../telemetry/schemas/common-shapes.js';
 import { requireTTY } from '../tui/guards/tty';
 import { BasePrimitive } from './BasePrimitive';
 import { SOURCE_CODE_NOTE } from './constants';
+import { mergeDeployedGateways } from './deployed-gateways';
 import type { AddResult, AddScreenComponent, RemovableResource } from './types';
 import type { Command } from '@commander-js/extra-typings';
 
@@ -196,12 +197,10 @@ export class PolicyEnginePrimitive extends BasePrimitive<AddPolicyEngineOptions,
       );
       const result: Record<string, string> = {};
       for (const target of Object.values(deployedState.targets)) {
-        const gateways = target.resources?.mcp?.gateways ?? target.resources?.gateways;
-        if (gateways) {
-          for (const [name, gw] of Object.entries(gateways)) {
-            if (gw?.gatewayArn && !mcpGatewayNames.has(name)) {
-              result[name] = gw.gatewayArn;
-            }
+        const gateways = mergeDeployedGateways(target);
+        for (const [name, gw] of Object.entries(gateways)) {
+          if (gw?.gatewayArn && !mcpGatewayNames.has(name)) {
+            result[name] = gw.gatewayArn;
           }
         }
       }

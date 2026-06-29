@@ -23,10 +23,27 @@ const defaultProject: AgentCoreProjectSpec = {
   payments: [],
 };
 
-const { mockConfigExists, mockReadProjectSpec, mockWriteProjectSpec } = vi.hoisted(() => ({
+const { mockConfigExists, mockReadProjectSpec, mockWriteProjectSpec, mockReadDeployedState } = vi.hoisted(() => ({
   mockConfigExists: vi.fn().mockReturnValue(true),
   mockReadProjectSpec: vi.fn(),
   mockWriteProjectSpec: vi.fn().mockResolvedValue(undefined),
+  mockReadDeployedState: vi.fn(),
+}));
+
+const { mockStartPolicyGeneration, mockGetPolicyGeneration } = vi.hoisted(() => ({
+  mockStartPolicyGeneration: vi.fn().mockResolvedValue({ generationId: 'gen-1' }),
+  mockGetPolicyGeneration: vi
+    .fn()
+    .mockResolvedValue({ status: 'COMPLETED', statement: 'permit(principal, action, resource);' }),
+}));
+
+vi.mock('../../aws/policy-generation', () => ({
+  startPolicyGeneration: mockStartPolicyGeneration,
+  getPolicyGeneration: mockGetPolicyGeneration,
+}));
+
+vi.mock('../../aws', () => ({
+  detectRegion: vi.fn().mockResolvedValue({ region: 'us-west-2' }),
 }));
 
 vi.mock('../../../lib', () => {
@@ -34,6 +51,7 @@ vi.mock('../../../lib', () => {
     this.configExists = mockConfigExists;
     this.readProjectSpec = mockReadProjectSpec;
     this.writeProjectSpec = mockWriteProjectSpec;
+    this.readDeployedState = mockReadDeployedState;
   });
   return {
     ConfigIO: MockConfigIO,
@@ -107,5 +125,91 @@ describe('PolicyPrimitive — enforcementMode', () => {
     });
     expect(result.success).toBe(true);
     expect(getWrittenPolicy().enforcementMode).toBe('ACTIVE');
+  });
+});
+
+describe('PolicyPrimitive — --generate gateway resolution', () => {
+  let primitive: PolicyPrimitive;
+
+  const deployedEngine = {
+    resources: { policyEngines: { eng: { policyEngineId: 'pe-1', policyEngineArn: 'arn:pe' } } },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStartPolicyGeneration.mockResolvedValue({ generationId: 'gen-1' });
+    mockGetPolicyGeneration.mockResolvedValue({
+      status: 'COMPLETED',
+      statement: 'permit(principal, action, resource);',
+    });
+    mockReadProjectSpec.mockImplementation(() =>
+      Promise.resolve({ ...defaultProject, policyEngines: [{ name: 'eng', policies: [] }] })
+    );
+    primitive = new PolicyPrimitive();
+  });
+
+  it('resolves an MCP gateway stored under resources.mcp.gateways', async () => {
+    mockReadDeployedState.mockResolvedValue({
+      targets: {
+        default: {
+          resources: {
+            ...deployedEngine.resources,
+            mcp: { gateways: { 'my-gw': { gatewayId: 'g', gatewayArn: 'arn:mcp-gw' } } },
+          },
+        },
+      },
+    });
+    const result = await primitive.add({ name: 'p', engine: 'eng', generate: 'Forbid X', gateway: 'my-gw' });
+    expect(result.success).toBe(true);
+    expect(mockStartPolicyGeneration).toHaveBeenCalledWith(expect.objectContaining({ resourceArn: 'arn:mcp-gw' }));
+  });
+
+  it('resolves an HTTP gateway stored under resources.gateways (the reported bug)', async () => {
+    mockReadDeployedState.mockResolvedValue({
+      targets: {
+        default: {
+          resources: {
+            ...deployedEngine.resources,
+            gateways: { 'my-gw': { gatewayId: 'g', gatewayArn: 'arn:http-gw' } },
+          },
+        },
+      },
+    });
+    const result = await primitive.add({ name: 'p', engine: 'eng', generate: 'Forbid X', gateway: 'my-gw' });
+    expect(result.success).toBe(true);
+    expect(mockStartPolicyGeneration).toHaveBeenCalledWith(expect.objectContaining({ resourceArn: 'arn:http-gw' }));
+  });
+
+  it('resolves an HTTP gateway even when an MCP gateway coexists', async () => {
+    mockReadDeployedState.mockResolvedValue({
+      targets: {
+        default: {
+          resources: {
+            ...deployedEngine.resources,
+            mcp: { gateways: { 'mcp-gw': { gatewayId: 'm', gatewayArn: 'arn:mcp-gw' } } },
+            gateways: { 'http-gw': { gatewayId: 'h', gatewayArn: 'arn:http-gw' } },
+          },
+        },
+      },
+    });
+    const result = await primitive.add({ name: 'p', engine: 'eng', generate: 'Forbid X', gateway: 'http-gw' });
+    expect(result.success).toBe(true);
+    expect(mockStartPolicyGeneration).toHaveBeenCalledWith(expect.objectContaining({ resourceArn: 'arn:http-gw' }));
+  });
+
+  it('errors when the named gateway is not deployed', async () => {
+    mockReadDeployedState.mockResolvedValue({
+      targets: {
+        default: {
+          resources: {
+            ...deployedEngine.resources,
+            mcp: { gateways: { other: { gatewayId: 'o', gatewayArn: 'arn:other' } } },
+          },
+        },
+      },
+    });
+    const result = await primitive.add({ name: 'p', engine: 'eng', generate: 'Forbid X', gateway: 'missing' });
+    expect(result.success).toBe(false);
+    expect(result.success ? '' : result.error.message).toContain('not found in deployed state');
   });
 });

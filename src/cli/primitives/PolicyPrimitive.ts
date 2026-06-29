@@ -19,6 +19,7 @@ import {
 } from '../tui/screens/policy/types';
 import { BasePrimitive } from './BasePrimitive';
 import { SOURCE_CODE_NOTE } from './constants';
+import { mergeDeployedGateways } from './deployed-gateways';
 import type { AddResult, AddScreenComponent, RemovableResource } from './types';
 import type { Command } from '@commander-js/extra-typings';
 import { existsSync, readFileSync } from 'fs';
@@ -83,18 +84,16 @@ export class PolicyPrimitive extends BasePrimitive<AddPolicyOptions, RemovablePo
 
         for (const target of Object.values(deployedState.targets)) {
           engineId ??= target.resources?.policyEngines?.[options.engine]?.policyEngineId;
-          const gateways = target.resources?.mcp?.gateways;
-          if (gateways) {
-            if (options.gateway) {
-              const gw = gateways[options.gateway];
-              if (gw?.gatewayArn) {
-                gatewayArn = gw.gatewayArn;
-              }
-            } else if (!gatewayArn) {
-              const firstGateway = Object.values(gateways)[0];
-              if (firstGateway?.gatewayArn) {
-                gatewayArn = firstGateway.gatewayArn;
-              }
+          const gateways = mergeDeployedGateways(target);
+          if (options.gateway) {
+            const gw = gateways[options.gateway];
+            if (gw?.gatewayArn) {
+              gatewayArn = gw.gatewayArn;
+            }
+          } else if (!gatewayArn) {
+            const firstGateway = Object.values(gateways)[0];
+            if (firstGateway?.gatewayArn) {
+              gatewayArn = firstGateway.gatewayArn;
             }
           }
         }
@@ -430,26 +429,24 @@ export class PolicyPrimitive extends BasePrimitive<AddPolicyOptions, RemovablePo
                   try {
                     const deployedState = await this.configIO.readDeployedState();
                     for (const target of Object.values(deployedState.targets)) {
-                      const gateways = target.resources?.mcp?.gateways ?? target.resources?.gateways;
-                      if (gateways) {
-                        const gw = gateways[cliOptions.gateway];
-                        if (gw?.gatewayArn) {
-                          resolvedGatewayArn = gw.gatewayArn;
-                          if (!resolvedTargetName) {
-                            const gwTargets = gw.targets;
-                            if (gwTargets) {
-                              const targetNames = Object.keys(gwTargets);
-                              if (targetNames.length === 1) {
-                                resolvedTargetName = targetNames[0];
-                              } else if (targetNames.length > 1) {
-                                throw new ValidationError(
-                                  `Multiple targets found on gateway "${cliOptions.gateway}": ${targetNames.join(', ')}. Use --target <name> to specify one.`
-                                );
-                              }
+                      const gateways = mergeDeployedGateways(target);
+                      const gw = gateways[cliOptions.gateway];
+                      if (gw?.gatewayArn) {
+                        resolvedGatewayArn = gw.gatewayArn;
+                        if (!resolvedTargetName) {
+                          const gwTargets = gw.targets;
+                          if (gwTargets) {
+                            const targetNames = Object.keys(gwTargets);
+                            if (targetNames.length === 1) {
+                              resolvedTargetName = targetNames[0];
+                            } else if (targetNames.length > 1) {
+                              throw new ValidationError(
+                                `Multiple targets found on gateway "${cliOptions.gateway}": ${targetNames.join(', ')}. Use --target <name> to specify one.`
+                              );
                             }
                           }
-                          break;
                         }
+                        break;
                       }
                     }
                   } catch (e) {
