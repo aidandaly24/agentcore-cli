@@ -145,7 +145,7 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     unmount();
 
     expect(deploySpy).toHaveBeenCalledTimes(1);
-    const arg = deploySpy.mock.calls[0][0];
+    const arg = deploySpy.mock.calls[0]![0];
 
     // Must NOT be called with stacks undefined (the pre-fix behavior → ALL_STACKS).
     expect(arg).toBeDefined();
@@ -165,7 +165,7 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     unmount();
 
     expect(deploySpy).toHaveBeenCalledTimes(1);
-    const arg = deploySpy.mock.calls[0][0];
+    const arg = deploySpy.mock.calls[0]![0];
     expect(arg.stacks.patterns).toEqual([toStackName(PROJECT_NAME, TARGET_A.name)]);
     expect(arg.stacks.patterns).not.toContain(toStackName(PROJECT_NAME, TARGET_B.name));
   });
@@ -178,7 +178,7 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     unmount();
 
     expect(deploySpy).toHaveBeenCalledTimes(1);
-    const arg = deploySpy.mock.calls[0][0];
+    const arg = deploySpy.mock.calls[0]![0];
     expect(arg.stacks.strategy).toBe(StackSelectionStrategy.PATTERN_MUST_MATCH);
     expect(arg.stacks.patterns).toEqual([
       toStackName(PROJECT_NAME, TARGET_A.name),
@@ -195,7 +195,7 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     unmount();
 
     expect(deploySpy).toHaveBeenCalledTimes(1);
-    const arg = deploySpy.mock.calls[0][0];
+    const arg = deploySpy.mock.calls[0]![0];
     // Either a pattern selector for the single stack, or undefined (assembly's lone stack) — both
     // deploy exactly one stack. Must never resolve to a broader set.
     if (arg.stacks) {
@@ -211,7 +211,7 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     unmount();
 
     expect(deploySpy).toHaveBeenCalledTimes(1);
-    const arg = deploySpy.mock.calls[0][0];
+    const arg = deploySpy.mock.calls[0]![0];
     expect(arg.stacks).toBeUndefined();
   });
 });

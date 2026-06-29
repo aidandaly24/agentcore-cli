@@ -1,7 +1,6 @@
 import { ConfigIO } from '../../../../lib';
 import type { AwsDeploymentTarget } from '../../../../schema';
 import type { CdkToolkitWrapper, DeployMessage, SwitchableIoHost } from '../../../cdk/toolkit-lib';
-import { toStackName } from '../../../commands/import/import-utils';
 import {
   buildDeployedState,
   getStackOutputs,
@@ -20,6 +19,7 @@ import {
   parseRuntimeEndpointOutputs,
 } from '../../../cloudformation';
 import { DEFAULT_DEPLOY_ATTRS, computeDeployAttrs } from '../../../commands/deploy/utils.js';
+import { toStackName } from '../../../commands/import/import-utils';
 import { getErrorMessage, isChangesetInProgressError, isExpiredTokenError } from '../../../errors';
 import { ExecLogger } from '../../../logging';
 import {
