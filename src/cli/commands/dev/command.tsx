@@ -405,7 +405,11 @@ export const registerDev = (program: Command) => {
 
               const isA2A = config.protocol === 'A2A';
               const isMcp = config.protocol === 'MCP';
-              const fixedPort = isA2A ? 9000 : isMcp ? 8000 : getAgentPort(project, config.agentName, port, portExplicit);
+              const fixedPort = isA2A
+                ? 9000
+                : isMcp
+                  ? 8000
+                  : getAgentPort(project, config.agentName, port, portExplicit);
               if (!isA2A && !isMcp && !portExplicit && fixedPort !== port) {
                 console.log(`Port ${port} in use as base, using ${fixedPort} for ${config.agentName}`);
               }
