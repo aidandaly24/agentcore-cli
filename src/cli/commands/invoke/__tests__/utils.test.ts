@@ -16,7 +16,7 @@ describe('computeEndpointSource', () => {
     }
   });
 
-  it("returns 'flag' when the --endpoint flag is set (even if the env var is also set)", () => {
+  it("returns 'flag' when the --runtime-endpoint flag is set (even if the env var is also set)", () => {
     process.env.AGENTCORE_RUNTIME_ENDPOINT = 'staging';
     expect(computeEndpointSource('prod')).toBe('flag');
   });

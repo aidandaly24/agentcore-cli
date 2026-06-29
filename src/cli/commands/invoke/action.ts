@@ -289,7 +289,7 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
     awsTargets,
     agentName: options.agentName,
     targetName: options.targetName,
-    endpointName: options.endpoint,
+    endpointName: options.runtimeEndpoint,
     bearerToken: options.bearerToken,
     sessionId: options.sessionId,
   });

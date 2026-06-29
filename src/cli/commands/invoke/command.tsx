@@ -140,7 +140,7 @@ export const registerInvoke = (program: Command) => {
     )
     .option('--runtime <name>', 'Select specific runtime [non-interactive]')
     .option(
-      '--endpoint <name>',
+      '--runtime-endpoint <name>',
       'Target a named runtime endpoint (version alias, e.g. prod/staging). Defaults to AGENTCORE_RUNTIME_ENDPOINT env var, then DEFAULT [non-interactive]'
     )
     .option('--gateway <name>', 'Invoke through a gateway [non-interactive]')
@@ -297,7 +297,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
         prompt?: string;
         promptFile?: string;
         runtime?: string;
-        endpoint?: string;
+        runtimeEndpoint?: string;
         gateway?: string;
         gatewayTargetName?: string;
         target?: string;
@@ -363,14 +363,14 @@ Model & Runtime Overrides (harness only) [non-interactive]
 
         // Resolve the named endpoint once, before the CLI-mode gate, so the
         // AGENTCORE_RUNTIME_ENDPOINT env-var fallback is honored in BOTH flows:
-        // --endpoint flag → env var → DEFAULT. A non-DEFAULT resolution forces
-        // CLI mode (so `AGENTCORE_RUNTIME_ENDPOINT=staging agentcore invoke` does
-        // not silently drop into the TUI and hit DEFAULT) and is also threaded
+        // --runtime-endpoint flag → env var → DEFAULT. A non-DEFAULT resolution
+        // forces CLI mode (so `AGENTCORE_RUNTIME_ENDPOINT=staging agentcore invoke`
+        // does not silently drop into the TUI and hit DEFAULT) and is also threaded
         // into the TUI route below for interactive parity. Leave it undefined for
         // DEFAULT so the SigV4 qualifier is omitted rather than sent explicitly.
-        const resolvedEndpoint = resolveEndpointName(cliOptions.endpoint);
+        const resolvedEndpoint = resolveEndpointName(cliOptions.runtimeEndpoint);
         const endpoint = resolvedEndpoint === DEFAULT_ENDPOINT_NAME ? undefined : resolvedEndpoint;
-        const endpointSource = computeEndpointSource(cliOptions.endpoint);
+        const endpointSource = computeEndpointSource(cliOptions.runtimeEndpoint);
 
         // CLI mode if any CLI-specific options provided, prompt resolved, or prompt resolution failed
         // (follows deploy command pattern)
@@ -382,7 +382,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
           cliOptions.gatewayTargetName ||
           cliOptions.stream ||
           cliOptions.runtime ||
-          cliOptions.endpoint ||
+          cliOptions.runtimeEndpoint ||
           endpoint !== undefined ||
           cliOptions.gateway ||
           cliOptions.tool ||
@@ -438,7 +438,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
               const options: InvokeOptions = {
                 prompt: resolved.prompt,
                 agentName: cliOptions.runtime,
-                endpoint,
+                runtimeEndpoint: endpoint,
                 gateway: cliOptions.gateway,
                 gatewayTarget: cliOptions.gatewayTargetName,
                 targetName: cliOptions.target ?? 'default',

@@ -276,7 +276,7 @@ describe('invoke command', () => {
   //
   // The same no-TTY signature lets us prove the env-var fallback no longer
   // silently drops into the TUI (which would invoke the DEFAULT endpoint). A
-  // non-DEFAULT resolved endpoint — whether from --endpoint or the
+  // non-DEFAULT resolved endpoint — whether from --runtime-endpoint or the
   // AGENTCORE_RUNTIME_ENDPOINT env var — forces CLI mode.
   // --------------------------------------------------------------------------
   describe('endpoint mode routing', () => {
@@ -299,10 +299,10 @@ describe('invoke command', () => {
       telemetry.assertMetricEmitted({ command: 'invoke', endpoint_source: 'env' });
     });
 
-    it('records endpoint_source=flag when --endpoint is passed', async () => {
-      // --endpoint forces CLI mode; the agent has no named endpoint configured so
-      // the action layer rejects it — but the telemetry attr is emitted regardless.
-      const result = await runCLI(['invoke', 'hi', '--endpoint', 'prod', '--json'], projectDir, {
+    it('records endpoint_source=flag when --runtime-endpoint is passed', async () => {
+      // --runtime-endpoint forces CLI mode; the agent has no named endpoint configured
+      // so the action layer rejects it — but the telemetry attr is emitted regardless.
+      const result = await runCLI(['invoke', 'hi', '--runtime-endpoint', 'prod', '--json'], projectDir, {
         env: telemetry.env,
       });
       expect(result.exitCode).toBe(1);
@@ -312,7 +312,7 @@ describe('invoke command', () => {
       telemetry.assertMetricEmitted({ command: 'invoke', endpoint_source: 'flag' });
     });
 
-    it('records endpoint_source=default when neither --endpoint nor the env var is set', async () => {
+    it('records endpoint_source=default when neither --runtime-endpoint nor the env var is set', async () => {
       const result = await runCLI(['invoke', 'hi', '--json'], projectDir, { env: telemetry.env });
       expect(result.exitCode).toBe(1);
       telemetry.assertMetricEmitted({ command: 'invoke', endpoint_source: 'default' });
