@@ -81,8 +81,16 @@ interface ParsedResource {
 
 /**
  * Get color for a resource status.
+ *
+ * Rollback states are checked first: in CloudFormation a ROLLBACK indicates a
+ * failed deploy whose changes are being reverted, so even a "clean" finish
+ * (ROLLBACK_COMPLETE / UPDATE_ROLLBACK_COMPLETE) is a failure, not a success.
+ * Coloring those green would mislead the user (see #1610). A failed rollback is
+ * the worst case (red); an in-progress or completed rollback signals
+ * "recovering from failure" (yellow).
  */
 function getStatusColor(status: ResourceStatus): string | undefined {
+  if (status.includes('ROLLBACK')) return status.endsWith('_FAILED') ? 'red' : 'yellow';
   if (status.endsWith('_COMPLETE')) return 'green';
   if (status.endsWith('_FAILED')) return 'red';
   if (status.endsWith('_IN_PROGRESS')) return 'cyan';

@@ -3,7 +3,17 @@ import { DeployStatus } from '../DeployStatus.js';
 import { render } from 'ink-testing-library';
 import React from 'react';
 import stripAnsi from 'strip-ansi';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Force ink/chalk to emit ANSI color codes so the status color-coding tests are
+// deterministic regardless of TTY/CI. vi.hoisted is lifted above the ink import
+// by vitest, so FORCE_COLOR is set before ink evaluates its color support.
+vi.hoisted(() => {
+  process.env.FORCE_COLOR = '1';
+});
+
+// ink/chalk ANSI foreground color codes.
+const ANSI = { green: '\x1b[32m', red: '\x1b[31m', yellow: '\x1b[33m', cyan: '\x1b[36m' } as const;
 
 function makeMsg(
   message: string,
@@ -124,6 +134,60 @@ describe('DeployStatus', () => {
       // Last 8 should be visible
       expect(frame).toContain('Resource4');
       expect(frame).toContain('Resource11');
+    });
+  });
+
+  describe('status color coding', () => {
+    // Returns the ANSI color code wrapping the line that contains the status, e.g.
+    // for "...\x1b[33mService::Resource ROLLBACK_COMPLETE\x1b[39m" -> "\x1b[33m".
+    // A single resource line is rendered as one colored Text node, so the opening
+    // code is the last ANSI escape before the status word on that line.
+    function colorOf(frame: string, status: string): string | undefined {
+      const line = frame.split('\n').find(l => l.includes(status));
+      if (!line) return undefined;
+      const before = line.slice(0, line.indexOf(status));
+      // eslint-disable-next-line no-control-regex
+      const codes = before.match(/\x1b\[\d+m/g);
+      return codes?.[codes.length - 1];
+    }
+
+    it('renders CREATE_COMPLETE green (sanity check)', () => {
+      const messages = [makeResourceMsg('Lambda::Function', 'CREATE_COMPLETE')];
+      const { lastFrame } = render(<DeployStatus messages={messages} isComplete={false} hasError={false} />);
+
+      expect(colorOf(lastFrame()!, 'CREATE_COMPLETE')).toBe(ANSI.green);
+    });
+
+    it('does NOT render ROLLBACK_COMPLETE green — it is a failed deploy, not a success (#1610)', () => {
+      const messages = [makeResourceMsg('CloudFormation::Stack', 'ROLLBACK_COMPLETE')];
+      const { lastFrame } = render(<DeployStatus messages={messages} isComplete={false} hasError={false} />);
+
+      const color = colorOf(lastFrame()!, 'ROLLBACK_COMPLETE');
+      expect(color).not.toBe(ANSI.green);
+      expect(color).toBe(ANSI.yellow);
+    });
+
+    it('does NOT render UPDATE_ROLLBACK_COMPLETE green', () => {
+      const messages = [makeResourceMsg('BedrockAgentCore::Gateway', 'UPDATE_ROLLBACK_COMPLETE')];
+      const { lastFrame } = render(<DeployStatus messages={messages} isComplete={false} hasError={false} />);
+
+      const color = colorOf(lastFrame()!, 'UPDATE_ROLLBACK_COMPLETE');
+      expect(color).not.toBe(ANSI.green);
+      expect(color).toBe(ANSI.yellow);
+    });
+
+    it('renders rollback in-progress states yellow (recovering from failure)', () => {
+      const messages = [makeResourceMsg('CloudFormation::Stack', 'ROLLBACK_IN_PROGRESS')];
+      const { lastFrame } = render(<DeployStatus messages={messages} isComplete={false} hasError={false} />);
+
+      expect(colorOf(lastFrame()!, 'ROLLBACK_IN_PROGRESS')).toBe(ANSI.yellow);
+    });
+
+    it('renders ROLLBACK_FAILED red (worst case)', () => {
+      const messages = [makeResourceMsg('CloudFormation::Stack', 'ROLLBACK_FAILED')];
+      const { lastFrame } = render(<DeployStatus messages={messages} isComplete={false} hasError={false} />);
+
+      expect(colorOf(lastFrame()!, 'ROLLBACK_FAILED')).toBe(ANSI.red);
     });
   });
 
