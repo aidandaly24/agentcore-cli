@@ -146,6 +146,14 @@ export interface WebUIOptions {
   uiPort: number;
   /** Available agents (metadata only — servers are started on demand) */
   agents: AgentInfo[];
+  /**
+   * Explicit agent base port from -p/--port. When set, the selected runtime
+   * ({@link selectedAgent}) is honored literally (binds exactly this value, no
+   * offset); other HTTP runtimes keep the default uiPort + 1 + index allocation.
+   * This keeps an explicit `-p` consistent with the --logs and TUI paths without
+   * remapping runtimes the user didn't ask for.
+   */
+  agentBasePort?: number;
   /** Deployed harnesses available for invocation (metadata only — no local server needed) */
   harnesses?: HarnessInfo[];
   /** Dev config factory — called when an agent needs to be started. Required for dev mode, unused when onStart is provided. */
