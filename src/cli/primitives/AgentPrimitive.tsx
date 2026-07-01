@@ -109,6 +109,7 @@ export interface AddAgentOptions extends VpcOptions {
   customClaims?: CustomClaimValidation[];
   clientId?: string;
   clientSecret?: string;
+  executionRoleArn?: string;
   idleTimeout?: number;
   maxLifetime?: number;
   sessionStorageMountPath?: string;
@@ -274,6 +275,10 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
       .option('--network-mode <mode>', 'Network mode (PUBLIC, VPC) [non-interactive]')
       .option('--subnets <ids>', 'Comma-separated subnet IDs (required for VPC mode) [non-interactive]')
       .option('--security-groups <ids>', 'Comma-separated security group IDs (required for VPC mode) [non-interactive]')
+      .option(
+        '--execution-role-arn <arn>',
+        'ARN of an existing IAM execution role to use instead of creating a CDK-managed one [non-interactive]'
+      )
       .option('--authorizer-type <type>', 'Inbound auth: AWS_IAM or CUSTOM_JWT [non-interactive]')
       .option('--discovery-url <url>', 'OIDC discovery URL (for CUSTOM_JWT) [non-interactive]')
       .option('--allowed-audience <audience>', 'Comma-separated allowed audiences (for CUSTOM_JWT) [non-interactive]')
@@ -435,6 +440,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
               customClaims,
               clientId: cliOptions.clientId,
               clientSecret: cliOptions.clientSecret,
+              executionRoleArn: cliOptions.executionRoleArn,
               idleTimeout: cliOptions.idleTimeout ? Number(cliOptions.idleTimeout) : undefined,
               maxLifetime: cliOptions.maxLifetime ? Number(cliOptions.maxLifetime) : undefined,
               sessionStorageMountPath: cliOptions.sessionStorageMountPath,
@@ -558,6 +564,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
           },
         }),
       requestHeaderAllowlist: options.requestHeaderAllowlist,
+      executionRoleArn: options.executionRoleArn,
       idleRuntimeSessionTimeout: options.idleTimeout,
       maxLifetime: options.maxLifetime,
       sessionStorageMountPath: options.sessionStorageMountPath,
@@ -726,6 +733,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
       ...(options.requestHeaderAllowlist?.length && {
         requestHeaderAllowlist: options.requestHeaderAllowlist,
       }),
+      ...(options.executionRoleArn && { executionRoleArn: options.executionRoleArn }),
       ...(authorizerType && { authorizerType }),
       ...(authorizerConfiguration && { authorizerConfiguration }),
       ...(lifecycleConfiguration && { lifecycleConfiguration }),

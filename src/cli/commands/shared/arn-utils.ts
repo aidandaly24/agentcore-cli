@@ -1,6 +1,9 @@
 const ARN_PART_COUNT = 6;
 const ARN_FORMAT = 'arn:partition:service:region:account:resource';
 
+/** Matches an IAM role ARN across any partition (commercial, GovCloud, China). */
+export const IAM_ROLE_ARN_REGEX = /^arn:[^:]+:iam::\d{12}:role\/.+/;
+
 /**
  * Check whether a string looks like a valid ARN (starts with `arn:` and has at least 6 colon-separated parts).
  */

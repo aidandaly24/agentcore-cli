@@ -1,3 +1,4 @@
+import { AgentEnvSpecSchema } from '../../../../../schema/index.js';
 import { computeManagedOAuthCredentialName } from '../../../../primitives/credential-utils.js';
 import { mapByoConfigToAgent } from '../../../../tui/screens/agent/useAddAgent.js';
 import type { GenerateConfig } from '../../../../tui/screens/generate/types.js';
@@ -339,6 +340,21 @@ describe('mapGenerateConfigToAgent - requestHeaderAllowlist', () => {
   it('omits requestHeaderAllowlist when undefined', () => {
     const result = mapGenerateConfigToAgent(baseConfig);
     expect(result.requestHeaderAllowlist).toBeUndefined();
+  });
+});
+
+describe('mapGenerateConfigToAgent - executionRoleArn', () => {
+  const ROLE_ARN = 'arn:aws:iam::123456789012:role/MyRole';
+
+  it('includes executionRoleArn when provided and round-trips through AgentEnvSpecSchema', () => {
+    const result = mapGenerateConfigToAgent({ ...baseConfig, executionRoleArn: ROLE_ARN });
+    expect(result.executionRoleArn).toBe(ROLE_ARN);
+    expect(AgentEnvSpecSchema.parse(result).executionRoleArn).toBe(ROLE_ARN);
+  });
+
+  it('omits executionRoleArn when undefined', () => {
+    const result = mapGenerateConfigToAgent(baseConfig);
+    expect(result.executionRoleArn).toBeUndefined();
   });
 });
 

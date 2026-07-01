@@ -24,7 +24,7 @@ import {
   matchEnumValue,
   validateApiFormat,
 } from '../../../schema';
-import { ARN_VALIDATION_MESSAGE, isValidArn } from '../shared/arn-utils';
+import { ARN_VALIDATION_MESSAGE, IAM_ROLE_ARN_REGEX, isValidArn } from '../shared/arn-utils';
 import { validateHeaderAllowlist } from '../shared/header-utils';
 import { MAX_INDEXED_KEYS, parseIndexedKeyArg } from '../shared/indexed-key-parser';
 import { parseAndValidateLifecycleOptions } from '../shared/lifecycle-utils';
@@ -113,6 +113,14 @@ export function validateAddAgentOptions(options: AddAgentOptions): ValidationRes
   const nameResult = AgentNameSchema.safeParse(options.name);
   if (!nameResult.success) {
     return { valid: false, error: nameResult.error.issues[0]?.message ?? 'Invalid agent name' };
+  }
+
+  if (options.executionRoleArn && !IAM_ROLE_ARN_REGEX.test(options.executionRoleArn)) {
+    return {
+      valid: false,
+      error:
+        '--execution-role-arn must be a valid IAM role ARN (e.g. arn:aws:iam::123456789012:role/MyRole)',
+    };
   }
 
   // Validate build type if provided
