@@ -165,7 +165,7 @@ export function mapGenerateConfigToAgent(config: GenerateConfig): AgentEnvSpec {
         }
       : {}),
     ...buildFilesystemConfigurations(config.sessionStorageMountPath, config.efsAccessPoints, config.s3AccessPoints),
-    ...(protocol === 'MCP' && { instrumentation: { enableOtel: false } }),
+    ...(protocol === 'MCP' && config.language === 'TypeScript' && { instrumentation: { enableOtel: false } }),
   };
 }
 
@@ -278,7 +278,7 @@ export async function mapGenerateConfigToRenderConfig(
 ): Promise<AgentRenderConfig> {
   const isMcp = config.protocol === 'MCP';
   const gatewayProviders = isMcp ? [] : await mapGatewaysToGatewayProviders();
-  const enableOtel = !isMcp && config.language !== 'TypeScript';
+  const enableOtel = config.language !== 'TypeScript';
 
   return {
     name: config.projectName,
