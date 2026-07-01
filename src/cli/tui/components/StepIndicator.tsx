@@ -1,4 +1,5 @@
 import { useResponsive } from '../hooks/useResponsive';
+import { symbols } from '../utils';
 import { Box, Text } from 'ink';
 
 interface StepIndicatorProps<T extends string> {
@@ -71,7 +72,7 @@ export function StepIndicator<T extends string>({
             const isLastInRow = idx === rowSteps.length - 1;
             const isLastStep = stepIdx === steps.length - 1;
 
-            const icon = isDone ? '✓' : isCurrent ? '●' : '○';
+            const icon = isDone ? symbols.stepDone : isCurrent ? symbols.stepCurrent : symbols.stepPending;
             const color = isCurrent ? 'cyan' : isDone ? 'green' : 'gray';
 
             return (
@@ -81,7 +82,7 @@ export function StepIndicator<T extends string>({
                   {' '}
                   {label}
                 </Text>
-                {showArrows && !isLastStep && !isLastInRow && <Text dimColor> → </Text>}
+                {showArrows && !isLastStep && !isLastInRow && <Text dimColor> {symbols.branch} </Text>}
               </Box>
             );
           })}

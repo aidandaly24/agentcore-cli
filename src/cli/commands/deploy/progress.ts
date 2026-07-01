@@ -3,6 +3,7 @@ import { ANSI } from '../../constants';
 import { getErrorMessage } from '../../errors';
 import { ensureDefaultDeploymentTarget } from '../../operations/deploy';
 import { canSkipDeploy } from '../../operations/deploy/change-detection';
+import { symbols } from '../../tui/utils/symbols';
 import { handleDeploy } from './actions';
 
 export const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -34,9 +35,9 @@ export function createSpinnerProgress(): SpinnerProgress {
         process.stdout.write(`\r${SPINNER_FRAMES[i]} ${step}...`);
       }, 80);
     } else if (status === 'success') {
-      console.log(`✓ ${step}`);
+      console.log(`${symbols.success} ${step}`);
     } else {
-      console.log(`✗ ${step}`);
+      console.log(`${symbols.failure} ${step}`);
     }
   };
 

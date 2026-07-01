@@ -14,7 +14,7 @@ import type { SelectableItem } from '../../components';
 import { JwtConfigInput, useJwtConfigFlow } from '../../components/jwt-config';
 import { HELP_TEXT } from '../../constants';
 import { useListNavigation, useMultiSelectNavigation } from '../../hooks';
-import { generateUniqueName } from '../../utils';
+import { generateUniqueName, symbols } from '../../utils';
 import type { AddGatewayConfig } from './types';
 import {
   AUTHORIZER_TYPE_OPTIONS,
@@ -283,11 +283,11 @@ export function AddGatewayScreen({
               {advancedConfigItems.map((item, idx) => {
                 const isCursor = idx === advancedNav.cursorIndex;
                 const isChecked = advancedNav.selectedIds.has(item.id);
-                const checkbox = isChecked ? '[✓]' : '[ ]';
+                const checkbox = isChecked ? symbols.checkboxOn : symbols.checkboxOff;
                 return (
                   <Box key={item.id}>
                     <Text wrap="truncate">
-                      <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? '❯' : ' '} </Text>
+                      <Text color={isCursor ? 'cyan' : undefined}>{isCursor ? symbols.cursor : ' '} </Text>
                       <Text color={isChecked ? 'green' : undefined}>{checkbox} </Text>
                       <Text color={isCursor ? 'cyan' : undefined}>{item.title}</Text>
                     </Text>
