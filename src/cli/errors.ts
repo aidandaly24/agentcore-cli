@@ -176,3 +176,16 @@ export function isChangesetInProgressError(err: unknown): boolean {
 
   return false;
 }
+
+/**
+ * Checks if an error is an access-denied failure on `ecr:CreateRepository`.
+ * Surfaces during CDK bootstrap when the account's SCP/IAM denies creating the
+ * shared bootstrap stack's ECR ContainerAssetsRepository.
+ */
+export function isEcrCreateRepositoryAccessDeniedError(err: unknown): boolean {
+  const message = getErrorMessage(err).toLowerCase();
+  return (
+    message.includes('ecr:createrepository') &&
+    (message.includes('accessdenied') || message.includes('access denied') || message.includes('not authorized'))
+  );
+}

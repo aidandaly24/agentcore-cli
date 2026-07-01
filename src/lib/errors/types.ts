@@ -62,6 +62,28 @@ export class AccessDeniedError extends BaseError {
 }
 
 /**
+ * Error thrown when CDK bootstrap is denied `ecr:CreateRepository`.
+ *
+ * The shared CDK bootstrap (CDKToolkit) stack always provisions an ECR
+ * `ContainerAssetsRepository`, even for CodeZip-only projects that never push a
+ * container image. In accounts whose SCP/IAM denies `ecr:CreateRepository`,
+ * bootstrap aborts with a raw CloudFormation error that misleadingly implies the
+ * agent needs ECR. This error replaces it with actionable guidance.
+ */
+export class BootstrapEcrAccessDeniedError extends BaseError {
+  constructor(options?: BaseErrorOptions) {
+    super(
+      'CDK bootstrap was denied ecr:CreateRepository. The shared CDK bootstrap stack (CDKToolkit) always ' +
+        'creates an ECR repository for container assets — this is needed only by the shared CDK bootstrap stack, ' +
+        'not by CodeZip agents, which never push a container image. To proceed, either deploy in an account that ' +
+        'permits ecr:CreateRepository, or bootstrap the environment ahead of time with a custom (ECR-less) ' +
+        'bootstrap template.',
+      { defaultSource: 'user', ...options }
+    );
+  }
+}
+
+/**
  * Error indicating missing system dependencies required for an operation.
  */
 export class DependencyCheckError extends BaseError {

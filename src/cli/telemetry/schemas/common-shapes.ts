@@ -105,6 +105,7 @@ export const ErrorName = z.enum([
   'AgentAlreadyExistsError',
   'ArtifactSizeError',
   'AwsCredentialsError',
+  'BootstrapEcrAccessDeniedError',
   'ConfigNotFoundError',
   'ConfigParseError',
   'ConfigReadError',

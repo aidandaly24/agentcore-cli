@@ -1,6 +1,6 @@
-import { CONFIG_DIR } from '../../../lib';
+import { BootstrapEcrAccessDeniedError, CONFIG_DIR } from '../../../lib';
 import { CDK_APP_ENTRY, CDK_PROJECT_DIR } from '../../constants';
-import { isChangesetInProgressError } from '../../errors';
+import { isChangesetInProgressError, isEcrCreateRepositoryAccessDeniedError } from '../../errors';
 import type { CdkToolkitWrapperOptions, DeployOptions, DestroyOptions, DiffOptions, ListOptions } from './types';
 import {
   BaseCredentials,
@@ -313,9 +313,18 @@ export class CdkToolkitWrapper {
     const { toolkit } = this.ensureInitialized();
     const params = kmsKeyId ? { kmsKeyId } : { createCustomerMasterKey: true };
     const options = { parameters: BootstrapStackParameters.withExisting(params) };
-    return withErrorContext('bootstrap', () =>
-      toolkit.bootstrap(BootstrapEnvironments.fromList(environments), options)
-    );
+    try {
+      return await withErrorContext('bootstrap', () =>
+        toolkit.bootstrap(BootstrapEnvironments.fromList(environments), options)
+      );
+    } catch (err) {
+      // The shared bootstrap stack unconditionally creates an ECR repository. In accounts
+      // that deny ecr:CreateRepository, surface actionable guidance instead of the raw error.
+      if (isEcrCreateRepositoryAccessDeniedError(err)) {
+        throw new BootstrapEcrAccessDeniedError({ cause: err });
+      }
+      throw err;
+    }
   }
 }
 
