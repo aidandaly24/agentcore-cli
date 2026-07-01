@@ -2,6 +2,7 @@ import { ConfigIO } from '../../../../lib';
 import type { CdkToolkitWrapper, DeployMessage, SwitchableIoHost } from '../../../cdk/toolkit-lib';
 import {
   buildDeployedState,
+  describeStackFailureDetail,
   getStackOutputs,
   parseAgentOutputs,
   parseConfigBundleOutputs,
@@ -108,6 +109,8 @@ interface DeployFlowState {
   postDeployWarnings: string[];
   /** True if any post-deploy sub-resource operation had errors */
   postDeployHasError: boolean;
+  /** Root CloudFormation resource failure detail (logical id, type, reason + console link) */
+  deployFailureDetail: string | null;
   /** Whether an on-demand diff is currently running */
   isDiffLoading: boolean;
   /** Request an on-demand diff (lazy: runs once, caches result) */
@@ -153,6 +156,9 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
   });
   const [publishAssetsStep, setPublishAssetsStep] = useState<Step>({ label: 'Publish assets', status: 'pending' });
   const [deployStep, setDeployStep] = useState<Step>({ label: 'Deploy to AWS', status: 'pending' });
+  // Root CloudFormation resource failure detail (logical id, type, reason + console link),
+  // surfaced in the deploy status box once the CFN apply has started.
+  const [deployFailureDetail, setDeployFailureDetail] = useState<string | null>(null);
   const [persistStateStep, setPersistStateStep] = useState<Step>({
     label: 'Persist deployment state',
     status: 'pending',
@@ -894,6 +900,16 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
           setHasTokenExpiredError(true);
         }
 
+        // Enrich CloudFormation/CDK failures with the root resource failure reason and
+        // a console link so users don't have to dig through stack events manually.
+        const failureRegion = context?.awsTargets[0]?.region;
+        const failureStackName = stackNames[0];
+        const failureDetail =
+          hasReceivedCfnEvent.current && failureRegion && failureStackName
+            ? await describeStackFailureDetail(failureRegion, failureStackName)
+            : null;
+        setDeployFailureDetail(failureDetail);
+
         // Mark the appropriate step as error based on whether CFn started
         if (hasReceivedCfnEvent.current) {
           setDeployStep(prev => ({
@@ -1157,6 +1173,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     managedMemoryNotice,
     postDeployWarnings,
     postDeployHasError,
+    deployFailureDetail,
     isDiffLoading,
     requestDiff,
     stackOutputs,

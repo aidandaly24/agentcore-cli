@@ -9,6 +9,8 @@ interface DeployStatusProps {
   hasError: boolean;
   hasPostDeployError?: boolean;
   postDeployWarnings?: string[];
+  /** Root CloudFormation resource failure detail (logical id, type, reason + console link). */
+  failureDetail?: string | null;
 }
 
 const PROGRESS_BAR_WIDTH = 20;
@@ -139,6 +141,7 @@ export function DeployStatus({
   hasError,
   hasPostDeployError,
   postDeployWarnings,
+  failureDetail,
 }: DeployStatusProps) {
   // Parse and filter messages to only meaningful resource updates
   const parsedResources = messages
@@ -174,6 +177,15 @@ export function DeployStatus({
           <Box flexDirection="column" marginTop={1}>
             {parsedResources.slice(-3).map((m, i) => (
               <ResourceLine key={`${m.original.code}-${i}`} resource={m.parsed} />
+            ))}
+          </Box>
+        )}
+        {hasError && failureDetail && (
+          <Box flexDirection="column" marginTop={1}>
+            {failureDetail.split('\n').map((line, i) => (
+              <Text key={i} color="red">
+                {line}
+              </Text>
             ))}
           </Box>
         )}

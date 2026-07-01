@@ -7,6 +7,7 @@ import { CdkToolkitWrapper, createSwitchableIoHost } from '../../cdk/toolkit-lib
 import type { DeployMessage, SwitchableIoHost } from '../../cdk/toolkit-lib';
 import {
   buildDeployedState,
+  describeStackFailureDetail,
   getStackOutputs,
   parseAgentOutputs,
   parseConfigBundleOutputs,
@@ -162,6 +163,10 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
   const logger = new ExecLogger({ command: 'deploy' });
   const { onProgress } = options;
   let currentStepName = '';
+  // Tracked for the catch block so a CloudFormation failure can be enriched with
+  // the root resource failure reason (DescribeStackEvents) and a console link.
+  let failedRegion: string | undefined;
+  let failedStackName: string | undefined;
 
   const startStep = (name: string) => {
     currentStepName = name;
@@ -199,6 +204,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
     // calls that don't receive an explicit region option.
     // See https://github.com/aws/agentcore-cli/issues/924.
     restoreEnv = applyTargetRegionToEnv(target.region);
+    failedRegion = target.region;
     endStep('success');
 
     // Read project spec for gateway information (used later for deploy step name and outputs)
@@ -431,6 +437,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
       };
     }
     const stackName = stackSelection.stackName;
+    failedStackName = stackName;
     endStep('success');
 
     // Check if bootstrap needed
@@ -950,7 +957,16 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
   } catch (err: unknown) {
     logger.log(getErrorMessage(err), 'error');
     logger.finalize(false);
-    return { success: false, error: toError(err), logPath: logger.getRelativeLogPath() };
+    const error = toError(err);
+    // Enrich CloudFormation/CDK failures with the root resource failure reason and a
+    // console link so users don't have to dig through stack events manually.
+    if (failedRegion && failedStackName) {
+      const detail = await describeStackFailureDetail(failedRegion, failedStackName);
+      if (detail) {
+        error.message = `${error.message}\n\n${detail}`;
+      }
+    }
+    return { success: false, error, logPath: logger.getRelativeLogPath() };
   } finally {
     if (toolkitWrapper) {
       await toolkitWrapper.dispose();
