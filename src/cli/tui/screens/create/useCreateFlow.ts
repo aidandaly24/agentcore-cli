@@ -73,6 +73,7 @@ interface CreateFlowState {
   // Project name actions
   setProjectName: (name: string) => void;
   confirmProjectName: () => void;
+  goBackToInput: () => void;
   // Create type selection
   handleCreateTypeSelection: (choice: 'harness' | 'agent' | 'skip') => void;
   // Add agent config (set when AddAgentScreen completes)
@@ -178,6 +179,10 @@ export function useCreateFlow(cwd: string): CreateFlowState {
 
   const confirmProjectName = useCallback(() => {
     setPhase('create-type-prompt');
+  }, []);
+
+  const goBackToInput = useCallback(() => {
+    setPhase('input');
   }, []);
 
   const updateStep = (index: number, update: Partial<Step>) => {
@@ -756,6 +761,7 @@ export function useCreateFlow(cwd: string): CreateFlowState {
     logFilePath,
     setProjectName,
     confirmProjectName,
+    goBackToInput,
     // Create type selection
     handleCreateTypeSelection,
     // Add agent
