@@ -156,7 +156,10 @@ function printCreateHarnessSummary(projectName: string, harnessName: string): vo
 
 /** Handle CLI mode for the harness path */
 async function handleCreateHarnessCLI(options: CreateOptions): Promise<void> {
-  const cwd = options.outputDir ?? getWorkingDirectory();
+  // The invocation cwd is where the user typed a relative --container Dockerfile path. Capture it
+  // before --output-dir overrides `cwd`, so the Dockerfile resolves from where the command was run.
+  const invocationCwd = getWorkingDirectory();
+  const cwd = options.outputDir ?? invocationCwd;
   const name = options.name ?? options.projectName;
   const projectName = options.projectName ?? name;
 
@@ -274,6 +277,7 @@ async function handleCreateHarnessCLI(options: CreateOptions): Promise<void> {
         additionalParams,
         containerUri: containerOption.containerUri,
         dockerfilePath: containerOption.dockerfilePath,
+        dockerfileBaseDir: invocationCwd,
         skipMemory: options.harnessMemory === false,
         maxIterations: options.maxIterations ? Number(options.maxIterations) : undefined,
         maxTokens: options.maxTokens ? Number(options.maxTokens) : undefined,
