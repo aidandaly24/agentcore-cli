@@ -1,6 +1,7 @@
 import { COMMAND_DESCRIPTIONS } from '../../constants';
 import { getErrorMessage } from '../../errors';
 import { loadDeployedProjectConfig } from '../../operations/resolve-agent';
+import { finalizeAndExit, withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { requireProject } from '../../tui/guards';
 import { handleTracesGet, handleTracesList } from './action';
 import type { TracesGetOptions, TracesListOptions } from './types';
@@ -31,8 +32,10 @@ export const registerTraces = (program: Command) => {
       requireProject();
 
       try {
-        const context = await loadDeployedProjectConfig();
-        const result = await handleTracesList(context, cliOptions);
+        const result = await withCommandRunTelemetry('traces.list', {}, async () => {
+          const context = await loadDeployedProjectConfig();
+          return handleTracesList(context, cliOptions);
+        });
 
         if (!result.success) {
           render(
@@ -41,7 +44,7 @@ export const registerTraces = (program: Command) => {
               {result.consoleUrl && <Text color="gray">Console: {result.consoleUrl}</Text>}
             </Box>
           );
-          process.exit(1);
+          await finalizeAndExit(1);
           return;
         }
 
@@ -88,7 +91,7 @@ export const registerTraces = (program: Command) => {
         );
       } catch (error) {
         render(<Text color="red">Error: {getErrorMessage(error)}</Text>);
-        process.exit(1);
+        await finalizeAndExit(1);
       }
     });
 
@@ -103,8 +106,10 @@ export const registerTraces = (program: Command) => {
       requireProject();
 
       try {
-        const context = await loadDeployedProjectConfig();
-        const result = await handleTracesGet(context, traceId, cliOptions);
+        const result = await withCommandRunTelemetry('traces.get', {}, async () => {
+          const context = await loadDeployedProjectConfig();
+          return handleTracesGet(context, traceId, cliOptions);
+        });
 
         if (!result.success) {
           render(
@@ -113,7 +118,7 @@ export const registerTraces = (program: Command) => {
               {result.consoleUrl && <Text color="gray">Console: {result.consoleUrl}</Text>}
             </Box>
           );
-          process.exit(1);
+          await finalizeAndExit(1);
           return;
         }
 
@@ -125,7 +130,7 @@ export const registerTraces = (program: Command) => {
         );
       } catch (error) {
         render(<Text color="red">Error: {getErrorMessage(error)}</Text>);
-        process.exit(1);
+        await finalizeAndExit(1);
       }
     });
 };

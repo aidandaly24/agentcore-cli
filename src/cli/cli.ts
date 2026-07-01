@@ -38,6 +38,7 @@ import { COMMAND_DESCRIPTIONS, PACKAGE_VERSION } from './constants';
 import { printPostCommandNotices, printTelemetryNotice } from './notices';
 import { ALL_PRIMITIVES } from './primitives';
 import { TelemetryClientAccessor } from './telemetry';
+import { finalizeAndExit, registerPostCommandFinalize } from './telemetry/cli-command-run.js';
 import { renderTUI, setupAltScreenCleanup } from './tui';
 import { LayoutProvider } from './tui/context';
 import { clearExitMessage, getExitMessage } from './tui/exit-message';
@@ -165,18 +166,24 @@ export const main = async (argv: string[]) => {
   }
 
   await TelemetryClientAccessor.init(args[0] ?? 'unknown');
-  try {
-    await program.parseAsync(argv);
-  } finally {
-    await TelemetryClientAccessor.shutdown();
-  }
 
-  // Telemetry notice already printed above; only run update check here.
-  await printPostCommandNotices(false, updateCheck);
+  // Post-command notices + exit message run once, whether the command returns
+  // normally or calls process.exit() inside its action. finalizeAndExit invokes
+  // this after telemetry shutdown (which prints the audit-mode line), so the
+  // tail output is never dropped by an early process.exit().
+  registerPostCommandFinalize(async () => {
+    // Telemetry notice already printed above; only run update check here.
+    await printPostCommandNotices(false, updateCheck);
 
-  const exitMessage = getExitMessage();
-  if (exitMessage) {
-    console.log(`\n${exitMessage}`);
-    clearExitMessage();
-  }
+    const exitMessage = getExitMessage();
+    if (exitMessage) {
+      console.log(`\n${exitMessage}`);
+      clearExitMessage();
+    }
+  });
+
+  await program.parseAsync(argv);
+
+  // Command returned without calling process.exit(); run the same finalize path.
+  await finalizeAndExit(0);
 };

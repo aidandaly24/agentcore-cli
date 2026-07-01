@@ -127,6 +127,11 @@ describe('COMMAND_SCHEMAS', () => {
     expect(COMMAND_SCHEMAS['telemetry.status'].parse({})).toEqual({});
   });
 
+  it('accepts valid config attrs and rejects invalid config_action', () => {
+    expect(COMMAND_SCHEMAS.config.parse({ config_action: 'set' })).toEqual({ config_action: 'set' });
+    expect(() => COMMAND_SCHEMAS.config.parse({ config_action: 'delete' })).toThrow();
+  });
+
   it('import subcommand schemas accept empty object', () => {
     expect(COMMAND_SCHEMAS.import.parse({})).toEqual({});
     expect(COMMAND_SCHEMAS['import.runtime'].parse({})).toEqual({});

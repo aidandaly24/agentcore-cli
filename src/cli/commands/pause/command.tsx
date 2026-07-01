@@ -3,7 +3,7 @@ import { getErrorMessage } from '../../errors';
 import { handlePauseResume } from '../../operations/eval';
 import type { OnlineEvalActionOptions } from '../../operations/eval';
 import { createJobEngine } from '../../operations/jobs';
-import { runCliCommand } from '../../telemetry/cli-command-run';
+import { finalizeAndExit, runCliCommand, withCommandRunTelemetry } from '../../telemetry/cli-command-run';
 import { COMMAND_DESCRIPTIONS } from '../../tui/copy';
 import { requireProject } from '../../tui/guards';
 import type { Command } from '@commander-js/extra-typings';
@@ -47,7 +47,11 @@ function registerOnlineEvalSubcommand(parent: Command, action: 'pause' | 'resume
       };
 
       try {
-        const result = await handlePauseResume(options, action);
+        const result = await withCommandRunTelemetry(
+          action === 'pause' ? 'pause.online-eval' : 'resume.online-eval',
+          { ref_type: cliOptions.arn ? 'arn' : 'name' },
+          () => handlePauseResume(options, action)
+        );
 
         if (cliOptions.json) {
           console.log(JSON.stringify(serializeResult(result)));
@@ -58,14 +62,14 @@ function registerOnlineEvalSubcommand(parent: Command, action: 'pause' | 'resume
           render(<Text color="red">{result.error.message}</Text>);
         }
 
-        process.exit(result.success ? 0 : 1);
+        await finalizeAndExit(result.success ? 0 : 1);
       } catch (error) {
         if (cliOptions.json) {
           console.log(JSON.stringify({ success: false, error: getErrorMessage(error) }));
         } else {
           render(<Text color="red">Error: {getErrorMessage(error)}</Text>);
         }
-        process.exit(1);
+        await finalizeAndExit(1);
       }
     });
 }
@@ -138,7 +142,11 @@ function registerOnlineInsightsSubcommand(parent: Command, action: 'pause' | 're
       };
 
       try {
-        const result = await handlePauseResume(options, action);
+        const result = await withCommandRunTelemetry(
+          action === 'pause' ? 'pause.online-insights' : 'resume.online-insights',
+          { ref_type: cliOptions.arn ? 'arn' : 'name' },
+          () => handlePauseResume(options, action)
+        );
 
         if (cliOptions.json) {
           console.log(JSON.stringify(serializeResult(result)));
@@ -149,14 +157,14 @@ function registerOnlineInsightsSubcommand(parent: Command, action: 'pause' | 're
           render(<Text color="red">{result.error.message}</Text>);
         }
 
-        process.exit(result.success ? 0 : 1);
+        await finalizeAndExit(result.success ? 0 : 1);
       } catch (error) {
         if (cliOptions.json) {
           console.log(JSON.stringify({ success: false, error: getErrorMessage(error) }));
         } else {
           render(<Text color="red">Error: {getErrorMessage(error)}</Text>);
         }
-        process.exit(1);
+        await finalizeAndExit(1);
       }
     });
 }

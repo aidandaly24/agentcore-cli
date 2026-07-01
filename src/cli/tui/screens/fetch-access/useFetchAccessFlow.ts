@@ -9,6 +9,8 @@ import {
   listGateways,
   listHarnesses,
 } from '../../../operations/fetch-access';
+import { withCommandRunTelemetry } from '../../../telemetry/cli-command-run.js';
+import { ResourceType, standardize } from '../../../telemetry/schemas/common-shapes.js';
 import { spawn } from 'node:child_process';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -122,12 +124,22 @@ export function useFetchAccessFlow() {
 
     const resource = state.selectedResource;
 
-    const fetchToken: Promise<TokenFetchResult> =
-      resource.resourceType === 'gateway'
-        ? fetchGatewayToken(resource.name)
-        : resource.resourceType === 'harness'
-          ? fetchTokenAccess(resource, fetchHarnessToken)
-          : fetchTokenAccess(resource, fetchRuntimeToken);
+    // Record cli.command_run for the TUI fetch path. The fetch result is captured via
+    // closure; the wrapper observes only success/throw to drive exit_reason/error_name.
+    let captured: TokenFetchResult;
+    const fetchToken: Promise<TokenFetchResult> = withCommandRunTelemetry(
+      'fetch.access',
+      { resource_type: standardize(ResourceType, resource.resourceType) },
+      async () => {
+        captured =
+          resource.resourceType === 'gateway'
+            ? await fetchGatewayToken(resource.name)
+            : resource.resourceType === 'harness'
+              ? await fetchTokenAccess(resource, fetchHarnessToken)
+              : await fetchTokenAccess(resource, fetchRuntimeToken);
+        return { success: true as const };
+      }
+    ).then(() => captured);
 
     fetchToken
       .then(result => {

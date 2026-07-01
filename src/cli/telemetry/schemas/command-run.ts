@@ -8,6 +8,7 @@ import {
   AuthType,
   AuthorizerType,
   BuildType,
+  ConfigAction,
   Count,
   CredentialType,
   DeployModeSchema,
@@ -172,6 +173,10 @@ const RunIngestAttrs = safeSchema({
 
 const FetchAccessAttrs = safeSchema({ resource_type: ResourceType });
 
+// config_action is derived from key/value presence. The key/value themselves are
+// never recorded — they can carry secrets (e.g. telemetry endpoint) or PII.
+const ConfigAttrs = safeSchema({ config_action: ConfigAction });
+
 /**
  * Async job commands (recommendation + batch-evaluation), keyed by verb with job_type to disambiguate.
  * safeSchema only permits required enum/boolean/number/literal fields, so per-type detail enums
@@ -253,6 +258,7 @@ export const COMMAND_SCHEMAS = {
   'resume.job': JobTypeOnlyAttrs,
   'promote.job': JobTypeOnlyAttrs,
   'fetch.access': FetchAccessAttrs,
+  config: ConfigAttrs,
   feedback: FeedbackAttrs,
   update: UpdateAttrs,
   'pause.online-eval': PauseResumeOnlineEvalAttrs,

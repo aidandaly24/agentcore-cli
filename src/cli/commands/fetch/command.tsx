@@ -1,6 +1,6 @@
 import { COMMAND_DESCRIPTIONS } from '../../constants';
 import { getErrorMessage } from '../../errors';
-import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
+import { finalizeAndExit, withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
 import { ResourceType, standardize } from '../../telemetry/schemas/common-shapes.js';
 import { requireProject } from '../../tui/guards';
 import { handleFetchAccess } from './action';
@@ -48,7 +48,7 @@ export const registerFetch = (program: Command) => {
         } else {
           render(<Text color="red">Error: {getErrorMessage(error)}</Text>);
         }
-        process.exit(1);
+        await finalizeAndExit(1);
         return;
       }
 
@@ -77,7 +77,7 @@ export const registerFetch = (program: Command) => {
             </Box>
           );
         }
-        process.exit(1);
+        await finalizeAndExit(1);
         return;
       }
 

@@ -17,7 +17,7 @@ import type {
   StartBatchEvaluationJobOptions,
 } from '../../operations/jobs';
 import { printABTestDetail } from '../../operations/jobs/ab-test/format';
-import { runCliCommand } from '../../telemetry/cli-command-run';
+import { finalizeAndExit, runCliCommand, withCommandRunTelemetry } from '../../telemetry/cli-command-run';
 import { requireProject } from '../../tui/guards';
 import type { Command } from '@commander-js/extra-typings';
 import { Text, render } from 'ink';
@@ -168,7 +168,17 @@ export const registerRun = (program: Command) => {
         };
 
         try {
-          const result = await handleRunEval(options);
+          const result = await withCommandRunTelemetry(
+            'run.eval',
+            {
+              evaluator_count: options.evaluator.length + (options.evaluatorArn?.length ?? 0),
+              ref_type: options.agentArn ? 'arn' : 'name',
+              has_assertions: !!options.assertions?.length,
+              has_expected_trajectory: !!options.expectedTrajectory?.length,
+              has_expected_response: !!options.expectedResponse,
+            },
+            () => handleRunEval(options)
+          );
 
           if (cliOptions.json) {
             console.log(JSON.stringify(serializeResult(result)));
@@ -179,14 +189,14 @@ export const registerRun = (program: Command) => {
             render(<Text color="red">{result.error.message}</Text>);
           }
 
-          process.exit(result.success ? 0 : 1);
+          await finalizeAndExit(result.success ? 0 : 1);
         } catch (error) {
           if (cliOptions.json) {
             console.log(JSON.stringify({ success: false, error: getErrorMessage(error) }));
           } else {
             render(<Text color="red">Error: {getErrorMessage(error)}</Text>);
           }
-          process.exit(1);
+          await finalizeAndExit(1);
         }
       }
     );
