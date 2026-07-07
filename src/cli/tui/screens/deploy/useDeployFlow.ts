@@ -165,7 +165,15 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
   const deployStacks = useMemo(() => {
     if (skipPreflight) return undefined;
     const projectName = context?.projectSpec.name;
-    if (!projectName || !selectedTargets || selectedTargets.length === 0) return undefined;
+    if (!projectName) return undefined;
+    // No picker selection provided at all (programmatic / non-interactive callers): keep the
+    // unscoped assembly, matching prior behavior for single-target and CLI-parity paths.
+    if (selectedTargets === undefined) return undefined;
+    // A picker selection is present — scope to exactly those stacks. An EMPTY selection must NOT
+    // silently fall through to ALL_STACKS (that would re-latent the #1267 bug): PATTERN_MUST_MATCH
+    // with no patterns makes toolkit-lib throw NoStacksMatched, so an unexpected empty pick fails
+    // safe (deploys nothing) instead of provisioning every configured target. The picker blocks
+    // empty selections today, so this is defense-in-depth rather than a reachable path.
     return {
       strategy: StackSelectionStrategy.PATTERN_MUST_MATCH,
       patterns: selectedTargets.map(t => toStackName(projectName, t.name)),
@@ -924,7 +932,22 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
         // their own start/end pairs, so this usually no-ops).
         logger.endStep('success');
         logger.finalize(true);
-        setDeployOutput(`Deployed ${stackNames.length} stack(s): ${stackNames.join(', ')}`);
+        // Report the stacks that were actually deployed — the picker-scoped set, not the full
+        // synthesized list (issue #1267). deployStacks is undefined on the single-target / plan
+        // path, where the lone synthesized stack in stackNames is exactly what deployed.
+        const deployedStackNames = deployStacks?.patterns ?? stackNames;
+        setDeployOutput(`Deployed ${deployedStackNames.length} stack(s): ${deployedStackNames.join(', ')}`);
+
+        // A multi-target pick deploys every selected stack, but the post-deploy bookkeeping above
+        // (persist state, transaction search) only covers `activeTarget` — the first selected
+        // target — so the other targets would silently have no recorded state or traces. Warn
+        // until full per-target bookkeeping lands as a follow-up (issue #1267).
+        if ((deployStacks?.patterns?.length ?? 0) > 1) {
+          setDeployNotes(prev => [
+            ...prev,
+            `Deployed ${deployStacks!.patterns.length} targets, but deployed-state and transaction search were recorded only for "${activeTarget?.name}". Re-run deploy selecting each remaining target to record its state and enable transaction search there.`,
+          ]);
+        }
         return { success: true } as const;
       } catch (err) {
         const errorMsg = getErrorMessage(err);
