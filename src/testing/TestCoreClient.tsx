@@ -8,6 +8,9 @@ import type {
   CreateHarnessEndpointResponse,
   CreateHarnessResponse,
   DeleteApiKeyCredentialProviderResponse,
+  DeleteGatewayResponse,
+  DeleteGatewayRuleResponse,
+  DeleteGatewayTargetResponse,
   DeleteOauth2CredentialProviderResponse,
   DeleteHarnessEndpointRequest,
   DeleteHarnessEndpointResponse,
@@ -186,14 +189,17 @@ const DEFAULT_CREATE_GATEWAY_RESPONSE = {} as CreateGatewayResponse;
 const DEFAULT_UPDATE_GATEWAY_RESPONSE = {} as UpdateGatewayResponse;
 const DEFAULT_GET_GATEWAY_RESPONSE = {} as GetGatewayResponse;
 const DEFAULT_LIST_GATEWAYS_RESPONSE: ListGatewaysResponse = { items: [] };
+const DEFAULT_DELETE_GATEWAY_RESPONSE = {} as DeleteGatewayResponse;
 const DEFAULT_CREATE_GATEWAY_TARGET_RESPONSE = {} as CreateGatewayTargetResponse;
 const DEFAULT_UPDATE_GATEWAY_TARGET_RESPONSE = {} as UpdateGatewayTargetResponse;
 const DEFAULT_GET_GATEWAY_TARGET_RESPONSE = {} as GetGatewayTargetResponse;
 const DEFAULT_LIST_GATEWAY_TARGETS_RESPONSE: ListGatewayTargetsResponse = { items: [] };
+const DEFAULT_DELETE_GATEWAY_TARGET_RESPONSE = {} as DeleteGatewayTargetResponse;
 const DEFAULT_CREATE_GATEWAY_RULE_RESPONSE = {} as CreateGatewayRuleResponse;
 const DEFAULT_UPDATE_GATEWAY_RULE_RESPONSE = {} as UpdateGatewayRuleResponse;
 const DEFAULT_GET_GATEWAY_RULE_RESPONSE = {} as GetGatewayRuleResponse;
 const DEFAULT_LIST_GATEWAY_RULES_RESPONSE: ListGatewayRulesResponse = { gatewayRules: [] };
+const DEFAULT_DELETE_GATEWAY_RULE_RESPONSE = {} as DeleteGatewayRuleResponse;
 const DEFAULT_CREATE_OAUTH2_RESPONSE = {} as CreateOauth2CredentialProviderResponse;
 const DEFAULT_GET_OAUTH2_RESPONSE = {} as GetOauth2CredentialProviderResponse;
 const DEFAULT_LIST_OAUTH2_RESPONSE: ListOauth2CredentialProvidersResponse = {
@@ -843,12 +849,16 @@ export class TestGatewayClient implements CoreGatewayClient {
 
   private getResponse: GetGatewayResponse = DEFAULT_GET_GATEWAY_RESPONSE;
   private listResponses = new Map<string | undefined, ListGatewaysResponse>();
+  private deleteResponse: DeleteGatewayResponse = DEFAULT_DELETE_GATEWAY_RESPONSE;
   private getTargetResponse: GetGatewayTargetResponse = DEFAULT_GET_GATEWAY_TARGET_RESPONSE;
   private listTargetResponses = new Map<string | undefined, ListGatewayTargetsResponse>();
   private getConnectorResponse: GetGatewayTargetResponse = DEFAULT_GET_GATEWAY_TARGET_RESPONSE;
   private listConnectorResponses = new Map<string | undefined, ListGatewayTargetsResponse>();
+  private deleteTargetResponse: DeleteGatewayTargetResponse =
+    DEFAULT_DELETE_GATEWAY_TARGET_RESPONSE;
   private getRuleResponse: GetGatewayRuleResponse = DEFAULT_GET_GATEWAY_RULE_RESPONSE;
   private listRuleResponses = new Map<string | undefined, ListGatewayRulesResponse>();
+  private deleteRuleResponse: DeleteGatewayRuleResponse = DEFAULT_DELETE_GATEWAY_RULE_RESPONSE;
   private error?: Error;
 
   setGetResponse(response: GetGatewayResponse): this {
@@ -858,6 +868,11 @@ export class TestGatewayClient implements CoreGatewayClient {
 
   setListResponse(response: ListGatewaysResponse, forNextToken?: string): this {
     this.listResponses.set(forNextToken, response);
+    return this;
+  }
+
+  setDeleteResponse(response: DeleteGatewayResponse): this {
+    this.deleteResponse = response;
     return this;
   }
 
@@ -881,6 +896,11 @@ export class TestGatewayClient implements CoreGatewayClient {
     return this;
   }
 
+  setDeleteTargetResponse(response: DeleteGatewayTargetResponse): this {
+    this.deleteTargetResponse = response;
+    return this;
+  }
+
   setGetRuleResponse(response: GetGatewayRuleResponse): this {
     this.getRuleResponse = response;
     return this;
@@ -888,6 +908,11 @@ export class TestGatewayClient implements CoreGatewayClient {
 
   setListRulesResponse(response: ListGatewayRulesResponse, forNextToken?: string): this {
     this.listRuleResponses.set(forNextToken, response);
+    return this;
+  }
+
+  setDeleteRuleResponse(response: DeleteGatewayRuleResponse): this {
+    this.deleteRuleResponse = response;
     return this;
   }
 
@@ -932,6 +957,12 @@ export class TestGatewayClient implements CoreGatewayClient {
       this.listResponses.get(undefined) ??
       DEFAULT_LIST_GATEWAYS_RESPONSE
     );
+  }
+
+  async deleteGateway(id: string, options: CoreOptions): Promise<DeleteGatewayResponse> {
+    this.calls.push({ method: "deleteGateway", args: [id, options] });
+    if (this.error) throw this.error;
+    return this.deleteResponse;
   }
 
   async createGatewayTarget(
@@ -1017,6 +1048,16 @@ export class TestGatewayClient implements CoreGatewayClient {
     );
   }
 
+  async deleteGatewayTarget(
+    gatewayId: string,
+    targetId: string,
+    options: CoreOptions,
+  ): Promise<DeleteGatewayTargetResponse> {
+    this.calls.push({ method: "deleteGatewayTarget", args: [gatewayId, targetId, options] });
+    if (this.error) throw this.error;
+    return this.deleteTargetResponse;
+  }
+
   async createGatewayRule(
     input: CreateGatewayRuleInput,
     options: CoreOptions,
@@ -1061,6 +1102,15 @@ export class TestGatewayClient implements CoreGatewayClient {
       this.listRuleResponses.get(undefined) ??
       DEFAULT_LIST_GATEWAY_RULES_RESPONSE
     );
+  }
+  async deleteGatewayRule(
+    gatewayId: string,
+    ruleId: string,
+    options: CoreOptions,
+  ): Promise<DeleteGatewayRuleResponse> {
+    this.calls.push({ method: "deleteGatewayRule", args: [gatewayId, ruleId, options] });
+    if (this.error) throw this.error;
+    return this.deleteRuleResponse;
   }
 }
 
