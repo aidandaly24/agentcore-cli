@@ -5,6 +5,9 @@ import type {
   CreateGatewayRuleResponse,
   CreateGatewayTargetRequest,
   CreateGatewayTargetResponse,
+  DeleteGatewayResponse,
+  DeleteGatewayRuleResponse,
+  DeleteGatewayTargetResponse,
   GetGatewayResponse,
   GetGatewayRuleResponse,
   GetGatewayTargetResponse,
@@ -84,6 +87,7 @@ export interface CoreGatewayClient {
     maxResults: number | undefined,
     options: CoreOptions,
   ): Promise<ListGatewaysResponse>;
+  deleteGateway(id: string, options: CoreOptions): Promise<DeleteGatewayResponse>;
   getGatewayTarget(
     gatewayId: string,
     targetId: string,
@@ -118,6 +122,11 @@ export interface CoreGatewayClient {
     patch: GatewayTargetUpdatePatch,
     options: CoreOptions,
   ): Promise<UpdateGatewayTargetResponse>;
+  deleteGatewayTarget(
+    gatewayId: string,
+    targetId: string,
+    options: CoreOptions,
+  ): Promise<DeleteGatewayTargetResponse>;
   getGatewayRule(
     gatewayId: string,
     ruleId: string,
@@ -137,4 +146,9 @@ export interface CoreGatewayClient {
     input: GatewayRuleUpdateInput,
     options: CoreOptions,
   ): Promise<UpdateGatewayRuleResponse>;
+  deleteGatewayRule(
+    gatewayId: string,
+    ruleId: string,
+    options: CoreOptions,
+  ): Promise<DeleteGatewayRuleResponse>;
 }
