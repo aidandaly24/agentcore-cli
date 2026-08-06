@@ -1,7 +1,13 @@
 {
+<<<<<<<< HEAD:src/handlers/gateway/__fixtures__/create/GetGatewayRuleCommand.136772a9fb296e8a.json
   "ruleId": "4acca581-009b-45ff-ad03-a8aed0c53b33",
   "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gw-pr2final737dv2-9fsgqbtcou",
   "priority": 10,
+========
+  "ruleId": "0e952280-1a16-4c44-8a81-ad7b73c5d693",
+  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:gateway/agentcore-cli-gateway-create-fixture-gyqeg9v9tq",
+  "priority": 20,
+>>>>>>>> 5fd7d5d4 (feat(gateway): add update commands):src/handlers/gateway/__fixtures__/create/GetGatewayRuleCommand.dbbb8ff3370c85e8.json
   "actions": [
     {
       "routeToTarget": {
@@ -12,11 +18,19 @@
     }
   ],
   "createdAt": {
+<<<<<<<< HEAD:src/handlers/gateway/__fixtures__/create/GetGatewayRuleCommand.136772a9fb296e8a.json
     "$date": "2026-08-12T22:10:14.019Z"
+========
+    "$date": "2026-08-06T20:33:28.448Z"
+>>>>>>>> 5fd7d5d4 (feat(gateway): add update commands):src/handlers/gateway/__fixtures__/create/GetGatewayRuleCommand.dbbb8ff3370c85e8.json
   },
   "status": "ACTIVE",
-  "description": "Disposable Gateway Rule Create fixture",
+  "description": "Updated Rule fixture",
   "updatedAt": {
+<<<<<<<< HEAD:src/handlers/gateway/__fixtures__/create/GetGatewayRuleCommand.136772a9fb296e8a.json
     "$date": "2026-08-12T22:10:14.019Z"
+========
+    "$date": "2026-08-06T20:33:44.959Z"
+>>>>>>>> 5fd7d5d4 (feat(gateway): add update commands):src/handlers/gateway/__fixtures__/create/GetGatewayRuleCommand.dbbb8ff3370c85e8.json
   }
 }
