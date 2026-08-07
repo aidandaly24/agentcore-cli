@@ -195,6 +195,12 @@ type FixtureState = {
   ruleId: string;
 };
 
+type FixtureResources = {
+  gatewayId?: string;
+  targetIds: string[];
+  ruleId?: string;
+};
+
 function createFixtureCore(): CoreClient {
   const { createControlClient, createDataClient, createIamClient } = fixtureFactories(FIXTURES);
   return new CoreClient({
@@ -220,7 +226,7 @@ class GatewayDeleteFixture {
   private readonly control = createControlClient({ region: "us-east-1" });
   private readonly iam = createIamClient({ region: "us-east-1" });
 
-  async setup(): Promise<FixtureState> {
+  async setup(resources: FixtureResources): Promise<FixtureState> {
     await this.ignoreMissing(() =>
       this.iam.send(new DeleteRolePolicyCommand({ RoleName: ROLE_NAME, PolicyName: POLICY_NAME })),
     );
@@ -254,6 +260,7 @@ class GatewayDeleteFixture {
     if (!gateway.gatewayId || !gateway.gatewayArn) {
       throw new Error("CreateGateway did not return fixture identifiers");
     }
+    resources.gatewayId = gateway.gatewayId;
     await this.waitUntil(
       () => this.control.send(new GetGatewayCommand({ gatewayIdentifier: gateway.gatewayId })),
       (response) => response.status === "READY",
@@ -295,6 +302,11 @@ class GatewayDeleteFixture {
         },
       }),
     );
+    if (!target.targetId) {
+      throw new Error("CreateGatewayTarget did not return the fixture Target ID");
+    }
+    resources.targetIds.push(target.targetId);
+
     const connector = await this.control.send(
       new CreateGatewayTargetCommand({
         gatewayIdentifier: gateway.gatewayId,
@@ -315,9 +327,10 @@ class GatewayDeleteFixture {
         credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
       }),
     );
-    if (!target.targetId || !connector.targetId) {
-      throw new Error("CreateGatewayTarget did not return fixture identifiers");
+    if (!connector.targetId) {
+      throw new Error("CreateGatewayTarget did not return the fixture Connector ID");
     }
+    resources.targetIds.push(connector.targetId);
     await Promise.all(
       [target.targetId, connector.targetId].map((targetId) =>
         this.waitUntil(
@@ -349,6 +362,7 @@ class GatewayDeleteFixture {
       }),
     );
     if (!rule.ruleId) throw new Error("CreateGatewayRule did not return the fixture rule ID");
+    resources.ruleId = rule.ruleId;
     await this.waitUntil(
       () =>
         this.control.send(
@@ -377,47 +391,53 @@ class GatewayDeleteFixture {
     await this.waitUntilMissing(operation);
   }
 
-  async cleanup(state: FixtureState): Promise<void> {
-    await this.ignoreMissing(() =>
-      this.control.send(
-        new DeleteGatewayRuleCommand({
-          gatewayIdentifier: state.gatewayId,
-          ruleId: state.ruleId,
-        }),
-      ),
-    );
-    await this.waitUntilMissing(() =>
-      this.control.send(
-        new GetGatewayRuleCommand({
-          gatewayIdentifier: state.gatewayId,
-          ruleId: state.ruleId,
-        }),
-      ),
-    );
-    for (const targetId of [state.targetId, state.connectorId]) {
+  async cleanup(resources: FixtureResources): Promise<void> {
+    if (resources.gatewayId && resources.ruleId) {
       await this.ignoreMissing(() =>
         this.control.send(
-          new DeleteGatewayTargetCommand({
-            gatewayIdentifier: state.gatewayId,
-            targetId,
+          new DeleteGatewayRuleCommand({
+            gatewayIdentifier: resources.gatewayId,
+            ruleId: resources.ruleId,
           }),
         ),
       );
       await this.waitUntilMissing(() =>
         this.control.send(
-          new GetGatewayTargetCommand({
-            gatewayIdentifier: state.gatewayId,
-            targetId,
+          new GetGatewayRuleCommand({
+            gatewayIdentifier: resources.gatewayId,
+            ruleId: resources.ruleId,
           }),
         ),
       );
     }
-    await this.ignoreMissing(() =>
-      this.control.send(new DeleteGatewayCommand({ gatewayIdentifier: state.gatewayId })),
-    );
-    await this.waitUntilMissing(() =>
-      this.control.send(new GetGatewayCommand({ gatewayIdentifier: state.gatewayId })),
-    );
+
+    if (resources.gatewayId) {
+      for (const targetId of resources.targetIds) {
+        await this.ignoreMissing(() =>
+          this.control.send(
+            new DeleteGatewayTargetCommand({
+              gatewayIdentifier: resources.gatewayId,
+              targetId,
+            }),
+          ),
+        );
+        await this.waitUntilMissing(() =>
+          this.control.send(
+            new GetGatewayTargetCommand({
+              gatewayIdentifier: resources.gatewayId,
+              targetId,
+            }),
+          ),
+        );
+      }
+      await this.ignoreMissing(() =>
+        this.control.send(new DeleteGatewayCommand({ gatewayIdentifier: resources.gatewayId })),
+      );
+      await this.waitUntilMissing(() =>
+        this.control.send(new GetGatewayCommand({ gatewayIdentifier: resources.gatewayId })),
+      );
+    }
+
     await this.ignoreMissing(() =>
       this.iam.send(
         new DeleteRolePolicyCommand({
@@ -469,11 +489,13 @@ test(
   "deletes a Rule, Target, Connector, and Gateway through the real Core",
   async () => {
     const fixture = new GatewayDeleteFixture();
-    const state = isRecording()
-      ? await fixture.setup()
-      : (JSON.parse(readFileSync(RESOURCE_STATE, "utf8")) as FixtureState);
+    const resources: FixtureResources = { targetIds: [] };
 
     try {
+      const state = isRecording()
+        ? await fixture.setup(resources)
+        : (JSON.parse(readFileSync(RESOURCE_STATE, "utf8")) as FixtureState);
+
       const ruleStdout = await runFixture([
         "gateway",
         "rule",
@@ -543,7 +565,7 @@ test(
         ),
       );
     } finally {
-      if (isRecording()) await fixture.cleanup(state);
+      if (isRecording()) await fixture.cleanup(resources);
     }
   },
   FLOW_TIMEOUT,
