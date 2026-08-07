@@ -81,6 +81,7 @@ describe("gateway command hierarchy", () => {
       "update",
       "get",
       "list",
+      "delete",
     ]);
     expect(rule?.children().map((child) => child.name())).toEqual([
       "create",

@@ -619,6 +619,7 @@ export class GatewayClient implements CoreGatewayClient {
   ): Promise<UpdateGatewayRuleResponse> {
     return this.clients.control(toClientConfig(options)).send(new UpdateGatewayRuleCommand(input));
   }
+
   async deleteGatewayRule(
     gatewayId: string,
     ruleId: string,
