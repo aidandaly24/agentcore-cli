@@ -1,0 +1,213 @@
+{
+  "$sequence": [
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:28.051Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway before update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:28.051Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway before update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.025Z"
+      },
+      "status": "UPDATING",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway before update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:27.392Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:43.490Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-update-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-update-fixture-oekefzo7r6.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Gateway after update",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-update-fixture-oekefzo7r6"
+      }
+    }
+  ]
+}

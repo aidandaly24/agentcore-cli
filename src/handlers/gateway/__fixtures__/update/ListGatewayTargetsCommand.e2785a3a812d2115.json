@@ -1,0 +1,184 @@
+{
+  "$sequence": [
+    {
+      "items": [
+        {
+          "targetId": "GUYJRMTLLR",
+          "name": "http-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.777Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.329Z"
+          },
+          "description": "Target before update",
+          "targetType": "PASSTHROUGH"
+        },
+        {
+          "targetId": "Z6OLJQ9NUE",
+          "name": "web-search-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.966Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.610Z"
+          },
+          "description": "Connector before update",
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": [
+        {
+          "targetId": "GUYJRMTLLR",
+          "name": "http-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.777Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.329Z"
+          },
+          "description": "Target before update",
+          "targetType": "PASSTHROUGH"
+        },
+        {
+          "targetId": "Z6OLJQ9NUE",
+          "name": "web-search-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.966Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.610Z"
+          },
+          "description": "Connector before update",
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": [
+        {
+          "targetId": "GUYJRMTLLR",
+          "name": "http-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.777Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.329Z"
+          },
+          "description": "Target before update",
+          "targetType": "PASSTHROUGH"
+        },
+        {
+          "targetId": "Z6OLJQ9NUE",
+          "name": "web-search-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.966Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.610Z"
+          },
+          "description": "Connector before update",
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": [
+        {
+          "targetId": "GUYJRMTLLR",
+          "name": "http-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:57.229Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:57.229Z"
+          },
+          "description": "Target after update",
+          "targetType": "PASSTHROUGH"
+        },
+        {
+          "targetId": "Z6OLJQ9NUE",
+          "name": "web-search-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.966Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.610Z"
+          },
+          "description": "Connector before update",
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": [
+        {
+          "targetId": "GUYJRMTLLR",
+          "name": "http-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:57.229Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:57.229Z"
+          },
+          "description": "Target after update",
+          "targetType": "PASSTHROUGH"
+        },
+        {
+          "targetId": "Z6OLJQ9NUE",
+          "name": "web-search-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:29.966Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:30.610Z"
+          },
+          "description": "Connector before update",
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": [
+        {
+          "targetId": "GUYJRMTLLR",
+          "name": "http-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:57.229Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:57.229Z"
+          },
+          "description": "Target after update",
+          "targetType": "PASSTHROUGH"
+        },
+        {
+          "targetId": "Z6OLJQ9NUE",
+          "name": "web-search-update-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:01:11.868Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:01:11.868Z"
+          },
+          "description": "Connector after update",
+          "targetType": "CONNECTOR"
+        }
+      ]
+    }
+  ]
+}

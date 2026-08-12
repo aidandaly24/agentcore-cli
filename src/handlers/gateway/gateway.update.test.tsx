@@ -20,6 +20,7 @@ import {
 } from "@aws-sdk/client-iam";
 import { CoreClient } from "../../core";
 import { createControlClient, createIamClient } from "../../core/factories";
+import { ExecutionRoleManager } from "../../core/executionRoleManager";
 import {
   createSilentLogger,
   fixtureFactories,
@@ -144,6 +145,7 @@ describe("Gateway update patch mapping", () => {
       "--policy-engine-mode",
       "enforce",
       "--clear-exception-level",
+      "--skip-role-policy-update",
     ]);
 
     expect(core.gateway.calls.find((call) => call.method === "updateGateway")?.args[0]).toEqual({
@@ -152,6 +154,7 @@ describe("Gateway update patch mapping", () => {
       clearProtocol: true,
       policyEngineConfiguration: { mode: "ENFORCE" },
       exceptionLevel: null,
+      skipRolePolicyUpdate: true,
     });
   });
 
@@ -168,6 +171,7 @@ describe("Gateway update patch mapping", () => {
       '{"http":{"passthrough":{"endpoint":"https://example.test","protocolType":"CUSTOM"}}}',
       "--clear-description",
       "--clear-credential-provider-configurations",
+      "--skip-role-policy-update",
     ]);
 
     expect(
@@ -180,6 +184,7 @@ describe("Gateway update patch mapping", () => {
         http: { passthrough: { endpoint: "https://example.test", protocolType: "CUSTOM" } },
       },
       credentialProviderConfigurations: null,
+      skipRolePolicyUpdate: true,
     });
   });
 
@@ -194,6 +199,7 @@ describe("Gateway update patch mapping", () => {
       "target-1",
       "--connector",
       "web-search",
+      "--skip-role-policy-update",
     ]);
 
     expect(
@@ -214,6 +220,7 @@ describe("Gateway update patch mapping", () => {
           },
         },
       },
+      skipRolePolicyUpdate: true,
     });
   });
 
@@ -249,8 +256,12 @@ const REGION = "us-east-1";
 const FIXTURES = join(import.meta.dir, "__fixtures__", "update");
 const RESOURCE_STATE = join(FIXTURES, "resources.json");
 const GATEWAY_NAME = "agentcore-cli-gateway-update-fixture";
-const ROLE_NAME = "AgentCoreCliGatewayUpdateFixtureRole";
-const POLICY_NAME = "AgentCoreCliGatewayUpdateFixture";
+const ROLE_NAME = "AgentCoreCliGateway-agentcore-cli-gateway-update-fixture";
+const POLICY_NAME = ExecutionRoleManager.generatedPolicyName("gateway", {
+  accountId: "603141041947",
+  region: REGION,
+  stableResourceKey: ROLE_NAME,
+});
 const HTTP_TARGET_NAME = "http-update-fixture";
 const CONNECTOR_TARGET_NAME = "web-search-update-fixture";
 const FLOW_TIMEOUT = 600_000;
@@ -272,6 +283,15 @@ function createFixtureCore(): CoreClient {
     createIamClient,
     createLogsClient,
     logger: createSilentLogger(),
+    gatewayOptions: isRecording()
+      ? undefined
+      : {
+          policyUpdater: {
+            propagationDelayMs: 0,
+            retryDelayMs: 0,
+          },
+          waitDelayMs: 0,
+        },
   });
 }
 

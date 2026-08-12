@@ -1,0 +1,22 @@
+{
+  "$sequence": [
+    {
+      "PolicyNames": [
+        "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a"
+      ],
+      "IsTruncated": false
+    },
+    {
+      "PolicyNames": [
+        "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a"
+      ],
+      "IsTruncated": false
+    },
+    {
+      "PolicyNames": [
+        "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a"
+      ],
+      "IsTruncated": false
+    }
+  ]
+}

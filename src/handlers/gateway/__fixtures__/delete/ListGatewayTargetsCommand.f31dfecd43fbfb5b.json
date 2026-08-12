@@ -1,0 +1,67 @@
+{
+  "$sequence": [
+    {
+      "items": [
+        {
+          "targetId": "LPEKLWUKBV",
+          "name": "http-delete-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:40.485Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:41.055Z"
+          },
+          "targetType": "PASSTHROUGH"
+        },
+        {
+          "targetId": "QQW3OGRIPL",
+          "name": "web-search-delete-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:40.681Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:41.389Z"
+          },
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": [
+        {
+          "targetId": "QQW3OGRIPL",
+          "name": "web-search-delete-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:40.681Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:41.389Z"
+          },
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": [
+        {
+          "targetId": "QQW3OGRIPL",
+          "name": "web-search-delete-fixture",
+          "status": "READY",
+          "createdAt": {
+            "$date": "2026-08-12T23:00:40.681Z"
+          },
+          "updatedAt": {
+            "$date": "2026-08-12T23:00:41.389Z"
+          },
+          "targetType": "CONNECTOR"
+        }
+      ]
+    },
+    {
+      "items": []
+    }
+  ]
+}

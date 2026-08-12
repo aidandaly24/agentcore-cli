@@ -1,8 +1,12 @@
 {
   "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
   "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
-  "createdAt": "2026-08-12T23:00:27.392Z",
-  "updatedAt": "2026-08-12T23:00:43.025Z",
+  "createdAt": {
+    "$date": "2026-08-12T23:00:27.392Z"
+  },
+  "updatedAt": {
+    "$date": "2026-08-12T23:00:43.025Z"
+  },
   "status": "UPDATING",
   "name": "agentcore-cli-gateway-update-fixture",
   "authorizerType": "NONE",

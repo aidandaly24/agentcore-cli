@@ -1,6 +1,4 @@
 {
-<<<<<<<< HEAD:src/handlers/gateway/__fixtures__/create/GetGatewayTargetCommand.d38d917375a78a69.json
-<<<<<<<< HEAD:src/handlers/gateway/__fixtures__/create/GetGatewayTargetCommand.d38d917375a78a69.json
   "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gw-pr2final737dv2-9fsgqbtcou",
   "targetId": "SAANHUVEQA",
   "createdAt": {
@@ -8,23 +6,6 @@
   },
   "updatedAt": {
     "$date": "2026-08-12T22:10:12.270Z"
-========
-  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:gateway/agentcore-cli-gateway-create-fixture-gyqeg9v9tq",
-  "targetId": "8U0ZVM6TPN",
-========
-  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:gateway/agentcore-cli-gateway-create-fixture-bkf6yayfce",
-  "targetId": "U4ADV7VNSV",
->>>>>>>> ab16e7c3 (test(gateway): isolate update fixtures):src/handlers/gateway/__fixtures__/create/GetGatewayTargetCommand.3855b58e8bc470ab.json
-  "createdAt": {
-    "$date": "2026-08-06T17:25:52.273Z"
-  },
-  "updatedAt": {
-<<<<<<<< HEAD:src/handlers/gateway/__fixtures__/create/GetGatewayTargetCommand.d38d917375a78a69.json
-    "$date": "2026-08-06T20:33:40.529Z"
->>>>>>>> 5fd7d5d4 (feat(gateway): add update commands):src/handlers/gateway/__fixtures__/create/GetGatewayTargetCommand.cda1fd397005aa48.json
-========
-    "$date": "2026-08-06T17:25:53.039Z"
->>>>>>>> ab16e7c3 (test(gateway): isolate update fixtures):src/handlers/gateway/__fixtures__/create/GetGatewayTargetCommand.3855b58e8bc470ab.json
   },
   "status": "READY",
   "name": "web-search-fixture",

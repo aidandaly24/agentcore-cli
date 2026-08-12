@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { GetGatewayCommand } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
   GetRolePolicyCommand,
   ListRolePoliciesCommand,
@@ -72,6 +73,40 @@ describe("fixture IAM replay", () => {
       iam.send(new GetRolePolicyCommand({ RoleName: roleName, PolicyName: policyName })),
     ).resolves.toMatchObject({
       PolicyDocument: encodeURIComponent(secondDocument),
+    });
+  });
+});
+
+describe("fixture temporal replay", () => {
+  test("replays repeated command responses in order across client instances", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "agentcore-fixture-temporal-"));
+    directories.push(directory);
+    const command = new GetGatewayCommand({ gatewayIdentifier: "gateway-1" });
+    record(directory, command, {
+      $sequence: [
+        { gatewayId: "gateway-1", status: "READY" },
+        {
+          $error: {
+            name: "ResourceNotFoundException",
+            message: "Gateway no longer exists.",
+          },
+        },
+      ],
+    });
+    const firstClient = fixtureFactories(directory).createControlClient({
+      region: "us-west-2",
+    });
+    const secondClient = fixtureFactories(directory).createControlClient({
+      region: "us-west-2",
+    });
+
+    await expect(firstClient.send(command)).resolves.toMatchObject({
+      gatewayId: "gateway-1",
+      status: "READY",
+    });
+    await expect(secondClient.send(command)).rejects.toMatchObject({
+      name: "ResourceNotFoundException",
+      message: "Gateway no longer exists.",
     });
   });
 });

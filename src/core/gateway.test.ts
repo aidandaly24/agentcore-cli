@@ -273,24 +273,36 @@ function target(): GetGatewayTargetResponse {
 }
 
 test("maps Gateway, Target, and Rule selectors to their delete commands", async () => {
-  const { client, commands } = recordingGatewayClient([{}, {}, {}]);
+  const gatewayMissing = new Error("missing");
+  gatewayMissing.name = "ResourceNotFoundException";
+  const targetMissing = new Error("missing");
+  targetMissing.name = "ResourceNotFoundException";
+  const { client, commands } = recordingGatewayClient([
+    gateway(),
+    {},
+    gatewayMissing,
+    gateway(),
+    {},
+    targetMissing,
+    {},
+  ]);
 
   await client.deleteGateway("gateway-1", OPTIONS);
   await client.deleteGatewayTarget("gateway-1", "target-1", OPTIONS);
   await client.deleteGatewayRule("gateway-1", "rule-1", OPTIONS);
 
-  expect(commands).toHaveLength(3);
-  expect(commands[0]).toBeInstanceOf(DeleteGatewayCommand);
-  expect((commands[0] as DeleteGatewayCommand).input).toEqual({
+  expect(commands).toHaveLength(7);
+  expect(commands[1]).toBeInstanceOf(DeleteGatewayCommand);
+  expect((commands[1] as DeleteGatewayCommand).input).toEqual({
     gatewayIdentifier: "gateway-1",
   });
-  expect(commands[1]).toBeInstanceOf(DeleteGatewayTargetCommand);
-  expect((commands[1] as DeleteGatewayTargetCommand).input).toEqual({
+  expect(commands[4]).toBeInstanceOf(DeleteGatewayTargetCommand);
+  expect((commands[4] as DeleteGatewayTargetCommand).input).toEqual({
     gatewayIdentifier: "gateway-1",
     targetId: "target-1",
   });
-  expect(commands[2]).toBeInstanceOf(DeleteGatewayRuleCommand);
-  expect((commands[2] as DeleteGatewayRuleCommand).input).toEqual({
+  expect(commands[6]).toBeInstanceOf(DeleteGatewayRuleCommand);
+  expect((commands[6] as DeleteGatewayRuleCommand).input).toEqual({
     gatewayIdentifier: "gateway-1",
     ruleId: "rule-1",
   });
@@ -304,7 +316,9 @@ function recordingGatewayClient(responses: unknown[]): {
   const control = {
     send: async (command: unknown) => {
       commands.push(command);
-      return responses.shift();
+      const response = responses.shift();
+      if (response instanceof Error) throw response;
+      return response;
     },
   } as unknown as BedrockAgentCoreControlClient;
   const clients: AwsClients = {
@@ -326,7 +340,11 @@ async function gatewayUpdateInput(
   patch: GatewayUpdatePatch,
   current: GetGatewayResponse = gateway(),
 ): Promise<UpdateGatewayCommand["input"]> {
-  const { client, commands } = recordingGatewayClient([current, {}]);
+  const { client, commands } = recordingGatewayClient([
+    current,
+    { ...current, status: "UPDATING" },
+    { ...current, status: "READY" },
+  ]);
   await client.updateGateway(patch, OPTIONS);
   expect(commands[0]).toBeInstanceOf(GetGatewayCommand);
   expect((commands[0] as GetGatewayCommand).input).toEqual({
@@ -339,14 +357,19 @@ async function targetUpdateInput(
   patch: GatewayTargetUpdatePatch,
   current: GetGatewayTargetResponse = target(),
 ): Promise<UpdateGatewayTargetCommand["input"]> {
-  const { client, commands } = recordingGatewayClient([current, {}]);
+  const { client, commands } = recordingGatewayClient([
+    current,
+    gateway(),
+    { ...current, status: "UPDATING" },
+    { ...current, status: "READY" },
+  ]);
   await client.updateGatewayTarget(patch, OPTIONS);
   expect(commands[0]).toBeInstanceOf(GetGatewayTargetCommand);
   expect((commands[0] as GetGatewayTargetCommand).input).toEqual({
     gatewayIdentifier: patch.gatewayId,
     targetId: patch.targetId,
   });
-  return (commands[1] as UpdateGatewayTargetCommand).input;
+  return (commands[2] as UpdateGatewayTargetCommand).input;
 }
 
 describe("GatewayClient updateGateway", () => {
@@ -485,7 +508,17 @@ describe("GatewayClient updateGatewayConnector", () => {
     };
     const { client, commands } = recordingGatewayClient([
       { targetId: "target-1", targetConfiguration } as GetGatewayTargetResponse,
-      {},
+      gateway(),
+      {
+        targetId: "target-1",
+        targetConfiguration,
+        status: "UPDATING",
+      },
+      {
+        targetId: "target-1",
+        targetConfiguration,
+        status: "READY",
+      },
     ]);
 
     await client.updateGatewayConnector(
@@ -497,8 +530,8 @@ describe("GatewayClient updateGatewayConnector", () => {
       OPTIONS,
     );
 
-    expect(commands[1]).toBeInstanceOf(UpdateGatewayTargetCommand);
-    expect((commands[1] as UpdateGatewayTargetCommand).input.targetConfiguration).toEqual(
+    expect(commands[2]).toBeInstanceOf(UpdateGatewayTargetCommand);
+    expect((commands[2] as UpdateGatewayTargetCommand).input.targetConfiguration).toEqual(
       targetConfiguration,
     );
   });

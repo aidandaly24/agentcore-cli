@@ -1,0 +1,34 @@
+{
+  "$sequence": [
+    {
+      "RoleName": "AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "PolicyName": "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a",
+      "PolicyDocument": "%7B%22Statement%22%3A%5B%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeGateway%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A603141041947%3Agateway%2Fagentcore-cli-gateway-update-fixture-oekefzo7r6%22%5D%7D%2C%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeWebSearch%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3A%3Aaws%3Atool%2Fweb-search.v1%22%2C%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3Aaws%3Atool%2Fweb-search.v1%22%5D%7D%5D%2C%22Version%22%3A%222012-10-17%22%7D"
+    },
+    {
+      "RoleName": "AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "PolicyName": "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a",
+      "PolicyDocument": "%7B%22Statement%22%3A%5B%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeGateway%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A603141041947%3Agateway%2Fagentcore-cli-gateway-update-fixture-oekefzo7r6%22%5D%7D%2C%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeWebSearch%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3A%3Aaws%3Atool%2Fweb-search.v1%22%2C%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3Aaws%3Atool%2Fweb-search.v1%22%5D%7D%5D%2C%22Version%22%3A%222012-10-17%22%7D"
+    },
+    {
+      "RoleName": "AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "PolicyName": "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a",
+      "PolicyDocument": "%7B%22Statement%22%3A%5B%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeGateway%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A603141041947%3Agateway%2Fagentcore-cli-gateway-update-fixture-oekefzo7r6%22%5D%7D%2C%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeWebSearch%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3A%3Aaws%3Atool%2Fweb-search.v1%22%2C%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3Aaws%3Atool%2Fweb-search.v1%22%5D%7D%5D%2C%22Version%22%3A%222012-10-17%22%7D"
+    },
+    {
+      "RoleName": "AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "PolicyName": "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a",
+      "PolicyDocument": "%7B%22Statement%22%3A%5B%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeGateway%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A603141041947%3Agateway%2Fagentcore-cli-gateway-update-fixture-oekefzo7r6%22%5D%7D%2C%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeWebSearch%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3A%3Aaws%3Atool%2Fweb-search.v1%22%2C%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3Aaws%3Atool%2Fweb-search.v1%22%5D%7D%5D%2C%22Version%22%3A%222012-10-17%22%7D"
+    },
+    {
+      "RoleName": "AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "PolicyName": "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a",
+      "PolicyDocument": "%7B%22Statement%22%3A%5B%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeGateway%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A603141041947%3Agateway%2Fagentcore-cli-gateway-update-fixture-oekefzo7r6%22%5D%7D%2C%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeWebSearch%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3A%3Aaws%3Atool%2Fweb-search.v1%22%2C%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3Aaws%3Atool%2Fweb-search.v1%22%5D%7D%5D%2C%22Version%22%3A%222012-10-17%22%7D"
+    },
+    {
+      "RoleName": "AgentCoreCliGateway-agentcore-cli-gateway-update-fixture",
+      "PolicyName": "AgentCoreCliGatewayExecutionPolicy-1aa28118165a374a",
+      "PolicyDocument": "%7B%22Statement%22%3A%5B%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeGateway%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3A603141041947%3Agateway%2Fagentcore-cli-gateway-update-fixture-oekefzo7r6%22%5D%7D%2C%7B%22Action%22%3A%5B%22bedrock-agentcore%3AInvokeWebSearch%22%5D%2C%22Effect%22%3A%22Allow%22%2C%22Resource%22%3A%5B%22arn%3Aaws%3Abedrock-agentcore%3A%3Aaws%3Atool%2Fweb-search.v1%22%2C%22arn%3Aaws%3Abedrock-agentcore%3Aus-east-1%3Aaws%3Atool%2Fweb-search.v1%22%5D%7D%5D%2C%22Version%22%3A%222012-10-17%22%7D"
+    }
+  ]
+}

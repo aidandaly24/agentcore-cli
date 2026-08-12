@@ -1,7 +1,7 @@
 {
-  "gatewayId": "agentcore-cli-gateway-update-fixture-f4dbqmv0kb",
-  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-f4dbqmv0kb",
-  "targetId": "O4WHLU0O7E",
-  "connectorId": "LN3LFG8R6V",
-  "ruleId": "46a7a8f4-91f9-4d17-b200-d1aea6825711"
+  "gatewayId": "agentcore-cli-gateway-update-fixture-oekefzo7r6",
+  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+  "targetId": "GUYJRMTLLR",
+  "connectorId": "Z6OLJQ9NUE",
+  "ruleId": "98d3fe46-46a2-4f45-b7b8-0f76bd2e2c41"
 }

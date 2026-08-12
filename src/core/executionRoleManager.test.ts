@@ -327,6 +327,56 @@ describe("ExecutionRoleManager role lifecycle", () => {
     }
   });
 
+  test("accepts standard trust conditions when the Gateway context matches", async () => {
+    const gatewayArn = "arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/orders-abc123";
+    const iam = {
+      send: async () => ({
+        Role: {
+          Arn: roleArn("AmazonBedrockAgentCoreGatewayDefaultServiceRole"),
+          RoleName: "AmazonBedrockAgentCoreGatewayDefaultServiceRole",
+          AssumeRolePolicyDocument: JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "bedrock-agentcore.amazonaws.com" },
+                Action: "sts:AssumeRole",
+                Condition: {
+                  StringEquals: { "aws:SourceAccount": ACCOUNT },
+                  ArnLike: {
+                    "aws:SourceArn": "arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/*",
+                  },
+                },
+              },
+            ],
+          }),
+        },
+      }),
+    } as unknown as IAMClient;
+
+    await expect(
+      new ExecutionRoleManager(iam).validateAgentCoreTrust(
+        "AmazonBedrockAgentCoreGatewayDefaultServiceRole",
+        {
+          sourceAccount: ACCOUNT,
+          sourceArn: gatewayArn,
+        },
+      ),
+    ).resolves.toMatchObject({
+      arn: roleArn("AmazonBedrockAgentCoreGatewayDefaultServiceRole"),
+      created: false,
+    });
+    await expect(
+      new ExecutionRoleManager(iam).validateAgentCoreTrust(
+        "AmazonBedrockAgentCoreGatewayDefaultServiceRole",
+        {
+          sourceAccount: "000000000000",
+          sourceArn: gatewayArn,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ExecutionRoleTrustError);
+  });
+
   test("rolls back only a role created by the current parent create", async () => {
     const sent: (DeleteRoleCommand | DeleteRolePolicyCommand)[] = [];
     const iam = {

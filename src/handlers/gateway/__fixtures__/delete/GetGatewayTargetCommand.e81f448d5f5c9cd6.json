@@ -1,0 +1,70 @@
+{
+  "$sequence": [
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "LPEKLWUKBV",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.485Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:41.055Z"
+      },
+      "status": "READY",
+      "name": "http-delete-fixture",
+      "targetConfiguration": {
+        "http": {
+          "passthrough": {
+            "endpoint": "https://example.com",
+            "protocolType": "CUSTOM"
+          }
+        }
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "LPEKLWUKBV",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.485Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:53.916Z"
+      },
+      "status": "DELETING",
+      "name": "http-delete-fixture",
+      "targetConfiguration": {
+        "http": {
+          "passthrough": {
+            "endpoint": "https://example.com",
+            "protocolType": "CUSTOM"
+          }
+        }
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "LPEKLWUKBV",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.485Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:53.916Z"
+      },
+      "status": "DELETING",
+      "name": "http-delete-fixture",
+      "targetConfiguration": {
+        "http": {
+          "passthrough": {
+            "endpoint": "https://example.com",
+            "protocolType": "CUSTOM"
+          }
+        }
+      }
+    },
+    {
+      "$error": {
+        "name": "ResourceNotFoundException",
+        "message": "Failed to retrieve target because it doesn't exist. Retry the request with a different resource identifier."
+      }
+    }
+  ]
+}

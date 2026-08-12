@@ -1,0 +1,328 @@
+{
+  "$sequence": [
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:29.966Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:30.610Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector before update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:29.966Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:30.610Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector before update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:29.966Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:30.610Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector before update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:29.966Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:30.610Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector before update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:29.966Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:30.610Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector before update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:29.966Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:30.610Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector before update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:29.966Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:01:10.729Z"
+      },
+      "status": "UPDATING",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector before update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:01:11.868Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:01:11.868Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector after update"
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-update-fixture-oekefzo7r6",
+      "targetId": "Z6OLJQ9NUE",
+      "createdAt": {
+        "$date": "2026-08-12T23:01:11.868Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:01:11.868Z"
+      },
+      "status": "READY",
+      "name": "web-search-update-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ],
+      "description": "Connector after update"
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "$sequence": [
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "QQW3OGRIPL",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.681Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:41.389Z"
+      },
+      "status": "READY",
+      "name": "web-search-delete-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ]
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "QQW3OGRIPL",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.681Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:41.389Z"
+      },
+      "status": "READY",
+      "name": "web-search-delete-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ]
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "QQW3OGRIPL",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.681Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:41.389Z"
+      },
+      "status": "READY",
+      "name": "web-search-delete-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ]
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "QQW3OGRIPL",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.681Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:41.389Z"
+      },
+      "status": "READY",
+      "name": "web-search-delete-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ]
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "QQW3OGRIPL",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.681Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:01:09.060Z"
+      },
+      "status": "DELETING",
+      "name": "web-search-delete-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ]
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "targetId": "QQW3OGRIPL",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:40.681Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:01:09.060Z"
+      },
+      "status": "DELETING",
+      "name": "web-search-delete-fixture",
+      "targetConfiguration": {
+        "mcp": {
+          "connector": {
+            "source": {
+              "connectorId": "web-search",
+              "version": "1.1.0"
+            },
+            "configurations": [
+              {
+                "name": "WebSearch",
+                "parameterValues": {
+                  "maxResults": 10
+                }
+              }
+            ]
+          }
+        }
+      },
+      "credentialProviderConfigurations": [
+        {
+          "credentialProviderType": "GATEWAY_IAM_ROLE"
+        }
+      ]
+    },
+    {
+      "$error": {
+        "name": "ResourceNotFoundException",
+        "message": "Failed to retrieve target because it doesn't exist. Retry the request with a different resource identifier."
+      }
+    }
+  ]
+}

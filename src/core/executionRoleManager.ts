@@ -70,6 +70,11 @@ export type ExecutionRoleManagerOptions = {
   sleep?: (milliseconds: number) => Promise<void>;
 };
 
+export type AgentCoreTrustContext = {
+  sourceAccount: string;
+  sourceArn: string;
+};
+
 export class ExecutionRoleTrustError extends Error {
   constructor(readonly roleName: string) {
     super(`IAM role ${roleName} does not allow bedrock-agentcore.amazonaws.com to assume it.`);
@@ -172,9 +177,12 @@ export class ExecutionRoleManager {
     return { arn: roleArn, name: roleName, created: true };
   }
 
-  async validateAgentCoreTrust(roleName: string): Promise<ManagedExecutionRole> {
+  async validateAgentCoreTrust(
+    roleName: string,
+    context?: AgentCoreTrustContext,
+  ): Promise<ManagedExecutionRole> {
     const response = await this.iam.send(new GetRoleCommand({ RoleName: roleName }));
-    return this.existingRole(response.Role, roleName);
+    return this.existingRole(response.Role, roleName, context);
   }
 
   async rollbackCreatedRole(
@@ -232,13 +240,17 @@ export class ExecutionRoleManager {
     }
   }
 
-  private existingRole(role: Role | undefined, expectedRoleName: string): ManagedExecutionRole {
+  private existingRole(
+    role: Role | undefined,
+    expectedRoleName: string,
+    context?: AgentCoreTrustContext,
+  ): ManagedExecutionRole {
     const roleArn = requiredRoleArn(role, expectedRoleName);
     let trusted = false;
     try {
       trusted =
         role?.AssumeRolePolicyDocument !== undefined &&
-        allowsAgentCoreAssumeRole(role.AssumeRolePolicyDocument);
+        allowsAgentCoreAssumeRole(role.AssumeRolePolicyDocument, context);
     } catch {
       trusted = false;
     }
@@ -297,7 +309,10 @@ function requiredRoleArn(role: Role | undefined, roleName: string): string {
   return role.Arn;
 }
 
-function allowsAgentCoreAssumeRole(policyDocument: string): boolean {
+function allowsAgentCoreAssumeRole(
+  policyDocument: string,
+  context?: AgentCoreTrustContext,
+): boolean {
   const policy = parseIamDocument(policyDocument);
   const statements = Array.isArray(policy.Statement) ? policy.Statement : [policy.Statement];
   const applicable = statements.filter((statement) => {
@@ -313,8 +328,44 @@ function allowsAgentCoreAssumeRole(policyDocument: string): boolean {
   });
   if (applicable.some((statement) => statement.Effect === "Deny")) return false;
   return applicable.some(
-    (statement) => statement.Effect === "Allow" && statement.Condition === undefined,
+    (statement) =>
+      statement.Effect === "Allow" &&
+      (statement.Condition === undefined || trustConditionsMatch(statement.Condition, context)),
   );
+}
+
+function trustConditionsMatch(
+  condition: unknown,
+  context: AgentCoreTrustContext | undefined,
+): boolean {
+  if (!context || !isRecord(condition)) return false;
+
+  for (const [operator, entries] of Object.entries(condition)) {
+    if (!isRecord(entries)) return false;
+    for (const [key, expected] of Object.entries(entries)) {
+      const normalizedKey = key.toLowerCase();
+      const actual =
+        normalizedKey === "aws:sourceaccount"
+          ? context.sourceAccount
+          : normalizedKey === "aws:sourcearn"
+            ? context.sourceArn
+            : undefined;
+      if (!actual) return false;
+      const expectedValues = stringList(expected);
+      if (expectedValues.length === 0) return false;
+      if (operator === "StringEquals" || operator === "ArnEquals") {
+        if (!expectedValues.includes(actual)) return false;
+        continue;
+      }
+      if (operator === "StringLike" || operator === "ArnLike") {
+        if (!expectedValues.some((pattern) => iamGlobMatches(pattern, actual))) return false;
+        continue;
+      }
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function statementAppliesToAssumeRole(statement: Record<string, unknown>): boolean {

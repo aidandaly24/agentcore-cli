@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CreateGatewayTargetCommand,
+  GetApiKeyCredentialProviderCommand,
   GetGatewayCommand,
   GetGatewayTargetCommand,
   ListGatewayTargetsCommand,
@@ -30,6 +31,12 @@ const GATEWAY_ARN = "arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/or
 const LAMBDA_ARN = "arn:aws:lambda:us-west-2:123456789012:function:orders";
 const WEB_SEARCH_ARN = "arn:aws:bedrock-agentcore::aws:tool/web-search.v1";
 const REGIONAL_WEB_SEARCH_ARN = "arn:aws:bedrock-agentcore:us-west-2:aws:tool/web-search.v1";
+const WORKLOAD_IDENTITY_ARN =
+  "arn:aws:bedrock-agentcore:us-west-2:123456789012:workload-identity-directory/default/workload-identity/orders-abc123";
+const API_KEY_PROVIDER_ARN =
+  "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/apikeycredentialprovider/orders";
+const API_KEY_SECRET_ARN =
+  "arn:aws:secretsmanager:us-west-2:123456789012:secret:bedrock-agentcore-orders";
 const POLICY_NAME = ExecutionRoleManager.generatedPolicyName("gateway", {
   accountId: ACCOUNT_ID,
   region: REGION,
@@ -51,7 +58,7 @@ function permissions(document: string): string[] {
 }
 
 describe("GatewayClient Target IAM reconciliation", () => {
-  test("stages and finalizes exact Lambda permission on a recognized role", async () => {
+  test("stages and finalizes exact target and credential permissions on a recognized role", async () => {
     const planner = new GatewayPolicyPlanner();
     const policies = new Map([
       [
@@ -102,6 +109,7 @@ describe("GatewayClient Target IAM reconciliation", () => {
       name: "orders",
       roleArn: ROLE_ARN,
       authorizerType: "NONE",
+      workloadIdentityDetails: { workloadIdentityArn: WORKLOAD_IDENTITY_ARN },
     };
     const lambdaTarget: GetGatewayTargetResponse = {
       gatewayArn: GATEWAY_ARN,
@@ -136,47 +144,61 @@ describe("GatewayClient Target IAM reconciliation", () => {
       },
       credentialProviderConfigurations: [{ credentialProviderType: "GATEWAY_IAM_ROLE" }],
     };
+    const apiKeyTarget: GetGatewayTargetResponse = {
+      gatewayArn: GATEWAY_ARN,
+      targetId: "api-key-target",
+      createdAt: new Date("2026-08-12T00:00:00Z"),
+      updatedAt: new Date("2026-08-12T00:00:00Z"),
+      status: "READY",
+      name: "api-key",
+      targetConfiguration: {
+        mcp: { mcpServer: { endpoint: "https://example.com/mcp" } },
+      },
+      credentialProviderConfigurations: [
+        {
+          credentialProviderType: "API_KEY",
+          credentialProvider: {
+            apiKeyCredentialProvider: {
+              providerArn: API_KEY_PROVIDER_ARN,
+              credentialLocation: "HEADER",
+              credentialParameterName: "x-api-key",
+            },
+          },
+        },
+      ],
+    };
     const targets: GetGatewayTargetResponse[] = [];
     const listedTokens: (string | undefined)[] = [];
     const control = {
       send: async (
         command:
           | CreateGatewayTargetCommand
+          | GetApiKeyCredentialProviderCommand
           | GetGatewayCommand
           | GetGatewayTargetCommand
           | ListGatewayTargetsCommand,
       ) => {
         if (command instanceof GetGatewayCommand) return gateway;
+        if (command instanceof GetApiKeyCredentialProviderCommand) {
+          return {
+            name: "orders",
+            credentialProviderArn: API_KEY_PROVIDER_ARN,
+            apiKeySecretArn: { secretArn: API_KEY_SECRET_ARN },
+            createdTime: new Date("2026-08-12T00:00:00Z"),
+            lastUpdatedTime: new Date("2026-08-12T00:00:00Z"),
+          };
+        }
         if (command instanceof ListGatewayTargetsCommand) {
           listedTokens.push(command.input.nextToken);
-          if (targets.length > 1) {
-            return command.input.nextToken
-              ? {
-                  items: [
-                    {
-                      targetId: targets[1]!.targetId,
-                      name: targets[1]!.name,
-                      status: targets[1]!.status,
-                    },
-                  ],
-                }
-              : {
-                  items: [
-                    {
-                      targetId: targets[0]!.targetId,
-                      name: targets[0]!.name,
-                      status: targets[0]!.status,
-                    },
-                  ],
-                  nextToken: "page-2",
-                };
-          }
+          const page = command.input.nextToken
+            ? Number(command.input.nextToken.replace("page-", "")) - 1
+            : 0;
+          const target = targets[page];
           return {
-            items: targets.map((target) => ({
-              targetId: target.targetId,
-              name: target.name,
-              status: target.status,
-            })),
+            items: target
+              ? [{ targetId: target.targetId, name: target.name, status: target.status }]
+              : [],
+            ...(page + 1 < targets.length ? { nextToken: `page-${page + 2}` } : {}),
           };
         }
         if (command instanceof GetGatewayTargetCommand) {
@@ -190,11 +212,22 @@ describe("GatewayClient Target IAM reconciliation", () => {
             targets.push(lambdaTarget);
             return { ...lambdaTarget, status: "CREATING" };
           }
-          expect(staged).toContain(`lambda:InvokeFunction ${LAMBDA_ARN}`);
-          expect(staged).toContain(`bedrock-agentcore:InvokeWebSearch ${WEB_SEARCH_ARN}`);
-          expect(staged).toContain(`bedrock-agentcore:InvokeWebSearch ${REGIONAL_WEB_SEARCH_ARN}`);
-          targets.push(webSearchTarget);
-          return { ...webSearchTarget, status: "CREATING" };
+          if (command.input.targetConfiguration?.mcp?.connector) {
+            expect(staged).toContain(`lambda:InvokeFunction ${LAMBDA_ARN}`);
+            expect(staged).toContain(`bedrock-agentcore:InvokeWebSearch ${WEB_SEARCH_ARN}`);
+            expect(staged).toContain(
+              `bedrock-agentcore:InvokeWebSearch ${REGIONAL_WEB_SEARCH_ARN}`,
+            );
+            targets.push(webSearchTarget);
+            return { ...webSearchTarget, status: "CREATING" };
+          }
+          expect(staged).toContain(`bedrock-agentcore:GetResourceApiKey ${API_KEY_PROVIDER_ARN}`);
+          expect(staged).toContain(
+            `bedrock-agentcore:GetWorkloadAccessToken ${WORKLOAD_IDENTITY_ARN}`,
+          );
+          expect(staged).toContain(`secretsmanager:GetSecretValue ${API_KEY_SECRET_ARN}`);
+          targets.push(apiKeyTarget);
+          return { ...apiKeyTarget, status: "CREATING" };
         }
         throw new Error("unexpected control command");
       },
@@ -251,6 +284,27 @@ describe("GatewayClient Target IAM reconciliation", () => {
       `lambda:InvokeFunction ${LAMBDA_ARN}`,
     ]);
     expect(listedTokens).toContain("page-2");
+
+    const apiKeyResult = await client.createGatewayTarget(
+      {
+        gatewayIdentifier: GATEWAY_ID,
+        name: "api-key",
+        targetConfiguration: apiKeyTarget.targetConfiguration!,
+        credentialProviderConfigurations: apiKeyTarget.credentialProviderConfigurations,
+      },
+      { region: REGION },
+    );
+
+    expect(apiKeyResult).toEqual({
+      response: { ...apiKeyTarget, status: "CREATING" },
+    });
+    expect(permissions(policies.get(POLICY_NAME)!)).toEqual(
+      expect.arrayContaining([
+        `bedrock-agentcore:GetResourceApiKey ${API_KEY_PROVIDER_ARN}`,
+        `bedrock-agentcore:GetWorkloadAccessToken ${WORKLOAD_IDENTITY_ARN}`,
+        `secretsmanager:GetSecretValue ${API_KEY_SECRET_ARN}`,
+      ]),
+    );
   });
 
   test("returns pending OAuth authorization data for an external role", async () => {

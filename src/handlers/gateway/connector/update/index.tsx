@@ -18,6 +18,7 @@ import {
 } from "../../../utils";
 import type { GatewayTargetUpdatePatch } from "../../types";
 import { GatewayConnectorTarget } from "../gatewayConnectorTarget";
+import { warnForGatewayRolePolicyUpdate } from "../../rolePolicyWarning";
 
 export const createUpdateGatewayConnectorHandler = (core: Core, io: AppIO) =>
   createHandler({
@@ -62,6 +63,7 @@ export const createUpdateGatewayConnectorHandler = (core: Core, io: AppIO) =>
       flag("clear-credential-provider-configurations", "remove outbound credentials", z.boolean()),
       flag("clear-metadata-configuration", "remove metadata propagation", z.boolean()),
       flag("clear-private-endpoint", "remove private endpoint configuration", z.boolean()),
+      flag("skip-role-policy-update", "leave execution-role IAM policies unchanged", z.boolean()),
     ],
     handle: async (ctx, flags) => {
       if (!flags["gateway-id"]) {
@@ -162,10 +164,15 @@ export const createUpdateGatewayConnectorHandler = (core: Core, io: AppIO) =>
         gatewayId: flags["gateway-id"],
         targetId: flags.id,
         ...mutations,
+        ...(flags["skip-role-policy-update"] ? { skipRolePolicyUpdate: true } : {}),
       };
 
+      const options = coreOptsFromCtx(ctx);
+      await warnForGatewayRolePolicyUpdate(core, io, flags["gateway-id"], options, {
+        skipRolePolicyUpdate: flags["skip-role-policy-update"],
+      });
       ctx
         .require(JsonRendererKey)
-        .renderJson(await core.gateway.updateGatewayConnector(patch, coreOptsFromCtx(ctx)));
+        .renderJson(await core.gateway.updateGatewayConnector(patch, options));
     },
   });

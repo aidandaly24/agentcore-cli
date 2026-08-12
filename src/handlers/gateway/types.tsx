@@ -46,6 +46,7 @@ export type GatewayMutationResult<T> = {
 export type GatewayUpdatePatch = {
   id: string;
   roleArn?: UpdateGatewayRequest["roleArn"];
+  skipRolePolicyUpdate?: boolean;
   clearProtocol?: boolean;
   description?: UpdateGatewayRequest["description"] | null;
   protocolConfiguration?: UpdateGatewayRequest["protocolConfiguration"] | null;
@@ -62,6 +63,7 @@ export type GatewayUpdatePatch = {
 export type GatewayTargetUpdatePatch = {
   gatewayId: string;
   targetId: string;
+  skipRolePolicyUpdate?: boolean;
   name?: UpdateGatewayTargetRequest["name"];
   description?: UpdateGatewayTargetRequest["description"] | null;
   endpoint?: string;

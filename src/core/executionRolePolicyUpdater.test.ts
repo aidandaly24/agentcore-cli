@@ -12,6 +12,8 @@ import {
   PolicyDriftError,
   PolicyFinalizationError,
   PolicyOperationOutcomeUnknownError,
+  PolicyRemovalFinalizationError,
+  PolicyRemovalOutcomeUnknownError,
   RoleInlinePolicyQuotaError,
 } from "./executionRolePolicyUpdater";
 
@@ -492,6 +494,82 @@ describe("ExecutionRolePolicyUpdater", () => {
       "GetRolePolicyCommand",
     ]);
     expect(writes).toHaveLength(1);
+  });
+
+  test("removes a generated policy only after a parent deletion succeeds", async () => {
+    const events: string[] = [];
+    const { iam } = statefulIam(events);
+    const updater = new ExecutionRolePolicyUpdater(iam, {
+      propagationDelayMs: 0,
+      retryDelayMs: 0,
+    });
+
+    const value = await updater.removeAfter({
+      roleName: ROLE_NAME,
+      policyName: POLICY_NAME,
+      operation: async () => {
+        events.push("AgentCoreDelete");
+        return { gatewayId: "gateway-1" };
+      },
+    });
+
+    expect(value).toEqual({ gatewayId: "gateway-1" });
+    expect(events).toEqual(["AgentCoreDelete", "DeleteRolePolicyCommand", "GetRolePolicyCommand"]);
+  });
+
+  test("retains the generated policy when parent deletion outcome is unknown", async () => {
+    const events: string[] = [];
+    const { iam } = statefulIam(events);
+    const updater = new ExecutionRolePolicyUpdater(iam, {
+      propagationDelayMs: 0,
+      retryDelayMs: 0,
+    });
+    const timeout = new Error("delete response timed out");
+    timeout.name = "GatewayOutcomeUnknownError";
+
+    const error = await updater
+      .removeAfter({
+        roleName: ROLE_NAME,
+        policyName: POLICY_NAME,
+        operation: async () => {
+          events.push("AgentCoreDelete");
+          throw timeout;
+        },
+        isOperationOutcomeUnknown: (caught) =>
+          (caught as Error).name === "GatewayOutcomeUnknownError",
+      })
+      .catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(PolicyRemovalOutcomeUnknownError);
+    expect((error as PolicyRemovalOutcomeUnknownError).cause).toBe(timeout);
+    expect(events).toEqual(["AgentCoreDelete"]);
+  });
+
+  test("reports exact manual repair coordinates when policy removal fails", async () => {
+    const iam = {
+      send: async (command: SentCommand) => {
+        if (command instanceof DeleteRolePolicyCommand) {
+          throw new Error("IAM denied cleanup");
+        }
+        throw new Error(`unexpected IAM command ${command.constructor.name}`);
+      },
+    } as unknown as IAMClient;
+    const updater = new ExecutionRolePolicyUpdater(iam, {
+      propagationDelayMs: 0,
+      retryDelayMs: 0,
+    });
+
+    const error = await updater
+      .removeAfter({
+        roleName: ROLE_NAME,
+        policyName: POLICY_NAME,
+        operation: async () => ({ gatewayId: "gateway-1" }),
+      })
+      .catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(PolicyRemovalFinalizationError);
+    expect((error as Error).message).toContain(POLICY_NAME);
+    expect((error as Error).message).toContain(ROLE_NAME);
   });
 
   test("paginates customer policies and excludes insignificant JSON whitespace from quota", async () => {

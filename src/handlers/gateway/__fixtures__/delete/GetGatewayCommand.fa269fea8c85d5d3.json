@@ -1,0 +1,124 @@
+{
+  "$sequence": [
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "gatewayId": "agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:38.134Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:39.070Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-delete-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-delete-fixture-bktovgujtu.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Disposable Gateway Delete fixture",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-delete-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-delete-fixture-bktovgujtu"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "gatewayId": "agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:38.134Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:39.070Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-delete-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-delete-fixture-bktovgujtu.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Disposable Gateway Delete fixture",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-delete-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-delete-fixture-bktovgujtu"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "gatewayId": "agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:38.134Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:39.070Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-delete-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-delete-fixture-bktovgujtu.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Disposable Gateway Delete fixture",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-delete-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-delete-fixture-bktovgujtu"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "gatewayId": "agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:38.134Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:39.070Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-delete-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-delete-fixture-bktovgujtu.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Disposable Gateway Delete fixture",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-delete-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-delete-fixture-bktovgujtu"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "gatewayId": "agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:38.134Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:00:39.070Z"
+      },
+      "status": "READY",
+      "name": "agentcore-cli-gateway-delete-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-delete-fixture-bktovgujtu.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Disposable Gateway Delete fixture",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-delete-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-delete-fixture-bktovgujtu"
+      }
+    },
+    {
+      "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "gatewayId": "agentcore-cli-gateway-delete-fixture-bktovgujtu",
+      "createdAt": {
+        "$date": "2026-08-12T23:00:38.134Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T23:01:23.764Z"
+      },
+      "status": "DELETING",
+      "name": "agentcore-cli-gateway-delete-fixture",
+      "authorizerType": "NONE",
+      "gatewayUrl": "https://agentcore-cli-gateway-delete-fixture-bktovgujtu.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+      "description": "Disposable Gateway Delete fixture",
+      "roleArn": "arn:aws:iam::603141041947:role/AgentCoreCliGateway-agentcore-cli-gateway-delete-fixture",
+      "workloadIdentityDetails": {
+        "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-delete-fixture-bktovgujtu"
+      }
+    },
+    {
+      "$error": {
+        "name": "ResourceNotFoundException",
+        "message": "Failed to retrieve gateway because it doesn't exist. Retry the request with a different resource identifier."
+      }
+    }
+  ]
+}

@@ -227,3 +227,66 @@ describe("gateway create", () => {
     expect(stderr).toContain("The CLI did not modify its IAM policies");
   });
 });
+
+describe("gateway update role policy warnings", () => {
+  test("warns before updating a Gateway with an unknown associated role", async () => {
+    const core = new TestCoreClient();
+    const roleArn = "arn:aws:iam::123456789012:role/CustomerCdkGatewayRole";
+    core.gateway.getGatewayRolePolicyWarning = async () => ({
+      reason: "unknown-role",
+      roleArn,
+    });
+
+    const { stderr } = await run(
+      ["gateway", "update", "--id", GATEWAY_ID, "--description", "after"],
+      core,
+    );
+
+    expect(stderr).toContain(`Execution role ${roleArn} is not recognized`);
+    expect(stderr).toContain("The CLI will not modify its IAM policies");
+  });
+
+  test("identifies an explicitly supplied update role as customer-managed", async () => {
+    const roleArn = "arn:aws:iam::123456789012:role/CustomerGatewayRole";
+
+    const { stderr } = await run([
+      "gateway",
+      "update",
+      "--id",
+      GATEWAY_ID,
+      "--description",
+      "after",
+      "--role-arn",
+      roleArn,
+    ]);
+
+    expect(stderr).toContain(
+      `Using customer-managed execution role ${roleArn}; IAM policies will not be modified.`,
+    );
+  });
+
+  test("skip-role-policy-update suppresses unknown-role preflight", async () => {
+    const core = new TestCoreClient();
+    core.gateway.getGatewayRolePolicyWarning = async () => {
+      throw new Error("role warning preflight must be skipped");
+    };
+
+    const { stderr } = await run(
+      [
+        "gateway",
+        "target",
+        "update",
+        "--gateway-id",
+        GATEWAY_ID,
+        "--target-id",
+        TARGET_ID,
+        "--description",
+        "after",
+        "--skip-role-policy-update",
+      ],
+      core,
+    );
+
+    expect(stderr).not.toContain("Execution role");
+  });
+});

@@ -18,6 +18,7 @@ import {
   parseJsonObjectFlag,
 } from "../../utils";
 import type { GatewayUpdatePatch } from "../types";
+import { warnForGatewayRolePolicyUpdate } from "../rolePolicyWarning";
 
 export const createUpdateGatewayHandler = (core: Core, io: AppIO) =>
   createHandler({
@@ -71,6 +72,7 @@ export const createUpdateGatewayHandler = (core: Core, io: AppIO) =>
       flag("clear-policy-engine", "detach the Policy Engine", z.boolean()),
       flag("clear-exception-level", "return to generic invocation errors", z.boolean()),
       flag("clear-waf-configuration", "reset WAF failure mode to FAIL_CLOSE", z.boolean()),
+      flag("skip-role-policy-update", "leave execution-role IAM policies unchanged", z.boolean()),
     ],
     handle: async (ctx, flags) => {
       if (!flags.id) {
@@ -187,10 +189,17 @@ export const createUpdateGatewayHandler = (core: Core, io: AppIO) =>
       if (Object.values(mutations).every((value) => value === undefined)) {
         throw new InputValidationError("Gateway update requires at least one mutation option");
       }
-      const patch: GatewayUpdatePatch = { id: flags.id, ...mutations };
+      const patch: GatewayUpdatePatch = {
+        id: flags.id,
+        ...mutations,
+        ...(flags["skip-role-policy-update"] ? { skipRolePolicyUpdate: true } : {}),
+      };
 
-      ctx
-        .require(JsonRendererKey)
-        .renderJson(await core.gateway.updateGateway(patch, coreOptsFromCtx(ctx)));
+      const options = coreOptsFromCtx(ctx);
+      await warnForGatewayRolePolicyUpdate(core, io, flags.id, options, {
+        explicitRoleArn: flags["role-arn"],
+        skipRolePolicyUpdate: flags["skip-role-policy-update"],
+      });
+      ctx.require(JsonRendererKey).renderJson(await core.gateway.updateGateway(patch, options));
     },
   });

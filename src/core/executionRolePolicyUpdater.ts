@@ -53,6 +53,13 @@ export type ExecutionRolePolicyUpdateResult<T> = {
   tightened: boolean;
 };
 
+export type ExecutionRolePolicyRemoval<T> = {
+  roleName: string;
+  policyName: string;
+  operation: () => Promise<T>;
+  isOperationOutcomeUnknown?: (error: unknown) => boolean;
+};
+
 export class PolicyPropagationError extends Error {
   constructor(
     readonly roleName: string,
@@ -139,6 +146,38 @@ export class PolicyFinalizationError<T> extends Error {
   }
 }
 
+export class PolicyRemovalOutcomeUnknownError extends Error {
+  constructor(
+    readonly roleName: string,
+    readonly policyName: string,
+    options: ErrorOptions,
+  ) {
+    super(
+      "AgentCore deletion outcome is unknown; the generated execution-role policy was retained. " +
+        "Inspect the resource before retrying.",
+      options,
+    );
+    this.name = "PolicyRemovalOutcomeUnknownError";
+  }
+}
+
+export class PolicyRemovalFinalizationError<T> extends Error {
+  constructor(
+    readonly value: T,
+    readonly roleName: string,
+    readonly policyName: string,
+    options: ErrorOptions,
+  ) {
+    const identity = resourceIdentity(value);
+    super(
+      `AgentCore deletion succeeded${identity ? ` for ${identity}` : ""}, but generated execution-role policy cleanup failed. ` +
+        `Remove policy ${policyName} from role ${roleName} manually; do not delete the role.`,
+      options,
+    );
+    this.name = "PolicyRemovalFinalizationError";
+  }
+}
+
 export class ExecutionRolePolicyUpdater {
   private readonly compiler: PolicyCompiler;
   private readonly maxVisibilityAttempts: number;
@@ -161,6 +200,34 @@ export class ExecutionRolePolicyUpdater {
     request: ExecutionRolePolicyUpdate<T>,
   ): Promise<ExecutionRolePolicyUpdateResult<T>> {
     return rolePolicyTransactions.run(request.roleName, () => this.updateUnlocked(request));
+  }
+
+  async removeAfter<T>(request: ExecutionRolePolicyRemoval<T>): Promise<T> {
+    return rolePolicyTransactions.run(request.roleName, () => this.removeAfterUnlocked(request));
+  }
+
+  private async removeAfterUnlocked<T>(request: ExecutionRolePolicyRemoval<T>): Promise<T> {
+    let value: T;
+    try {
+      value = await request.operation();
+    } catch (error) {
+      if (request.isOperationOutcomeUnknown?.(error)) {
+        throw new PolicyRemovalOutcomeUnknownError(request.roleName, request.policyName, {
+          cause: error,
+        });
+      }
+      throw error;
+    }
+
+    try {
+      await this.deletePolicy(request.roleName, request.policyName);
+      await this.waitUntilAbsent(request.roleName, request.policyName);
+    } catch (error) {
+      throw new PolicyRemovalFinalizationError(value, request.roleName, request.policyName, {
+        cause: error,
+      });
+    }
+    return value;
   }
 
   private async updateUnlocked<T>(

@@ -114,19 +114,56 @@ function normalizeResponse(response: unknown): unknown {
 // on a fresh account). A rejected send is recorded under this tag and re-thrown
 // with the same name/message on replay.
 const ERROR_TAG = "$error";
+const SEQUENCE_TAG = "$sequence";
 
 interface TaggedError {
   [ERROR_TAG]: { name: string; message: string };
+}
+
+interface TaggedSequence {
+  [SEQUENCE_TAG]: unknown[];
 }
 
 function isTaggedError(value: unknown): value is TaggedError {
   return typeof value === "object" && value !== null && ERROR_TAG in value;
 }
 
+function isTaggedSequence(value: unknown): value is TaggedSequence {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    SEQUENCE_TAG in value &&
+    Array.isArray((value as TaggedSequence)[SEQUENCE_TAG])
+  );
+}
+
 function reviveError(tagged: TaggedError): Error {
   const error = new Error(tagged[ERROR_TAG].message);
   error.name = tagged[ERROR_TAG].name;
   return error;
+}
+
+const recordingSequences = new Map<string, unknown[]>();
+const replaySequencePositions = new Map<string, number>();
+
+function recordFixtureValue(path: string, value: unknown): void {
+  let sequence = recordingSequences.get(path);
+  if (!sequence) {
+    sequence = [];
+    recordingSequences.set(path, sequence);
+  }
+  sequence.push(value);
+  writeFileSync(path, stringify(sequence.length === 1 ? value : { [SEQUENCE_TAG]: sequence }));
+}
+
+function nextFixtureValue(path: string, recorded: unknown): unknown {
+  if (!isTaggedSequence(recorded)) return recorded;
+  if (recorded[SEQUENCE_TAG].length === 0) {
+    throw new Error(`Fixture sequence ${path} is empty.`);
+  }
+  const position = replaySequencePositions.get(path) ?? 0;
+  replaySequencePositions.set(path, position + 1);
+  return recorded[SEQUENCE_TAG][Math.min(position, recorded[SEQUENCE_TAG].length - 1)];
 }
 
 // makeRecordingSend returns a `.send()` that records to / replays from `dir`.
@@ -149,10 +186,10 @@ function makeRecordingSend<C extends { send: (command: any) => Promise<any> }>(
         const tagged: TaggedError = {
           [ERROR_TAG]: { name: (error as Error).name, message: (error as Error).message },
         };
-        writeFileSync(path, stringify(tagged));
+        recordFixtureValue(path, tagged);
         throw error;
       }
-      writeFileSync(path, stringify(response));
+      recordFixtureValue(path, response);
       return response;
     }
 
@@ -162,7 +199,7 @@ function makeRecordingSend<C extends { send: (command: any) => Promise<any> }>(
           `Re-run with RECORD=1 to record it against the live API.`,
       );
     }
-    const recorded = parse(readFileSync(path, "utf8"));
+    const recorded = nextFixtureValue(path, parse(readFileSync(path, "utf8")));
     if (isTaggedError(recorded)) throw reviveError(recorded);
     return recorded;
   };

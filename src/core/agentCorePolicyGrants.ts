@@ -28,6 +28,22 @@ export class AgentCorePolicyGrants {
     return allow(["bedrock-agentcore:InvokeGateway"], [gatewayArn]);
   }
 
+  static getWorkloadAccessToken(workloadArns: readonly string[]): GeneratedPolicyStatement {
+    return allow(["bedrock-agentcore:GetWorkloadAccessToken"], workloadArns);
+  }
+
+  static getResourceApiKey(providerArn: string): GeneratedPolicyStatement {
+    return allow(["bedrock-agentcore:GetResourceApiKey"], [providerArn]);
+  }
+
+  static getResourceOauth2Token(providerArn: string): GeneratedPolicyStatement {
+    return allow(["bedrock-agentcore:GetResourceOauth2Token"], [providerArn]);
+  }
+
+  static readSecret(secretArn: string): GeneratedPolicyStatement {
+    return allow(["secretsmanager:GetSecretValue"], [secretArn]);
+  }
+
   static invokeRuntime(runtimeArns: readonly string[]): GeneratedPolicyStatement {
     return allow(["bedrock-agentcore:InvokeAgentRuntime"], runtimeArns);
   }
@@ -83,6 +99,30 @@ export class AgentCorePolicyGrants {
 
   static retrieveKnowledgeBase(knowledgeBaseArn: string): GeneratedPolicyStatement {
     return allow(["bedrock:GetKnowledgeBase", "bedrock:Retrieve"], [knowledgeBaseArn]);
+  }
+
+  static getKnowledgeBases(knowledgeBaseArns: readonly string[]): GeneratedPolicyStatement {
+    return allow(["bedrock:GetKnowledgeBase"], knowledgeBaseArns);
+  }
+
+  static retrieveKnowledgeBases(knowledgeBaseArns: readonly string[]): GeneratedPolicyStatement {
+    return allow(["bedrock:Retrieve"], knowledgeBaseArns);
+  }
+
+  static agenticRetrieveKnowledgeBases(): GeneratedPolicyStatement {
+    return allow(["bedrock:AgenticRetrieveStream"], ["*"]);
+  }
+
+  static createMantleInference(projectArns: readonly string[]): GeneratedPolicyStatement {
+    return allow(["bedrock-mantle:CreateInference"], projectArns);
+  }
+
+  static listMantleModels(projectArn: string): GeneratedPolicyStatement {
+    return allow(["bedrock-mantle:ListModels"], [projectArn]);
+  }
+
+  static callMantleWithBearerToken(): GeneratedPolicyStatement {
+    return allow(["bedrock-mantle:CallWithBearerToken"], ["*"]);
   }
 
   static decryptKmsKey(keyArn: string): GeneratedPolicyStatement {

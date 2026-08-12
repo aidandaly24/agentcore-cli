@@ -96,6 +96,7 @@ import type {
   CreateGatewayRuleInput,
   CreateGatewayTargetInput,
   GatewayRuleUpdateInput,
+  GatewayRolePolicyWarning,
   GatewayTargetUpdatePatch,
   GatewayUpdatePatch,
 } from "../handlers/gateway/types";
@@ -921,7 +922,7 @@ export class TestGatewayClient implements CoreGatewayClient {
     return this;
   }
 
-  async getGatewayRolePolicyWarning(): Promise<undefined> {
+  async getGatewayRolePolicyWarning(): Promise<GatewayRolePolicyWarning | undefined> {
     return undefined;
   }
 

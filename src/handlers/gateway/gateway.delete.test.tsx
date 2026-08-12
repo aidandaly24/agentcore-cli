@@ -24,6 +24,7 @@ import {
 } from "@aws-sdk/client-iam";
 import { CoreClient } from "../../core";
 import { createControlClient, createIamClient } from "../../core/factories";
+import { ExecutionRoleManager } from "../../core/executionRoleManager";
 import {
   createSilentLogger,
   fixtureFactories,
@@ -181,8 +182,12 @@ describe("gateway delete validation", () => {
 const FIXTURES = join(import.meta.dir, "__fixtures__", "delete");
 const RESOURCE_STATE = join(FIXTURES, "resources.json");
 const GATEWAY_NAME = "agentcore-cli-gateway-delete-fixture";
-const ROLE_NAME = "AgentCoreCliGatewayDeleteFixtureRole";
-const POLICY_NAME = "AgentCoreCliGatewayDeleteFixture";
+const ROLE_NAME = "AgentCoreCliGateway-agentcore-cli-gateway-delete-fixture";
+const POLICY_NAME = ExecutionRoleManager.generatedPolicyName("gateway", {
+  accountId: "603141041947",
+  region: "us-east-1",
+  stableResourceKey: ROLE_NAME,
+});
 const HTTP_TARGET_NAME = "http-delete-fixture";
 const CONNECTOR_TARGET_NAME = "web-search-delete-fixture";
 const FLOW_TIMEOUT = 600_000;
@@ -210,6 +215,15 @@ function createFixtureCore(): CoreClient {
     createIamClient,
     createLogsClient,
     logger: createSilentLogger(),
+    gatewayOptions: isRecording()
+      ? undefined
+      : {
+          policyUpdater: {
+            propagationDelayMs: 0,
+            retryDelayMs: 0,
+          },
+          waitDelayMs: 0,
+        },
   });
 }
 
