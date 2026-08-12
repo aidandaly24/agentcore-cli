@@ -11,6 +11,7 @@ import {
   ExecutionRolePolicyUpdater,
   PolicyDriftError,
   PolicyFinalizationError,
+  PolicyOperationOutcomeUnknownError,
   RoleInlinePolicyQuotaError,
 } from "./executionRolePolicyUpdater";
 
@@ -694,5 +695,35 @@ describe("ExecutionRolePolicyUpdater", () => {
     expect(attempts).toBe(2);
     expect(sleeps.filter((milliseconds) => milliseconds > 0)).toEqual([17]);
     expect(result.value).toEqual({ status: "READY" });
+  });
+
+  test("retains the transition policy when the AgentCore outcome is unknown", async () => {
+    const events: string[] = [];
+    const { iam, writes } = statefulIam(events);
+    const updater = new ExecutionRolePolicyUpdater(iam, {
+      propagationDelayMs: 0,
+      retryDelayMs: 0,
+    });
+    const timeout = new Error("status polling timed out");
+    timeout.name = "GatewayOutcomeUnknownError";
+
+    const error = await updater
+      .update({
+        roleName: ROLE_NAME,
+        policyName: POLICY_NAME,
+        current: [contribution("gateway-target:a", LAMBDA_A)],
+        desired: [contribution("gateway-target:b", LAMBDA_B)],
+        operation: async () => {
+          throw timeout;
+        },
+        isOperationOutcomeUnknown: (caught) =>
+          (caught as Error).name === "GatewayOutcomeUnknownError",
+      })
+      .catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(PolicyOperationOutcomeUnknownError);
+    expect((error as PolicyOperationOutcomeUnknownError).cause).toBe(timeout);
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(writes[0]!).Statement[0].Resource).toEqual([LAMBDA_A, LAMBDA_B]);
   });
 });

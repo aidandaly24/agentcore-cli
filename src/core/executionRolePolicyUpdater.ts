@@ -30,6 +30,7 @@ export type ExecutionRolePolicyUpdate<T> = {
   inventoryComplete?: boolean;
   operation: () => Promise<T>;
   operationRetry?: OperationRetryPolicy;
+  isOperationOutcomeUnknown?: (error: unknown) => boolean;
   resolveDesired?: (value: T) => Promise<ResolvedExecutionRolePolicy>;
 };
 
@@ -69,6 +70,22 @@ export class PolicyDriftError extends Error {
   ) {
     super(`IAM policy ${policyName} on role ${roleName} changed during the AgentCore operation.`);
     this.name = "PolicyDriftError";
+  }
+}
+
+export class PolicyOperationOutcomeUnknownError extends Error {
+  constructor(
+    readonly roleName: string,
+    readonly policyName: string,
+    readonly transitionHash: string,
+    options: ErrorOptions,
+  ) {
+    super(
+      "AgentCore operation outcome is unknown; the transition IAM policy was retained. " +
+        "Inspect the resource before retrying, then rerun the command to reconcile IAM.",
+      options,
+    );
+    this.name = "PolicyOperationOutcomeUnknownError";
   }
 }
 
@@ -112,7 +129,12 @@ export class PolicyFinalizationError<T> extends Error {
     readonly desiredHash: string,
     options: ErrorOptions,
   ) {
-    super("AgentCore succeeded but execution-role policy finalization failed.", options);
+    const identity = resourceIdentity(value);
+    super(
+      `AgentCore succeeded${identity ? ` for ${identity}` : ""}, but execution-role policy finalization failed. ` +
+        "The resource may not be invokable. Rerun the same command without changing its configuration to reconcile IAM; do not recreate the resource.",
+      options,
+    );
     this.name = "PolicyFinalizationError";
   }
 }
@@ -181,6 +203,14 @@ export class ExecutionRolePolicyUpdater {
     try {
       value = await this.runOperation(request.operation, request.operationRetry);
     } catch (operationError) {
+      if (request.isOperationOutcomeUnknown?.(operationError)) {
+        throw new PolicyOperationOutcomeUnknownError(
+          request.roleName,
+          request.policyName,
+          transition.hash,
+          { cause: operationError },
+        );
+      }
       if (transitionStaged) {
         try {
           await this.writeExact(request.roleName, request.policyName, current);
@@ -541,6 +571,24 @@ function policyStringList(value: unknown, path: string): string[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function resourceIdentity(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  for (const key of [
+    "gatewayId",
+    "targetId",
+    "harnessId",
+    "onlineEvaluationConfigId",
+    "policyEngineId",
+  ]) {
+    if (typeof value[key] === "string") return `${key} ${value[key]}`;
+  }
+  for (const nested of ["response", "gateway", "target", "harness"]) {
+    const identity = resourceIdentity(value[nested]);
+    if (identity) return identity;
+  }
+  return undefined;
 }
 
 function delay(milliseconds: number): Promise<void> {
