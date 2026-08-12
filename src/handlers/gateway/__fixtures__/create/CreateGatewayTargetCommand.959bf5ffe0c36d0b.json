@@ -1,11 +1,11 @@
 {
-  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:gateway/agentcore-cli-gateway-create-fixture-bkf6yayfce",
-  "targetId": "U4ADV7VNSV",
+  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gw-pr2final737dv2-9fsgqbtcou",
+  "targetId": "SAANHUVEQA",
   "createdAt": {
-    "$date": "2026-08-06T17:25:52.273Z"
+    "$date": "2026-08-12T22:10:11.223Z"
   },
   "updatedAt": {
-    "$date": "2026-08-06T17:25:52.273Z"
+    "$date": "2026-08-12T22:10:11.223Z"
   },
   "status": "CREATING",
   "name": "web-search-fixture",

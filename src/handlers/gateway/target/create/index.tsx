@@ -7,7 +7,7 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import z from "zod";
 import { InputValidationError } from "../../../../errors";
-import { type AppIO, SourceResolver } from "../../../../io";
+import { type AppIO, SourceResolver, warn } from "../../../../io";
 import { createHandler, flag } from "../../../../router";
 import { JsonRendererKey } from "../../../../tui";
 import type { Core } from "../../../types";
@@ -118,8 +118,26 @@ export const createCreateGatewayTargetHandler = (core: Core, io: AppIO) =>
         ...(flags["client-token"] ? { clientToken: flags["client-token"] } : {}),
       };
 
-      ctx
-        .require(JsonRendererKey)
-        .renderJson(await core.gateway.createGatewayTarget(input, coreOptsFromCtx(ctx)));
+      const options = coreOptsFromCtx(ctx);
+      const preflightWarning = await core.gateway.getGatewayRolePolicyWarning(
+        input.gatewayIdentifier!,
+        options,
+      );
+      if (preflightWarning) {
+        warn(
+          io,
+          `Execution role ${preflightWarning.roleArn} is not recognized as AgentCore CLI or console managed. ` +
+            "The CLI did not modify its IAM policies; you are responsible for this Target's permissions.",
+        );
+      }
+      const result = await core.gateway.createGatewayTarget(input, options);
+      if (result.rolePolicyWarning && !preflightWarning) {
+        warn(
+          io,
+          `Execution role ${result.rolePolicyWarning.roleArn} is not recognized as AgentCore CLI or console managed. ` +
+            "The CLI did not modify its IAM policies; you are responsible for this Target's permissions.",
+        );
+      }
+      ctx.require(JsonRendererKey).renderJson(result.response);
     },
   });

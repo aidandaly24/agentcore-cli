@@ -1,0 +1,29 @@
+{
+  "items": [
+    {
+      "targetId": "PTTEODWQQM",
+      "name": "http-fixture",
+      "status": "READY",
+      "createdAt": {
+        "$date": "2026-08-12T22:09:58.061Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T22:09:58.733Z"
+      },
+      "targetType": "PASSTHROUGH"
+    },
+    {
+      "targetId": "SAANHUVEQA",
+      "name": "web-search-fixture",
+      "status": "READY",
+      "createdAt": {
+        "$date": "2026-08-12T22:10:11.223Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-12T22:10:12.270Z"
+      },
+      "description": "Disposable Gateway Connector Create fixture",
+      "targetType": "CONNECTOR"
+    }
+  ]
+}

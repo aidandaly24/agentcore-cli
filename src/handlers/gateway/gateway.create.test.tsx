@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DeleteGatewayCommand,
@@ -7,12 +7,12 @@ import {
   DeleteGatewayTargetCommand,
   GetGatewayCommand,
   GetGatewayTargetCommand,
+  ListGatewaysCommand,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  CreateRoleCommand,
   DeleteRoleCommand,
   DeleteRolePolicyCommand,
-  PutRolePolicyCommand,
+  ListRolePoliciesCommand,
 } from "@aws-sdk/client-iam";
 import { CoreClient } from "../../core";
 import { createControlClient, createIamClient } from "../../core/factories";
@@ -27,20 +27,28 @@ import {
 import { createRootHandler } from "../index";
 
 const REGION = "us-east-1";
-const GATEWAY_NAME = "agentcore-cli-gateway-create-fixture";
+const FIXTURES = join(import.meta.dir, "__fixtures__", "create");
+const RESOURCE_FIXTURE = join(FIXTURES, "resources.json");
+const recordedResources = isRecording()
+  ? undefined
+  : (JSON.parse(readFileSync(RESOURCE_FIXTURE, "utf8")) as {
+      gatewayName: string;
+    });
+const GATEWAY_NAME = isRecording()
+  ? `agentcore-cli-gw-${process.env.AGENTCORE_E2E_RUN_ID ?? Date.now().toString(36)}`
+  : recordedResources!.gatewayName;
 const HTTP_TARGET_NAME = "http-fixture";
 const CONNECTOR_TARGET_NAME = "web-search-fixture";
-const ROLE_NAME = "AgentCoreGateway-agentcore-cli-gateway-create-fix-f0aa3f799a4b";
-const WEB_SEARCH_POLICY_NAME = "AgentCoreCliWebSearchFixture";
-const FIXTURES = join(import.meta.dir, "__fixtures__", "create");
+const ROLE_NAME = `AgentCoreCliGateway-${GATEWAY_NAME}`;
 const FLOW_TIMEOUT = 600_000;
 const TEST_ROLE_ARN = "arn:aws:iam::123456789012:role/GatewayFixtureRole";
 
-// Record with AWS_PROFILE=e2e-test RECORD=1 bun test src/handlers/gateway/gateway.create.test.tsx
+// Record with AWS_PROFILE=deploy RECORD=1 bun test src/handlers/gateway/gateway.create.test.tsx
 type FixtureState = {
   gatewayId?: string;
   targetIds: string[];
   ruleId?: string;
+  roleCreated?: boolean;
 };
 
 function createFixtureCore(): CoreClient {
@@ -52,12 +60,21 @@ function createFixtureCore(): CoreClient {
     createIamClient,
     createLogsClient,
     logger: createSilentLogger(),
+    gatewayOptions: isRecording()
+      ? undefined
+      : {
+          policyUpdater: {
+            propagationDelayMs: 0,
+            retryDelayMs: 0,
+          },
+          waitDelayMs: 0,
+        },
   });
 }
 
-async function run(args: string[]): Promise<string> {
+async function run(args: string[], core = createFixtureCore()): Promise<string> {
   const io = testIO();
-  const root = createRootHandler(createFixtureCore(), {
+  const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
@@ -69,9 +86,10 @@ async function run(args: string[]): Promise<string> {
 async function pollUntil(
   args: string[],
   done: (response: Record<string, unknown>) => boolean,
+  core = createFixtureCore(),
 ): Promise<void> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const response = JSON.parse(await run(args)) as Record<string, unknown>;
+    const response = JSON.parse(await run(args, core)) as Record<string, unknown>;
     if (done(response)) return;
     if (!isRecording()) {
       throw new Error(`Replayed fixture for \`${args.join(" ")}\` is not settled`);
@@ -102,38 +120,6 @@ async function waitUntilMissing(operation: () => Promise<unknown>): Promise<void
     await Bun.sleep(2_000);
   }
   throw new Error("Timed out waiting for fixture resource deletion");
-}
-
-async function fixtureRoleArn(): Promise<string> {
-  if (!isRecording()) {
-    return JSON.parse(readFileSync(join(FIXTURES, "gateway-create.golden.json"), "utf8")).roleArn;
-  }
-
-  const iam = createIamClient({ region: REGION });
-  await ignoreMissing(() =>
-    iam.send(
-      new DeleteRolePolicyCommand({ RoleName: ROLE_NAME, PolicyName: WEB_SEARCH_POLICY_NAME }),
-    ),
-  );
-  await ignoreMissing(() => iam.send(new DeleteRoleCommand({ RoleName: ROLE_NAME })));
-  const response = await iam.send(
-    new CreateRoleCommand({
-      RoleName: ROLE_NAME,
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Effect: "Allow",
-            Principal: { Service: "bedrock-agentcore.amazonaws.com" },
-            Action: "sts:AssumeRole",
-          },
-        ],
-      }),
-    }),
-  );
-  if (!response.Role?.Arn) throw new Error("IAM did not return the fixture role ARN");
-  await Bun.sleep(10_000);
-  return response.Role.Arn;
 }
 
 async function deleteTarget(
@@ -176,6 +162,18 @@ async function cleanup(state: FixtureState): Promise<void> {
   if (!isRecording()) return;
 
   const control = createControlClient({ region: REGION });
+  if (!state.gatewayId && state.roleCreated) {
+    let nextToken: string | undefined;
+    do {
+      const page = await control.send(new ListGatewaysCommand({ nextToken, maxResults: 100 }));
+      const match = (page.items ?? []).find((gateway) => gateway.name === GATEWAY_NAME);
+      if (match?.gatewayId) {
+        state.gatewayId = match.gatewayId;
+        break;
+      }
+      nextToken = page.nextToken;
+    } while (nextToken);
+  }
   if (state.gatewayId && state.ruleId) {
     await ignoreMissing(() =>
       control.send(
@@ -200,32 +198,33 @@ async function cleanup(state: FixtureState): Promise<void> {
     );
   }
 
-  const iam = createIamClient({ region: REGION });
-  await ignoreMissing(() =>
-    iam.send(
-      new DeleteRolePolicyCommand({
-        RoleName: ROLE_NAME,
-        PolicyName: WEB_SEARCH_POLICY_NAME,
-      }),
-    ),
-  );
-  await ignoreMissing(() =>
-    iam.send(
-      new DeleteRoleCommand({
-        RoleName: ROLE_NAME,
-      }),
-    ),
-  );
+  if (state.roleCreated) {
+    const iam = createIamClient({ region: REGION });
+    try {
+      const policies = await iam.send(new ListRolePoliciesCommand({ RoleName: ROLE_NAME }));
+      for (const policyName of (policies.PolicyNames ?? []).filter((name) =>
+        name.startsWith("AgentCoreCliGatewayExecutionPolicy-"),
+      )) {
+        await ignoreMissing(() =>
+          iam.send(new DeleteRolePolicyCommand({ RoleName: ROLE_NAME, PolicyName: policyName })),
+        );
+      }
+    } catch (error) {
+      if ((error as Error).name !== "NoSuchEntityException") throw error;
+    }
+    await ignoreMissing(() =>
+      iam.send(
+        new DeleteRoleCommand({
+          RoleName: ROLE_NAME,
+        }),
+      ),
+    );
+  }
 }
 
 describe("Gateway create validation", () => {
   test.each([
     ["Gateway name", ["gateway", "create", "--authorizer-type", "NONE"], /--name/],
-    [
-      "Gateway role",
-      ["gateway", "create", "--name", "orders", "--authorizer-type", "NONE"],
-      /--role-arn/,
-    ],
     [
       "Gateway authorizer",
       ["gateway", "create", "--name", "orders", "--role-arn", TEST_ROLE_ARN],
@@ -473,21 +472,26 @@ describe("Gateway fixture-backed creates", () => {
     "creates a Gateway, Target, Connector, and Rule through the real Core",
     async () => {
       const state: FixtureState = { targetIds: [] };
-      const roleArn = await fixtureRoleArn();
+      const core = createFixtureCore();
+      if (isRecording()) {
+        state.roleCreated = true;
+        writeFileSync(RESOURCE_FIXTURE, JSON.stringify({ gatewayName: GATEWAY_NAME }, null, 2));
+      }
 
       try {
-        const gatewayStdout = await run([
-          "gateway",
-          "create",
-          "--name",
-          GATEWAY_NAME,
-          "--role-arn",
-          roleArn,
-          "--authorizer-type",
-          "NONE",
-          "--description",
-          "Disposable Gateway Create fixture",
-        ]);
+        const gatewayStdout = await run(
+          [
+            "gateway",
+            "create",
+            "--name",
+            GATEWAY_NAME,
+            "--authorizer-type",
+            "NONE",
+            "--description",
+            "Disposable Gateway Create fixture",
+          ],
+          core,
+        );
         matchGolden(FIXTURES, "gateway-create.golden.json", gatewayStdout);
         const gateway = JSON.parse(gatewayStdout);
         expect(gateway.name).toBe(GATEWAY_NAME);
@@ -498,26 +502,30 @@ describe("Gateway fixture-backed creates", () => {
         await pollUntil(
           ["gateway", "get", "--id", state.gatewayId!],
           (response) => response.status === "READY",
+          core,
         );
 
-        const targetStdout = await run([
-          "gateway",
-          "target",
-          "create",
-          "--gateway-id",
-          state.gatewayId!,
-          "--name",
-          HTTP_TARGET_NAME,
-          "--target-configuration",
-          JSON.stringify({
-            http: {
-              passthrough: {
-                endpoint: "https://example.com",
-                protocolType: "CUSTOM",
+        const targetStdout = await run(
+          [
+            "gateway",
+            "target",
+            "create",
+            "--gateway-id",
+            state.gatewayId!,
+            "--name",
+            HTTP_TARGET_NAME,
+            "--target-configuration",
+            JSON.stringify({
+              http: {
+                passthrough: {
+                  endpoint: "https://example.com",
+                  protocolType: "CUSTOM",
+                },
               },
-            },
-          }),
-        ]);
+            }),
+          ],
+          core,
+        );
         matchGolden(FIXTURES, "target-create.golden.json", targetStdout);
         const target = JSON.parse(targetStdout);
         expect(target.targetId).toBeString();
@@ -534,32 +542,25 @@ describe("Gateway fixture-backed creates", () => {
             target.targetId,
           ],
           (response) => response.status === "READY",
+          core,
         );
 
-        // TODO: Remove this fixture-only grant when managed Gateway roles reconcile Target permissions.
-        if (isRecording()) {
-          await createIamClient({ region: REGION }).send(
-            new PutRolePolicyCommand({
-              RoleName: ROLE_NAME,
-              PolicyName: WEB_SEARCH_POLICY_NAME,
-              PolicyDocument: JSON.stringify(webSearchPolicy(gateway.gatewayArn)),
-            }),
-          );
-        }
-
-        const connectorStdout = await run([
-          "gateway",
-          "connector",
-          "create",
-          "--gateway-id",
-          state.gatewayId!,
-          "--name",
-          CONNECTOR_TARGET_NAME,
-          "--connector",
-          "web-search",
-          "--description",
-          "Disposable Gateway Connector Create fixture",
-        ]);
+        const connectorStdout = await run(
+          [
+            "gateway",
+            "connector",
+            "create",
+            "--gateway-id",
+            state.gatewayId!,
+            "--name",
+            CONNECTOR_TARGET_NAME,
+            "--connector",
+            "web-search",
+            "--description",
+            "Disposable Gateway Connector Create fixture",
+          ],
+          core,
+        );
         matchGolden(FIXTURES, "connector-create.golden.json", connectorStdout);
         const connector = JSON.parse(connectorStdout);
         expect(connector.targetId).toBeString();
@@ -589,29 +590,33 @@ describe("Gateway fixture-backed creates", () => {
             connector.targetId,
           ],
           (response) => response.status === "READY",
+          core,
         );
 
-        const ruleStdout = await run([
-          "gateway",
-          "rule",
-          "create",
-          "--gateway-id",
-          state.gatewayId!,
-          "--priority",
-          "10",
-          "--actions",
-          JSON.stringify([
-            {
-              routeToTarget: {
-                staticRoute: {
-                  targetName: HTTP_TARGET_NAME,
+        const ruleStdout = await run(
+          [
+            "gateway",
+            "rule",
+            "create",
+            "--gateway-id",
+            state.gatewayId!,
+            "--priority",
+            "10",
+            "--actions",
+            JSON.stringify([
+              {
+                routeToTarget: {
+                  staticRoute: {
+                    targetName: HTTP_TARGET_NAME,
+                  },
                 },
               },
-            },
-          ]),
-          "--description",
-          "Disposable Gateway Rule Create fixture",
-        ]);
+            ]),
+            "--description",
+            "Disposable Gateway Rule Create fixture",
+          ],
+          core,
+        );
         matchGolden(FIXTURES, "rule-create.golden.json", ruleStdout);
         const rule = JSON.parse(ruleStdout);
         expect(rule.ruleId).toBeString();
@@ -620,6 +625,7 @@ describe("Gateway fixture-backed creates", () => {
         await pollUntil(
           ["gateway", "rule", "get", "--gateway-id", state.gatewayId!, "--rule-id", state.ruleId!],
           (response) => response.status === "ACTIVE",
+          core,
         );
       } finally {
         await cleanup(state);
@@ -628,25 +634,3 @@ describe("Gateway fixture-backed creates", () => {
     FLOW_TIMEOUT,
   );
 });
-
-function webSearchPolicy(gatewayArn: string): Record<string, unknown> {
-  const [prefix, partition, service, region] = gatewayArn.split(":");
-  if (prefix !== "arn" || service !== "bedrock-agentcore" || !region) {
-    throw new Error(`Unexpected Gateway ARN: ${gatewayArn}`);
-  }
-  return {
-    Version: "2012-10-17",
-    Statement: [
-      {
-        Effect: "Allow",
-        Action: "bedrock-agentcore:InvokeGateway",
-        Resource: gatewayArn,
-      },
-      {
-        Effect: "Allow",
-        Action: "bedrock-agentcore:InvokeWebSearch",
-        Resource: `arn:${partition}:${service}:${region}:aws:tool/web-search.v1`,
-      },
-    ],
-  };
-}

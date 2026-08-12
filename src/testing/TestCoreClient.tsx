@@ -887,6 +887,10 @@ export class TestGatewayClient implements CoreGatewayClient {
     return this;
   }
 
+  async getGatewayRolePolicyWarning(): Promise<undefined> {
+    return undefined;
+  }
+
   async createGateway(
     input: CreateGatewayInput,
     options: CoreOptions,
@@ -919,10 +923,10 @@ export class TestGatewayClient implements CoreGatewayClient {
   async createGatewayTarget(
     input: CreateGatewayTargetInput,
     options: CoreOptions,
-  ): Promise<CreateGatewayTargetResponse> {
+  ): Promise<{ response: CreateGatewayTargetResponse }> {
     this.calls.push({ method: "createGatewayTarget", args: [input, options] });
     if (this.error) throw this.error;
-    return DEFAULT_CREATE_GATEWAY_TARGET_RESPONSE;
+    return { response: DEFAULT_CREATE_GATEWAY_TARGET_RESPONSE };
   }
 
   async getGatewayTarget(

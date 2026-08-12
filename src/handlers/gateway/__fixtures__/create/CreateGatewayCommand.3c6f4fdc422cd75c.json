@@ -1,8 +1,12 @@
 {
   "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gw-pr2final737dv2-9fsgqbtcou",
   "gatewayId": "agentcore-cli-gw-pr2final737dv2-9fsgqbtcou",
-  "createdAt": "2026-08-12T22:09:35.171Z",
-  "updatedAt": "2026-08-12T22:09:35.171Z",
+  "createdAt": {
+    "$date": "2026-08-12T22:09:35.171Z"
+  },
+  "updatedAt": {
+    "$date": "2026-08-12T22:09:35.171Z"
+  },
   "status": "CREATING",
   "name": "agentcore-cli-gw-pr2final737dv2",
   "authorizerType": "NONE",

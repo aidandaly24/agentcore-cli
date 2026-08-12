@@ -16,7 +16,7 @@ const RULE_ID = "rule-1";
 async function run(
   args: string[],
   core = new TestCoreClient(),
-): Promise<{ core: TestCoreClient; stdout: string }> {
+): Promise<{ core: TestCoreClient; stdout: string; stderr: string }> {
   const io = testIO();
   const root = createRootHandler(core, {
     io: io.io,
@@ -25,7 +25,7 @@ async function run(
   });
 
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
-  return { core, stdout: io.stdout() };
+  return { core, stdout: io.stdout(), stderr: io.stderr() };
 }
 
 function supportsTui(path: readonly string[]): boolean {
@@ -129,5 +129,81 @@ describe("gateway validation", () => {
       /Invalid value for option '--max-results'/,
     );
     expect(core.gateway.calls).toEqual([]);
+  });
+});
+
+describe("gateway create", () => {
+  test("allows Core to provision the execution role when --role-arn is omitted", async () => {
+    const { core } = await run([
+      "gateway",
+      "create",
+      "--name",
+      "orders",
+      "--authorizer-type",
+      "NONE",
+    ]);
+
+    expect(core.gateway.calls).toEqual([
+      {
+        method: "createGateway",
+        args: [
+          {
+            name: "orders",
+            roleArn: undefined,
+            authorizerType: "NONE",
+          },
+          {
+            region: REGION,
+            endpointUrl: undefined,
+          },
+        ],
+      },
+    ]);
+  });
+
+  test("identifies an explicit role as customer-managed", async () => {
+    const roleArn = "arn:aws:iam::123456789012:role/CustomerGatewayRole";
+    const { stderr } = await run([
+      "gateway",
+      "create",
+      "--name",
+      "orders",
+      "--role-arn",
+      roleArn,
+      "--authorizer-type",
+      "NONE",
+    ]);
+
+    expect(stderr).toContain(
+      `Using customer-managed execution role ${roleArn}; IAM policies will not be modified.`,
+    );
+  });
+
+  test("warns without changing JSON output when a Target role is unknown", async () => {
+    const core = new TestCoreClient();
+    const roleArn = "arn:aws:iam::123456789012:role/CustomerCdkGatewayRole";
+    core.gateway.createGatewayTarget = async () => ({
+      response: { targetId: "target-1", status: "CREATING" } as never,
+      rolePolicyWarning: { reason: "unknown-role", roleArn },
+    });
+
+    const { stdout, stderr } = await run(
+      [
+        "gateway",
+        "target",
+        "create",
+        "--gateway-id",
+        "gateway-1",
+        "--name",
+        "lambda",
+        "--target-configuration",
+        '{"mcp":{"lambda":{"lambdaArn":"arn:aws:lambda:us-west-2:123456789012:function:orders","toolSchema":{"inlinePayload":[]}}}}',
+      ],
+      core,
+    );
+
+    expect(JSON.parse(stdout)).toEqual({ targetId: "target-1", status: "CREATING" });
+    expect(stderr).toContain(`Execution role ${roleArn} is not recognized`);
+    expect(stderr).toContain("The CLI did not modify its IAM policies");
   });
 });

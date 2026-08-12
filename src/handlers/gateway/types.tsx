@@ -24,7 +24,21 @@ export type CreateGatewayTargetInput = CreateGatewayTargetRequest;
 
 export type CreateGatewayRuleInput = CreateGatewayRuleRequest;
 
+export type GatewayRolePolicyWarning = {
+  reason: "unknown-role";
+  roleArn: string;
+};
+
+export type GatewayMutationResult<T> = {
+  response: T;
+  rolePolicyWarning?: GatewayRolePolicyWarning;
+};
+
 export interface CoreGatewayClient {
+  getGatewayRolePolicyWarning(
+    gatewayId: string,
+    options: CoreOptions,
+  ): Promise<GatewayRolePolicyWarning | undefined>;
   createGateway(input: CreateGatewayInput, options: CoreOptions): Promise<CreateGatewayResponse>;
   getGateway(id: string, options: CoreOptions): Promise<GetGatewayResponse>;
   listGateways(
@@ -46,7 +60,7 @@ export interface CoreGatewayClient {
   createGatewayTarget(
     input: CreateGatewayTargetInput,
     options: CoreOptions,
-  ): Promise<CreateGatewayTargetResponse>;
+  ): Promise<GatewayMutationResult<CreateGatewayTargetResponse>>;
   getGatewayConnector(
     gatewayId: string,
     targetId: string,

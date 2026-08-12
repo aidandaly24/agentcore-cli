@@ -18,7 +18,11 @@ export const createCreateGatewayHandler = (core: Core, io: AppIO) =>
     description: "create an AgentCore Gateway",
     flags: [
       flag("name", "the Gateway name", z.string().optional()),
-      flag("role-arn", "IAM role the Gateway assumes", z.string().optional()),
+      flag(
+        "role-arn",
+        "customer-managed IAM role; a CLI-managed role is created when omitted",
+        z.string().optional(),
+      ),
       flag(
         "protocol",
         "restrict Target protocols to MCP; omitted allows every Target protocol",
@@ -63,9 +67,6 @@ export const createCreateGatewayHandler = (core: Core, io: AppIO) =>
     handle: async (ctx, flags) => {
       if (!flags.name) {
         throw new InputValidationError("required option '--name <name>' not specified");
-      }
-      if (!flags["role-arn"]) {
-        throw new InputValidationError("required option '--role-arn <role-arn>' not specified");
       }
       if (!flags["authorizer-type"]) {
         throw new InputValidationError(
@@ -134,9 +135,13 @@ export const createCreateGatewayHandler = (core: Core, io: AppIO) =>
         ...(flags["client-token"] ? { clientToken: flags["client-token"] } : {}),
       };
 
-      ctx
-        .require(JsonRendererKey)
-        .renderJson(await core.gateway.createGateway(input, coreOptsFromCtx(ctx)));
+      if (flags["role-arn"]) {
+        io.stderr.write(
+          `Using customer-managed execution role ${flags["role-arn"]}; IAM policies will not be modified.\n`,
+        );
+      }
+      const response = await core.gateway.createGateway(input, coreOptsFromCtx(ctx));
+      ctx.require(JsonRendererKey).renderJson(response);
     },
   });
 

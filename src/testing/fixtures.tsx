@@ -1,9 +1,24 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect } from "bun:test";
-import type { BedrockAgentCoreControlClient } from "@aws-sdk/client-bedrock-agentcore-control";
+import {
+  CreateGatewayCommand,
+  CreateGatewayTargetCommand,
+  DeleteGatewayTargetCommand,
+  ListGatewayTargetsCommand,
+  type BedrockAgentCoreControlClient,
+} from "@aws-sdk/client-bedrock-agentcore-control";
 import type { BedrockAgentCoreClient } from "@aws-sdk/client-bedrock-agentcore";
-import type { IAMClient } from "@aws-sdk/client-iam";
+import {
+  CreateRoleCommand,
+  DeleteRoleCommand,
+  DeleteRolePolicyCommand,
+  GetRoleCommand,
+  GetRolePolicyCommand,
+  ListRolePoliciesCommand,
+  PutRolePolicyCommand,
+  type IAMClient,
+} from "@aws-sdk/client-iam";
 import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import type {
   ClientConfig,
@@ -62,8 +77,21 @@ interface SdkCommand {
 // staying deterministic and offline-stable across runs.
 function fixturePath(dir: string, command: SdkCommand): string {
   const op = command.constructor.name;
-  const hash = Bun.hash(stringify(command.input ?? {})).toString(16);
+  const hash = Bun.hash(stringify(normalizeFixtureInput(command.input ?? {}))).toString(16);
   return join(dir, `${op}.${hash}.json`);
+}
+
+function normalizeFixtureInput(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeFixtureInput);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        key === "clientToken" ? "<generated-client-token>" : normalizeFixtureInput(entry),
+      ]),
+    );
+  }
+  return value;
 }
 
 // normalizeResponse strips volatile transport metadata from a recorded SDK
@@ -140,6 +168,178 @@ function makeRecordingSend<C extends { send: (command: any) => Promise<any> }>(
   };
 }
 
+function makeIamRecordingSend(
+  realClient: IAMClient,
+  dir: string,
+): (command: SdkCommand) => Promise<unknown> {
+  const recordedSend = makeRecordingSend(realClient, dir);
+  const inlinePolicies = new Map<string, Map<string, string>>();
+  const deletedPolicies = new Map<string, Set<string>>();
+  const rolesCreatedInScenario = recordedCreatedRoleNames(dir);
+  const existingRoles = new Set<string>();
+
+  return async (command: SdkCommand) => {
+    if (isRecording()) return recordedSend(command);
+
+    if (command instanceof GetRoleCommand) {
+      const roleName = command.input.RoleName;
+      if (roleName && rolesCreatedInScenario.has(roleName) && !existingRoles.has(roleName)) {
+        const error = new Error(`Role ${roleName} does not exist in replay state.`);
+        error.name = "NoSuchEntityException";
+        throw error;
+      }
+      return recordedSend(command);
+    }
+
+    if (command instanceof CreateRoleCommand) {
+      const response = await recordedSend(command);
+      if (command.input.RoleName) existingRoles.add(command.input.RoleName);
+      return response;
+    }
+
+    if (command instanceof DeleteRoleCommand) {
+      const response = await recordedSend(command);
+      if (command.input.RoleName) existingRoles.delete(command.input.RoleName);
+      return response;
+    }
+
+    if (command instanceof PutRolePolicyCommand) {
+      const response = await recordedSend(command);
+      const { RoleName, PolicyName, PolicyDocument } = command.input;
+      if (RoleName && PolicyName && PolicyDocument) {
+        let policies = inlinePolicies.get(RoleName);
+        if (!policies) {
+          policies = new Map();
+          inlinePolicies.set(RoleName, policies);
+        }
+        policies.set(PolicyName, PolicyDocument);
+        deletedPolicies.get(RoleName)?.delete(PolicyName);
+      }
+      return response;
+    }
+
+    if (command instanceof DeleteRolePolicyCommand) {
+      const response = await recordedSend(command);
+      const { RoleName, PolicyName } = command.input;
+      if (RoleName && PolicyName) {
+        inlinePolicies.get(RoleName)?.delete(PolicyName);
+        let deleted = deletedPolicies.get(RoleName);
+        if (!deleted) {
+          deleted = new Set();
+          deletedPolicies.set(RoleName, deleted);
+        }
+        deleted.add(PolicyName);
+      }
+      return response;
+    }
+
+    if (command instanceof GetRolePolicyCommand) {
+      const { RoleName, PolicyName } = command.input;
+      const current = RoleName && PolicyName ? inlinePolicies.get(RoleName)?.get(PolicyName) : null;
+      if (current) {
+        return {
+          RoleName,
+          PolicyName,
+          PolicyDocument: encodeURIComponent(current),
+        };
+      }
+      return recordedSend(command);
+    }
+
+    if (command instanceof ListRolePoliciesCommand) {
+      const recorded = (await recordedSend(command)) as {
+        PolicyNames?: string[];
+        IsTruncated?: boolean;
+        Marker?: string;
+      };
+      const roleName = command.input.RoleName;
+      const deleted = roleName ? deletedPolicies.get(roleName) : undefined;
+      const current = roleName ? inlinePolicies.get(roleName) : undefined;
+      const policyNames = new Set(
+        (recorded.PolicyNames ?? []).filter((policyName) => !deleted?.has(policyName)),
+      );
+      for (const policyName of current?.keys() ?? []) policyNames.add(policyName);
+      return {
+        ...recorded,
+        PolicyNames: [...policyNames].sort(),
+      };
+    }
+
+    return recordedSend(command);
+  };
+}
+
+function recordedCreatedRoleNames(dir: string): Set<string> {
+  if (!existsSync(dir)) return new Set();
+  const names = new Set<string>();
+  for (const file of readdirSync(dir).filter((name) => name.startsWith("CreateRoleCommand."))) {
+    const response = parse(readFileSync(join(dir, file), "utf8")) as {
+      Role?: { RoleName?: string };
+    };
+    if (response.Role?.RoleName) names.add(response.Role.RoleName);
+  }
+  return names;
+}
+
+function makeControlRecordingSend(
+  realClient: BedrockAgentCoreControlClient,
+  dir: string,
+): (command: SdkCommand) => Promise<unknown> {
+  const recordedSend = makeRecordingSend(realClient, dir);
+  const targetIdsByGateway = new Map<string, Set<string>>();
+
+  return async (command: SdkCommand) => {
+    if (isRecording()) return recordedSend(command);
+
+    if (command instanceof CreateGatewayCommand) {
+      const response = (await recordedSend(command)) as { gatewayId?: string };
+      if (response.gatewayId) targetIdsByGateway.set(response.gatewayId, new Set());
+      return response;
+    }
+
+    if (command instanceof CreateGatewayTargetCommand) {
+      const response = (await recordedSend(command)) as { targetId?: string };
+      const gatewayId = command.input.gatewayIdentifier;
+      if (gatewayId && response.targetId) {
+        let targetIds = targetIdsByGateway.get(gatewayId);
+        if (!targetIds) {
+          targetIds = new Set();
+          targetIdsByGateway.set(gatewayId, targetIds);
+        }
+        targetIds.add(response.targetId);
+      }
+      return response;
+    }
+
+    if (command instanceof DeleteGatewayTargetCommand) {
+      const response = await recordedSend(command);
+      const { gatewayIdentifier, targetId } = command.input;
+      if (gatewayIdentifier && targetId) {
+        targetIdsByGateway.get(gatewayIdentifier)?.delete(targetId);
+      }
+      return response;
+    }
+
+    if (command instanceof ListGatewayTargetsCommand) {
+      const recorded = (await recordedSend(command)) as {
+        items?: { targetId?: string }[];
+      };
+      const targetIds = command.input.gatewayIdentifier
+        ? targetIdsByGateway.get(command.input.gatewayIdentifier)
+        : undefined;
+      if (!targetIds) return recorded;
+      return {
+        ...recorded,
+        items: (recorded.items ?? []).filter(
+          (target) => target.targetId && targetIds.has(target.targetId),
+        ),
+      };
+    }
+
+    return recordedSend(command);
+  };
+}
+
 // fixtureFactories builds Core client factories backed by the golden files in
 // `dir`. Drop these into `new CoreClient(...)` to run the real command flow
 // (parsing → middleware → handler → CoreClient) against recorded data. The fake
@@ -156,7 +356,7 @@ export function fixtureFactories(dir: string): {
       // mode its `.send()` is never reached.
       const real = createControlClient(config);
       return {
-        send: makeRecordingSend(real, dir),
+        send: makeControlRecordingSend(real, dir),
       } as unknown as BedrockAgentCoreControlClient;
     },
     createDataClient: (config: ClientConfig) => {
@@ -168,7 +368,7 @@ export function fixtureFactories(dir: string): {
     createIamClient: (config: ClientConfig) => {
       const real = createIamClient(config);
       return {
-        send: makeRecordingSend(real, dir),
+        send: makeIamRecordingSend(real, dir),
       } as unknown as IAMClient;
     },
     createLogsClient: (config: ClientConfig) => {
