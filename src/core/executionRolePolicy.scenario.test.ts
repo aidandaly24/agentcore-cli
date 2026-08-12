@@ -22,7 +22,7 @@ describe("execution-role policy scenarios", () => {
         reason: "authorize Gateway requests",
         statements: [
           AgentCorePolicyGrants.getPolicyEngine(POLICY_ENGINE_ARN),
-          AgentCorePolicyGrants.authorizeGateway(GATEWAY_ARN),
+          AgentCorePolicyGrants.authorizeGateway(POLICY_ENGINE_ARN, GATEWAY_ARN),
         ],
       },
       {

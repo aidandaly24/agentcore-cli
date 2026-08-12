@@ -13,15 +13,15 @@ export class AgentCorePolicyGrants {
     return allow(["bedrock-agentcore:GetPolicyEngine"], [policyEngineArn]);
   }
 
-  static authorizeGateway(gatewayArn: string): GeneratedPolicyStatement {
+  static authorizeGateway(policyEngineArn: string, gatewayArn: string): GeneratedPolicyStatement {
     return allow(
       ["bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions"],
-      [gatewayArn],
+      [policyEngineArn, gatewayArn],
     );
   }
 
-  static invokeWebSearch(webSearchArn: string): GeneratedPolicyStatement {
-    return allow(["bedrock-agentcore:InvokeWebSearch"], [webSearchArn]);
+  static invokeWebSearch(webSearchArns: readonly string[]): GeneratedPolicyStatement {
+    return allow(["bedrock-agentcore:InvokeWebSearch"], webSearchArns);
   }
 
   static invokeGateway(gatewayArn: string): GeneratedPolicyStatement {

@@ -18,15 +18,17 @@ describe("AgentCorePolicyGrants", () => {
       actions: ["bedrock-agentcore:GetPolicyEngine"],
       resources: ["engine"],
     });
-    expect(AgentCorePolicyGrants.authorizeGateway("gateway")).toEqual({
+    expect(AgentCorePolicyGrants.authorizeGateway("engine", "gateway")).toEqual({
       effect: "Allow",
       actions: ["bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions"],
-      resources: ["gateway"],
+      resources: ["engine", "gateway"],
     });
-    expect(AgentCorePolicyGrants.invokeWebSearch("web-search")).toEqual({
+    expect(
+      AgentCorePolicyGrants.invokeWebSearch(["global-web-search", "regional-web-search"]),
+    ).toEqual({
       effect: "Allow",
       actions: ["bedrock-agentcore:InvokeWebSearch"],
-      resources: ["web-search"],
+      resources: ["global-web-search", "regional-web-search"],
     });
     expect(AgentCorePolicyGrants.invokeGateway("gateway")).toEqual({
       effect: "Allow",
