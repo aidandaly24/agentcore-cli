@@ -291,6 +291,33 @@ describe("Runtime invoke response output", () => {
     );
   });
 
+  test("JSON cancellation emits no partial envelope and preserves the typed reason", async () => {
+    const controller = new AbortController();
+    const cancellation = new UserCancellationError();
+    const stdout = capture();
+    const stderr = capture();
+    const source = (async function* () {
+      yield Buffer.from("partial");
+      controller.abort(cancellation);
+      throw Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    })();
+
+    await expect(
+      writeRuntimeInvokeResponse(response({ body: source }), {
+        stdout: stdout.stream,
+        stderr: stderr.stream,
+        json: true,
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(cancellation);
+    expect(stdout.bytes()).toHaveLength(0);
+    expect(stderr.bytes().toString()).toBe(
+      "status=200 content-type=text/plain runtime-session-id=- mcp-session-id=- " +
+        "mcp-protocol-version=- trace-id=- trace-parent=- trace-state=- baggage=- " +
+        "complete=false bytes=7 error=interrupted\n",
+    );
+  });
+
   test("preserves partial raw output regardless of response media type", async () => {
     const stdout = capture();
     const stderr = capture();

@@ -247,6 +247,64 @@ describe("runtime invoke", () => {
     expect((invoke.args[0] as RuntimeInvokeRequest).payload).toEqual(new Uint8Array());
   });
 
+  test("SIGINT cancels payload stdin resolution with the typed reason", async () => {
+    const core = new TestCoreClient();
+    const output = captureIO();
+    const initialListeners = process.listenerCount("SIGINT");
+    const pending = runCommand(core, output.io, [
+      "runtime",
+      "invoke",
+      "--id",
+      RUNTIME_ID,
+      "--payload",
+      "-",
+    ]);
+
+    try {
+      await waitFor(() => process.listenerCount("SIGINT") > initialListeners);
+      process.emit("SIGINT", "SIGINT");
+
+      await expect(pending).rejects.toBeInstanceOf(UserCancellationError);
+      expect(core.runtime.calls).toEqual([]);
+    } finally {
+      await pending.catch(() => undefined);
+    }
+  });
+
+  test("SIGINT replaces a raw Runtime lookup abort with the typed reason", async () => {
+    const core = new TestCoreClient();
+    const output = captureIO();
+    core.runtime.getRuntime = async (id, options, signal) => {
+      core.runtime.calls.push({ method: "getRuntime", args: [id, options, signal] });
+      return new Promise<never>((_, reject) => {
+        const abort = () =>
+          reject(Object.assign(new Error("lookup aborted"), { name: "AbortError" }));
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+      });
+    };
+    const pending = runCommand(core, output.io, [
+      "runtime",
+      "invoke",
+      "--id",
+      RUNTIME_ID,
+      "--payload",
+      "{}",
+    ]);
+
+    try {
+      await waitFor(() => core.runtime.calls.some((call) => call.method === "getRuntime"));
+      process.emit("SIGINT", "SIGINT");
+
+      const signal = core.runtime.calls[0]!.args[2] as AbortSignal;
+      expect(signal.reason).toBeInstanceOf(UserCancellationError);
+      await expect(pending).rejects.toBe(signal.reason);
+      expect(core.runtime.calls.map((call) => call.method)).toEqual(["getRuntime"]);
+    } finally {
+      await pending.catch(() => undefined);
+    }
+  });
+
   test("SIGINT aborts an active headless invocation after preserving emitted bytes", async () => {
     const core = new TestCoreClient();
     const output = captureIO();
