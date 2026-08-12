@@ -3,6 +3,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
+import { UserCancellationError } from "../../../errors";
 import { waitFor } from "../../../testing";
 import type { RuntimeInvokeResponse } from "../types";
 import { writeRuntimeInvokeResponse } from "./response";
@@ -128,7 +129,7 @@ describe("Runtime invoke response output", () => {
       }),
     ).rejects.toMatchObject({
       message: "response stream failed",
-      reported: true,
+      displayMessage: false,
     });
   });
 
@@ -266,11 +267,12 @@ describe("Runtime invoke response output", () => {
 
   test("writes an interruption summary after the output signal is aborted", async () => {
     const controller = new AbortController();
+    const cancellation = new UserCancellationError();
     const stdout = capture();
     const stderr = capture();
     const source = (async function* () {
       yield Buffer.from("partial");
-      controller.abort();
+      controller.abort(cancellation);
       throw Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
     })();
 
@@ -280,7 +282,7 @@ describe("Runtime invoke response output", () => {
         stderr: stderr.stream,
         signal: controller.signal,
       }),
-    ).rejects.toMatchObject({ name: "AbortError" });
+    ).rejects.toBe(cancellation);
     expect(stdout.bytes().toString()).toBe("partial");
     expect(stderr.bytes().toString()).toBe(
       "status=200 content-type=text/event-stream runtime-session-id=- mcp-session-id=- " +

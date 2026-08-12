@@ -1,5 +1,5 @@
 import z from "zod";
-import { InputValidationError, RuntimeInvokeInterruptedError } from "../../../errors";
+import { InputValidationError, UserCancellationError } from "../../../errors";
 import { createHandler, flag, PathKey } from "../../../router";
 import type { AppIO } from "../../../io";
 import type { Core } from "../../types";
@@ -105,7 +105,7 @@ export const createInvokeRuntimeHandler = (core: Core, io: AppIO) =>
         throw new InputValidationError("--json cannot be used with --output-file");
       }
       const controller = new AbortController();
-      const interrupt = () => controller.abort();
+      const interrupt = () => controller.abort(new UserCancellationError());
       process.once("SIGINT", interrupt);
       try {
         const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
@@ -144,10 +144,7 @@ export const createInvokeRuntimeHandler = (core: Core, io: AppIO) =>
           signal: controller.signal,
         });
       } catch (error) {
-        if (controller.signal.aborted && (error as Error)?.name === "AbortError") {
-          if (error instanceof RuntimeInvokeInterruptedError) throw error;
-          throw new RuntimeInvokeInterruptedError(error);
-        }
+        controller.signal.throwIfAborted();
         throw error;
       } finally {
         controller.abort();

@@ -1,6 +1,6 @@
 import z from "zod";
 import { createHandler, flag } from "../../../../router";
-import { InputValidationError } from "../../../../errors";
+import { InputValidationError, UserCancellationError } from "../../../../errors";
 import { JsonRendererKey } from "../../../../tui";
 import type { Core } from "../../../types";
 import { coreOptsFromCtx } from "../../../utils";
@@ -37,7 +37,7 @@ export const createGetDatasetHandler = (core: Core) =>
 
       // --file-path downloads the contents via the presigned download URL in metadata
       const controller = new AbortController();
-      const interrupt = () => controller.abort();
+      const interrupt = () => controller.abort(new UserCancellationError());
       process.once("SIGINT", interrupt);
       try {
         const response = await core.eval.downloadDataset(

@@ -16,9 +16,9 @@ export {
   ProjectFileExistsError,
   ResourceNotFoundError,
   ResultTruncationError,
-  RuntimeInvokeInterruptedError,
   RuntimeInvokeResponseError,
   SourceResolutionError,
+  UserCancellationError,
   type AgentCoreCLIErrorOptions,
 } from "./errors";
 export { ERROR_SOURCE } from "./types";

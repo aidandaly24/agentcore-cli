@@ -12,6 +12,7 @@ import {
   waitFor,
 } from "../../../testing";
 import { ExitCode, runWithExitCode } from "../../../runnable";
+import { UserCancellationError } from "../../../errors";
 import { createRootHandler } from "../../index";
 import * as tui from "../../../tui";
 import { RuntimeInvokeLaunchContextKey } from "./launchContext";
@@ -284,14 +285,14 @@ describe("runtime invoke", () => {
       process.emit("SIGINT", "SIGINT");
 
       expect(signal!.aborted).toBe(true);
-      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+      await expect(pending).rejects.toBeInstanceOf(UserCancellationError);
       expect(output.bytes().toString()).toBe("partial");
     } finally {
       await pending.catch(() => undefined);
     }
   });
 
-  test("wraps a raw Core abort after SIGINT", async () => {
+  test("replaces a raw Core abort with the typed SIGINT reason", async () => {
     const core = new TestCoreClient();
     const output = captureIO();
     const rawAbort = Object.assign(new Error("transport aborted"), { name: "AbortError" });
@@ -317,11 +318,10 @@ describe("runtime invoke", () => {
       await waitFor(() => core.runtime.calls.some((call) => call.method === "invokeRuntime"));
       process.emit("SIGINT", "SIGINT");
 
-      await expect(pending).rejects.toMatchObject({
-        name: "AbortError",
-        cause: rawAbort,
-        reported: false,
-      });
+      const signal = core.runtime.calls.find((call) => call.method === "invokeRuntime")!
+        .args[2] as AbortSignal;
+      expect(signal.reason).toBeInstanceOf(UserCancellationError);
+      await expect(pending).rejects.toBe(signal.reason);
     } finally {
       await pending.catch(() => undefined);
     }

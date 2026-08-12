@@ -1,4 +1,5 @@
 import { ServiceException } from "@smithy/core/client";
+import { CommanderError } from "commander";
 import { join } from "node:path";
 import { ERROR_SOURCE, type ErrorSource } from "./types";
 
@@ -11,6 +12,8 @@ export interface AgentCoreCLIErrorOptions extends ErrorOptions {
   exitCode?: number;
   /** Describes the name of the underlying error, defaults to AgentCoreCLIError */
   name?: string;
+  /** Whether the root handler should display this error's message */
+  displayMessage?: boolean;
 }
 
 /** Base error for CLI failures, including their source, metadata, and process exit code. */
@@ -18,6 +21,7 @@ export class AgentCoreCLIError extends Error {
   readonly source: ErrorSource;
   readonly meta: Record<string, unknown>;
   readonly exitCode: number;
+  readonly displayMessage: boolean;
 
   constructor(message?: string, options?: AgentCoreCLIErrorOptions) {
     super(message, options);
@@ -25,6 +29,7 @@ export class AgentCoreCLIError extends Error {
     this.source = options?.source ?? ERROR_SOURCE.INTERNAL;
     this.meta = options?.meta ?? {};
     this.exitCode = options?.exitCode ?? 1;
+    this.displayMessage = options?.displayMessage ?? true;
   }
   /** Convert the error into an object with its attributes enumerated as keys **/
   json(): Record<string, unknown> {
@@ -33,6 +38,7 @@ export class AgentCoreCLIError extends Error {
       message: this.message,
       stack: this.stack,
       exitCode: this.exitCode,
+      displayMessage: this.displayMessage,
       meta: this.meta,
       source: this.source,
     };
@@ -40,6 +46,17 @@ export class AgentCoreCLIError extends Error {
 
   static fromError(error: unknown): AgentCoreCLIError {
     if (error instanceof AgentCoreCLIError) return error;
+
+    if (error instanceof CommanderError) {
+      return new AgentCoreCLIError(error.message, {
+        cause: error,
+        source: ERROR_SOURCE.USER,
+        name: error.name,
+        meta: { code: error.code },
+        exitCode: error.exitCode === 0 ? 0 : 2,
+        displayMessage: false,
+      });
+    }
 
     if (ServiceException.isInstance(error)) {
       const httpStatusCode = error.$metadata.httpStatusCode;
@@ -137,23 +154,20 @@ export class EmbeddedAssetNotFoundError extends AgentCoreCLIError {
   }
 }
 
-export class CommandInterruptedError extends AgentCoreCLIError {
-  readonly reported: boolean;
-
-  constructor(cause?: unknown, reported = false) {
-    super("The operation was aborted", { cause, exitCode: 130 });
-    this.name = "AbortError";
-    this.reported = reported;
+/** Raised when a user intentionally cancels a headless CLI operation. */
+export class UserCancellationError extends AgentCoreCLIError {
+  constructor() {
+    super("Operation cancelled by user", {
+      source: ERROR_SOURCE.USER,
+      exitCode: 130,
+      displayMessage: false,
+    });
   }
 }
 
-export class RuntimeInvokeInterruptedError extends CommandInterruptedError {}
-
 export class RuntimeInvokeResponseError extends AgentCoreCLIError {
-  readonly reported = true;
-
   constructor(message: string, cause?: unknown) {
-    super(message, { cause });
+    super(message, { cause, displayMessage: false });
   }
 }
 

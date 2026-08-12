@@ -8,7 +8,9 @@ import {
   TestCoreClient,
   TestGlobalConfigAccessor,
   testIO,
+  waitFor,
 } from "../../../testing";
+import { UserCancellationError } from "../../../errors";
 import { createRootHandler } from "../../index";
 import type { CreateDatasetInput } from "../types";
 
@@ -440,6 +442,41 @@ describe("dataset get", () => {
 
     const call = core.eval.calls.find((c) => c.method === "downloadDataset");
     expect(call?.args.slice(0, 3)).toEqual(["dataset-orders-abc123", "2", "/tmp/v2.jsonl"]);
+  });
+
+  test("SIGINT cancels a download with the shared user cancellation error", async () => {
+    const { core, route } = testDatasetCommand();
+    core.eval.downloadDataset = async (id, version, filePath, options, signal) => {
+      core.eval.calls.push({
+        method: "downloadDataset",
+        args: [id, version, filePath, options, signal],
+      });
+      return new Promise<never>((_, reject) => {
+        const abort = () => reject(signal?.reason);
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+      });
+    };
+    const pending = route([
+      "eval",
+      "dataset",
+      "get",
+      "--id",
+      "dataset-orders-abc123",
+      "--file-path",
+      "/tmp/out.jsonl",
+    ]);
+
+    try {
+      await waitFor(() => core.eval.calls.some((call) => call.method === "downloadDataset"));
+      process.emit("SIGINT", "SIGINT");
+
+      const signal = core.eval.calls[0]!.args[4] as AbortSignal;
+      expect(signal.reason).toBeInstanceOf(UserCancellationError);
+      await expect(pending).rejects.toBe(signal.reason);
+    } finally {
+      await pending.catch(() => undefined);
+    }
   });
 
   test("requires --id", async () => {

@@ -1,7 +1,7 @@
 import { expect, spyOn, test } from "bun:test";
 import { CommanderError } from "commander";
 
-import { AgentCoreCLIError, CommandInterruptedError, InputValidationError } from "../errors";
+import { AgentCoreCLIError, InputValidationError, UserCancellationError } from "../errors";
 import { ExitCode, runRunnable, runWithExitCode, type Runnable } from "./index.tsx";
 
 async function captureErrors(run: () => Promise<number>) {
@@ -75,37 +75,16 @@ test.each([
     ExitCode.USAGE,
     ["Error: bad request"],
   ],
+  ["user cancellation", new UserCancellationError(), ExitCode.INTERRUPTED, []],
   [
-    "interruption",
+    "raw AbortError",
     Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
-    ExitCode.INTERRUPTED,
-    ["AbortError: The operation was aborted"],
-  ],
-  [
-    "classified interruption",
-    AgentCoreCLIError.fromError(
-      Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
-    ),
-    ExitCode.INTERRUPTED,
-    ["AbortError: The operation was aborted"],
-  ],
-  [
-    "reported command interruption",
-    new CommandInterruptedError(undefined, true),
-    ExitCode.INTERRUPTED,
-    [],
+    ExitCode.FAILURE,
+    ["Error: The operation was aborted"],
   ],
   [
     "Commander parse failure",
     new CommanderError(1, "commander.invalidArgument", "invalid option"),
-    ExitCode.USAGE,
-    [],
-  ],
-  [
-    "classified Commander parse failure",
-    AgentCoreCLIError.fromError(
-      new CommanderError(1, "commander.invalidArgument", "invalid option"),
-    ),
     ExitCode.USAGE,
     [],
   ],
@@ -116,20 +95,8 @@ test.each([
     [],
   ],
   [
-    "classified Commander help",
-    AgentCoreCLIError.fromError(new CommanderError(0, "commander.helpDisplayed", "help displayed")),
-    ExitCode.SUCCESS,
-    [],
-  ],
-  [
-    "classified reported failure",
-    AgentCoreCLIError.fromError(Object.assign(new Error("already reported"), { reported: true })),
-    ExitCode.FAILURE,
-    [],
-  ],
-  [
-    "reported failure",
-    Object.assign(new Error("already reported"), { reported: true }),
+    "hidden failure",
+    new AgentCoreCLIError("already displayed", { displayMessage: false }),
     ExitCode.FAILURE,
     [],
   ],
@@ -137,7 +104,7 @@ test.each([
     "arbitrary TypeError",
     new TypeError("transport failed"),
     ExitCode.FAILURE,
-    ["TypeError: transport failed"],
+    ["Error: transport failed"],
   ],
 ])("runWithExitCode maps %s", async (_name, error, expected, expectedErrors) => {
   const result = await captureErrors(() => runWithExitCode(async () => Promise.reject(error)));
