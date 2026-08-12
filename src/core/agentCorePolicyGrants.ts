@@ -9,14 +9,14 @@ export class AgentCorePolicyGrants {
     return allow(["lambda:GetFunction", "lambda:InvokeFunction"], [functionArn]);
   }
 
-  static usePolicyEngine(policyEngineArn: string): GeneratedPolicyStatement {
+  static getPolicyEngine(policyEngineArn: string): GeneratedPolicyStatement {
+    return allow(["bedrock-agentcore:GetPolicyEngine"], [policyEngineArn]);
+  }
+
+  static authorizeGateway(gatewayArn: string): GeneratedPolicyStatement {
     return allow(
-      [
-        "bedrock-agentcore:GetPolicyEngine",
-        "bedrock-agentcore:AuthorizeAction",
-        "bedrock-agentcore:PartiallyAuthorizeActions",
-      ],
-      [policyEngineArn],
+      ["bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions"],
+      [gatewayArn],
     );
   }
 

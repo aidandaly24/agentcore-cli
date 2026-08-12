@@ -13,14 +13,15 @@ describe("AgentCorePolicyGrants", () => {
       actions: ["lambda:GetFunction", "lambda:InvokeFunction"],
       resources: ["lambda"],
     });
-    expect(AgentCorePolicyGrants.usePolicyEngine("engine")).toEqual({
+    expect(AgentCorePolicyGrants.getPolicyEngine("engine")).toEqual({
       effect: "Allow",
-      actions: [
-        "bedrock-agentcore:GetPolicyEngine",
-        "bedrock-agentcore:AuthorizeAction",
-        "bedrock-agentcore:PartiallyAuthorizeActions",
-      ],
+      actions: ["bedrock-agentcore:GetPolicyEngine"],
       resources: ["engine"],
+    });
+    expect(AgentCorePolicyGrants.authorizeGateway("gateway")).toEqual({
+      effect: "Allow",
+      actions: ["bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions"],
+      resources: ["gateway"],
     });
     expect(AgentCorePolicyGrants.invokeWebSearch("web-search")).toEqual({
       effect: "Allow",
