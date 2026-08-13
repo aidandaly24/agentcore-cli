@@ -1,7 +1,7 @@
 {
-  "gatewayId": "agentcore-cli-gateway-delete-fixture-oiemu02wfc",
-  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:gateway/agentcore-cli-gateway-delete-fixture-oiemu02wfc",
-  "targetId": "JYNNGDZ42F",
-  "connectorId": "U9OM2R9I8Q",
-  "ruleId": "80e073e4-eb05-4371-8e6a-f4bde522699c"
+  "gatewayId": "agentcore-cli-gateway-delete-fixture-ezjljj9oro",
+  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-ezjljj9oro",
+  "targetId": "JSO2GGRAMS",
+  "connectorId": "ARDOBZFUWC",
+  "ruleId": "de4dd841-9a60-40bd-b98e-a2051cfddd5b"
 }

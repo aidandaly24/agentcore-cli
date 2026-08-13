@@ -13,6 +13,7 @@ import { JsonRendererKey } from "../../../../tui";
 import type { Core } from "../../../types";
 import { coreOptsFromCtx, parseJsonArrayFlag, parseJsonObjectFlag } from "../../../utils";
 import type { CreateGatewayTargetInput } from "../../types";
+import { warnForGatewayRolePolicyUpdate } from "../../rolePolicyWarning";
 
 export const createCreateGatewayTargetHandler = (core: Core, io: AppIO) =>
   createHandler({
@@ -118,8 +119,10 @@ export const createCreateGatewayTargetHandler = (core: Core, io: AppIO) =>
         ...(flags["client-token"] ? { clientToken: flags["client-token"] } : {}),
       };
 
+      const options = coreOptsFromCtx(ctx);
+      await warnForGatewayRolePolicyUpdate(core, io, flags["gateway-id"], options);
       ctx
         .require(JsonRendererKey)
-        .renderJson(await core.gateway.createGatewayTarget(input, coreOptsFromCtx(ctx)));
+        .renderJson(await core.gateway.createGatewayTarget(input, options));
     },
   });
