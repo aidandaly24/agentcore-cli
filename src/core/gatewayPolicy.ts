@@ -19,6 +19,7 @@ export type GatewayPolicyState = {
   interceptorConfigurations?: readonly GatewayInterceptorConfiguration[];
   customTransformConfiguration?: CustomTransformConfiguration;
   credentialSecrets?: ReadonlyMap<string, string>;
+  tokenVaultKmsKeyArn?: string;
   targets?: readonly GatewayPolicyTarget[];
 };
 
@@ -52,6 +53,9 @@ export function gatewayPolicy(state: GatewayPolicyState): GatewayPolicyStatement
       Action: ["bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions"],
       Resource: [state.policyEngineArn, state.gatewayArn ?? gatewayWildcard(state.policyEngineArn)],
     });
+  }
+  if (state.tokenVaultKmsKeyArn) {
+    statements.push(allow("kms:Decrypt", state.tokenVaultKmsKeyArn));
   }
 
   for (const target of state.targets ?? []) {

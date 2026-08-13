@@ -8,6 +8,7 @@ import {
   GetApiKeyCredentialProviderCommand,
   GetGatewayCommand,
   GetGatewayTargetCommand,
+  GetTokenVaultCommand,
   ListGatewayTargetsCommand,
   TargetType,
   UpdateGatewayCommand,
@@ -344,6 +345,12 @@ test("stages a Lambda grant without dropping existing target and auth grants", a
             return {
               credentialProviderArn: providerArn,
               apiKeySecretArn: { secretArn },
+            };
+          }
+          if (command instanceof GetTokenVaultCommand) {
+            return {
+              tokenVaultId: "default",
+              kmsConfiguration: { keyType: "ServiceManagedKey" },
             };
           }
           if (command instanceof CreateGatewayTargetCommand) {

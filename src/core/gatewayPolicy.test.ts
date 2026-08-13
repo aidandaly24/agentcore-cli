@@ -14,6 +14,7 @@ const OAUTH_PROVIDER_ARN =
   "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/oauth2credentialprovider/orders";
 const API_KEY_SECRET_ARN = "arn:aws:secretsmanager:us-west-2:123456789012:secret:api-key";
 const OAUTH_SECRET_ARN = "arn:aws:secretsmanager:us-west-2:123456789012:secret:oauth";
+const TOKEN_VAULT_KEY_ARN = "arn:aws:kms:us-west-2:123456789012:key/token-vault";
 
 test("builds exact grants for every inferable Gateway permission family", () => {
   expect(
@@ -25,6 +26,7 @@ test("builds exact grants for every inferable Gateway permission family", () => 
         [API_KEY_PROVIDER_ARN, API_KEY_SECRET_ARN],
         [OAUTH_PROVIDER_ARN, OAUTH_SECRET_ARN],
       ]),
+      tokenVaultKmsKeyArn: TOKEN_VAULT_KEY_ARN,
       interceptorConfigurations: [
         {
           interceptor: { lambda: { arn: INTERCEPTOR_ARN } },
@@ -178,6 +180,11 @@ test("builds exact grants for every inferable Gateway permission family", () => 
       Effect: "Allow",
       Action: ["bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions"],
       Resource: [ENGINE_ARN, GATEWAY_ARN],
+    },
+    {
+      Effect: "Allow",
+      Action: ["kms:Decrypt"],
+      Resource: [TOKEN_VAULT_KEY_ARN],
     },
     {
       Effect: "Allow",

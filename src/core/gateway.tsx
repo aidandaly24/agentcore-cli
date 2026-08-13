@@ -10,6 +10,7 @@ import {
   GetGatewayRuleCommand,
   GetGatewayTargetCommand,
   GetOauth2CredentialProviderCommand,
+  GetTokenVaultCommand,
   ListGatewayRulesCommand,
   ListGatewaysCommand,
   ListGatewayTargetsCommand,
@@ -69,6 +70,11 @@ const DEFAULT_WAIT_DELAY_MS = 2_000;
 type GatewayClientOptions = GatewayExecutionRoleOptions & {
   waitAttempts?: number;
   waitDelayMs?: number;
+};
+
+type GatewayCredentialState = {
+  secrets: ReadonlyMap<string, string>;
+  tokenVaultKmsKeyArn?: string;
 };
 
 export class GatewayClient implements CoreGatewayClient {
@@ -234,8 +240,8 @@ export class GatewayClient implements CoreGatewayClient {
     if (!isGatewayExecutionRole(name, roleArn)) return operation();
     const roleManager = this.executionRole(options);
     const targets = await this.targetInventory(patch.id, options);
-    const credentialSecrets = await this.credentialSecrets(targets, options);
-    const currentPolicy = this.policy(current, targets, credentialSecrets);
+    const credentials = await this.credentials(targets, options);
+    const currentPolicy = this.policy(current, targets, credentials);
     const desiredPolicy = this.policy(
       {
         ...current,
@@ -244,7 +250,7 @@ export class GatewayClient implements CoreGatewayClient {
         customTransformConfiguration,
       },
       targets,
-      credentialSecrets,
+      credentials,
     );
     return roleManager.update(roleArn, currentPolicy, desiredPolicy, async () => {
       const response = await operation();
@@ -326,9 +332,9 @@ export class GatewayClient implements CoreGatewayClient {
         credentialProviderConfigurations: input.credentialProviderConfigurations,
       },
     ];
-    const credentialSecrets = await this.credentialSecrets(desiredTargets, options);
-    const current = this.policy(gateway, targets, credentialSecrets);
-    const desired = this.policy(gateway, desiredTargets, credentialSecrets);
+    const credentials = await this.credentials(desiredTargets, options);
+    const current = this.policy(gateway, targets, credentials);
+    const desired = this.policy(gateway, desiredTargets, credentials);
     return this.executionRole(options).update(roleArn, current, desired, async () => {
       const response = await operation();
       const targetId = GatewayClient.required(response.targetId, "Created Gateway Target", "ID");
@@ -416,10 +422,10 @@ export class GatewayClient implements CoreGatewayClient {
     const response = await operation();
     await this.waitForGatewayTargetDeletion(gatewayId, targetId, options);
     const remaining = await this.targetInventory(gatewayId, options);
-    const credentialSecrets = await this.credentialSecrets(remaining, options);
+    const credentials = await this.credentials(remaining, options);
     await this.executionRole(options).replace(
       roleArn,
-      this.policy(gateway, remaining, credentialSecrets),
+      this.policy(gateway, remaining, credentials),
     );
     return response;
   }
@@ -555,12 +561,9 @@ export class GatewayClient implements CoreGatewayClient {
     const desiredTargets = targets.map((target) =>
       target.targetId === patch.targetId ? { ...target, targetConfiguration } : target,
     );
-    const credentialSecrets = await this.credentialSecrets(
-      [...targets, ...desiredTargets],
-      options,
-    );
-    const currentPolicy = this.policy(gateway, targets, credentialSecrets);
-    const desiredPolicy = this.policy(gateway, desiredTargets, credentialSecrets);
+    const credentials = await this.credentials([...targets, ...desiredTargets], options);
+    const currentPolicy = this.policy(gateway, targets, credentials);
+    const desiredPolicy = this.policy(gateway, desiredTargets, credentials);
     return this.executionRole(options).update(roleArn, currentPolicy, desiredPolicy, async () => {
       const response = await operation();
       await this.waitForGatewayTarget(patch.gatewayId, patch.targetId, options);
@@ -598,7 +601,7 @@ export class GatewayClient implements CoreGatewayClient {
       GetGatewayTargetResponse,
       "targetConfiguration" | "credentialProviderConfigurations"
     >[],
-    credentialSecrets: ReadonlyMap<string, string> = new Map(),
+    credentials: GatewayCredentialState = { secrets: new Map() },
   ): GatewayPolicyStatement[] {
     return gatewayPolicy({
       gatewayArn: GatewayClient.required(gateway.gatewayArn, "Gateway", "ARN"),
@@ -606,7 +609,8 @@ export class GatewayClient implements CoreGatewayClient {
       policyEngineArn: gateway.policyEngineConfiguration?.arn,
       interceptorConfigurations: gateway.interceptorConfigurations,
       customTransformConfiguration: gateway.customTransformConfiguration,
-      credentialSecrets,
+      credentialSecrets: credentials.secrets,
+      tokenVaultKmsKeyArn: credentials.tokenVaultKmsKeyArn,
       targets: targets.map((target) => ({
         targetConfiguration: GatewayClient.required(
           target.targetConfiguration,
@@ -618,10 +622,10 @@ export class GatewayClient implements CoreGatewayClient {
     });
   }
 
-  private async credentialSecrets(
+  private async credentials(
     targets: readonly Pick<GetGatewayTargetResponse, "credentialProviderConfigurations">[],
     options: CoreOptions,
-  ): Promise<Map<string, string>> {
+  ): Promise<GatewayCredentialState> {
     const providers = new Map<string, "api-key" | "oauth">();
     for (const target of targets) {
       for (const configuration of target.credentialProviderConfigurations ?? []) {
@@ -662,7 +666,16 @@ export class GatewayClient implements CoreGatewayClient {
       if (!secretArn) throw new Error(`Credential provider ${providerArn} returned no secret ARN`);
       secrets.set(providerArn, secretArn);
     }
-    return secrets;
+    if (providers.size === 0) return { secrets };
+    const vault = await control.send(new GetTokenVaultCommand({ tokenVaultId: "default" }));
+    const tokenVaultKmsKeyArn =
+      vault.kmsConfiguration?.keyType === "CustomerManagedKey"
+        ? vault.kmsConfiguration.kmsKeyArn
+        : undefined;
+    if (vault.kmsConfiguration?.keyType === "CustomerManagedKey" && !tokenVaultKmsKeyArn) {
+      throw new Error("Default Token Vault returned no customer-managed KMS key ARN");
+    }
+    return { secrets, tokenVaultKmsKeyArn };
   }
 
   private async targetInventory(
