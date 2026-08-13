@@ -362,6 +362,14 @@ agentcore gateway rule list
 agentcore gateway rule get
 ```
 
+Gateway execution-role reconciliation supports one mutation at a time per
+Gateway. Do not run Gateway, Target, or Connector create, update, or delete
+commands concurrently for the same Gateway; the CLI does not provide
+cross-process locking. If a Gateway deletion remains indeterminate after
+retries, the CLI retains `AgentCoreCliGatewayExecutionPolicy` rather than risk
+removing permissions from a live Gateway. After confirming the Gateway is
+deleted, remove that inline policy manually from its former execution role.
+
 ---
 
 # Architecture & patterns

@@ -696,6 +696,84 @@ test("maps Gateway, Target, and Rule selectors to their delete commands", async 
   });
 });
 
+test("reconciles stale grants when a Target delete retry finds the Target missing", async () => {
+  const policies: unknown[] = [];
+  const clients = {
+    control: () =>
+      ({
+        send: async (command: unknown) => {
+          if (command instanceof GetGatewayCommand) {
+            return { ...gateway(), roleArn: MANAGED_ROLE_ARN };
+          }
+          if (command instanceof DeleteGatewayTargetCommand) {
+            const error = new Error("missing");
+            error.name = "ResourceNotFoundException";
+            throw error;
+          }
+          if (command instanceof ListGatewayTargetsCommand) return { items: [] };
+          throw new Error(`unexpected command ${command}`);
+        },
+      }) as unknown as BedrockAgentCoreControlClient,
+    iam: () =>
+      ({
+        send: async (command: GetRoleCommand | PutRolePolicyCommand) => {
+          if (command instanceof GetRoleCommand) return { Role: managedRole() };
+          policies.push(JSON.parse(command.input.PolicyDocument!));
+          return {};
+        },
+      }) as unknown as IAMClient,
+  } as unknown as AwsClients;
+
+  await expect(
+    new GatewayClient(clients).deleteGatewayTarget("gateway-1", "target-1", OPTIONS),
+  ).rejects.toMatchObject({ name: "ResourceNotFoundException" });
+
+  expect(policies).toHaveLength(1);
+  expect(JSON.stringify(policies[0])).toContain("bedrock-agentcore:InvokeGateway");
+});
+
+test("retries an indeterminate Gateway deletion read before preserving its policy", async () => {
+  let gatewayReads = 0;
+  const iamCommands: unknown[] = [];
+  const clients = {
+    control: () =>
+      ({
+        send: async (command: unknown) => {
+          if (command instanceof GetGatewayCommand) {
+            gatewayReads += 1;
+            if (gatewayReads === 1) {
+              return { ...gateway(), roleArn: MANAGED_ROLE_ARN };
+            }
+            const error = new Error(gatewayReads === 2 ? "throttled" : "missing");
+            error.name = gatewayReads === 2 ? "ThrottlingException" : "ResourceNotFoundException";
+            throw error;
+          }
+          if (command instanceof DeleteGatewayCommand) {
+            return { gatewayId: "gateway-1", status: "DELETING" };
+          }
+          throw new Error(`unexpected command ${command}`);
+        },
+      }) as unknown as BedrockAgentCoreControlClient,
+    iam: () =>
+      ({
+        send: async (command: unknown) => {
+          iamCommands.push(command);
+          if (command instanceof GetRoleCommand) return { Role: managedRole() };
+          return {};
+        },
+      }) as unknown as IAMClient,
+  } as unknown as AwsClients;
+
+  await expect(
+    new GatewayClient(clients, { waitAttempts: 2, waitDelayMs: 0 }).deleteGateway(
+      "gateway-1",
+      OPTIONS,
+    ),
+  ).resolves.toMatchObject({ gatewayId: "gateway-1" });
+
+  expect(iamCommands.some((command) => command instanceof DeleteRolePolicyCommand)).toBe(true);
+});
+
 function recordingGatewayClient(responses: unknown[]): {
   client: GatewayClient;
   commands: unknown[];
@@ -750,6 +828,27 @@ async function targetUpdateInput(
 }
 
 describe("GatewayClient updateGateway", () => {
+  test("does not touch IAM when replacing a role with policy updates skipped", async () => {
+    const { client, commands } = recordingGatewayClient([
+      { ...gateway(), roleArn: MANAGED_ROLE_ARN },
+      { gatewayId: "gateway-1" },
+    ]);
+    const replacementRoleArn = "arn:aws:iam::123456789012:role/customer-managed";
+
+    await client.updateGateway(
+      {
+        id: "gateway-1",
+        roleArn: replacementRoleArn,
+        skipRolePolicyUpdate: true,
+      },
+      OPTIONS,
+    );
+
+    expect(commands).toHaveLength(2);
+    expect(commands[1]).toBeInstanceOf(UpdateGatewayCommand);
+    expect((commands[1] as UpdateGatewayCommand).input.roleArn).toBe(replacementRoleArn);
+  });
+
   test("stages Policy Engine permissions before updating a CLI-owned Gateway", async () => {
     const order: string[] = [];
     const current = {

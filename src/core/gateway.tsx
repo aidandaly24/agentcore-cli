@@ -259,6 +259,7 @@ export class GatewayClient implements CoreGatewayClient {
       wafConfiguration,
     };
     const operation = () => control.send(new UpdateGatewayCommand(request));
+    if (patch.skipRolePolicyUpdate) return operation();
     if (patch.roleArn && patch.roleArn !== roleArn) {
       const response = await operation();
       const roleManager = await this.managedExecutionRole(name, roleArn, options);
@@ -269,10 +270,9 @@ export class GatewayClient implements CoreGatewayClient {
       return response;
     }
     if (
-      patch.skipRolePolicyUpdate ||
-      (patch.policyEngineConfiguration === undefined &&
-        patch.interceptorConfigurations === undefined &&
-        patch.customTransformConfiguration === undefined)
+      patch.policyEngineConfiguration === undefined &&
+      patch.interceptorConfigurations === undefined &&
+      patch.customTransformConfiguration === undefined
     ) {
       return operation();
     }
@@ -482,11 +482,22 @@ export class GatewayClient implements CoreGatewayClient {
     const roleManager = await this.managedExecutionRole(name, roleArn, options);
     if (!roleManager) return operation();
 
-    const response = await operation();
+    const reconcile = async () => {
+      const remaining = await this.targetInventory(gatewayId, options, undefined, targetId);
+      const credentials = await this.credentials(remaining, options);
+      await roleManager.replace(roleArn, this.policy(gateway, remaining, credentials));
+    };
+
+    let response: DeleteGatewayTargetResponse;
+    try {
+      response = await operation();
+    } catch (error) {
+      if ((error as Error).name !== "ResourceNotFoundException") throw error;
+      await reconcile();
+      throw error;
+    }
     await this.waitForGatewayTargetDeletion(gatewayId, targetId, options);
-    const remaining = await this.targetInventory(gatewayId, options);
-    const credentials = await this.credentials(remaining, options);
-    await roleManager.replace(roleArn, this.policy(gateway, remaining, credentials));
+    await reconcile();
     return response;
   }
 
@@ -777,6 +788,7 @@ export class GatewayClient implements CoreGatewayClient {
     gatewayId: string,
     options: CoreOptions,
     known?: GetGatewayTargetResponse,
+    excludedTargetId?: string,
   ): Promise<GetGatewayTargetResponse[]> {
     const targets: GetGatewayTargetResponse[] = [];
     let nextToken: string | undefined;
@@ -789,6 +801,7 @@ export class GatewayClient implements CoreGatewayClient {
       );
       for (const summary of response.items ?? []) {
         const targetId = GatewayClient.required(summary.targetId, "Gateway Target", "ID");
+        if (targetId === excludedTargetId) continue;
         targets.push(
           known?.targetId === targetId
             ? known
@@ -870,9 +883,11 @@ export class GatewayClient implements CoreGatewayClient {
     missingIsSuccess = false,
   ): Promise<void> {
     const attempts = this.roleOptions.waitAttempts ?? DEFAULT_WAIT_ATTEMPTS;
+    let lastError: unknown;
     for (let attempt = 0; attempt < attempts; attempt++) {
       try {
         const current = await read();
+        lastError = undefined;
         if (current.status && successful.includes(current.status)) return;
         if (current.status && failed.includes(current.status)) {
           throw new GatewayMutationTerminalError(
@@ -883,14 +898,15 @@ export class GatewayClient implements CoreGatewayClient {
         }
       } catch (error) {
         if (error instanceof GatewayMutationTerminalError) throw error;
-        if ((error as Error).name !== "ResourceNotFoundException") {
-          throw new GatewayMutationIndeterminateError(resource, { cause: error });
-        }
-        if (missingIsSuccess) return;
+        if ((error as Error).name === "ResourceNotFoundException" && missingIsSuccess) return;
+        lastError = error;
       }
       if (attempt < attempts - 1) await this.wait();
     }
-    throw new GatewayMutationIndeterminateError(resource);
+    throw new GatewayMutationIndeterminateError(
+      resource,
+      lastError === undefined ? undefined : { cause: lastError },
+    );
   }
 
   private async wait(): Promise<void> {

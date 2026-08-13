@@ -126,6 +126,18 @@ describe("GatewayExecutionRole update", () => {
     expect(writes).toEqual([[...current, ...desired], desired]);
   });
 
+  test("rewrites exact desired grants after a successful retry with no state delta", async () => {
+    const { iam, writes } = policyWrites();
+    const role = new GatewayExecutionRole(iam, { propagationDelayMs: 0 });
+
+    await role.update(ROLE_ARN, desired, desired, {
+      mutate: async () => "updated",
+      stabilize: async () => {},
+    });
+
+    expect(writes).toEqual([desired]);
+  });
+
   test("restores current grants when the mutation is rejected", async () => {
     const { iam, writes } = policyWrites();
     const role = new GatewayExecutionRole(iam, { propagationDelayMs: 0 });

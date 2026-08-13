@@ -180,7 +180,7 @@ export class GatewayExecutionRole {
       }
       throw error;
     }
-    if (JSON.stringify(transition) !== JSON.stringify(desired)) {
+    if (!staged || JSON.stringify(transition) !== JSON.stringify(desired)) {
       await this.write(roleName, desired);
     }
     return value;
