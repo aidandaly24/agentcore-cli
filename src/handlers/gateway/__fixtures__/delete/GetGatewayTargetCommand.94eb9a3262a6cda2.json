@@ -1,11 +1,11 @@
 {
-  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:603141041947:gateway/agentcore-cli-gateway-delete-fixture-ezjljj9oro",
-  "targetId": "ARDOBZFUWC",
+  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:gateway/agentcore-cli-gateway-delete-fixture-oiemu02wfc",
+  "targetId": "U9OM2R9I8Q",
   "createdAt": {
-    "$date": "2026-08-13T14:14:09.417Z"
+    "$date": "2026-08-07T17:54:45.522Z"
   },
   "updatedAt": {
-    "$date": "2026-08-13T14:14:10.049Z"
+    "$date": "2026-08-07T17:54:46.453Z"
   },
   "status": "READY",
   "name": "web-search-delete-fixture",
@@ -13,8 +13,7 @@
     "mcp": {
       "connector": {
         "source": {
-          "connectorId": "web-search",
-          "version": "1.1.0"
+          "connectorId": "web-search"
         },
         "configurations": [
           {
