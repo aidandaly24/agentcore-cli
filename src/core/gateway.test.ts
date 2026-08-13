@@ -8,6 +8,7 @@ import {
   GetApiKeyCredentialProviderCommand,
   GetGatewayCommand,
   GetGatewayTargetCommand,
+  GetOauth2CredentialProviderCommand,
   GetTokenVaultCommand,
   ListGatewayTargetsCommand,
   TargetType,
@@ -486,10 +487,12 @@ test("preserves a newly created role when Gateway mutation outcome is indetermin
 async function updateTargetCredentials(
   currentCredentials: CredentialProviderConfiguration[],
   desiredCredentials: CredentialProviderConfiguration[] | null,
-  apiKeySecretSource: "MANAGED" | "EXTERNAL" = "MANAGED",
+  secretSource: "MANAGED" | "EXTERNAL" = "MANAGED",
 ): Promise<unknown[]> {
-  const providerArn =
+  const apiKeyProviderArn =
     "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/apikeycredentialprovider/orders";
+  const oauthProviderArn =
+    "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/oauth2credentialprovider/orders";
   const secretArn = "arn:aws:secretsmanager:us-west-2:123456789012:secret:orders";
   const currentTarget = {
     ...target(),
@@ -519,9 +522,16 @@ async function updateTargetCredentials(
           }
           if (command instanceof GetApiKeyCredentialProviderCommand) {
             return {
-              credentialProviderArn: providerArn,
+              credentialProviderArn: apiKeyProviderArn,
               apiKeySecretArn: { secretArn },
-              apiKeySecretSource,
+              apiKeySecretSource: secretSource,
+            };
+          }
+          if (command instanceof GetOauth2CredentialProviderCommand) {
+            return {
+              credentialProviderArn: oauthProviderArn,
+              clientSecretArn: { secretArn },
+              clientSecretSource: secretSource,
             };
           }
           if (command instanceof GetTokenVaultCommand) {
@@ -579,25 +589,41 @@ test("adds credential grants when a Target changes from JWT passthrough to API k
   expect(JSON.stringify(policies.at(-1))).toContain("kms:Decrypt");
 });
 
-test("rejects external API-key secrets before mutating a managed Target", async () => {
-  const providerArn =
-    "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/apikeycredentialprovider/orders";
+test.each(["API-key", "OAuth"] as const)(
+  "rejects external %s secrets before mutating a managed Target",
+  async (kind) => {
+    const configuration: CredentialProviderConfiguration =
+      kind === "API-key"
+        ? {
+            credentialProviderType: "API_KEY",
+            credentialProvider: {
+              apiKeyCredentialProvider: {
+                providerArn:
+                  "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/apikeycredentialprovider/orders",
+              },
+            },
+          }
+        : {
+            credentialProviderType: "OAUTH",
+            credentialProvider: {
+              oauthCredentialProvider: {
+                providerArn:
+                  "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/oauth2credentialprovider/orders",
+                scopes: ["orders.read"],
+                grantType: "CLIENT_CREDENTIALS",
+              },
+            },
+          };
 
-  await expect(
-    updateTargetCredentials(
-      [{ credentialProviderType: "JWT_PASSTHROUGH" }],
-      [
-        {
-          credentialProviderType: "API_KEY",
-          credentialProvider: {
-            apiKeyCredentialProvider: { providerArn },
-          },
-        },
-      ],
-      "EXTERNAL",
-    ),
-  ).rejects.toThrow(/--skip-role-policy-update/);
-});
+    await expect(
+      updateTargetCredentials(
+        [{ credentialProviderType: "JWT_PASSTHROUGH" }],
+        [configuration],
+        "EXTERNAL",
+      ),
+    ).rejects.toThrow(/--skip-role-policy-update/);
+  },
+);
 
 function gateway(): GetGatewayResponse {
   return {
@@ -762,6 +788,7 @@ describe("GatewayClient updateGateway", () => {
     await client.updateGateway(
       {
         id: "gateway-1",
+        roleArn: MANAGED_ROLE_ARN,
         policyEngineConfiguration: {
           arn: "arn:aws:bedrock-agentcore:us-west-2:123456789012:policy-engine/engine-2",
           mode: "ENFORCE",

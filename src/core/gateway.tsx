@@ -259,12 +259,9 @@ export class GatewayClient implements CoreGatewayClient {
       wafConfiguration,
     };
     const operation = () => control.send(new UpdateGatewayCommand(request));
-    if (patch.roleArn) {
+    if (patch.roleArn && patch.roleArn !== roleArn) {
       const response = await operation();
-      const roleManager =
-        patch.roleArn !== roleArn
-          ? await this.managedExecutionRole(name, roleArn, options)
-          : undefined;
+      const roleManager = await this.managedExecutionRole(name, roleArn, options);
       if (roleManager) {
         await this.waitForGateway(patch.id, options);
         await roleManager.replace(roleArn, []);
@@ -749,9 +746,12 @@ export class GatewayClient implements CoreGatewayClient {
       if (response.credentialProviderArn !== providerArn) {
         throw new Error(`Credential provider ${name} returned an unexpected ARN`);
       }
-      if ("apiKeySecretSource" in response && response.apiKeySecretSource === "EXTERNAL") {
+      if (
+        ("apiKeySecretSource" in response && response.apiKeySecretSource === "EXTERNAL") ||
+        ("clientSecretSource" in response && response.clientSecretSource === "EXTERNAL")
+      ) {
         throw new InputValidationError(
-          `API key credential provider ${providerArn} uses an external secret; rerun with --skip-role-policy-update and manage its secret and KMS permissions externally`,
+          `${kind === "api-key" ? "API key" : "OAuth"} credential provider ${providerArn} uses an external secret; rerun with --skip-role-policy-update and manage its secret and KMS permissions externally`,
         );
       }
       const secretArn =
