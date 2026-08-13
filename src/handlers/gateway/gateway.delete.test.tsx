@@ -85,7 +85,7 @@ describe("gateway delete commands", () => {
     expect(core.gateway.calls).toEqual([
       {
         method: "deleteGatewayTarget",
-        args: [GATEWAY_ID, TARGET_ID, { region: REGION }],
+        args: [{ gatewayId: GATEWAY_ID, targetId: TARGET_ID }, { region: REGION }],
       },
     ]);
     expect(JSON.parse(result.stdout)).toEqual(response);
@@ -115,7 +115,7 @@ describe("gateway delete commands", () => {
       },
       {
         method: "deleteGatewayTarget",
-        args: [GATEWAY_ID, TARGET_ID, { region: REGION }],
+        args: [{ gatewayId: GATEWAY_ID, targetId: TARGET_ID }, { region: REGION }],
       },
     ]);
     expect(JSON.parse(result.stdout)).toEqual(response);

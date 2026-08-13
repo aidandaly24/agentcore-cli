@@ -167,7 +167,7 @@ export class GatewayExecutionRole {
     try {
       value = await operation.mutate();
     } catch (error) {
-      if (staged && !(error instanceof GatewayMutationIndeterminateError)) {
+      if (!(error instanceof GatewayMutationIndeterminateError)) {
         await this.write(roleName, current);
       }
       throw error;
@@ -175,7 +175,7 @@ export class GatewayExecutionRole {
     try {
       await operation.stabilize();
     } catch (error) {
-      if (staged && error instanceof GatewayMutationTerminalError) {
+      if (error instanceof GatewayMutationTerminalError) {
         await this.write(roleName, current);
       }
       throw error;

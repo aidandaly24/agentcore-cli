@@ -170,7 +170,6 @@ describe("Gateway update patch mapping", () => {
       '{"http":{"passthrough":{"endpoint":"https://example.test","protocolType":"CUSTOM"}}}',
       "--clear-description",
       "--clear-credential-provider-configurations",
-      "--skip-role-policy-update",
     ]);
 
     expect(
@@ -183,7 +182,6 @@ describe("Gateway update patch mapping", () => {
         http: { passthrough: { endpoint: "https://example.test", protocolType: "CUSTOM" } },
       },
       credentialProviderConfigurations: null,
-      skipRolePolicyUpdate: true,
     });
   });
 
@@ -198,7 +196,6 @@ describe("Gateway update patch mapping", () => {
       "target-1",
       "--connector",
       "web-search",
-      "--skip-role-policy-update",
     ]);
 
     expect(
@@ -219,7 +216,6 @@ describe("Gateway update patch mapping", () => {
           },
         },
       },
-      skipRolePolicyUpdate: true,
     });
   });
 

@@ -102,6 +102,7 @@ import type {
   CreateGatewayInput,
   CreateGatewayRuleInput,
   CreateGatewayTargetInput,
+  GatewayTargetDeleteInput,
   GatewayRuleUpdateInput,
   GatewayTargetUpdatePatch,
   GatewayUpdatePatch,
@@ -1075,11 +1076,10 @@ export class TestGatewayClient implements CoreGatewayClient {
   }
 
   async deleteGatewayTarget(
-    gatewayId: string,
-    targetId: string,
+    input: GatewayTargetDeleteInput,
     options: CoreOptions,
   ): Promise<DeleteGatewayTargetResponse> {
-    this.calls.push({ method: "deleteGatewayTarget", args: [gatewayId, targetId, options] });
+    this.calls.push({ method: "deleteGatewayTarget", args: [input, options] });
     if (this.error) throw this.error;
     return this.deleteTargetResponse;
   }

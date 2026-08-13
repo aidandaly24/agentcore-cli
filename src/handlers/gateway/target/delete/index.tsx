@@ -12,6 +12,7 @@ export const createDeleteGatewayTargetHandler = (core: Core) =>
     flags: [
       flag("gateway-id", "the parent Gateway ID", z.string().optional()),
       flag("target-id", "the Target ID", z.string().optional()),
+      flag("skip-role-policy-update", "leave execution-role IAM policies unchanged", z.boolean()),
     ],
     handle: async (ctx, flags) => {
       if (!flags["gateway-id"]) {
@@ -20,14 +21,15 @@ export const createDeleteGatewayTargetHandler = (core: Core) =>
       if (!flags["target-id"]) {
         throw new InputValidationError("required option '--target-id <target-id>' not specified");
       }
-      ctx
-        .require(JsonRendererKey)
-        .renderJson(
-          await core.gateway.deleteGatewayTarget(
-            flags["gateway-id"],
-            flags["target-id"],
-            coreOptsFromCtx(ctx),
-          ),
-        );
+      ctx.require(JsonRendererKey).renderJson(
+        await core.gateway.deleteGatewayTarget(
+          {
+            gatewayId: flags["gateway-id"],
+            targetId: flags["target-id"],
+            ...(flags["skip-role-policy-update"] ? { skipRolePolicyUpdate: true } : {}),
+          },
+          coreOptsFromCtx(ctx),
+        ),
+      );
     },
   });

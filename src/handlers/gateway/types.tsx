@@ -67,6 +67,11 @@ export type GatewayTargetUpdatePatch = {
   privateEndpoint?: UpdateGatewayTargetRequest["privateEndpoint"] | null;
 };
 
+export type GatewayTargetDeleteInput = Pick<
+  GatewayTargetUpdatePatch,
+  "gatewayId" | "targetId" | "skipRolePolicyUpdate"
+>;
+
 export type GatewayRuleUpdateInput = UpdateGatewayRuleRequest;
 
 export interface CoreGatewayClient {
@@ -115,8 +120,7 @@ export interface CoreGatewayClient {
     options: CoreOptions,
   ): Promise<UpdateGatewayTargetResponse>;
   deleteGatewayTarget(
-    gatewayId: string,
-    targetId: string,
+    input: GatewayTargetDeleteInput,
     options: CoreOptions,
   ): Promise<DeleteGatewayTargetResponse>;
   getGatewayRule(

@@ -49,6 +49,7 @@ import type {
   CreateGatewayInput,
   CreateGatewayRuleInput,
   CreateGatewayTargetInput,
+  GatewayTargetDeleteInput,
   GatewayRuleUpdateInput,
   GatewayTargetUpdatePatch,
   GatewayUpdatePatch,
@@ -469,24 +470,24 @@ export class GatewayClient implements CoreGatewayClient {
   }
 
   async deleteGatewayTarget(
-    gatewayId: string,
-    targetId: string,
+    input: GatewayTargetDeleteInput,
     options: CoreOptions,
   ): Promise<DeleteGatewayTargetResponse> {
     const control = this.clients.control(toClientConfig(options));
+    const { gatewayId, targetId, skipRolePolicyUpdate } = input;
     const request = { gatewayIdentifier: gatewayId, targetId };
     const operation = () => control.send(new DeleteGatewayTargetCommand(request));
+    if (skipRolePolicyUpdate) return operation();
     const gateway = await control.send(new GetGatewayCommand({ gatewayIdentifier: gatewayId }));
     const name = GatewayClient.required(gateway.name, "Gateway", "name");
     const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
     const roleManager = await this.managedExecutionRole(name, roleArn, options);
     if (!roleManager) return operation();
 
-    const reconcile = async () => {
-      const remaining = await this.targetInventory(gatewayId, options, undefined, targetId);
-      const credentials = await this.credentials(remaining, options);
-      await roleManager.replace(roleArn, this.policy(gateway, remaining, credentials));
-    };
+    const remaining = await this.targetInventory(gatewayId, options, undefined, targetId);
+    const credentials = await this.credentials(remaining, options);
+    const desiredPolicy = this.policy(gateway, remaining, credentials);
+    const reconcile = () => roleManager.replace(roleArn, desiredPolicy);
 
     let response: DeleteGatewayTargetResponse;
     try {

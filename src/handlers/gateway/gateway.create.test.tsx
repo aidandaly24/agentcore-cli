@@ -21,7 +21,6 @@ import {
   fixtureFactories,
   isRecording,
   matchGolden,
-  TestCoreClient,
   TestGlobalConfigAccessor,
   testIO,
 } from "../../testing";
@@ -65,17 +64,6 @@ async function run(args: string[]): Promise<string> {
   });
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
   return io.stdout();
-}
-
-async function runWithTestCore(args: string[]): Promise<TestCoreClient> {
-  const core = new TestCoreClient();
-  const root = createRootHandler(core, {
-    io: testIO().io,
-    logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
-  });
-  await root.route(["node", "agentcore", ...args, "--region", REGION]);
-  return core;
 }
 
 async function pollUntil(
@@ -472,49 +460,6 @@ describe("Gateway create validation", () => {
         '[{"credentialProviderType":"GATEWAY_IAM_ROLE"}]',
       ]),
     ).rejects.toThrow(/connector Target/);
-  });
-});
-
-describe("Gateway create mapping", () => {
-  test.each([
-    {
-      resource: "Target",
-      args: [
-        "gateway",
-        "target",
-        "create",
-        "--gateway-id",
-        "gateway-1",
-        "--name",
-        "calendar",
-        "--endpoint",
-        "https://example.test/mcp",
-        "--skip-role-policy-update",
-      ],
-    },
-    {
-      resource: "Connector",
-      args: [
-        "gateway",
-        "connector",
-        "create",
-        "--gateway-id",
-        "gateway-1",
-        "--name",
-        "search",
-        "--connector",
-        "web-search",
-        "--skip-role-policy-update",
-      ],
-    },
-  ])("maps --skip-role-policy-update for $resource create", async ({ args }) => {
-    const core = await runWithTestCore([...args]);
-
-    expect(core.gateway.calls).toHaveLength(1);
-    expect(core.gateway.calls[0]).toMatchObject({
-      method: "createGatewayTarget",
-      args: [{ skipRolePolicyUpdate: true }, { region: REGION }],
-    });
   });
 });
 

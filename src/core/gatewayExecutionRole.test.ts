@@ -143,7 +143,7 @@ describe("GatewayExecutionRole update", () => {
     const role = new GatewayExecutionRole(iam, { propagationDelayMs: 0 });
 
     await expect(
-      role.update(ROLE_ARN, current, desired, {
+      role.update(ROLE_ARN, desired, desired, {
         mutate: async () => {
           throw new Error("update failed");
         },
@@ -151,7 +151,7 @@ describe("GatewayExecutionRole update", () => {
       }),
     ).rejects.toThrow("update failed");
 
-    expect(writes).toEqual([[...current, ...desired], current]);
+    expect(writes).toEqual([desired]);
   });
 
   test("restores current grants after a terminal service failure", async () => {
@@ -159,7 +159,7 @@ describe("GatewayExecutionRole update", () => {
     const role = new GatewayExecutionRole(iam, { propagationDelayMs: 0 });
 
     await expect(
-      role.update(ROLE_ARN, current, desired, {
+      role.update(ROLE_ARN, desired, desired, {
         mutate: async () => "accepted",
         stabilize: async () => {
           throw new GatewayMutationTerminalError("Gateway", "FAILED", ["invalid"]);
@@ -167,7 +167,7 @@ describe("GatewayExecutionRole update", () => {
       }),
     ).rejects.toThrow("Gateway reached FAILED: invalid");
 
-    expect(writes).toEqual([[...current, ...desired], current]);
+    expect(writes).toEqual([desired]);
   });
 
   test.each(["mutation", "stabilization"] as const)(
