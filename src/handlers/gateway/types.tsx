@@ -25,17 +25,21 @@ import type { CoreOptions } from "../../core/types";
 
 export type GatewayProtocol = "mcp";
 
-export type CreateGatewayInput = Omit<CreateGatewayRequest, "protocolType"> & {
+export type CreateGatewayInput = Omit<CreateGatewayRequest, "protocolType" | "roleArn"> & {
   protocol?: GatewayProtocol;
+  roleArn?: string;
 };
 
-export type CreateGatewayTargetInput = CreateGatewayTargetRequest;
+export type CreateGatewayTargetInput = CreateGatewayTargetRequest & {
+  skipRolePolicyUpdate?: boolean;
+};
 
 export type CreateGatewayRuleInput = CreateGatewayRuleRequest;
 
 export type GatewayUpdatePatch = {
   id: string;
   roleArn?: UpdateGatewayRequest["roleArn"];
+  skipRolePolicyUpdate?: boolean;
   clearProtocol?: boolean;
   description?: UpdateGatewayRequest["description"] | null;
   protocolConfiguration?: UpdateGatewayRequest["protocolConfiguration"] | null;
@@ -52,6 +56,7 @@ export type GatewayUpdatePatch = {
 export type GatewayTargetUpdatePatch = {
   gatewayId: string;
   targetId: string;
+  skipRolePolicyUpdate?: boolean;
   name?: UpdateGatewayTargetRequest["name"];
   description?: UpdateGatewayTargetRequest["description"] | null;
   endpoint?: string;
@@ -62,9 +67,15 @@ export type GatewayTargetUpdatePatch = {
   privateEndpoint?: UpdateGatewayTargetRequest["privateEndpoint"] | null;
 };
 
+export type GatewayTargetDeleteInput = Pick<
+  GatewayTargetUpdatePatch,
+  "gatewayId" | "targetId" | "skipRolePolicyUpdate"
+>;
+
 export type GatewayRuleUpdateInput = UpdateGatewayRuleRequest;
 
 export interface CoreGatewayClient {
+  getGatewayRolePolicyWarning(gatewayId: string, options: CoreOptions): Promise<string | undefined>;
   createGateway(input: CreateGatewayInput, options: CoreOptions): Promise<CreateGatewayResponse>;
   updateGateway(patch: GatewayUpdatePatch, options: CoreOptions): Promise<UpdateGatewayResponse>;
   getGateway(id: string, options: CoreOptions): Promise<GetGatewayResponse>;
@@ -109,8 +120,7 @@ export interface CoreGatewayClient {
     options: CoreOptions,
   ): Promise<UpdateGatewayTargetResponse>;
   deleteGatewayTarget(
-    gatewayId: string,
-    targetId: string,
+    input: GatewayTargetDeleteInput,
     options: CoreOptions,
   ): Promise<DeleteGatewayTargetResponse>;
   getGatewayRule(

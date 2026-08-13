@@ -13,6 +13,7 @@ export const createDeleteGatewayConnectorHandler = (core: Core) =>
     flags: [
       flag("gateway-id", "the parent Gateway ID", z.string().optional()),
       flag("id", "the connector-backed Gateway Target ID", z.string().optional()),
+      flag("skip-role-policy-update", "leave execution-role IAM policies unchanged", z.boolean()),
     ],
     handle: async (ctx, flags) => {
       if (!flags["gateway-id"]) {
@@ -27,8 +28,15 @@ export const createDeleteGatewayConnectorHandler = (core: Core) =>
       if (!GatewayConnectorTarget.is(target.targetConfiguration)) {
         throw new InputValidationError(`Gateway Target "${flags.id}" is not connector-backed`);
       }
-      ctx
-        .require(JsonRendererKey)
-        .renderJson(await core.gateway.deleteGatewayTarget(flags["gateway-id"], flags.id, options));
+      ctx.require(JsonRendererKey).renderJson(
+        await core.gateway.deleteGatewayTarget(
+          {
+            gatewayId: flags["gateway-id"],
+            targetId: flags.id,
+            ...(flags["skip-role-policy-update"] ? { skipRolePolicyUpdate: true } : {}),
+          },
+          options,
+        ),
+      );
     },
   });

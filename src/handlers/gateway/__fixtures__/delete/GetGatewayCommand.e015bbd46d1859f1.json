@@ -1,0 +1,19 @@
+{
+  "gatewayArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:gateway/agentcore-cli-gateway-delete-fixture-oiemu02wfc",
+  "gatewayId": "agentcore-cli-gateway-delete-fixture-oiemu02wfc",
+  "createdAt": {
+    "$date": "2026-08-07T17:54:42.000Z"
+  },
+  "updatedAt": {
+    "$date": "2026-08-07T17:54:43.000Z"
+  },
+  "status": "READY",
+  "name": "agentcore-cli-gateway-delete-fixture",
+  "authorizerType": "NONE",
+  "gatewayUrl": "https://agentcore-cli-gateway-delete-fixture-oiemu02wfc.gateway.bedrock-agentcore.us-east-1.amazonaws.com",
+  "description": "Disposable Gateway Delete fixture",
+  "roleArn": "arn:aws:iam::685197708687:role/AgentCoreCliGatewayDeleteFixtureRole",
+  "workloadIdentityDetails": {
+    "workloadIdentityArn": "arn:aws:bedrock-agentcore:us-east-1:685197708687:workload-identity-directory/default/workload-identity/agentcore-cli-gateway-delete-fixture-oiemu02wfc"
+  }
+}

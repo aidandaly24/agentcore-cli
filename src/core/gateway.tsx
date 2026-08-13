@@ -5,9 +5,12 @@ import {
   DeleteGatewayCommand,
   DeleteGatewayRuleCommand,
   DeleteGatewayTargetCommand,
+  GetApiKeyCredentialProviderCommand,
   GetGatewayCommand,
   GetGatewayRuleCommand,
   GetGatewayTargetCommand,
+  GetOauth2CredentialProviderCommand,
+  GetTokenVaultCommand,
   ListGatewayRulesCommand,
   ListGatewaysCommand,
   ListGatewayTargetsCommand,
@@ -46,18 +49,69 @@ import type {
   CreateGatewayInput,
   CreateGatewayRuleInput,
   CreateGatewayTargetInput,
+  GatewayTargetDeleteInput,
   GatewayRuleUpdateInput,
   GatewayTargetUpdatePatch,
   GatewayUpdatePatch,
 } from "../handlers/gateway/types";
 import type { AwsClients, CoreOptions } from "./types";
+import {
+  GatewayExecutionRole,
+  GatewayMutationIndeterminateError,
+  GatewayMutationTerminalError,
+  matchesGatewayExecutionRole,
+  type GatewayExecutionRoleOptions,
+} from "./gatewayExecutionRole";
+import { gatewayPolicy, type GatewayPolicyStatement } from "./gatewayPolicy";
 import { toClientConfig } from "./utils";
 
 const DEFAULT_CONNECTOR_PAGE_SIZE = 100;
 const MAX_CONNECTOR_TARGET_PAGES = 101;
+const DEFAULT_WAIT_ATTEMPTS = 150;
+const DEFAULT_WAIT_DELAY_MS = 2_000;
+
+type GatewayClientOptions = GatewayExecutionRoleOptions & {
+  waitAttempts?: number;
+  waitDelayMs?: number;
+};
+
+type GatewayCredentialState = {
+  secrets: ReadonlyMap<string, string>;
+  tokenVaultKmsKeyArn?: string;
+};
+
+type GatewayPolicyTargetState = Pick<
+  GetGatewayTargetResponse,
+  "targetConfiguration" | "credentialProviderConfigurations"
+> & {
+  targetId?: GetGatewayTargetResponse["targetId"];
+};
+
+type GatewayFamilyState = {
+  gateway: GetGatewayResponse;
+  targets: readonly GatewayPolicyTargetState[];
+};
+
+type GatewayPolicySnapshots = {
+  current: GatewayPolicyStatement[];
+  desired: GatewayPolicyStatement[];
+};
 
 export class GatewayClient implements CoreGatewayClient {
-  constructor(private readonly clients: AwsClients) {}
+  constructor(
+    private readonly clients: AwsClients,
+    private readonly roleOptions: GatewayClientOptions = {},
+  ) {}
+
+  async getGatewayRolePolicyWarning(
+    gatewayId: string,
+    options: CoreOptions,
+  ): Promise<string | undefined> {
+    const gateway = await this.getGateway(gatewayId, options);
+    const name = GatewayClient.required(gateway.name, "Gateway", "name");
+    const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
+    return (await this.managedExecutionRole(name, roleArn, options)) ? undefined : roleArn;
+  }
 
   async createGateway(
     input: CreateGatewayInput,
@@ -65,13 +119,70 @@ export class GatewayClient implements CoreGatewayClient {
   ): Promise<CreateGatewayResponse> {
     const control = this.clients.control(toClientConfig(options));
     const { protocol, roleArn, ...request } = input;
-    return control.send(
-      new CreateGatewayCommand({
-        ...request,
-        roleArn,
-        ...(protocol === "mcp" ? { protocolType: "MCP" as const } : {}),
+    const operation = (executionRoleArn: string) =>
+      control.send(
+        new CreateGatewayCommand({
+          ...request,
+          roleArn: executionRoleArn,
+          ...(protocol === "mcp" ? { protocolType: "MCP" as const } : {}),
+        }),
+      );
+    if (roleArn) return operation(roleArn);
+    const roleManager = this.executionRole(options);
+    const role = await roleManager.ensure(request.name!, options.region);
+    let response: CreateGatewayResponse;
+    let createdResponse: CreateGatewayResponse | undefined;
+    let mutationAccepted = false;
+    try {
+      const staged = gatewayPolicy({
+        policyEngineArn: request.policyEngineConfiguration?.arn,
+        interceptorConfigurations: request.interceptorConfigurations,
+      });
+      const current = role.created ? [] : await roleManager.read(role.arn);
+      response = await roleManager.update(
+        role.arn,
+        current,
+        staged,
+        {
+          mutate: async () => {
+            const created = await this.mutate(
+              () => operation(role.arn),
+              `Gateway "${request.name}"`,
+            );
+            mutationAccepted = true;
+            createdResponse = created;
+            return created;
+          },
+          stabilize: async () => {
+            const gatewayId = GatewayClient.required(
+              createdResponse?.gatewayId,
+              "Created Gateway",
+              "ID",
+            );
+            await this.waitForGateway(gatewayId, options);
+          },
+        },
+        { forcePropagation: role.created },
+      );
+    } catch (error) {
+      if (
+        error instanceof GatewayMutationTerminalError ||
+        (!mutationAccepted && !(error instanceof GatewayMutationIndeterminateError))
+      ) {
+        await roleManager.rollbackCreate(role);
+      }
+      throw error;
+    }
+    const gatewayArn = GatewayClient.required(response.gatewayArn, "Created Gateway", "ARN");
+    await roleManager.replace(
+      role.arn,
+      gatewayPolicy({
+        gatewayArn,
+        policyEngineArn: request.policyEngineConfiguration?.arn,
+        interceptorConfigurations: request.interceptorConfigurations,
       }),
     );
+    return response;
   }
 
   async getGateway(id: string, options: CoreOptions): Promise<GetGatewayResponse> {
@@ -148,7 +259,45 @@ export class GatewayClient implements CoreGatewayClient {
       exceptionLevel,
       wafConfiguration,
     };
-    return control.send(new UpdateGatewayCommand(request));
+    const operation = () => control.send(new UpdateGatewayCommand(request));
+    if (patch.skipRolePolicyUpdate) return operation();
+    if (patch.roleArn && patch.roleArn !== roleArn) {
+      const response = await operation();
+      const roleManager = await this.managedExecutionRole(name, roleArn, options);
+      if (roleManager) {
+        await this.waitForGateway(patch.id, options);
+        await roleManager.replace(roleArn, []);
+      }
+      return response;
+    }
+    if (
+      patch.policyEngineConfiguration === undefined &&
+      patch.interceptorConfigurations === undefined &&
+      patch.customTransformConfiguration === undefined
+    ) {
+      return operation();
+    }
+
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
+    const targets = await this.targetInventory(patch.id, options);
+    const snapshots = await this.policySnapshots(
+      { gateway: current, targets },
+      {
+        gateway: {
+          ...current,
+          policyEngineConfiguration,
+          interceptorConfigurations,
+          customTransformConfiguration,
+        },
+        targets,
+      },
+      options,
+    );
+    return roleManager.update(roleArn, snapshots.current, snapshots.desired, {
+      mutate: () => this.mutate(operation, resource),
+      stabilize: () => this.waitForGateway(patch.id, options),
+    });
   }
 
   async listGateways(
@@ -162,9 +311,18 @@ export class GatewayClient implements CoreGatewayClient {
   }
 
   async deleteGateway(id: string, options: CoreOptions): Promise<DeleteGatewayResponse> {
-    return this.clients
-      .control(toClientConfig(options))
-      .send(new DeleteGatewayCommand({ gatewayIdentifier: id }));
+    const control = this.clients.control(toClientConfig(options));
+    const operation = () => control.send(new DeleteGatewayCommand({ gatewayIdentifier: id }));
+    const gateway = await control.send(new GetGatewayCommand({ gatewayIdentifier: id }));
+    const name = GatewayClient.required(gateway.name, "Gateway", "name");
+    const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
+
+    const response = await operation();
+    await this.waitForGatewayDeletion(id, options);
+    await roleManager.replace(roleArn, []);
+    return response;
   }
 
   async getGatewayTarget(
@@ -199,9 +357,53 @@ export class GatewayClient implements CoreGatewayClient {
     input: CreateGatewayTargetInput,
     options: CoreOptions,
   ): Promise<CreateGatewayTargetResponse> {
-    return this.clients
-      .control(toClientConfig(options))
-      .send(new CreateGatewayTargetCommand(input));
+    const control = this.clients.control(toClientConfig(options));
+    const { skipRolePolicyUpdate, ...request } = input;
+    const operation = () => control.send(new CreateGatewayTargetCommand(request));
+    if (skipRolePolicyUpdate) return operation();
+    const gateway = await control.send(
+      new GetGatewayCommand({ gatewayIdentifier: request.gatewayIdentifier }),
+    );
+    const name = GatewayClient.required(gateway.name, "Gateway", "name");
+    const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
+
+    const targets = await this.targetInventory(request.gatewayIdentifier!, options);
+    const targetConfiguration = GatewayClient.required(
+      request.targetConfiguration,
+      "Gateway Target",
+      "configuration",
+    );
+    const desiredTargets = [
+      ...targets,
+      {
+        targetConfiguration,
+        credentialProviderConfigurations: request.credentialProviderConfigurations,
+      },
+    ];
+    const snapshots = await this.policySnapshots(
+      { gateway, targets },
+      { gateway, targets: desiredTargets },
+      options,
+    );
+    let targetId: string | undefined;
+    return roleManager.update(roleArn, snapshots.current, snapshots.desired, {
+      mutate: async () => {
+        const response = await this.mutate(
+          operation,
+          `Gateway Target "${request.name ?? "unnamed"}"`,
+        );
+        if (!response.targetId) {
+          throw new GatewayMutationIndeterminateError(
+            `Gateway Target "${request.name ?? "unnamed"}"`,
+          );
+        }
+        targetId = response.targetId;
+        return response;
+      },
+      stabilize: () => this.waitForGatewayTarget(request.gatewayIdentifier!, targetId!, options),
+    });
   }
 
   async getGatewayConnector(
@@ -268,16 +470,36 @@ export class GatewayClient implements CoreGatewayClient {
   }
 
   async deleteGatewayTarget(
-    gatewayId: string,
-    targetId: string,
+    input: GatewayTargetDeleteInput,
     options: CoreOptions,
   ): Promise<DeleteGatewayTargetResponse> {
-    return this.clients.control(toClientConfig(options)).send(
-      new DeleteGatewayTargetCommand({
-        gatewayIdentifier: gatewayId,
-        targetId,
-      }),
-    );
+    const control = this.clients.control(toClientConfig(options));
+    const { gatewayId, targetId, skipRolePolicyUpdate } = input;
+    const request = { gatewayIdentifier: gatewayId, targetId };
+    const operation = () => control.send(new DeleteGatewayTargetCommand(request));
+    if (skipRolePolicyUpdate) return operation();
+    const gateway = await control.send(new GetGatewayCommand({ gatewayIdentifier: gatewayId }));
+    const name = GatewayClient.required(gateway.name, "Gateway", "name");
+    const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
+
+    const remaining = await this.targetInventory(gatewayId, options, undefined, targetId);
+    const credentials = await this.credentials(remaining, options);
+    const desiredPolicy = this.policy(gateway, remaining, credentials);
+    const reconcile = () => roleManager.replace(roleArn, desiredPolicy);
+
+    let response: DeleteGatewayTargetResponse;
+    try {
+      response = await operation();
+    } catch (error) {
+      if ((error as Error).name !== "ResourceNotFoundException") throw error;
+      await reconcile();
+      throw error;
+    }
+    await this.waitForGatewayTargetDeletion(gatewayId, targetId, options);
+    await reconcile();
+    return response;
   }
 
   async getGatewayRule(
@@ -379,9 +601,8 @@ export class GatewayClient implements CoreGatewayClient {
       current.credentialProviderConfigurations,
       patch.credentialProviderConfigurations,
     );
-    const metadataConfiguration = GatewayClient.replace(
-      current.metadataConfiguration,
-      patch.metadataConfiguration,
+    const metadataConfiguration = GatewayClient.nonEmptyMetadata(
+      GatewayClient.replace(current.metadataConfiguration, patch.metadataConfiguration),
     );
     const privateEndpoint = GatewayClient.replace(current.privateEndpoint, patch.privateEndpoint);
     const request: UpdateGatewayTargetRequest = {
@@ -399,7 +620,35 @@ export class GatewayClient implements CoreGatewayClient {
         "Connector updates require an MCP or inference connector Target configuration",
       );
     }
-    return control.send(new UpdateGatewayTargetCommand(request));
+    const operation = () => control.send(new UpdateGatewayTargetCommand(request));
+    if (patch.skipRolePolicyUpdate) return operation();
+    const gateway = await control.send(
+      new GetGatewayCommand({ gatewayIdentifier: patch.gatewayId }),
+    );
+    const gatewayName = GatewayClient.required(gateway.name, "Gateway", "name");
+    const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
+    const roleManager = await this.managedExecutionRole(gatewayName, roleArn, options);
+    if (!roleManager) return operation();
+
+    const targets = await this.targetInventory(patch.gatewayId, options, current);
+    const desiredTargets = targets.map((target) =>
+      target.targetId === patch.targetId
+        ? { ...target, targetConfiguration, credentialProviderConfigurations }
+        : target,
+    );
+    const snapshots = await this.policySnapshots(
+      { gateway, targets },
+      { gateway, targets: desiredTargets },
+      options,
+    );
+    return roleManager.update(roleArn, snapshots.current, snapshots.desired, {
+      mutate: () =>
+        this.mutate(
+          operation,
+          `Gateway Target "${patch.targetId}" under Gateway "${patch.gatewayId}"`,
+        ),
+      stabilize: () => this.waitForGatewayTarget(patch.gatewayId, patch.targetId, options),
+    });
   }
 
   private static replace<T>(
@@ -408,6 +657,266 @@ export class GatewayClient implements CoreGatewayClient {
   ): T | undefined {
     if (replacement === undefined) return current;
     return replacement === null ? undefined : replacement;
+  }
+
+  private static nonEmptyMetadata(
+    configuration: UpdateGatewayTargetRequest["metadataConfiguration"],
+  ): UpdateGatewayTargetRequest["metadataConfiguration"] {
+    if (
+      configuration &&
+      Object.values(configuration).some((values) => values && values.length > 0)
+    ) {
+      return configuration;
+    }
+    return undefined;
+  }
+
+  private executionRole(options: CoreOptions): GatewayExecutionRole {
+    return new GatewayExecutionRole(this.clients.iam({ region: options.region }), this.roleOptions);
+  }
+
+  private async managedExecutionRole(
+    gatewayName: string,
+    roleArn: string,
+    options: CoreOptions,
+  ): Promise<GatewayExecutionRole | undefined> {
+    if (!matchesGatewayExecutionRole(gatewayName, options.region, roleArn)) return undefined;
+    const role = this.executionRole(options);
+    return (await role.isManaged(gatewayName, options.region, roleArn)) ? role : undefined;
+  }
+
+  private policy(
+    gateway: GetGatewayResponse,
+    targets: readonly GatewayPolicyTargetState[],
+    credentials: GatewayCredentialState = { secrets: new Map() },
+  ): GatewayPolicyStatement[] {
+    return gatewayPolicy({
+      gatewayArn: GatewayClient.required(gateway.gatewayArn, "Gateway", "ARN"),
+      workloadIdentityArn: gateway.workloadIdentityDetails?.workloadIdentityArn,
+      policyEngineArn: gateway.policyEngineConfiguration?.arn,
+      interceptorConfigurations: gateway.interceptorConfigurations,
+      customTransformConfiguration: gateway.customTransformConfiguration,
+      credentialSecrets: credentials.secrets,
+      tokenVaultKmsKeyArn: credentials.tokenVaultKmsKeyArn,
+      targets: targets.map((target) => ({
+        targetConfiguration: GatewayClient.required(
+          target.targetConfiguration,
+          "Gateway Target",
+          "configuration",
+        ),
+        credentialProviderConfigurations: target.credentialProviderConfigurations,
+      })),
+    });
+  }
+
+  private async policySnapshots(
+    current: GatewayFamilyState,
+    desired: GatewayFamilyState,
+    options: CoreOptions,
+  ): Promise<GatewayPolicySnapshots> {
+    const credentials = await this.credentials([...current.targets, ...desired.targets], options);
+    return {
+      current: this.policy(current.gateway, current.targets, credentials),
+      desired: this.policy(desired.gateway, desired.targets, credentials),
+    };
+  }
+
+  private async credentials(
+    targets: readonly Pick<GatewayPolicyTargetState, "credentialProviderConfigurations">[],
+    options: CoreOptions,
+  ): Promise<GatewayCredentialState> {
+    const providers = new Map<string, "api-key" | "oauth">();
+    for (const target of targets) {
+      for (const configuration of target.credentialProviderConfigurations ?? []) {
+        const kind =
+          configuration.credentialProviderType === "API_KEY"
+            ? "api-key"
+            : configuration.credentialProviderType === "OAUTH"
+              ? "oauth"
+              : undefined;
+        if (!kind) continue;
+        const providerArn =
+          kind === "api-key"
+            ? configuration.credentialProvider?.apiKeyCredentialProvider?.providerArn
+            : configuration.credentialProvider?.oauthCredentialProvider?.providerArn;
+        if (!providerArn) throw new Error(`${configuration.credentialProviderType} ARN is missing`);
+        if (providers.get(providerArn) && providers.get(providerArn) !== kind) {
+          throw new Error(`Credential provider ${providerArn} is used as two provider types`);
+        }
+        providers.set(providerArn, kind);
+      }
+    }
+
+    const control = this.clients.control(toClientConfig(options));
+    const secrets = new Map<string, string>();
+    for (const [providerArn, kind] of providers) {
+      const name = credentialProviderName(providerArn, kind);
+      const response =
+        kind === "api-key"
+          ? await control.send(new GetApiKeyCredentialProviderCommand({ name }))
+          : await control.send(new GetOauth2CredentialProviderCommand({ name }));
+      if (response.credentialProviderArn !== providerArn) {
+        throw new Error(`Credential provider ${name} returned an unexpected ARN`);
+      }
+      if (
+        ("apiKeySecretSource" in response && response.apiKeySecretSource === "EXTERNAL") ||
+        ("clientSecretSource" in response && response.clientSecretSource === "EXTERNAL")
+      ) {
+        throw new InputValidationError(
+          `${kind === "api-key" ? "API key" : "OAuth"} credential provider ${providerArn} uses an external secret; rerun with --skip-role-policy-update and manage its secret and KMS permissions externally`,
+        );
+      }
+      const secretArn =
+        "apiKeySecretArn" in response
+          ? response.apiKeySecretArn?.secretArn
+          : response.clientSecretArn?.secretArn;
+      if (!secretArn) throw new Error(`Credential provider ${providerArn} returned no secret ARN`);
+      secrets.set(providerArn, secretArn);
+    }
+    if (providers.size === 0) return { secrets };
+    const vault = await control.send(new GetTokenVaultCommand({ tokenVaultId: "default" }));
+    const tokenVaultKmsKeyArn =
+      vault.kmsConfiguration?.keyType === "CustomerManagedKey"
+        ? vault.kmsConfiguration.kmsKeyArn
+        : undefined;
+    if (vault.kmsConfiguration?.keyType === "CustomerManagedKey" && !tokenVaultKmsKeyArn) {
+      throw new Error("Default Token Vault returned no customer-managed KMS key ARN");
+    }
+    return { secrets, tokenVaultKmsKeyArn };
+  }
+
+  private async targetInventory(
+    gatewayId: string,
+    options: CoreOptions,
+    known?: GetGatewayTargetResponse,
+    excludedTargetId?: string,
+  ): Promise<GetGatewayTargetResponse[]> {
+    const targets: GetGatewayTargetResponse[] = [];
+    let nextToken: string | undefined;
+    for (let page = 0; page < MAX_CONNECTOR_TARGET_PAGES; page++) {
+      const response = await this.listGatewayTargets(
+        gatewayId,
+        nextToken,
+        DEFAULT_CONNECTOR_PAGE_SIZE,
+        options,
+      );
+      for (const summary of response.items ?? []) {
+        const targetId = GatewayClient.required(summary.targetId, "Gateway Target", "ID");
+        if (targetId === excludedTargetId) continue;
+        targets.push(
+          known?.targetId === targetId
+            ? known
+            : await this.getGatewayTarget(gatewayId, targetId, options),
+        );
+      }
+      if (!response.nextToken) return targets;
+      nextToken = response.nextToken;
+    }
+    throw new ResultTruncationError(
+      `Gateway Target discovery exceeded ${MAX_CONNECTOR_TARGET_PAGES} pages; policy inventory is incomplete`,
+    );
+  }
+
+  private async mutate<T>(operation: () => Promise<T>, resource: string): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      const statusCode = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+        ?.httpStatusCode;
+      if (statusCode === undefined || statusCode >= 500) {
+        throw new GatewayMutationIndeterminateError(resource, { cause: error });
+      }
+      throw error;
+    }
+  }
+
+  private async waitForGateway(gatewayId: string, options: CoreOptions): Promise<void> {
+    await this.waitForTerminal(
+      `Gateway "${gatewayId}"`,
+      () => this.getGateway(gatewayId, options),
+      ["READY"],
+      ["FAILED", "UPDATE_UNSUCCESSFUL"],
+    );
+  }
+
+  private async waitForGatewayTarget(
+    gatewayId: string,
+    targetId: string,
+    options: CoreOptions,
+  ): Promise<void> {
+    await this.waitForTerminal(
+      `Gateway Target "${targetId}"`,
+      () => this.getGatewayTarget(gatewayId, targetId, options),
+      ["READY", "CREATE_PENDING_AUTH", "UPDATE_PENDING_AUTH", "SYNCHRONIZE_PENDING_AUTH"],
+      ["FAILED", "UPDATE_UNSUCCESSFUL", "SYNCHRONIZE_UNSUCCESSFUL"],
+    );
+  }
+
+  private async waitForGatewayTargetDeletion(
+    gatewayId: string,
+    targetId: string,
+    options: CoreOptions,
+  ): Promise<void> {
+    await this.waitForTerminal(
+      `Gateway Target "${targetId}"`,
+      () => this.getGatewayTarget(gatewayId, targetId, options),
+      [],
+      ["FAILED", "UPDATE_UNSUCCESSFUL", "SYNCHRONIZE_UNSUCCESSFUL"],
+      true,
+    );
+  }
+
+  private async waitForGatewayDeletion(gatewayId: string, options: CoreOptions): Promise<void> {
+    await this.waitForTerminal(
+      `Gateway "${gatewayId}"`,
+      () => this.getGateway(gatewayId, options),
+      [],
+      ["FAILED", "UPDATE_UNSUCCESSFUL"],
+      true,
+    );
+  }
+
+  private async waitForTerminal(
+    resource: string,
+    read: () => Promise<{ status?: string; statusReasons?: string[] }>,
+    successful: readonly string[],
+    failed: readonly string[],
+    missingIsSuccess = false,
+  ): Promise<void> {
+    const attempts = this.roleOptions.waitAttempts ?? DEFAULT_WAIT_ATTEMPTS;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      try {
+        const current = await read();
+        lastError = undefined;
+        if (current.status && successful.includes(current.status)) return;
+        if (current.status && failed.includes(current.status)) {
+          throw new GatewayMutationTerminalError(
+            resource,
+            current.status,
+            current.statusReasons ?? [],
+          );
+        }
+      } catch (error) {
+        if (error instanceof GatewayMutationTerminalError) throw error;
+        if ((error as Error).name === "ResourceNotFoundException" && missingIsSuccess) return;
+        lastError = error;
+      }
+      if (attempt < attempts - 1) await this.wait();
+    }
+    throw new GatewayMutationIndeterminateError(
+      resource,
+      lastError === undefined ? undefined : { cause: lastError },
+    );
+  }
+
+  private async wait(): Promise<void> {
+    const milliseconds = this.roleOptions.waitDelayMs ?? DEFAULT_WAIT_DELAY_MS;
+    if (milliseconds > 0) {
+      await (
+        this.roleOptions.sleep ?? ((delay) => new Promise((resolve) => setTimeout(resolve, delay)))
+      )(milliseconds);
+    }
   }
 
   private static required<T>(value: T | undefined, resource: string, field: string): T {
@@ -425,4 +934,12 @@ export class GatewayClient implements CoreGatewayClient {
       configuration?.inference?.connector !== undefined
     );
   }
+}
+
+function credentialProviderName(providerArn: string, kind: "api-key" | "oauth"): string {
+  const resource = providerArn.split(":").slice(5).join(":");
+  const type = kind === "api-key" ? "apikeycredentialprovider" : "oauth2credentialprovider";
+  const name = resource.match(new RegExp(`^token-vault/[^/]+/${type}/([^/]+)$`))?.[1];
+  if (!name) throw new Error(`Invalid ${kind} credential provider ARN: ${providerArn}`);
+  return name;
 }

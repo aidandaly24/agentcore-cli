@@ -222,11 +222,6 @@ describe("Gateway create validation", () => {
   test.each([
     ["Gateway name", ["gateway", "create", "--authorizer-type", "NONE"], /--name/],
     [
-      "Gateway role",
-      ["gateway", "create", "--name", "orders", "--authorizer-type", "NONE"],
-      /--role-arn/,
-    ],
-    [
       "Gateway authorizer",
       ["gateway", "create", "--name", "orders", "--role-arn", TEST_ROLE_ARN],
       /--authorizer-type/,

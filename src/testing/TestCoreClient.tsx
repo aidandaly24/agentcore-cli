@@ -102,6 +102,7 @@ import type {
   CreateGatewayInput,
   CreateGatewayRuleInput,
   CreateGatewayTargetInput,
+  GatewayTargetDeleteInput,
   GatewayRuleUpdateInput,
   GatewayTargetUpdatePatch,
   GatewayUpdatePatch,
@@ -886,6 +887,14 @@ export class TestGatewayClient implements CoreGatewayClient {
   private getRuleResponse: GetGatewayRuleResponse = DEFAULT_GET_GATEWAY_RULE_RESPONSE;
   private listRuleResponses = new Map<string | undefined, ListGatewayRulesResponse>();
   private deleteRuleResponse: DeleteGatewayRuleResponse = DEFAULT_DELETE_GATEWAY_RULE_RESPONSE;
+
+  async getGatewayRolePolicyWarning(
+    gatewayId: string,
+    options: CoreOptions,
+  ): Promise<string | undefined> {
+    this.calls.push({ method: "getGatewayRolePolicyWarning", args: [gatewayId, options] });
+    return undefined;
+  }
   private error?: Error;
 
   setGetResponse(response: GetGatewayResponse): this {
@@ -1076,11 +1085,10 @@ export class TestGatewayClient implements CoreGatewayClient {
   }
 
   async deleteGatewayTarget(
-    gatewayId: string,
-    targetId: string,
+    input: GatewayTargetDeleteInput,
     options: CoreOptions,
   ): Promise<DeleteGatewayTargetResponse> {
-    this.calls.push({ method: "deleteGatewayTarget", args: [gatewayId, targetId, options] });
+    this.calls.push({ method: "deleteGatewayTarget", args: [input, options] });
     if (this.error) throw this.error;
     return this.deleteTargetResponse;
   }

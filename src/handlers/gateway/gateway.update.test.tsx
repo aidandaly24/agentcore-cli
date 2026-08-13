@@ -144,6 +144,7 @@ describe("Gateway update patch mapping", () => {
       "--policy-engine-mode",
       "enforce",
       "--clear-exception-level",
+      "--skip-role-policy-update",
     ]);
 
     expect(core.gateway.calls.find((call) => call.method === "updateGateway")?.args[0]).toEqual({
@@ -152,6 +153,7 @@ describe("Gateway update patch mapping", () => {
       clearProtocol: true,
       policyEngineConfiguration: { mode: "ENFORCE" },
       exceptionLevel: null,
+      skipRolePolicyUpdate: true,
     });
   });
 

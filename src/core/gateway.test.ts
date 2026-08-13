@@ -3,21 +3,33 @@ import {
   DeleteGatewayCommand,
   DeleteGatewayRuleCommand,
   DeleteGatewayTargetCommand,
+  GetApiKeyCredentialProviderCommand,
   GetGatewayCommand,
   GetGatewayTargetCommand,
+  GetOauth2CredentialProviderCommand,
+  GetTokenVaultCommand,
   ListGatewayTargetsCommand,
   TargetType,
   UpdateGatewayCommand,
   UpdateGatewayTargetCommand,
   type BedrockAgentCoreControlClient,
+  type CredentialProviderConfiguration,
   type GetGatewayResponse,
   type GetGatewayTargetResponse,
   type TargetSummary,
 } from "@aws-sdk/client-bedrock-agentcore-control";
+import {
+  DeleteRoleCommand,
+  DeleteRolePolicyCommand,
+  GetRoleCommand,
+  PutRolePolicyCommand,
+  type IAMClient,
+} from "@aws-sdk/client-iam";
 import { ERROR_SOURCE, ResultTruncationError } from "../errors";
 import type { GatewayTargetUpdatePatch, GatewayUpdatePatch } from "../handlers/gateway/types";
 import type { AwsClients } from "./types";
 import { GatewayClient } from "./gateway";
+import { GatewayMutationIndeterminateError } from "./gatewayExecutionRole";
 
 const options = { region: "us-west-2", endpointUrl: "https://agentcore.example.test" };
 
@@ -228,12 +240,205 @@ describe("GatewayClient Connector facade", () => {
 });
 
 const OPTIONS = { region: "us-west-2" };
+const MANAGED_ROLE_NAME = "AgentCoreCliGateway-us-west-2-orders";
+const MANAGED_ROLE_ARN = `arn:aws:iam::123456789012:role/${MANAGED_ROLE_NAME}`;
+const MANAGED_ROLE_TAGS = [
+  { Key: "AgentCoreCLIManaged", Value: "true" },
+  { Key: "AgentCoreCLIResourceType", Value: "Gateway" },
+  { Key: "AgentCoreCLIRegion", Value: OPTIONS.region },
+  { Key: "AgentCoreCLIResourceName", Value: "orders" },
+];
+
+function managedRole() {
+  return {
+    Arn: MANAGED_ROLE_ARN,
+    RoleName: MANAGED_ROLE_NAME,
+    Tags: MANAGED_ROLE_TAGS,
+  };
+}
+
+test("preserves a newly created role when Gateway mutation outcome is indeterminate", async () => {
+  const iamCommands: unknown[] = [];
+  const clients = {
+    control: () =>
+      ({
+        send: async () => {
+          throw new Error("connection reset");
+        },
+      }) as unknown as BedrockAgentCoreControlClient,
+    iam: () =>
+      ({
+        send: async (command: unknown) => {
+          iamCommands.push(command);
+          if (command instanceof GetRoleCommand) {
+            const error = new Error("missing");
+            error.name = "NoSuchEntityException";
+            throw error;
+          }
+          return { Role: { Arn: MANAGED_ROLE_ARN, RoleName: MANAGED_ROLE_NAME } };
+        },
+      }) as unknown as IAMClient,
+  } as unknown as AwsClients;
+
+  await expect(
+    new GatewayClient(clients, { propagationDelayMs: 0 }).createGateway(
+      { name: "orders", authorizerType: "NONE" },
+      OPTIONS,
+    ),
+  ).rejects.toBeInstanceOf(GatewayMutationIndeterminateError);
+
+  expect(iamCommands.some((command) => command instanceof DeleteRolePolicyCommand)).toBe(false);
+  expect(iamCommands.some((command) => command instanceof DeleteRoleCommand)).toBe(false);
+});
+
+async function updateTargetCredentials(
+  currentCredentials: CredentialProviderConfiguration[],
+  desiredCredentials: CredentialProviderConfiguration[] | null,
+  secretSource: "MANAGED" | "EXTERNAL" = "MANAGED",
+): Promise<unknown[]> {
+  const apiKeyProviderArn =
+    "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/apikeycredentialprovider/orders";
+  const oauthProviderArn =
+    "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/oauth2credentialprovider/orders";
+  const secretArn = "arn:aws:secretsmanager:us-west-2:123456789012:secret:orders";
+  const currentTarget = {
+    ...target(),
+    credentialProviderConfigurations: currentCredentials,
+  };
+  const gatewayResponse = {
+    ...gateway(),
+    roleArn: MANAGED_ROLE_ARN,
+    workloadIdentityDetails: {
+      workloadIdentityArn:
+        "arn:aws:bedrock-agentcore:us-west-2:123456789012:workload-identity-directory/default/workload-identity/orders",
+    },
+  };
+  let targetReads = 0;
+  const policies: unknown[] = [];
+  const clients = {
+    control: () =>
+      ({
+        send: async (command: unknown) => {
+          if (command instanceof GetGatewayTargetCommand) {
+            targetReads += 1;
+            return targetReads === 1 ? currentTarget : { ...currentTarget, status: "READY" };
+          }
+          if (command instanceof GetGatewayCommand) return gatewayResponse;
+          if (command instanceof ListGatewayTargetsCommand) {
+            return { items: [{ targetId: currentTarget.targetId }] };
+          }
+          if (command instanceof GetApiKeyCredentialProviderCommand) {
+            return {
+              credentialProviderArn: apiKeyProviderArn,
+              apiKeySecretArn: { secretArn },
+              apiKeySecretSource: secretSource,
+            };
+          }
+          if (command instanceof GetOauth2CredentialProviderCommand) {
+            return {
+              credentialProviderArn: oauthProviderArn,
+              clientSecretArn: { secretArn },
+              clientSecretSource: secretSource,
+            };
+          }
+          if (command instanceof GetTokenVaultCommand) {
+            return {
+              tokenVaultId: "default",
+              kmsConfiguration: {
+                keyType: "CustomerManagedKey",
+                kmsKeyArn: "arn:aws:kms:us-west-2:123456789012:key/token-vault",
+              },
+            };
+          }
+          if (command instanceof UpdateGatewayTargetCommand) return { targetId: "target-1" };
+          throw new Error(`unexpected command ${command}`);
+        },
+      }) as unknown as BedrockAgentCoreControlClient,
+    iam: () =>
+      ({
+        send: async (command: GetRoleCommand | PutRolePolicyCommand) => {
+          if (command instanceof GetRoleCommand) return { Role: managedRole() };
+          policies.push(JSON.parse(command.input.PolicyDocument!));
+          return {};
+        },
+      }) as unknown as IAMClient,
+  } as unknown as AwsClients;
+
+  await new GatewayClient(clients, { propagationDelayMs: 0 }).updateGatewayTarget(
+    {
+      gatewayId: "gateway-1",
+      targetId: "target-1",
+      credentialProviderConfigurations: desiredCredentials,
+    },
+    OPTIONS,
+  );
+  return policies;
+}
+
+test("adds credential grants when a Target changes from JWT passthrough to API key", async () => {
+  const providerArn =
+    "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/apikeycredentialprovider/orders";
+  const policies = await updateTargetCredentials(
+    [{ credentialProviderType: "JWT_PASSTHROUGH" }],
+    [
+      {
+        credentialProviderType: "API_KEY",
+        credentialProvider: {
+          apiKeyCredentialProvider: { providerArn },
+        },
+      },
+    ],
+  );
+
+  expect(policies).toHaveLength(2);
+  expect(JSON.stringify(policies.at(-1))).toContain("GetResourceApiKey");
+  expect(JSON.stringify(policies.at(-1))).toContain("secretsmanager:GetSecretValue");
+  expect(JSON.stringify(policies.at(-1))).toContain("kms:Decrypt");
+});
+
+test.each(["API-key", "OAuth"] as const)(
+  "rejects external %s secrets before mutating a managed Target",
+  async (kind) => {
+    const configuration: CredentialProviderConfiguration =
+      kind === "API-key"
+        ? {
+            credentialProviderType: "API_KEY",
+            credentialProvider: {
+              apiKeyCredentialProvider: {
+                providerArn:
+                  "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/apikeycredentialprovider/orders",
+              },
+            },
+          }
+        : {
+            credentialProviderType: "OAUTH",
+            credentialProvider: {
+              oauthCredentialProvider: {
+                providerArn:
+                  "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default/oauth2credentialprovider/orders",
+                scopes: ["orders.read"],
+                grantType: "CLIENT_CREDENTIALS",
+              },
+            },
+          };
+
+    await expect(
+      updateTargetCredentials(
+        [{ credentialProviderType: "JWT_PASSTHROUGH" }],
+        [configuration],
+        "EXTERNAL",
+      ),
+    ).rejects.toThrow(/--skip-role-policy-update/);
+  },
+);
 
 function gateway(): GetGatewayResponse {
   return {
     gatewayId: "gateway-1",
+    gatewayArn: "arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/gateway-1",
     name: "orders",
     roleArn: "arn:aws:iam::123456789012:role/orders",
+    status: "READY",
     authorizerType: "CUSTOM_JWT",
     authorizerConfiguration: {
       customJWTAuthorizer: {
@@ -273,27 +478,110 @@ function target(): GetGatewayTargetResponse {
 }
 
 test("maps Gateway, Target, and Rule selectors to their delete commands", async () => {
-  const { client, commands } = recordingGatewayClient([{}, {}, {}]);
+  const { client, commands } = recordingGatewayClient([gateway(), {}, gateway(), {}, {}]);
 
   await client.deleteGateway("gateway-1", OPTIONS);
-  await client.deleteGatewayTarget("gateway-1", "target-1", OPTIONS);
+  await client.deleteGatewayTarget({ gatewayId: "gateway-1", targetId: "target-1" }, OPTIONS);
   await client.deleteGatewayRule("gateway-1", "rule-1", OPTIONS);
 
-  expect(commands).toHaveLength(3);
-  expect(commands[0]).toBeInstanceOf(DeleteGatewayCommand);
-  expect((commands[0] as DeleteGatewayCommand).input).toEqual({
+  expect(commands).toHaveLength(5);
+  expect(commands[0]).toBeInstanceOf(GetGatewayCommand);
+  expect(commands[1]).toBeInstanceOf(DeleteGatewayCommand);
+  expect((commands[1] as DeleteGatewayCommand).input).toEqual({
     gatewayIdentifier: "gateway-1",
   });
-  expect(commands[1]).toBeInstanceOf(DeleteGatewayTargetCommand);
-  expect((commands[1] as DeleteGatewayTargetCommand).input).toEqual({
+  expect(commands[2]).toBeInstanceOf(GetGatewayCommand);
+  expect(commands[3]).toBeInstanceOf(DeleteGatewayTargetCommand);
+  expect((commands[3] as DeleteGatewayTargetCommand).input).toEqual({
     gatewayIdentifier: "gateway-1",
     targetId: "target-1",
   });
-  expect(commands[2]).toBeInstanceOf(DeleteGatewayRuleCommand);
-  expect((commands[2] as DeleteGatewayRuleCommand).input).toEqual({
+  expect(commands[4]).toBeInstanceOf(DeleteGatewayRuleCommand);
+  expect((commands[4] as DeleteGatewayRuleCommand).input).toEqual({
     gatewayIdentifier: "gateway-1",
     ruleId: "rule-1",
   });
+});
+
+test("reconciles stale grants when a Target delete retry finds the Target missing", async () => {
+  const policies: unknown[] = [];
+  const clients = {
+    control: () =>
+      ({
+        send: async (command: unknown) => {
+          if (command instanceof GetGatewayCommand) {
+            return { ...gateway(), roleArn: MANAGED_ROLE_ARN };
+          }
+          if (command instanceof DeleteGatewayTargetCommand) {
+            const error = new Error("missing");
+            error.name = "ResourceNotFoundException";
+            throw error;
+          }
+          if (command instanceof ListGatewayTargetsCommand) return { items: [] };
+          throw new Error(`unexpected command ${command}`);
+        },
+      }) as unknown as BedrockAgentCoreControlClient,
+    iam: () =>
+      ({
+        send: async (command: GetRoleCommand | PutRolePolicyCommand) => {
+          if (command instanceof GetRoleCommand) return { Role: managedRole() };
+          policies.push(JSON.parse(command.input.PolicyDocument!));
+          return {};
+        },
+      }) as unknown as IAMClient,
+  } as unknown as AwsClients;
+
+  await expect(
+    new GatewayClient(clients).deleteGatewayTarget(
+      { gatewayId: "gateway-1", targetId: "target-1" },
+      OPTIONS,
+    ),
+  ).rejects.toMatchObject({ name: "ResourceNotFoundException" });
+
+  expect(policies).toHaveLength(1);
+  expect(JSON.stringify(policies[0])).toContain("bedrock-agentcore:InvokeGateway");
+});
+
+test("retries an indeterminate Gateway deletion read before preserving its policy", async () => {
+  let gatewayReads = 0;
+  const iamCommands: unknown[] = [];
+  const clients = {
+    control: () =>
+      ({
+        send: async (command: unknown) => {
+          if (command instanceof GetGatewayCommand) {
+            gatewayReads += 1;
+            if (gatewayReads === 1) {
+              return { ...gateway(), roleArn: MANAGED_ROLE_ARN };
+            }
+            const error = new Error(gatewayReads === 2 ? "throttled" : "missing");
+            error.name = gatewayReads === 2 ? "ThrottlingException" : "ResourceNotFoundException";
+            throw error;
+          }
+          if (command instanceof DeleteGatewayCommand) {
+            return { gatewayId: "gateway-1", status: "DELETING" };
+          }
+          throw new Error(`unexpected command ${command}`);
+        },
+      }) as unknown as BedrockAgentCoreControlClient,
+    iam: () =>
+      ({
+        send: async (command: unknown) => {
+          iamCommands.push(command);
+          if (command instanceof GetRoleCommand) return { Role: managedRole() };
+          return {};
+        },
+      }) as unknown as IAMClient,
+  } as unknown as AwsClients;
+
+  await expect(
+    new GatewayClient(clients, { waitAttempts: 2, waitDelayMs: 0 }).deleteGateway(
+      "gateway-1",
+      OPTIONS,
+    ),
+  ).resolves.toMatchObject({ gatewayId: "gateway-1" });
+
+  expect(iamCommands.some((command) => command instanceof DeleteRolePolicyCommand)).toBe(true);
 });
 
 function recordingGatewayClient(responses: unknown[]): {
@@ -339,17 +627,88 @@ async function targetUpdateInput(
   patch: GatewayTargetUpdatePatch,
   current: GetGatewayTargetResponse = target(),
 ): Promise<UpdateGatewayTargetCommand["input"]> {
-  const { client, commands } = recordingGatewayClient([current, {}]);
+  const { client, commands } = recordingGatewayClient([current, gateway(), {}]);
   await client.updateGatewayTarget(patch, OPTIONS);
   expect(commands[0]).toBeInstanceOf(GetGatewayTargetCommand);
   expect((commands[0] as GetGatewayTargetCommand).input).toEqual({
     gatewayIdentifier: patch.gatewayId,
     targetId: patch.targetId,
   });
-  return (commands[1] as UpdateGatewayTargetCommand).input;
+  return (commands[2] as UpdateGatewayTargetCommand).input;
 }
 
 describe("GatewayClient updateGateway", () => {
+  test("does not touch IAM when replacing a role with policy updates skipped", async () => {
+    const { client, commands } = recordingGatewayClient([
+      { ...gateway(), roleArn: MANAGED_ROLE_ARN },
+      { gatewayId: "gateway-1" },
+    ]);
+    const replacementRoleArn = "arn:aws:iam::123456789012:role/customer-managed";
+
+    await client.updateGateway(
+      {
+        id: "gateway-1",
+        roleArn: replacementRoleArn,
+        skipRolePolicyUpdate: true,
+      },
+      OPTIONS,
+    );
+
+    expect(commands).toHaveLength(2);
+    expect(commands[1]).toBeInstanceOf(UpdateGatewayCommand);
+    expect((commands[1] as UpdateGatewayCommand).input.roleArn).toBe(replacementRoleArn);
+  });
+
+  test("stages Policy Engine permissions before updating a CLI-owned Gateway", async () => {
+    const order: string[] = [];
+    const current = {
+      ...gateway(),
+      gatewayArn: "arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/gateway-1",
+      roleArn: MANAGED_ROLE_ARN,
+      policyEngineConfiguration: undefined,
+    };
+    const clients = {
+      control: () =>
+        ({
+          send: async (command: GetGatewayCommand | UpdateGatewayCommand) => {
+            if (command instanceof GetGatewayCommand) {
+              order.push("get");
+              return current;
+            }
+            if (command instanceof ListGatewayTargetsCommand) return { items: [] };
+            order.push("update");
+            return { gatewayId: "gateway-1" };
+          },
+        }) as unknown as BedrockAgentCoreControlClient,
+      iam: () =>
+        ({
+          send: async (command: GetRoleCommand | PutRolePolicyCommand) => {
+            if (command instanceof GetRoleCommand) {
+              order.push("role");
+              return { Role: managedRole() };
+            }
+            order.push("policy");
+            return {};
+          },
+        }) as unknown as IAMClient,
+    } as unknown as AwsClients;
+    const client = new GatewayClient(clients, { propagationDelayMs: 0 });
+
+    await client.updateGateway(
+      {
+        id: "gateway-1",
+        roleArn: MANAGED_ROLE_ARN,
+        policyEngineConfiguration: {
+          arn: "arn:aws:bedrock-agentcore:us-west-2:123456789012:policy-engine/engine-2",
+          mode: "ENFORCE",
+        },
+      },
+      OPTIONS,
+    );
+
+    expect(order).toEqual(["get", "role", "policy", "update", "get"]);
+  });
+
   test("clears requested fields and merges a Policy Engine mode change", async () => {
     expect(
       await gatewayUpdateInput({
@@ -485,6 +844,7 @@ describe("GatewayClient updateGatewayConnector", () => {
     };
     const { client, commands } = recordingGatewayClient([
       { targetId: "target-1", targetConfiguration } as GetGatewayTargetResponse,
+      gateway(),
       {},
     ]);
 
@@ -497,8 +857,8 @@ describe("GatewayClient updateGatewayConnector", () => {
       OPTIONS,
     );
 
-    expect(commands[1]).toBeInstanceOf(UpdateGatewayTargetCommand);
-    expect((commands[1] as UpdateGatewayTargetCommand).input.targetConfiguration).toEqual(
+    expect(commands[2]).toBeInstanceOf(UpdateGatewayTargetCommand);
+    expect((commands[2] as UpdateGatewayTargetCommand).input.targetConfiguration).toEqual(
       targetConfiguration,
     );
   });

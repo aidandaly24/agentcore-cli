@@ -5,7 +5,7 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import z from "zod";
 import { InputValidationError } from "../../../errors";
-import { type AppIO, SourceResolver } from "../../../io";
+import { type AppIO, SourceResolver, warn } from "../../../io";
 import { createHandler, flag } from "../../../router";
 import { JsonRendererKey } from "../../../tui";
 import type { Core } from "../../types";
@@ -64,9 +64,6 @@ export const createCreateGatewayHandler = (core: Core, io: AppIO) =>
       if (!flags.name) {
         throw new InputValidationError("required option '--name <name>' not specified");
       }
-      if (!flags["role-arn"]) {
-        throw new InputValidationError("required option '--role-arn <role-arn>' not specified");
-      }
       if (!flags["authorizer-type"]) {
         throw new InputValidationError(
           "required option '--authorizer-type <authorizer-type>' not specified",
@@ -120,7 +117,7 @@ export const createCreateGatewayHandler = (core: Core, io: AppIO) =>
 
       const input: CreateGatewayInput = {
         name: flags.name,
-        roleArn: flags["role-arn"],
+        ...(flags["role-arn"] ? { roleArn: flags["role-arn"] } : {}),
         ...(flags.protocol ? { protocol: flags.protocol } : {}),
         authorizerType: flags["authorizer-type"],
         ...(flags.description ? { description: flags.description } : {}),
@@ -134,6 +131,12 @@ export const createCreateGatewayHandler = (core: Core, io: AppIO) =>
         ...(flags["client-token"] ? { clientToken: flags["client-token"] } : {}),
       };
 
+      if (flags["role-arn"]) {
+        warn(
+          io,
+          `Using customer-managed execution role ${flags["role-arn"]}; IAM policies will not be modified.`,
+        );
+      }
       ctx
         .require(JsonRendererKey)
         .renderJson(await core.gateway.createGateway(input, coreOptsFromCtx(ctx)));
