@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect } from "bun:test";
 import {
@@ -10,10 +10,7 @@ import {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type { BedrockAgentCoreClient } from "@aws-sdk/client-bedrock-agentcore";
 import {
-  CreateRoleCommand,
-  DeleteRoleCommand,
   DeleteRolePolicyCommand,
-  GetRoleCommand,
   GetRolePolicyCommand,
   ListRolePoliciesCommand,
   PutRolePolicyCommand,
@@ -212,33 +209,9 @@ function makeIamRecordingSend(
   const recordedSend = makeRecordingSend(realClient, dir);
   const inlinePolicies = new Map<string, Map<string, string>>();
   const deletedPolicies = new Map<string, Set<string>>();
-  const rolesCreatedInScenario = recordedCreatedRoleNames(dir);
-  const existingRoles = new Set<string>();
 
   return async (command: SdkCommand) => {
     if (isRecording()) return recordedSend(command);
-
-    if (command instanceof GetRoleCommand) {
-      const roleName = command.input.RoleName;
-      if (roleName && rolesCreatedInScenario.has(roleName) && !existingRoles.has(roleName)) {
-        const error = new Error(`Role ${roleName} does not exist in replay state.`);
-        error.name = "NoSuchEntityException";
-        throw error;
-      }
-      return recordedSend(command);
-    }
-
-    if (command instanceof CreateRoleCommand) {
-      const response = await recordedSend(command);
-      if (command.input.RoleName) existingRoles.add(command.input.RoleName);
-      return response;
-    }
-
-    if (command instanceof DeleteRoleCommand) {
-      const response = await recordedSend(command);
-      if (command.input.RoleName) existingRoles.delete(command.input.RoleName);
-      return response;
-    }
 
     if (command instanceof PutRolePolicyCommand) {
       const response = await recordedSend(command);
@@ -305,19 +278,6 @@ function makeIamRecordingSend(
     return recordedSend(command);
   };
 }
-
-function recordedCreatedRoleNames(dir: string): Set<string> {
-  if (!existsSync(dir)) return new Set();
-  const names = new Set<string>();
-  for (const file of readdirSync(dir).filter((name) => name.startsWith("CreateRoleCommand."))) {
-    const response = parse(readFileSync(join(dir, file), "utf8")) as {
-      Role?: { RoleName?: string };
-    };
-    if (response.Role?.RoleName) names.add(response.Role.RoleName);
-  }
-  return names;
-}
-
 function makeControlRecordingSend(
   realClient: BedrockAgentCoreControlClient,
   dir: string,

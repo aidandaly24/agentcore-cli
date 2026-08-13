@@ -44,6 +44,7 @@ export type ExecutionRolePolicyManagementInput = {
   associatedRoleArn: string;
   explicitRoleArn?: string;
   skipPolicyUpdate?: boolean;
+  expectedCliRoleName?: string;
 };
 
 export class InvalidExecutionRoleArnError extends Error {
@@ -137,6 +138,17 @@ export class ExecutionRoleManager {
     }
 
     const roleName = ExecutionRoleManager.roleNameFromArn(input.associatedRoleArn);
+    if (
+      roleName.startsWith("AgentCoreCli") &&
+      input.expectedCliRoleName &&
+      roleName !== input.expectedCliRoleName
+    ) {
+      return {
+        mode: "external",
+        reason: "unknown-role",
+        roleArn: input.associatedRoleArn,
+      };
+    }
     if (RECOGNIZED_EXECUTION_ROLE_PREFIXES.some((prefix) => roleName.startsWith(prefix))) {
       return {
         mode: "managed",

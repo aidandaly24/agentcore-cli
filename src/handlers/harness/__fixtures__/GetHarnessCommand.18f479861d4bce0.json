@@ -1,0 +1,677 @@
+{
+  "$sequence": [
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "CREATING",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are a concise assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "1",
+        "memory": {
+          "managedMemoryConfiguration": {}
+        },
+        "maxIterations": 25,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:11:48.102Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are a concise assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "1",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 25,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:11:48.102Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are a concise assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "1",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 25,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:11:48.102Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are a concise assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "1",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 25,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:11:48.102Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are a concise assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "1",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 25,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "UPDATING",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:14:28.886Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are an updated assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "2",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 30,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:14:39.901Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are an updated assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "2",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 30,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:14:39.901Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are an updated assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "2",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 30,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:14:39.901Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are an updated assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "2",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 30,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "READY",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:14:39.901Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are an updated assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "2",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 30,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "harness": {
+        "harnessId": "AgentCoreCliIamE2E-mzw9kCl3pf",
+        "harnessName": "AgentCoreCliIamE2E",
+        "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:harness/AgentCoreCliIamE2E-mzw9kCl3pf",
+        "status": "DELETING",
+        "executionRoleArn": "arn:aws:iam::603141041947:role/AgentCoreCliHarness-AgentCoreCliIamE2E",
+        "createdAt": {
+          "$date": "2026-08-13T01:11:36.697Z"
+        },
+        "updatedAt": {
+          "$date": "2026-08-13T01:15:03.517Z"
+        },
+        "model": {
+          "bedrockModelConfig": {
+            "modelId": "global.anthropic.claude-sonnet-4-6",
+            "apiFormat": "converse_stream"
+          }
+        },
+        "systemPrompt": [
+          {
+            "text": "You are an updated assistant used in an end-to-end CLI test."
+          }
+        ],
+        "tools": [],
+        "skills": [],
+        "allowedTools": [
+          "*"
+        ],
+        "truncation": {
+          "strategy": "sliding_window",
+          "config": {
+            "slidingWindow": {
+              "messagesCount": 150
+            }
+          }
+        },
+        "environment": {
+          "agentCoreRuntimeEnvironment": {
+            "agentRuntimeArn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:runtime/harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "agentRuntimeName": "harness_AgentCoreCliIamE2E",
+            "agentRuntimeId": "harness_AgentCoreCliIamE2E-87rSrGDxXT",
+            "lifecycleConfiguration": {
+              "idleRuntimeSessionTimeout": 900,
+              "maxLifetime": 28800
+            },
+            "networkConfiguration": {
+              "networkMode": "PUBLIC"
+            }
+          }
+        },
+        "harnessVersion": "2",
+        "memory": {
+          "managedMemoryConfiguration": {
+            "arn": "arn:aws:bedrock-agentcore:us-west-2:603141041947:memory/AgentCoreCliIamE2E-0xYqWxEdbi"
+          }
+        },
+        "maxIterations": 30,
+        "timeoutSeconds": 3600
+      }
+    },
+    {
+      "$error": {
+        "name": "ResourceNotFoundException",
+        "message": "Agent with name AgentCoreCliIamE2E-mzw9kCl3pf not found."
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$sequence": [
+    {
+      "PolicyNames": [],
+      "IsTruncated": false
+    },
+    {
+      "PolicyNames": [
+        "AgentCoreCliHarnessExecutionPolicy-ba70363c5e1f0fb4"
+      ],
+      "IsTruncated": false
+    },
+    {
+      "PolicyNames": [
+        "AgentCoreCliHarnessExecutionPolicy-ba70363c5e1f0fb4"
+      ],
+      "IsTruncated": false
+    }
+  ]
+}

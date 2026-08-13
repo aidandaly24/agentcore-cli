@@ -15,8 +15,9 @@ import { coreOptsFromCtx, parseJsonFlag } from "../../utils.tsx";
 import { JsonRendererKey } from "../../../tui";
 import { InputValidationError } from "../../../errors";
 import { parameterHelp } from "../parameterHelp.tsx";
+import { type AppIO, warn } from "../../../io";
 
-export const createCreateHarnessHandler = (core: Core) =>
+export const createCreateHarnessHandler = (core: Core, io: AppIO) =>
   createHandler({
     name: "create",
     description: "create a harness",
@@ -96,6 +97,12 @@ export const createCreateHarnessHandler = (core: Core) =>
         throw new InputValidationError("required option '--name <name>' not specified");
       }
 
+      if (flags["execution-role-arn"]) {
+        warn(
+          io,
+          `Using customer-managed execution role ${flags["execution-role-arn"]}; IAM policies will not be modified.`,
+        );
+      }
       const response = await core.harness.createHarness(
         {
           harnessName: flags["name"],

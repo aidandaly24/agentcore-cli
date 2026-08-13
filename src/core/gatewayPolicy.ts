@@ -6,6 +6,7 @@ import type {
   TargetConfiguration,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import { AgentCorePolicyGrants } from "./agentCorePolicyGrants";
+import type { CredentialProviderPolicyState } from "./credentialProviderPolicy";
 import type { PolicyContribution } from "./executionRolePolicy";
 
 export type GatewayTargetPolicyState = {
@@ -25,10 +26,7 @@ export type GatewayPolicyState = {
   targets: readonly GatewayTargetPolicyState[];
 };
 
-export type GatewayCredentialProviderPolicyState = {
-  providerArn: string;
-  secretArn: string;
-};
+export type GatewayCredentialProviderPolicyState = CredentialProviderPolicyState;
 
 export class UninferrableGatewayPermissionError extends Error {
   constructor(

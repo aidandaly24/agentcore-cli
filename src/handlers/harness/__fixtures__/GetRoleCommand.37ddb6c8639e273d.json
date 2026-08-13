@@ -1,6 +1,0 @@
-{
-  "$error": {
-    "name": "NoSuchEntityException",
-    "message": "The role with name AgentCoreHarness-AgentCoreCliE2E cannot be found."
-  }
-}

@@ -22,7 +22,7 @@ the agent needs (Bedrock model invocation, CloudWatch Logs, built-in tools,
 memory, ...).
 
 When omitted, the CLI provisions a default per-harness role named
-AgentCoreHarness-<name> with the baseline policy and uses it.
+AgentCoreCliHarness-<name> with a generated policy and uses it.
 
 Example:
   --execution-role-arn arn:aws:iam::123456789012:role/MyHarnessRole`,

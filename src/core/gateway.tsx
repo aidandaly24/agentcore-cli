@@ -6,11 +6,9 @@ import {
   DeleteGatewayCommand,
   DeleteGatewayRuleCommand,
   DeleteGatewayTargetCommand,
-  GetApiKeyCredentialProviderCommand,
   GetGatewayCommand,
   GetGatewayRuleCommand,
   GetGatewayTargetCommand,
-  GetOauth2CredentialProviderCommand,
   ListGatewayRulesCommand,
   ListGatewaysCommand,
   ListGatewayTargetsCommand,
@@ -61,6 +59,7 @@ import {
   type ExecutionRoleManagerOptions,
   type ExecutionRolePolicyManagement,
 } from "./executionRoleManager";
+import { CredentialProviderPolicyResolver } from "./credentialProviderPolicy";
 import type { PolicyContribution } from "./executionRolePolicy";
 import {
   ExecutionRolePolicyUpdater,
@@ -240,6 +239,7 @@ export class GatewayClient implements CoreGatewayClient {
     }
     const management = ExecutionRoleManager.policyManagement({
       associatedRoleArn: gateway.roleArn,
+      expectedCliRoleName: expectedGatewayCliRoleName(gateway, gatewayId),
     });
     return management.mode === "external" && management.reason === "unknown-role"
       ? { reason: "unknown-role", roleArn: management.roleArn }
@@ -324,11 +324,13 @@ export class GatewayClient implements CoreGatewayClient {
       associatedRoleArn: roleArn,
       explicitRoleArn: patch.roleArn,
       skipPolicyUpdate: patch.skipRolePolicyUpdate,
+      expectedCliRoleName: ExecutionRoleManager.cliRoleName("gateway", name),
     });
     if (management.mode === "external") {
       if (management.reason === "explicit-role" && !patch.skipRolePolicyUpdate) {
         const previousManagement = ExecutionRoleManager.policyManagement({
           associatedRoleArn: roleArn,
+          expectedCliRoleName: ExecutionRoleManager.cliRoleName("gateway", name),
         });
         if (previousManagement.mode === "managed") {
           const policyName = gatewayPolicyName(
@@ -392,6 +394,7 @@ export class GatewayClient implements CoreGatewayClient {
     const request = { gatewayIdentifier: id };
     const management = ExecutionRoleManager.policyManagement({
       associatedRoleArn: gateway.roleArn,
+      expectedCliRoleName: expectedGatewayCliRoleName(gateway, id),
     });
     if (management.mode === "external") {
       return (await this.deleteGatewayAndWait(request, options)).response;
@@ -457,6 +460,7 @@ export class GatewayClient implements CoreGatewayClient {
     }
     const management = ExecutionRoleManager.policyManagement({
       associatedRoleArn: gateway.roleArn,
+      expectedCliRoleName: expectedGatewayCliRoleName(gateway, input.gatewayIdentifier!),
     });
     const control = this.clients.control(toClientConfig(options));
 
@@ -632,6 +636,7 @@ export class GatewayClient implements CoreGatewayClient {
     };
     const management = ExecutionRoleManager.policyManagement({
       associatedRoleArn: gateway.roleArn,
+      expectedCliRoleName: expectedGatewayCliRoleName(gateway, gatewayId),
     });
     if (management.mode === "external") {
       return (await this.deleteGatewayTargetAndWait(request, options)).response;
@@ -775,6 +780,7 @@ export class GatewayClient implements CoreGatewayClient {
     const management = ExecutionRoleManager.policyManagement({
       associatedRoleArn: gateway.roleArn,
       skipPolicyUpdate: patch.skipRolePolicyUpdate,
+      expectedCliRoleName: expectedGatewayCliRoleName(gateway, patch.gatewayId),
     });
     if (management.mode === "external") {
       return (await this.updateGatewayTargetAndWait(request, options)).response;
@@ -1261,73 +1267,45 @@ export class GatewayClient implements CoreGatewayClient {
     }[],
     options: CoreOptions,
   ): Promise<GatewayCredentialProviderPolicyState[]> {
-    const providerKinds = new Map<string, "api-key" | "oauth">();
+    const providerTypes = new Map<string, "api-key" | "oauth">();
     for (const target of targets) {
       for (const configuration of target.credentialProviderConfigurations ?? []) {
         const providerArn =
           configuration.credentialProvider?.apiKeyCredentialProvider?.providerArn ??
           configuration.credentialProvider?.oauthCredentialProvider?.providerArn;
-        const kind =
+        const type =
           configuration.credentialProviderType === "API_KEY"
             ? "api-key"
             : configuration.credentialProviderType === "OAUTH"
               ? "oauth"
               : undefined;
-        if (!kind) continue;
+        if (!type) continue;
         if (!providerArn) {
           throw new Error(
             `${configuration.credentialProviderType} credential provider ARN is missing.`,
           );
         }
-        const existingKind = providerKinds.get(providerArn);
-        if (existingKind && existingKind !== kind) {
+        const existing = providerTypes.get(providerArn);
+        if (existing && existing !== type) {
           throw new Error(`Credential provider ${providerArn} is used as two provider types.`);
         }
-        providerKinds.set(providerArn, kind);
+        providerTypes.set(providerArn, type);
       }
     }
-
-    const control = this.clients.control(toClientConfig(options));
-    const providers: GatewayCredentialProviderPolicyState[] = [];
-    for (const [providerArn, kind] of [...providerKinds].sort(([left], [right]) =>
-      left.localeCompare(right),
-    )) {
-      const name = credentialProviderName(providerArn, kind);
-      if (kind === "api-key") {
-        const response = await control.send(new GetApiKeyCredentialProviderCommand({ name }));
-        if (response.credentialProviderArn !== providerArn) {
-          throw new Error(`API key credential provider ${name} returned an unexpected ARN.`);
-        }
-        const secretArn = response.apiKeySecretArn?.secretArn;
-        if (!secretArn) {
-          throw new Error(`API key credential provider ${providerArn} returned no secret ARN.`);
-        }
-        providers.push({ providerArn, secretArn });
-        continue;
-      }
-
-      const response = await control.send(new GetOauth2CredentialProviderCommand({ name }));
-      if (response.credentialProviderArn !== providerArn) {
-        throw new Error(`OAuth credential provider ${name} returned an unexpected ARN.`);
-      }
-      const secretArn = response.clientSecretArn?.secretArn;
-      if (!secretArn) {
-        throw new Error(`OAuth credential provider ${providerArn} returned no secret ARN.`);
-      }
-      providers.push({ providerArn, secretArn });
-    }
-    return providers;
+    return new CredentialProviderPolicyResolver(
+      this.clients.control(toClientConfig(options)),
+    ).resolve(
+      [...providerTypes].map(([providerArn, type]) => ({
+        type,
+        providerArn,
+      })),
+    );
   }
 }
 
-function credentialProviderName(providerArn: string, kind: "api-key" | "oauth"): string {
-  const resource = providerArn.split(":").slice(5).join(":");
-  const expectedType = kind === "api-key" ? "apikeycredentialprovider" : "oauth2credentialprovider";
-  const match = resource.match(new RegExp(`^token-vault/[^/]+/${expectedType}/([^/]+)$`));
-  if (!match?.[1]) {
-    throw new Error(`Invalid ${kind} credential provider ARN "${providerArn}".`);
-  }
-  return match[1];
+function expectedGatewayCliRoleName(gateway: GetGatewayResponse, gatewayId: string): string {
+  if (!gateway.name) throw new Error(`Gateway ${gatewayId} returned no name.`);
+  return ExecutionRoleManager.cliRoleName("gateway", gateway.name);
 }
 
 function accountIdFromRoleArn(roleArn: string): string {

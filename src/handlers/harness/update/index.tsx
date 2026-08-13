@@ -15,6 +15,8 @@ import { coreOptsFromCtx, parseJsonFlag } from "../../utils.tsx";
 import { JsonRendererKey } from "../../../tui";
 import { InputValidationError } from "../../../errors";
 import { parameterHelp } from "../parameterHelp.tsx";
+import type { AppIO } from "../../../io";
+import { warnForHarnessRolePolicyUpdate } from "../rolePolicyWarning";
 
 // updated wraps a PATCH-semantics field: `--<flag> <json>` replaces the value,
 // `--clear-<flag> true` sends an empty wrapper (unsetting it), and omitting
@@ -24,7 +26,7 @@ function updated<T>(value: T | undefined, clear: boolean): { optionalValue?: T }
   return value !== undefined ? { optionalValue: value } : undefined;
 }
 
-export const createUpdateHarnessHandler = (core: Core) =>
+export const createUpdateHarnessHandler = (core: Core, io: AppIO) =>
   createHandler({
     name: "update",
     description: "update a harness (creates a new version)",
@@ -105,6 +107,7 @@ export const createUpdateHarnessHandler = (core: Core) =>
       flag("max-iterations", "max agent loop iterations per invocation", z.number().optional()),
       flag("max-tokens", "max total output tokens per invocation", z.number().optional()),
       flag("timeout-seconds", "max duration in seconds per invocation", z.number().optional()),
+      flag("skip-role-policy-update", "leave execution-role IAM policies unchanged", z.boolean()),
     ],
     handle: async (ctx, flags) => {
       // Required at runtime but declared optional so that a bare
@@ -113,51 +116,55 @@ export const createUpdateHarnessHandler = (core: Core) =>
         throw new InputValidationError("required option '--id <id>' not specified");
       }
 
-      const response = await core.harness.updateHarness(
-        {
-          harnessId: flags["id"],
-          executionRoleArn: flags["execution-role-arn"],
-          systemPrompt: flags["system-prompt"] ? [{ text: flags["system-prompt"] }] : undefined,
-          model: parseJsonFlag<HarnessModelConfiguration>("model", flags["model"]),
-          tools: parseJsonFlag<HarnessTool[]>("tools", flags["tools"]),
-          skills: parseJsonFlag<HarnessSkill[]>("skills", flags["skills"]),
-          allowedTools: flags["allowed-tools"],
-          memory: updated(
-            parseJsonFlag<HarnessMemoryConfiguration>("memory", flags["memory"]),
-            flags["clear-memory"] === "true",
+      const request = {
+        harnessId: flags["id"],
+        executionRoleArn: flags["execution-role-arn"],
+        systemPrompt: flags["system-prompt"] ? [{ text: flags["system-prompt"] }] : undefined,
+        model: parseJsonFlag<HarnessModelConfiguration>("model", flags["model"]),
+        tools: parseJsonFlag<HarnessTool[]>("tools", flags["tools"]),
+        skills: parseJsonFlag<HarnessSkill[]>("skills", flags["skills"]),
+        allowedTools: flags["allowed-tools"],
+        memory: updated(
+          parseJsonFlag<HarnessMemoryConfiguration>("memory", flags["memory"]),
+          flags["clear-memory"] === "true",
+        ),
+        truncation: parseJsonFlag<HarnessTruncationConfiguration>(
+          "truncation",
+          flags["truncation"],
+        ),
+        environment: parseJsonFlag<HarnessEnvironmentProviderRequest>(
+          "environment",
+          flags["environment"],
+        ),
+        environmentArtifact: updated(
+          parseJsonFlag<HarnessEnvironmentArtifact>(
+            "environment-artifact",
+            flags["environment-artifact"],
           ),
-          truncation: parseJsonFlag<HarnessTruncationConfiguration>(
-            "truncation",
-            flags["truncation"],
+          flags["clear-environment-artifact"] === "true",
+        ),
+        environmentVariables: parseJsonFlag<Record<string, string>>(
+          "environment-variables",
+          flags["environment-variables"],
+        ),
+        authorizerConfiguration: updated(
+          parseJsonFlag<AuthorizerConfiguration>(
+            "authorizer-configuration",
+            flags["authorizer-configuration"],
           ),
-          environment: parseJsonFlag<HarnessEnvironmentProviderRequest>(
-            "environment",
-            flags["environment"],
-          ),
-          environmentArtifact: updated(
-            parseJsonFlag<HarnessEnvironmentArtifact>(
-              "environment-artifact",
-              flags["environment-artifact"],
-            ),
-            flags["clear-environment-artifact"] === "true",
-          ),
-          environmentVariables: parseJsonFlag<Record<string, string>>(
-            "environment-variables",
-            flags["environment-variables"],
-          ),
-          authorizerConfiguration: updated(
-            parseJsonFlag<AuthorizerConfiguration>(
-              "authorizer-configuration",
-              flags["authorizer-configuration"],
-            ),
-            flags["clear-authorizer-configuration"] === "true",
-          ),
-          maxIterations: flags["max-iterations"],
-          maxTokens: flags["max-tokens"],
-          timeoutSeconds: flags["timeout-seconds"],
-        },
-        coreOptsFromCtx(ctx),
-      );
+          flags["clear-authorizer-configuration"] === "true",
+        ),
+        maxIterations: flags["max-iterations"],
+        maxTokens: flags["max-tokens"],
+        timeoutSeconds: flags["timeout-seconds"],
+        ...(flags["skip-role-policy-update"] ? { skipRolePolicyUpdate: true } : {}),
+      };
+      const options = coreOptsFromCtx(ctx);
+      await warnForHarnessRolePolicyUpdate(core, io, flags.id, options, {
+        explicitRoleArn: flags["execution-role-arn"],
+        skipRolePolicyUpdate: flags["skip-role-policy-update"],
+      });
+      const response = await core.harness.updateHarness(request, options);
       ctx.require(JsonRendererKey).renderJson(response);
     },
   });

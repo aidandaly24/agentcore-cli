@@ -40,8 +40,17 @@ function UpdateWizard({ ctx, core, harnessId }: ScreenProps & { harnessId: strin
     queryKey: ["harness", opts.region, harnessId],
     queryFn: () => core.harness.getHarness(harnessId, opts),
   });
+  const rolePolicyWarning = useQuery({
+    queryKey: ["harness-role-policy-warning", opts.region, harnessId],
+    queryFn: async () => (await core.harness.getHarnessRolePolicyWarning(harnessId, opts)) ?? null,
+  });
 
-  if (detail.isPending || detail.isError) {
+  if (
+    detail.isPending ||
+    detail.isError ||
+    rolePolicyWarning.isPending ||
+    rolePolicyWarning.isError
+  ) {
     return (
       <Layout
         breadcrumb={["agentcore", "harness", "update", harnessId]}
@@ -50,10 +59,12 @@ function UpdateWizard({ ctx, core, harnessId }: ScreenProps & { harnessId: strin
           { key: "ctl+c", label: "quit" },
         ]}
       >
-        {detail.isPending ? (
+        {detail.isPending || rolePolicyWarning.isPending ? (
           <Spinner label="loading harness…" />
         ) : (
-          <Text color="red">Error: {(detail.error as Error).message}</Text>
+          <Text color="red">
+            Error: {((detail.error ?? rolePolicyWarning.error) as Error).message}
+          </Text>
         )}
       </Layout>
     );
@@ -67,6 +78,7 @@ function UpdateWizard({ ctx, core, harnessId }: ScreenProps & { harnessId: strin
       harnessId={harnessId}
       breadcrumb={["agentcore", "harness", "update", harnessId]}
       initial={fromHarness(detail.data.harness!)}
+      rolePolicyWarning={rolePolicyWarning.data ?? undefined}
       onDone={(id) => finishFlow(`/agentcore/harness/get/${id}`)}
     />
   );

@@ -4,7 +4,7 @@ import { IAMClient } from "@aws-sdk/client-iam";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { EvalClient } from "./eval";
 import { GatewayClient, type GatewayClientOptions } from "./gateway";
-import { HarnessClient } from "./harness";
+import { HarnessClient, type HarnessClientOptions } from "./harness";
 import { IdentityClient } from "./identity";
 import { MemoryClient } from "./memory";
 import { RuntimeClient } from "./runtime";
@@ -39,6 +39,7 @@ type CoreClientConfig = {
   logger: Logger;
   fetch?: CoreFetch;
   gatewayOptions?: GatewayClientOptions;
+  harnessOptions?: HarnessClientOptions;
 };
 
 // CoreClient is the single entry point to the Bedrock AgentCore APIs. It owns the
@@ -58,7 +59,7 @@ export class CoreClient implements AwsClients {
   private logger: Logger;
 
   // Feature-scoped sub-clients. Access as e.g. `coreClient.harness.getHarness(...)`.
-  readonly harness: HarnessClient = new HarnessClient(this);
+  readonly harness: HarnessClient;
   readonly identity: IdentityClient = new IdentityClient(this);
   readonly memory: MemoryClient = new MemoryClient(this);
   readonly runtime: RuntimeClient;
@@ -74,6 +75,7 @@ export class CoreClient implements AwsClients {
     this.createLogsClient = config.createLogsClient;
     this.logger = config.logger;
     this.gateway = new GatewayClient(this, config.gatewayOptions);
+    this.harness = new HarnessClient(this, config.harnessOptions);
     const fetch = config.fetch ?? globalThis.fetch;
     this.runtime = new RuntimeClient(this, fetch, this.logger.child({ module: "runtime" }));
     // EvalClient shares the injected fetch: dataset content is served from a

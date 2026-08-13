@@ -188,6 +188,29 @@ describe("harness update wizard", () => {
     r.unmount();
   });
 
+  test("shows the external IAM warning before submitting an unknown-role update", async () => {
+    const core = coreForUpdate();
+    const roleArn = "arn:aws:iam::123456789012:role/CdkHarnessRole";
+    core.harness.getHarnessRolePolicyWarning = async () => ({
+      reason: "unknown-role",
+      roleArn,
+    });
+    const r = renderScreen("/agentcore/harness/update/MyHarness-abc123", { core });
+
+    await waitForText(r.lastFrame, "● keep current");
+    await r.press("return");
+    await waitForText(r.lastFrame, "● managed");
+    await r.press("return");
+    await waitForText(r.lastFrame, "[✓] browser");
+    await r.press("return");
+    await waitForText(r.lastFrame, "type or paste the agent's instructions");
+    await r.write("\x04");
+    await waitForText(r.lastFrame, roleArn);
+    expect(r.lastFrame()).toContain("policies will not be modified");
+    expect(r.lastFrame()).toContain("you are responsible for permissions");
+    r.unmount();
+  });
+
   test("disabling memory sends the wrapped disabled configuration", async () => {
     const core = coreForUpdate();
     const r = renderScreen("/agentcore/harness/update/MyHarness-abc123", { core });

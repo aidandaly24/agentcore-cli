@@ -62,7 +62,6 @@ import type {
   UpdateGatewayTargetResponse,
   UpdateHarnessEndpointRequest,
   UpdateHarnessEndpointResponse,
-  UpdateHarnessRequest,
   UpdateHarnessResponse,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type {
@@ -89,7 +88,12 @@ import type {
   StartBatchEvaluationResponse,
 } from "@aws-sdk/client-bedrock-agentcore";
 import type { Core } from "../handlers/types";
-import type { CoreHarnessClient, CreateHarnessInput } from "../handlers/harness/types";
+import type {
+  CoreHarnessClient,
+  CreateHarnessInput,
+  HarnessRolePolicyWarning,
+  HarnessUpdateInput,
+} from "../handlers/harness/types";
 import type {
   CoreGatewayClient,
   CreateGatewayInput,
@@ -274,6 +278,10 @@ export class TestHarnessClient implements CoreHarnessClient {
   private deleteEndpointResponse: DeleteHarnessEndpointResponse = DEFAULT_DELETE_ENDPOINT_RESPONSE;
   private error?: Error;
 
+  async getHarnessRolePolicyWarning(): Promise<HarnessRolePolicyWarning | undefined> {
+    return undefined;
+  }
+
   // setListResponse sets what listHarnesses resolves to (when not erroring).
   // Pass `forNextToken` to serve a later page: the response is returned when
   // listHarnesses is called with that nextToken.
@@ -401,7 +409,7 @@ export class TestHarnessClient implements CoreHarnessClient {
   }
 
   async updateHarness(
-    request: UpdateHarnessRequest,
+    request: HarnessUpdateInput,
     options: CoreOptions,
   ): Promise<UpdateHarnessResponse> {
     this.calls.push({ method: "updateHarness", args: [request, options] });

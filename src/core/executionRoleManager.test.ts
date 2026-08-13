@@ -77,6 +77,27 @@ describe("ExecutionRoleManager policy ownership", () => {
     });
   });
 
+  test("manages a CLI role only for the resource that owns its deterministic name", () => {
+    const associatedRoleArn = roleArn("AgentCoreCliHarness-orders");
+
+    expect(
+      ExecutionRoleManager.policyManagement({
+        associatedRoleArn,
+        expectedCliRoleName: "AgentCoreCliHarness-orders",
+      }),
+    ).toMatchObject({ mode: "managed", roleName: "AgentCoreCliHarness-orders" });
+    expect(
+      ExecutionRoleManager.policyManagement({
+        associatedRoleArn,
+        expectedCliRoleName: "AgentCoreCliHarness-invoices",
+      }),
+    ).toEqual({
+      mode: "external",
+      reason: "unknown-role",
+      roleArn: associatedRoleArn,
+    });
+  });
+
   test("creates bounded deterministic role and per-parent policy names", () => {
     expect(ExecutionRoleManager.cliRoleName("gateway", "orders")).toBe(
       "AgentCoreCliGateway-orders",

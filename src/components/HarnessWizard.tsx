@@ -7,7 +7,7 @@ import type {
   HarnessTool,
   UpdateHarnessRequest,
 } from "@aws-sdk/client-bedrock-agentcore-control";
-import type { CreateHarnessInput } from "../handlers/harness/types";
+import type { CreateHarnessInput, HarnessRolePolicyWarning } from "../handlers/harness/types";
 import type { ScreenProps } from "../handlers/types";
 import { coreOptsFromCtx } from "../handlers/utils";
 import { Layout } from "./Layout";
@@ -241,6 +241,7 @@ export interface HarnessWizardProps extends ScreenProps {
   harnessId?: string;
   // initial seeds the form (update mode: the current configuration).
   initial?: HarnessFormValues;
+  rolePolicyWarning?: HarnessRolePolicyWarning;
   // onDone is called after a successful submit is acknowledged.
   onDone: (harnessId: string) => void;
 }
@@ -258,6 +259,7 @@ export function HarnessWizard({
   breadcrumb,
   harnessId,
   initial,
+  rolePolicyWarning,
   onDone,
 }: HarnessWizardProps) {
   const navigate = useNavigate();
@@ -354,6 +356,7 @@ export function HarnessWizard({
             values={values}
             patch={patch}
             request={request}
+            rolePolicyWarning={rolePolicyWarning}
             onNext={next}
             onBack={back}
             onSubmit={submit}
@@ -430,6 +433,7 @@ interface WizardStepProps {
   values: HarnessFormValues;
   patch: (update: Partial<HarnessFormValues>) => void;
   request: unknown;
+  rolePolicyWarning?: HarnessRolePolicyWarning;
   onNext: () => void;
   onBack: () => void;
   onSubmit: () => void;
@@ -441,6 +445,7 @@ function WizardStep({
   values,
   patch,
   request,
+  rolePolicyWarning,
   onNext,
   onBack,
   onSubmit,
@@ -493,7 +498,15 @@ function WizardStep({
         />
       );
     case "review":
-      return <ReviewStep mode={mode} request={request} onSubmit={onSubmit} onBack={onBack} />;
+      return (
+        <ReviewStep
+          mode={mode}
+          request={request}
+          rolePolicyWarning={rolePolicyWarning}
+          onSubmit={onSubmit}
+          onBack={onBack}
+        />
+      );
     default:
       return null;
   }
@@ -1099,11 +1112,13 @@ function PromptStep({
 function ReviewStep({
   mode,
   request,
+  rolePolicyWarning,
   onSubmit,
   onBack,
 }: {
   mode: "create" | "update";
   request: unknown;
+  rolePolicyWarning?: HarnessRolePolicyWarning;
   onSubmit: () => void;
   onBack: () => void;
 }) {
@@ -1124,6 +1139,11 @@ function ReviewStep({
           ? "this request will be sent to CreateHarness"
           : "only the changed fields are sent to UpdateHarness"}
       </Text>
+      {rolePolicyWarning && (
+        <Text color={theme.colors.warning}>
+          {`Execution role ${rolePolicyWarning.roleArn} is not managed for this Harness. IAM policies will not be modified; you are responsible for permissions required by this update.`}
+        </Text>
+      )}
       {/* The step body is inset by paddingX on both sides. */}
       <Divider width={columns - 2} />
       <ScrollView>

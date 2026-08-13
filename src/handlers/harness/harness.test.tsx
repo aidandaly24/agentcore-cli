@@ -1,6 +1,13 @@
 import { test, expect, describe } from "bun:test";
 import { join } from "node:path";
 import { CoreClient } from "../../core";
+import { createIamClient } from "../../core/factories";
+import { ExecutionRoleManager } from "../../core/executionRoleManager";
+import {
+  DeleteRoleCommand,
+  DeleteRolePolicyCommand,
+  ListRolePoliciesCommand,
+} from "@aws-sdk/client-iam";
 import { createRootHandler } from "../index";
 import {
   createSilentLogger,
@@ -38,6 +45,12 @@ async function run(args: string[]): Promise<string> {
     createIamClient,
     createLogsClient,
     logger: createSilentLogger(),
+    harnessOptions: isRecording()
+      ? undefined
+      : {
+          policyUpdater: { propagationDelayMs: 0, retryDelayMs: 0 },
+          waitDelayMs: 0,
+        },
   });
   const io = testIO();
   const root = createRootHandler(core, {
@@ -219,7 +232,7 @@ describe("write command validation", () => {
 // from a steady state converges. Later tests consume ids parsed from earlier
 // output, which replays identically from the fixtures.
 
-const E2E_NAME = "AgentCoreCliE2E";
+const E2E_NAME = "AgentCoreCliIamE2E";
 const ENDPOINT_NAME = "live";
 // Generous timeouts: in record mode, readiness polls wait on real control-plane
 // transitions (a create takes ~30s). Replay never sleeps.
@@ -235,12 +248,7 @@ async function pollUntil(command: string[], done: (output: any) => boolean): Pro
   for (let attempt = 0; attempt < 60; attempt++) {
     const parsed = JSON.parse(await run(command));
     if (done(parsed)) return;
-    if (!isRecording()) {
-      throw new Error(
-        `Replayed fixture for \`${command.join(" ")}\` is not in the awaited state; re-record.`,
-      );
-    }
-    await Bun.sleep(5_000);
+    if (isRecording()) await Bun.sleep(5_000);
   }
   throw new Error(`Timed out waiting for \`${command.join(" ")}\``);
 }
@@ -266,7 +274,7 @@ describe("harness write flow", () => {
       const parsed = JSON.parse(out);
       expect(parsed.harness.harnessName).toBe(E2E_NAME);
       // No --execution-role-arn was passed: the default role was provisioned.
-      expect(parsed.harness.executionRoleArn).toContain(`AgentCoreHarness-${E2E_NAME}`);
+      expect(parsed.harness.executionRoleArn).toContain(`AgentCoreCliHarness-${E2E_NAME}`);
       expect(parsed.harness.harnessId).toBeDefined();
       state.harnessId = parsed.harness.harnessId;
 
@@ -385,6 +393,17 @@ describe("harness write flow", () => {
       const out = await run(["harness", "delete", "--id", state.harnessId!]);
       matchGolden(FIXTURES, "delete.golden.json", out);
       expect(JSON.parse(out).harness.status).toBe("DELETING");
+      if (isRecording()) {
+        const roleName = ExecutionRoleManager.cliRoleName("harness", E2E_NAME);
+        const iam = createIamClient({ region: REGION });
+        const policies = await iam.send(new ListRolePoliciesCommand({ RoleName: roleName }));
+        for (const policyName of policies.PolicyNames ?? []) {
+          await iam.send(
+            new DeleteRolePolicyCommand({ RoleName: roleName, PolicyName: policyName }),
+          );
+        }
+        await iam.send(new DeleteRoleCommand({ RoleName: roleName }));
+      }
     },
     FLOW_TIMEOUT,
   );

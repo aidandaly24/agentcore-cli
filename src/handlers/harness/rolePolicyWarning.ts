@@ -2,10 +2,10 @@ import { warn, type AppIO } from "../../io";
 import type { CoreOptions } from "../../core/types";
 import type { Core } from "../types";
 
-export async function warnForGatewayRolePolicyUpdate(
+export async function warnForHarnessRolePolicyUpdate(
   core: Core,
   io: AppIO,
-  gatewayId: string,
+  harnessId: string,
   options: CoreOptions,
   input: {
     explicitRoleArn?: string;
@@ -20,12 +20,11 @@ export async function warnForGatewayRolePolicyUpdate(
     );
     return;
   }
-
-  const warning = await core.gateway.getGatewayRolePolicyWarning(gatewayId, options);
+  const warning = await core.harness.getHarnessRolePolicyWarning(harnessId, options);
   if (!warning) return;
   warn(
     io,
-    `Execution role ${warning.roleArn} is not recognized as managed for this Gateway. ` +
+    `Execution role ${warning.roleArn} is not recognized as managed for this Harness. ` +
       "The CLI will not modify its IAM policies. " +
       "You are responsible for permissions required by this update.",
   );

@@ -32,12 +32,22 @@ export type CreateHarnessInput = Omit<CreateHarnessRequest, "executionRoleArn"> 
   executionRoleArn?: string;
 };
 
+export type HarnessUpdateInput = UpdateHarnessRequest & {
+  skipRolePolicyUpdate?: boolean;
+};
+
+export type HarnessRolePolicyWarning = {
+  reason: "unknown-role";
+  roleArn: string;
+};
+
 export interface CoreHarnessClient {
-  createHarness(input: CreateHarnessInput, options: CoreOptions): Promise<CreateHarnessResponse>;
-  updateHarness(
-    request: UpdateHarnessRequest,
+  getHarnessRolePolicyWarning(
+    harnessId: string,
     options: CoreOptions,
-  ): Promise<UpdateHarnessResponse>;
+  ): Promise<HarnessRolePolicyWarning | undefined>;
+  createHarness(input: CreateHarnessInput, options: CoreOptions): Promise<CreateHarnessResponse>;
+  updateHarness(request: HarnessUpdateInput, options: CoreOptions): Promise<UpdateHarnessResponse>;
   deleteHarness(
     request: DeleteHarnessRequest,
     options: CoreOptions,
