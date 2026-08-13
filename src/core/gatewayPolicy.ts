@@ -71,10 +71,15 @@ export function gatewayPolicy(state: GatewayPolicyState): GatewayPolicyStatement
       const secretArn = state.credentialSecrets?.get(providerArn);
       if (!secretArn) throw unsupported(`Credential provider ${providerArn} was not resolved`);
       const workloadArns = workloadIdentityResources(state.workloadIdentityArn);
+      const grantType = credential.credentialProvider?.oauthCredentialProvider?.grantType;
       statements.push(
         {
           Effect: "Allow",
-          Action: ["bedrock-agentcore:GetWorkloadAccessToken"],
+          Action: [
+            oauth && grantType && grantType !== "CLIENT_CREDENTIALS"
+              ? "bedrock-agentcore:GetWorkloadAccessTokenForJWT"
+              : "bedrock-agentcore:GetWorkloadAccessToken",
+          ],
           Resource: workloadArns,
         },
         allow(

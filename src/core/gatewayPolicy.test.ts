@@ -145,6 +145,7 @@ test("builds exact grants for every inferable Gateway permission family", () => 
                 oauthCredentialProvider: {
                   providerArn: OAUTH_PROVIDER_ARN,
                   scopes: ["orders.read"],
+                  grantType: "AUTHORIZATION_CODE",
                 },
               },
             },
@@ -261,6 +262,14 @@ test("builds exact grants for every inferable Gateway permission family", () => 
       Effect: "Allow",
       Action: ["secretsmanager:GetSecretValue"],
       Resource: [API_KEY_SECRET_ARN],
+    },
+    {
+      Effect: "Allow",
+      Action: ["bedrock-agentcore:GetWorkloadAccessTokenForJWT"],
+      Resource: [
+        "arn:aws:bedrock-agentcore:us-west-2:123456789012:workload-identity-directory/default",
+        WORKLOAD_ARN,
+      ],
     },
     {
       Effect: "Allow",
