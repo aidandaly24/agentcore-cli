@@ -12,8 +12,6 @@ export interface AgentCoreCLIErrorOptions extends ErrorOptions {
   exitCode?: number;
   /** Describes the name of the underlying error, defaults to AgentCoreCLIError */
   name?: string;
-  /** Whether the root handler should display this error's message */
-  displayMessage?: boolean;
 }
 
 /** Base error for CLI failures, including their source, metadata, and process exit code. */
@@ -21,7 +19,6 @@ export class AgentCoreCLIError extends Error {
   readonly source: ErrorSource;
   readonly meta: Record<string, unknown>;
   readonly exitCode: number;
-  readonly displayMessage: boolean;
 
   constructor(message?: string, options?: AgentCoreCLIErrorOptions) {
     super(message, options);
@@ -29,7 +26,6 @@ export class AgentCoreCLIError extends Error {
     this.source = options?.source ?? ERROR_SOURCE.INTERNAL;
     this.meta = options?.meta ?? {};
     this.exitCode = options?.exitCode ?? 1;
-    this.displayMessage = options?.displayMessage ?? true;
   }
   /** Convert the error into an object with its attributes enumerated as keys **/
   json(): Record<string, unknown> {
@@ -38,7 +34,6 @@ export class AgentCoreCLIError extends Error {
       message: this.message,
       stack: this.stack,
       exitCode: this.exitCode,
-      displayMessage: this.displayMessage,
       meta: this.meta,
       source: this.source,
     };
@@ -48,13 +43,12 @@ export class AgentCoreCLIError extends Error {
     if (error instanceof AgentCoreCLIError) return error;
 
     if (error instanceof CommanderError) {
-      return new AgentCoreCLIError(error.message, {
+      return new SilentCLIError(error.message, {
         cause: error,
         source: ERROR_SOURCE.USER,
         name: error.name,
         meta: { code: error.code },
         exitCode: error.exitCode === 0 ? 0 : 2,
-        displayMessage: false,
       });
     }
 
@@ -78,6 +72,9 @@ export class AgentCoreCLIError extends Error {
     return new AgentCoreCLIError(String(error), { cause: error });
   }
 }
+
+/** Base for CLI errors intentionally omitted from root stderr output. */
+export class SilentCLIError extends AgentCoreCLIError {}
 
 /** Error raised for invalid user input. */
 export class InputValidationError extends AgentCoreCLIError {
@@ -155,19 +152,18 @@ export class EmbeddedAssetNotFoundError extends AgentCoreCLIError {
 }
 
 /** Raised when a user intentionally cancels a headless CLI operation. */
-export class UserCancellationError extends AgentCoreCLIError {
+export class UserCancellationError extends SilentCLIError {
   constructor() {
     super("Operation cancelled by user", {
       source: ERROR_SOURCE.USER,
       exitCode: 130,
-      displayMessage: false,
     });
   }
 }
 
-export class RuntimeInvokeResponseError extends AgentCoreCLIError {
+export class RuntimeInvokeResponseError extends SilentCLIError {
   constructor(message: string, cause?: unknown) {
-    super(message, { cause, displayMessage: false });
+    super(message, { cause });
   }
 }
 

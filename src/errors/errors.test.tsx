@@ -5,7 +5,12 @@ import {
   InternalServerException,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import { CommanderError } from "commander";
-import { AgentCoreCLIError, InputValidationError, UserCancellationError } from "./errors";
+import {
+  AgentCoreCLIError,
+  InputValidationError,
+  SilentCLIError,
+  UserCancellationError,
+} from "./errors";
 
 describe("AgentCoreCLIError", () => {
   test("fromError preserves existing AgentCoreCLIError instances", () => {
@@ -22,22 +27,24 @@ describe("AgentCoreCLIError", () => {
     ["parse failures", new CommanderError(1, "commander.invalidArgument", "invalid option"), 2],
     ["help", new CommanderError(0, "commander.helpDisplayed", "help displayed"), 0],
   ])("fromError classifies Commander %s", (_label, err, exitCode) => {
-    expect(AgentCoreCLIError.fromError(err).json()).toMatchObject({
+    const result = AgentCoreCLIError.fromError(err);
+    expect(result).toBeInstanceOf(SilentCLIError);
+    expect(result.json()).toMatchObject({
       name: "CommanderError",
       source: "user",
       exitCode,
-      displayMessage: false,
       meta: { code: err.code },
     });
   });
 
   test("UserCancellationError is a silent user interruption", () => {
-    expect(new UserCancellationError().json()).toMatchObject({
+    const error = new UserCancellationError();
+    expect(error).toBeInstanceOf(SilentCLIError);
+    expect(error.json()).toMatchObject({
       name: "UserCancellationError",
       message: "Operation cancelled by user",
       source: "user",
       exitCode: 130,
-      displayMessage: false,
     });
   });
 
@@ -85,7 +92,6 @@ describe("AgentCoreCLIError", () => {
       name: "AgentCoreCLIError",
       source: "internal",
       message: expectedMessage,
-      displayMessage: true,
     });
   });
 });

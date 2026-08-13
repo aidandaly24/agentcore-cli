@@ -1,4 +1,4 @@
-import { AgentCoreCLIError } from "../errors";
+import { AgentCoreCLIError, SilentCLIError } from "../errors";
 
 // ExitCode provides names for default Unix exit codes.
 export enum ExitCode {
@@ -33,7 +33,7 @@ export async function runWithExitCode(
     return ExitCode.SUCCESS;
   } catch (caught) {
     const error = AgentCoreCLIError.fromError(caught);
-    if (error.displayMessage) console.error(`Error: ${error.message}`);
+    if (!(error instanceof SilentCLIError)) console.error(`Error: ${error.message}`);
     return error.exitCode;
   }
 }

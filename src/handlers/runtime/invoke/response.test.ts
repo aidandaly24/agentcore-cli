@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
-import { UserCancellationError } from "../../../errors";
+import { SilentCLIError, UserCancellationError } from "../../../errors";
 import { waitFor } from "../../../testing";
 import type { RuntimeInvokeResponse } from "../types";
 import { writeRuntimeInvokeResponse } from "./response";
@@ -122,15 +122,13 @@ describe("Runtime invoke response output", () => {
       },
     }) as unknown as NodeJS.WriteStream;
 
-    await expect(
-      writeRuntimeInvokeResponse(response(), {
-        stdout: stdout.stream,
-        stderr,
-      }),
-    ).rejects.toMatchObject({
-      message: "response stream failed",
-      displayMessage: false,
+    const pending = writeRuntimeInvokeResponse(response(), {
+      stdout: stdout.stream,
+      stderr,
     });
+
+    await expect(pending).rejects.toBeInstanceOf(SilentCLIError);
+    await expect(pending).rejects.toThrow("response stream failed");
   });
 
   test("streams exact bytes to a file and leaves stdout empty", async () => {

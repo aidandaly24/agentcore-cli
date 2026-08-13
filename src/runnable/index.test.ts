@@ -1,7 +1,12 @@
 import { expect, spyOn, test } from "bun:test";
 import { CommanderError } from "commander";
 
-import { AgentCoreCLIError, InputValidationError, UserCancellationError } from "../errors";
+import {
+  AgentCoreCLIError,
+  InputValidationError,
+  SilentCLIError,
+  UserCancellationError,
+} from "../errors";
 import { ExitCode, runRunnable, runWithExitCode, type Runnable } from "./index.tsx";
 
 async function captureErrors(run: () => Promise<number>) {
@@ -94,12 +99,7 @@ test.each([
     ExitCode.SUCCESS,
     [],
   ],
-  [
-    "hidden failure",
-    new AgentCoreCLIError("already displayed", { displayMessage: false }),
-    ExitCode.FAILURE,
-    [],
-  ],
+  ["hidden failure", new SilentCLIError("already displayed"), ExitCode.FAILURE, []],
   [
     "arbitrary TypeError",
     new TypeError("transport failed"),

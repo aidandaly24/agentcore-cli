@@ -17,6 +17,7 @@ export {
   ResourceNotFoundError,
   ResultTruncationError,
   RuntimeInvokeResponseError,
+  SilentCLIError,
   SourceResolutionError,
   UserCancellationError,
   type AgentCoreCLIErrorOptions,
