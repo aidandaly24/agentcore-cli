@@ -256,7 +256,12 @@ test("builds exact grants for every inferable Gateway permission family", () => 
     {
       Effect: "Allow",
       Action: ["bedrock-agentcore:GetResourceApiKey"],
-      Resource: [API_KEY_PROVIDER_ARN],
+      Resource: [
+        "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default",
+        "arn:aws:bedrock-agentcore:us-west-2:123456789012:workload-identity-directory/default",
+        WORKLOAD_ARN,
+        API_KEY_PROVIDER_ARN,
+      ],
     },
     {
       Effect: "Allow",
@@ -274,7 +279,12 @@ test("builds exact grants for every inferable Gateway permission family", () => 
     {
       Effect: "Allow",
       Action: ["bedrock-agentcore:GetResourceOauth2Token"],
-      Resource: [OAUTH_PROVIDER_ARN],
+      Resource: [
+        "arn:aws:bedrock-agentcore:us-west-2:123456789012:token-vault/default",
+        "arn:aws:bedrock-agentcore:us-west-2:123456789012:workload-identity-directory/default",
+        WORKLOAD_ARN,
+        OAUTH_PROVIDER_ARN,
+      ],
     },
     {
       Effect: "Allow",

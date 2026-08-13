@@ -82,12 +82,15 @@ export function gatewayPolicy(state: GatewayPolicyState): GatewayPolicyStatement
           ],
           Resource: workloadArns,
         },
-        allow(
-          apiKey
-            ? "bedrock-agentcore:GetResourceApiKey"
-            : "bedrock-agentcore:GetResourceOauth2Token",
-          providerArn,
-        ),
+        {
+          Effect: "Allow",
+          Action: [
+            apiKey
+              ? "bedrock-agentcore:GetResourceApiKey"
+              : "bedrock-agentcore:GetResourceOauth2Token",
+          ],
+          Resource: credentialProviderResources(providerArn, workloadArns),
+        },
         allow("secretsmanager:GetSecretValue", secretArn),
       );
     }
@@ -216,6 +219,15 @@ function workloadIdentityResources(workloadIdentityArn: string | undefined): str
     throw unsupported("Gateway workload identity ARN is missing");
   }
   return [workloadIdentityArn.slice(0, separatorIndex), workloadIdentityArn];
+}
+
+function credentialProviderResources(providerArn: string, workloadArns: string[]): string[] {
+  const providerMarker = providerArn.includes("/apikeycredentialprovider/")
+    ? "/apikeycredentialprovider/"
+    : "/oauth2credentialprovider/";
+  const providerIndex = providerArn.indexOf(providerMarker);
+  if (providerIndex < 0) throw unsupported(`Invalid credential provider ARN ${providerArn}`);
+  return [providerArn.slice(0, providerIndex), ...workloadArns, providerArn];
 }
 
 function allow(action: string, resource: string): GatewayPolicyStatement {
