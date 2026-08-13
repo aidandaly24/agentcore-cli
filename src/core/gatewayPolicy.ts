@@ -54,10 +54,6 @@ export function gatewayPolicy(state: GatewayPolicyState): GatewayPolicyStatement
       Resource: [state.policyEngineArn, state.gatewayArn ?? gatewayWildcard(state.policyEngineArn)],
     });
   }
-  if (state.tokenVaultKmsKeyArn) {
-    statements.push(allow("kms:Decrypt", state.tokenVaultKmsKeyArn));
-  }
-
   for (const target of state.targets ?? []) {
     const configuration = target.targetConfiguration;
     if (containsUnknown(configuration)) throw unsupported("Gateway Target type is not supported");
@@ -76,6 +72,9 @@ export function gatewayPolicy(state: GatewayPolicyState): GatewayPolicyStatement
       if (!secretArn) throw unsupported(`Credential provider ${providerArn} was not resolved`);
       const workloadArns = workloadIdentityResources(state.workloadIdentityArn);
       const grantType = credential.credentialProvider?.oauthCredentialProvider?.grantType;
+      if (state.tokenVaultKmsKeyArn) {
+        statements.push(allow("kms:Decrypt", state.tokenVaultKmsKeyArn));
+      }
       statements.push(
         {
           Effect: "Allow",

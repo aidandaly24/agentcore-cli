@@ -56,7 +56,9 @@ import type {
 import type { AwsClients, CoreOptions } from "./types";
 import {
   GatewayExecutionRole,
-  isGatewayExecutionRole,
+  GatewayMutationIndeterminateError,
+  GatewayMutationTerminalError,
+  matchesGatewayExecutionRole,
   type GatewayExecutionRoleOptions,
 } from "./gatewayExecutionRole";
 import { gatewayPolicy, type GatewayPolicyStatement } from "./gatewayPolicy";
@@ -77,6 +79,23 @@ type GatewayCredentialState = {
   tokenVaultKmsKeyArn?: string;
 };
 
+type GatewayPolicyTargetState = Pick<
+  GetGatewayTargetResponse,
+  "targetConfiguration" | "credentialProviderConfigurations"
+> & {
+  targetId?: GetGatewayTargetResponse["targetId"];
+};
+
+type GatewayFamilyState = {
+  gateway: GetGatewayResponse;
+  targets: readonly GatewayPolicyTargetState[];
+};
+
+type GatewayPolicySnapshots = {
+  current: GatewayPolicyStatement[];
+  desired: GatewayPolicyStatement[];
+};
+
 export class GatewayClient implements CoreGatewayClient {
   constructor(
     private readonly clients: AwsClients,
@@ -90,7 +109,7 @@ export class GatewayClient implements CoreGatewayClient {
     const gateway = await this.getGateway(gatewayId, options);
     const name = GatewayClient.required(gateway.name, "Gateway", "name");
     const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
-    return isGatewayExecutionRole(name, roleArn) ? undefined : roleArn;
+    return (await this.managedExecutionRole(name, roleArn, options)) ? undefined : roleArn;
   }
 
   async createGateway(
@@ -109,8 +128,10 @@ export class GatewayClient implements CoreGatewayClient {
       );
     if (roleArn) return operation(roleArn);
     const roleManager = this.executionRole(options);
-    const role = await roleManager.ensure(request.name!);
+    const role = await roleManager.ensure(request.name!, options.region);
     let response: CreateGatewayResponse;
+    let createdResponse: CreateGatewayResponse | undefined;
+    let mutationAccepted = false;
     try {
       const staged = gatewayPolicy({
         policyEngineArn: request.policyEngineConfiguration?.arn,
@@ -121,16 +142,34 @@ export class GatewayClient implements CoreGatewayClient {
         role.arn,
         current,
         staged,
-        async () => {
-          const created = await operation(role.arn);
-          const gatewayId = GatewayClient.required(created.gatewayId, "Created Gateway", "ID");
-          await this.waitForGateway(gatewayId, options);
-          return created;
+        {
+          mutate: async () => {
+            const created = await this.mutate(
+              () => operation(role.arn),
+              `Gateway "${request.name}"`,
+            );
+            mutationAccepted = true;
+            createdResponse = created;
+            return created;
+          },
+          stabilize: async () => {
+            const gatewayId = GatewayClient.required(
+              createdResponse?.gatewayId,
+              "Created Gateway",
+              "ID",
+            );
+            await this.waitForGateway(gatewayId, options);
+          },
         },
         { forcePropagation: role.created },
       );
     } catch (error) {
-      await roleManager.rollbackCreate(role);
+      if (
+        error instanceof GatewayMutationTerminalError ||
+        (!mutationAccepted && !(error instanceof GatewayMutationIndeterminateError))
+      ) {
+        await roleManager.rollbackCreate(role);
+      }
       throw error;
     }
     const gatewayArn = GatewayClient.required(response.gatewayArn, "Created Gateway", "ARN");
@@ -222,9 +261,13 @@ export class GatewayClient implements CoreGatewayClient {
     const operation = () => control.send(new UpdateGatewayCommand(request));
     if (patch.roleArn) {
       const response = await operation();
-      if (patch.roleArn !== roleArn && isGatewayExecutionRole(name, roleArn)) {
+      const roleManager =
+        patch.roleArn !== roleArn
+          ? await this.managedExecutionRole(name, roleArn, options)
+          : undefined;
+      if (roleManager) {
         await this.waitForGateway(patch.id, options);
-        await this.executionRole(options).replace(roleArn, []);
+        await roleManager.replace(roleArn, []);
       }
       return response;
     }
@@ -237,25 +280,25 @@ export class GatewayClient implements CoreGatewayClient {
       return operation();
     }
 
-    if (!isGatewayExecutionRole(name, roleArn)) return operation();
-    const roleManager = this.executionRole(options);
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
     const targets = await this.targetInventory(patch.id, options);
-    const credentials = await this.credentials(targets, options);
-    const currentPolicy = this.policy(current, targets, credentials);
-    const desiredPolicy = this.policy(
+    const snapshots = await this.policySnapshots(
+      { gateway: current, targets },
       {
-        ...current,
-        policyEngineConfiguration,
-        interceptorConfigurations,
-        customTransformConfiguration,
+        gateway: {
+          ...current,
+          policyEngineConfiguration,
+          interceptorConfigurations,
+          customTransformConfiguration,
+        },
+        targets,
       },
-      targets,
-      credentials,
+      options,
     );
-    return roleManager.update(roleArn, currentPolicy, desiredPolicy, async () => {
-      const response = await operation();
-      await this.waitForGateway(patch.id, options);
-      return response;
+    return roleManager.update(roleArn, snapshots.current, snapshots.desired, {
+      mutate: () => this.mutate(operation, resource),
+      stabilize: () => this.waitForGateway(patch.id, options),
     });
   }
 
@@ -275,11 +318,12 @@ export class GatewayClient implements CoreGatewayClient {
     const gateway = await control.send(new GetGatewayCommand({ gatewayIdentifier: id }));
     const name = GatewayClient.required(gateway.name, "Gateway", "name");
     const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
-    if (!isGatewayExecutionRole(name, roleArn)) return operation();
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
 
     const response = await operation();
     await this.waitForGatewayDeletion(id, options);
-    await this.executionRole(options).replace(roleArn, []);
+    await roleManager.replace(roleArn, []);
     return response;
   }
 
@@ -316,30 +360,51 @@ export class GatewayClient implements CoreGatewayClient {
     options: CoreOptions,
   ): Promise<CreateGatewayTargetResponse> {
     const control = this.clients.control(toClientConfig(options));
-    const operation = () => control.send(new CreateGatewayTargetCommand(input));
+    const { skipRolePolicyUpdate, ...request } = input;
+    const operation = () => control.send(new CreateGatewayTargetCommand(request));
+    if (skipRolePolicyUpdate) return operation();
     const gateway = await control.send(
-      new GetGatewayCommand({ gatewayIdentifier: input.gatewayIdentifier }),
+      new GetGatewayCommand({ gatewayIdentifier: request.gatewayIdentifier }),
     );
     const name = GatewayClient.required(gateway.name, "Gateway", "name");
     const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
-    if (!isGatewayExecutionRole(name, roleArn)) return operation();
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
 
-    const targets = await this.targetInventory(input.gatewayIdentifier!, options);
+    const targets = await this.targetInventory(request.gatewayIdentifier!, options);
+    const targetConfiguration = GatewayClient.required(
+      request.targetConfiguration,
+      "Gateway Target",
+      "configuration",
+    );
     const desiredTargets = [
       ...targets,
       {
-        targetConfiguration: input.targetConfiguration,
-        credentialProviderConfigurations: input.credentialProviderConfigurations,
+        targetConfiguration,
+        credentialProviderConfigurations: request.credentialProviderConfigurations,
       },
     ];
-    const credentials = await this.credentials(desiredTargets, options);
-    const current = this.policy(gateway, targets, credentials);
-    const desired = this.policy(gateway, desiredTargets, credentials);
-    return this.executionRole(options).update(roleArn, current, desired, async () => {
-      const response = await operation();
-      const targetId = GatewayClient.required(response.targetId, "Created Gateway Target", "ID");
-      await this.waitForGatewayTarget(input.gatewayIdentifier!, targetId, options);
-      return response;
+    const snapshots = await this.policySnapshots(
+      { gateway, targets },
+      { gateway, targets: desiredTargets },
+      options,
+    );
+    let targetId: string | undefined;
+    return roleManager.update(roleArn, snapshots.current, snapshots.desired, {
+      mutate: async () => {
+        const response = await this.mutate(
+          operation,
+          `Gateway Target "${request.name ?? "unnamed"}"`,
+        );
+        if (!response.targetId) {
+          throw new GatewayMutationIndeterminateError(
+            `Gateway Target "${request.name ?? "unnamed"}"`,
+          );
+        }
+        targetId = response.targetId;
+        return response;
+      },
+      stabilize: () => this.waitForGatewayTarget(request.gatewayIdentifier!, targetId!, options),
     });
   }
 
@@ -417,16 +482,14 @@ export class GatewayClient implements CoreGatewayClient {
     const gateway = await control.send(new GetGatewayCommand({ gatewayIdentifier: gatewayId }));
     const name = GatewayClient.required(gateway.name, "Gateway", "name");
     const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
-    if (!isGatewayExecutionRole(name, roleArn)) return operation();
+    const roleManager = await this.managedExecutionRole(name, roleArn, options);
+    if (!roleManager) return operation();
 
     const response = await operation();
     await this.waitForGatewayTargetDeletion(gatewayId, targetId, options);
     const remaining = await this.targetInventory(gatewayId, options);
     const credentials = await this.credentials(remaining, options);
-    await this.executionRole(options).replace(
-      roleArn,
-      this.policy(gateway, remaining, credentials),
-    );
+    await roleManager.replace(roleArn, this.policy(gateway, remaining, credentials));
     return response;
   }
 
@@ -555,19 +618,27 @@ export class GatewayClient implements CoreGatewayClient {
     );
     const gatewayName = GatewayClient.required(gateway.name, "Gateway", "name");
     const roleArn = GatewayClient.required(gateway.roleArn, "Gateway", "role ARN");
-    if (!isGatewayExecutionRole(gatewayName, roleArn)) return operation();
+    const roleManager = await this.managedExecutionRole(gatewayName, roleArn, options);
+    if (!roleManager) return operation();
 
     const targets = await this.targetInventory(patch.gatewayId, options, current);
     const desiredTargets = targets.map((target) =>
-      target.targetId === patch.targetId ? { ...target, targetConfiguration } : target,
+      target.targetId === patch.targetId
+        ? { ...target, targetConfiguration, credentialProviderConfigurations }
+        : target,
     );
-    const credentials = await this.credentials([...targets, ...desiredTargets], options);
-    const currentPolicy = this.policy(gateway, targets, credentials);
-    const desiredPolicy = this.policy(gateway, desiredTargets, credentials);
-    return this.executionRole(options).update(roleArn, currentPolicy, desiredPolicy, async () => {
-      const response = await operation();
-      await this.waitForGatewayTarget(patch.gatewayId, patch.targetId, options);
-      return response;
+    const snapshots = await this.policySnapshots(
+      { gateway, targets },
+      { gateway, targets: desiredTargets },
+      options,
+    );
+    return roleManager.update(roleArn, snapshots.current, snapshots.desired, {
+      mutate: () =>
+        this.mutate(
+          operation,
+          `Gateway Target "${patch.targetId}" under Gateway "${patch.gatewayId}"`,
+        ),
+      stabilize: () => this.waitForGatewayTarget(patch.gatewayId, patch.targetId, options),
     });
   }
 
@@ -595,12 +666,19 @@ export class GatewayClient implements CoreGatewayClient {
     return new GatewayExecutionRole(this.clients.iam({ region: options.region }), this.roleOptions);
   }
 
+  private async managedExecutionRole(
+    gatewayName: string,
+    roleArn: string,
+    options: CoreOptions,
+  ): Promise<GatewayExecutionRole | undefined> {
+    if (!matchesGatewayExecutionRole(gatewayName, options.region, roleArn)) return undefined;
+    const role = this.executionRole(options);
+    return (await role.isManaged(gatewayName, options.region, roleArn)) ? role : undefined;
+  }
+
   private policy(
     gateway: GetGatewayResponse,
-    targets: readonly Pick<
-      GetGatewayTargetResponse,
-      "targetConfiguration" | "credentialProviderConfigurations"
-    >[],
+    targets: readonly GatewayPolicyTargetState[],
     credentials: GatewayCredentialState = { secrets: new Map() },
   ): GatewayPolicyStatement[] {
     return gatewayPolicy({
@@ -622,8 +700,20 @@ export class GatewayClient implements CoreGatewayClient {
     });
   }
 
+  private async policySnapshots(
+    current: GatewayFamilyState,
+    desired: GatewayFamilyState,
+    options: CoreOptions,
+  ): Promise<GatewayPolicySnapshots> {
+    const credentials = await this.credentials([...current.targets, ...desired.targets], options);
+    return {
+      current: this.policy(current.gateway, current.targets, credentials),
+      desired: this.policy(desired.gateway, desired.targets, credentials),
+    };
+  }
+
   private async credentials(
-    targets: readonly Pick<GetGatewayTargetResponse, "credentialProviderConfigurations">[],
+    targets: readonly Pick<GatewayPolicyTargetState, "credentialProviderConfigurations">[],
     options: CoreOptions,
   ): Promise<GatewayCredentialState> {
     const providers = new Map<string, "api-key" | "oauth">();
@@ -658,6 +748,11 @@ export class GatewayClient implements CoreGatewayClient {
           : await control.send(new GetOauth2CredentialProviderCommand({ name }));
       if (response.credentialProviderArn !== providerArn) {
         throw new Error(`Credential provider ${name} returned an unexpected ARN`);
+      }
+      if ("apiKeySecretSource" in response && response.apiKeySecretSource === "EXTERNAL") {
+        throw new InputValidationError(
+          `API key credential provider ${providerArn} uses an external secret; rerun with --skip-role-policy-update and manage its secret and KMS permissions externally`,
+        );
       }
       const secretArn =
         "apiKeySecretArn" in response
@@ -706,6 +801,19 @@ export class GatewayClient implements CoreGatewayClient {
     throw new ResultTruncationError(
       `Gateway Target discovery exceeded ${MAX_CONNECTOR_TARGET_PAGES} pages; policy inventory is incomplete`,
     );
+  }
+
+  private async mutate<T>(operation: () => Promise<T>, resource: string): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      const statusCode = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+        ?.httpStatusCode;
+      if (statusCode === undefined || statusCode >= 500) {
+        throw new GatewayMutationIndeterminateError(resource, { cause: error });
+      }
+      throw error;
+    }
   }
 
   private async waitForGateway(gatewayId: string, options: CoreOptions): Promise<void> {
@@ -767,20 +875,22 @@ export class GatewayClient implements CoreGatewayClient {
         const current = await read();
         if (current.status && successful.includes(current.status)) return;
         if (current.status && failed.includes(current.status)) {
-          throw new AgentCoreCLIError(
-            `${resource} reached ${current.status}: ${(current.statusReasons ?? []).join(", ")}`,
-            { source: ERROR_SOURCE.SERVICE },
+          throw new GatewayMutationTerminalError(
+            resource,
+            current.status,
+            current.statusReasons ?? [],
           );
         }
       } catch (error) {
-        if ((error as Error).name !== "ResourceNotFoundException") throw error;
+        if (error instanceof GatewayMutationTerminalError) throw error;
+        if ((error as Error).name !== "ResourceNotFoundException") {
+          throw new GatewayMutationIndeterminateError(resource, { cause: error });
+        }
         if (missingIsSuccess) return;
       }
       if (attempt < attempts - 1) await this.wait();
     }
-    throw new AgentCoreCLIError(`Timed out waiting for ${resource}`, {
-      source: ERROR_SOURCE.SERVICE,
-    });
+    throw new GatewayMutationIndeterminateError(resource);
   }
 
   private async wait(): Promise<void> {

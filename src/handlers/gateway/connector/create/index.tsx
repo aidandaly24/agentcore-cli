@@ -53,6 +53,7 @@ export const createCreateGatewayConnectorHandler = (core: Core, io: AppIO) =>
         "private endpoint (JSON; inline, file://<path>, or - for stdin)",
         z.string().optional(),
       ),
+      flag("skip-role-policy-update", "leave execution-role IAM policies unchanged", z.boolean()),
     ],
     handle: async (ctx, flags) => {
       if (!flags["gateway-id"]) {
@@ -134,10 +135,17 @@ export const createCreateGatewayConnectorHandler = (core: Core, io: AppIO) =>
         credentialProviderConfigurations,
         ...(metadataConfiguration ? { metadataConfiguration } : {}),
         ...(privateEndpoint ? { privateEndpoint } : {}),
+        ...(flags["skip-role-policy-update"] ? { skipRolePolicyUpdate: true } : {}),
       };
 
       const options = coreOptsFromCtx(ctx);
-      await warnForGatewayRolePolicyUpdate(core, io, flags["gateway-id"], options);
+      await warnForGatewayRolePolicyUpdate(
+        core,
+        io,
+        flags["gateway-id"],
+        options,
+        flags["skip-role-policy-update"],
+      );
       ctx
         .require(JsonRendererKey)
         .renderJson(await core.gateway.createGatewayTarget(input, options));

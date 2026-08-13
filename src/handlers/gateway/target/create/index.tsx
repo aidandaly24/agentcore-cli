@@ -54,6 +54,7 @@ export const createCreateGatewayTargetHandler = (core: Core, io: AppIO) =>
         z.string().optional(),
       ),
       flag("client-token", "idempotency token", z.string().optional()),
+      flag("skip-role-policy-update", "leave execution-role IAM policies unchanged", z.boolean()),
     ],
     handle: async (ctx, flags) => {
       if (!flags["gateway-id"]) {
@@ -117,10 +118,17 @@ export const createCreateGatewayTargetHandler = (core: Core, io: AppIO) =>
         ...(metadataConfiguration ? { metadataConfiguration } : {}),
         ...(privateEndpoint ? { privateEndpoint } : {}),
         ...(flags["client-token"] ? { clientToken: flags["client-token"] } : {}),
+        ...(flags["skip-role-policy-update"] ? { skipRolePolicyUpdate: true } : {}),
       };
 
       const options = coreOptsFromCtx(ctx);
-      await warnForGatewayRolePolicyUpdate(core, io, flags["gateway-id"], options);
+      await warnForGatewayRolePolicyUpdate(
+        core,
+        io,
+        flags["gateway-id"],
+        options,
+        flags["skip-role-policy-update"],
+      );
       ctx
         .require(JsonRendererKey)
         .renderJson(await core.gateway.createGatewayTarget(input, options));

@@ -7,11 +7,20 @@ import {
   GetRolePolicyCommand,
   PutRolePolicyCommand,
   type IAMClient,
+  type Role,
+  type Tag,
 } from "@aws-sdk/client-iam";
+import { AgentCoreCLIError, ERROR_SOURCE } from "../errors";
 import type { GatewayPolicyStatement } from "./gatewayPolicy";
 
 const POLICY_NAME = "AgentCoreCliGatewayExecutionPolicy";
 const ROLE_PREFIX = "AgentCoreCliGateway-";
+const ROLE_TAGS = {
+  managed: "AgentCoreCLIManaged",
+  resourceType: "AgentCoreCLIResourceType",
+  region: "AgentCoreCLIRegion",
+  resourceName: "AgentCoreCLIResourceName",
+} as const;
 
 export type GatewayExecutionRoleOptions = {
   propagationDelayMs?: number;
@@ -23,6 +32,27 @@ export type ManagedGatewayRole = {
   name: string;
   created: boolean;
 };
+
+export class GatewayMutationIndeterminateError extends AgentCoreCLIError {
+  constructor(resource: string, options?: ErrorOptions) {
+    super(`The outcome of the ${resource} mutation could not be determined`, {
+      ...options,
+      source: ERROR_SOURCE.SERVICE,
+    });
+  }
+}
+
+export class GatewayMutationTerminalError extends AgentCoreCLIError {
+  constructor(
+    readonly resource: string,
+    readonly status: string,
+    readonly statusReasons: readonly string[],
+  ) {
+    super(`${resource} reached ${status}: ${statusReasons.join(", ")}`, {
+      source: ERROR_SOURCE.SERVICE,
+    });
+  }
+}
 
 export class GatewayExecutionRole {
   private readonly propagationDelayMs: number;
@@ -38,11 +68,16 @@ export class GatewayExecutionRole {
       ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   }
 
-  async ensure(gatewayName: string): Promise<ManagedGatewayRole> {
-    const roleName = gatewayRoleName(gatewayName);
+  async ensure(gatewayName: string, region: string): Promise<ManagedGatewayRole> {
+    const roleName = gatewayRoleName(gatewayName, region);
     try {
       const response = await this.iam.send(new GetRoleCommand({ RoleName: roleName }));
       if (!response.Role?.Arn) throw new Error(`IAM returned no ARN for role ${roleName}`);
+      if (!isOwnedRole(response.Role, gatewayName, region)) {
+        throw new Error(
+          `IAM role ${roleName} already exists but is not tagged as managed by the AgentCore CLI`,
+        );
+      }
       return { arn: response.Role.Arn, name: roleName, created: false };
     } catch (error) {
       if ((error as Error).name !== "NoSuchEntityException") throw error;
@@ -51,6 +86,7 @@ export class GatewayExecutionRole {
     const response = await this.iam.send(
       new CreateRoleCommand({
         RoleName: roleName,
+        Tags: gatewayRoleTags(gatewayName, region),
         AssumeRolePolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: [
@@ -65,6 +101,25 @@ export class GatewayExecutionRole {
     );
     if (!response.Role?.Arn) throw new Error(`IAM returned no ARN for role ${roleName}`);
     return { arn: response.Role.Arn, name: roleName, created: true };
+  }
+
+  async isManaged(gatewayName: string, region: string, roleArn: string): Promise<boolean> {
+    if (!matchesGatewayExecutionRole(gatewayName, region, roleArn)) return false;
+    const roleName = roleNameFromArn(roleArn);
+
+    try {
+      const response = await this.iam.send(new GetRoleCommand({ RoleName: roleName }));
+      return response.Role?.Arn === roleArn && isOwnedRole(response.Role, gatewayName, region);
+    } catch (error) {
+      if (
+        ["NoSuchEntityException", "AccessDenied", "AccessDeniedException"].includes(
+          (error as Error).name,
+        )
+      ) {
+        return false;
+      }
+      throw error;
+    }
   }
 
   async rollbackCreate(role: ManagedGatewayRole): Promise<void> {
@@ -94,7 +149,10 @@ export class GatewayExecutionRole {
     roleArn: string,
     current: GatewayPolicyStatement[],
     desired: GatewayPolicyStatement[],
-    operation: () => Promise<T>,
+    operation: {
+      mutate: () => Promise<T>;
+      stabilize: () => Promise<void>;
+    },
     options: { forcePropagation?: boolean } = {},
   ): Promise<T> {
     const roleName = roleNameFromArn(roleArn);
@@ -107,9 +165,19 @@ export class GatewayExecutionRole {
 
     let value: T;
     try {
-      value = await operation();
+      value = await operation.mutate();
     } catch (error) {
-      if (staged) await this.write(roleName, current);
+      if (staged && !(error instanceof GatewayMutationIndeterminateError)) {
+        await this.write(roleName, current);
+      }
+      throw error;
+    }
+    try {
+      await operation.stabilize();
+    } catch (error) {
+      if (staged && error instanceof GatewayMutationTerminalError) {
+        await this.write(roleName, current);
+      }
       throw error;
     }
     if (JSON.stringify(transition) !== JSON.stringify(desired)) {
@@ -152,15 +220,42 @@ function parsePolicy(document: string): { Statement?: GatewayPolicyStatement[] }
   }
 }
 
-export function gatewayRoleName(gatewayName: string): string {
-  const fullName = `${ROLE_PREFIX}${gatewayName}`;
+export function gatewayRoleName(gatewayName: string, region: string): string {
+  const fullName = `${ROLE_PREFIX}${region}-${gatewayName}`;
   if (fullName.length <= 64) return fullName;
-  const hash = createHash("sha256").update(gatewayName).digest("hex").slice(0, 8);
+  const hash = createHash("sha256").update(`${region}:${gatewayName}`).digest("hex").slice(0, 8);
   return `${fullName.slice(0, 55)}-${hash}`;
 }
 
-export function isGatewayExecutionRole(gatewayName: string, roleArn: string): boolean {
-  return roleNameFromArn(roleArn) === gatewayRoleName(gatewayName);
+export function matchesGatewayExecutionRole(
+  gatewayName: string,
+  region: string,
+  roleArn: string,
+): boolean {
+  try {
+    return roleNameFromArn(roleArn) === gatewayRoleName(gatewayName, region);
+  } catch {
+    return false;
+  }
+}
+
+function gatewayRoleTags(gatewayName: string, region: string): Tag[] {
+  return [
+    { Key: ROLE_TAGS.managed, Value: "true" },
+    { Key: ROLE_TAGS.resourceType, Value: "Gateway" },
+    { Key: ROLE_TAGS.region, Value: region },
+    { Key: ROLE_TAGS.resourceName, Value: gatewayName },
+  ];
+}
+
+function isOwnedRole(role: Role, gatewayName: string, region: string): boolean {
+  const tags = new Map((role.Tags ?? []).map(({ Key, Value }) => [Key, Value]));
+  return (
+    tags.get(ROLE_TAGS.managed) === "true" &&
+    tags.get(ROLE_TAGS.resourceType) === "Gateway" &&
+    tags.get(ROLE_TAGS.region) === region &&
+    tags.get(ROLE_TAGS.resourceName) === gatewayName
+  );
 }
 
 function uniqueStatements(statements: GatewayPolicyStatement[]): GatewayPolicyStatement[] {

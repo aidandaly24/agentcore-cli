@@ -30,7 +30,9 @@ export type CreateGatewayInput = Omit<CreateGatewayRequest, "protocolType" | "ro
   roleArn?: string;
 };
 
-export type CreateGatewayTargetInput = CreateGatewayTargetRequest;
+export type CreateGatewayTargetInput = CreateGatewayTargetRequest & {
+  skipRolePolicyUpdate?: boolean;
+};
 
 export type CreateGatewayRuleInput = CreateGatewayRuleRequest;
 

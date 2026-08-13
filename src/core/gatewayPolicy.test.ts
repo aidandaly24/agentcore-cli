@@ -183,11 +183,6 @@ test("builds exact grants for every inferable Gateway permission family", () => 
     },
     {
       Effect: "Allow",
-      Action: ["kms:Decrypt"],
-      Resource: [TOKEN_VAULT_KEY_ARN],
-    },
-    {
-      Effect: "Allow",
       Action: ["lambda:InvokeFunction"],
       Resource: [LAMBDA_ARN],
     },
@@ -251,6 +246,11 @@ test("builds exact grants for every inferable Gateway permission family", () => 
       Effect: "Allow",
       Action: ["s3:GetObject"],
       Resource: ["arn:aws:s3:::schemas/mcp.json"],
+    },
+    {
+      Effect: "Allow",
+      Action: ["kms:Decrypt"],
+      Resource: [TOKEN_VAULT_KEY_ARN],
     },
     {
       Effect: "Allow",
@@ -335,4 +335,20 @@ test("stages an account-scoped Gateway wildcard before create returns its ARN", 
       Resource: [ENGINE_ARN, "arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/*"],
     },
   ]);
+});
+
+test("omits the Token Vault KMS grant when no Target uses stored credentials", () => {
+  expect(
+    gatewayPolicy({
+      tokenVaultKmsKeyArn: TOKEN_VAULT_KEY_ARN,
+      targets: [
+        {
+          targetConfiguration: {
+            mcp: { mcpServer: { endpoint: "https://example.test/mcp" } },
+          },
+          credentialProviderConfigurations: [{ credentialProviderType: "JWT_PASSTHROUGH" }],
+        },
+      ],
+    }),
+  ).toEqual([]);
 });
