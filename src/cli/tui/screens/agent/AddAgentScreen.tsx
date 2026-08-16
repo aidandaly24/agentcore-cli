@@ -1013,7 +1013,7 @@ export function AddAgentScreen({ existingAgentNames, onComplete, onExit }: AddAg
         <Panel>
           <TextInput
             prompt="Agent name"
-            initialValue={generateUniqueName('MyAgent', existingAgentNames)}
+            initialValue={name || generateUniqueName('MyAgent', existingAgentNames)}
             onSubmit={handleSetName}
             onCancel={onExit}
             schema={AgentNameSchema}

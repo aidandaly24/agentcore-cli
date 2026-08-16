@@ -83,6 +83,8 @@ function ListNav({
   isDisabled,
   getHotkeys,
   onHotkeySelect,
+  initialSelectedIndex,
+  resetKey,
 }: {
   items: string[];
   onSelect?: (item: string, index: number) => void;
@@ -90,6 +92,8 @@ function ListNav({
   isDisabled?: (item: string) => boolean;
   getHotkeys?: (item: string) => string[] | undefined;
   onHotkeySelect?: (item: string, index: number) => void;
+  initialSelectedIndex?: number;
+  resetKey?: string | number;
 }) {
   const { selectedIndex } = useListNavigation({
     items,
@@ -98,6 +102,8 @@ function ListNav({
     isDisabled,
     getHotkeys,
     onHotkeySelect,
+    initialSelectedIndex,
+    resetKey,
   });
   return <Text>idx:{selectedIndex}</Text>;
 }
@@ -232,5 +238,44 @@ describe('useListNavigation hook', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     expect(lastFrame()).toContain('idx:0');
+  });
+
+  describe('initialSelectedIndex', () => {
+    it('honors initialSelectedIndex on mount', () => {
+      const { lastFrame } = render(<ListNav items={items} initialSelectedIndex={2} />);
+      expect(lastFrame()).toContain('idx:2');
+    });
+
+    it('still defaults to 0 when initialSelectedIndex is unset', () => {
+      const { lastFrame } = render(<ListNav items={items} />);
+      expect(lastFrame()).toContain('idx:0');
+    });
+
+    it('ignores an out-of-range initialSelectedIndex and falls back to first enabled', () => {
+      const { lastFrame } = render(<ListNav items={items} initialSelectedIndex={99} />);
+      expect(lastFrame()).toContain('idx:0');
+    });
+
+    it('falls back to first enabled when initialSelectedIndex points to a disabled item', () => {
+      const isDisabled = (item: string) => item === 'alpha';
+      const { lastFrame } = render(<ListNav items={items} initialSelectedIndex={0} isDisabled={isDisabled} />);
+      expect(lastFrame()).toContain('idx:1');
+    });
+
+    it('re-applies initialSelectedIndex when resetKey changes', async () => {
+      const { lastFrame, stdin, rerender } = render(
+        <ListNav items={items} initialSelectedIndex={2} resetKey="step-a" />
+      );
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(lastFrame()).toContain('idx:2');
+
+      stdin.write(UP_ARROW); // move off the seeded index
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(lastFrame()).toContain('idx:1');
+
+      rerender(<ListNav items={items} initialSelectedIndex={2} resetKey="step-b" />);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(lastFrame()).toContain('idx:2');
+    });
   });
 });
