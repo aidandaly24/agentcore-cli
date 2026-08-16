@@ -192,6 +192,9 @@ Policy engines apply Cedar-based pre/post-call policies to agent invocations —
 | `add policy-engine` | Add a Cedar policy engine to the project                             |
 | `add policy`        | Add a policy to a policy engine (form-based guardrails or raw Cedar) |
 
+> See [Policies & Guardrails](docs/policies.md) for engine attachment, the form-based guardrail builder, policy effects,
+> and enforcement modes.
+
 ### Payments
 
 Pay-per-call agent transactions via the [x402 protocol](https://www.x402.org/). When a tool call returns
@@ -302,6 +305,7 @@ Projects use JSON schema files in the `agentcore/` directory:
 - [Gateway](docs/gateway.md) - Gateway setup, targets, and authentication
 - [Knowledge Bases](docs/knowledge-bases.md) - Managed Bedrock Knowledge Bases wired to gateways
 - [Payments](docs/payments.md) - x402-protocol microtransactions for paid tools/APIs
+- [Policies & Guardrails](docs/policies.md) - Cedar policy engines, form-based guardrails, and enforcement modes
 - [Config Bundles](docs/config-bundles.md) - Versioned runtime configurations
 - [Container Builds](docs/container-builds.md) - Container build types and Dockerfile setup
 
