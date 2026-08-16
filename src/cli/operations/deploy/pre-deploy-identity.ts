@@ -26,6 +26,8 @@ import {
   apiKeyProviderExists,
   createApiKeyProvider,
   createOAuth2Provider,
+  getApiKeyProvider,
+  getOAuth2Provider,
   oAuth2ProviderExists,
   setTokenVaultKmsKey,
   updateApiKeyProvider,
@@ -43,7 +45,7 @@ import { join } from 'path';
 
 export interface ApiKeyProviderSetupResult {
   providerName: string;
-  status: 'created' | 'updated' | 'exists' | 'skipped' | 'error';
+  status: 'created' | 'updated' | 'exists' | 'linked' | 'skipped' | 'error';
   credentialProviderArn?: string;
   error?: Error;
 }
@@ -173,10 +175,24 @@ async function setupApiKeyCredentialProvider(
   const apiKey = credentials.get(envVarName);
 
   if (!apiKey) {
+    // No local secret to create/update from. Link an existing provider of the same
+    // name (created in the console, another project, or via IaC) so its ARN reaches
+    // deployed state for CDK/gateway wiring.
+    const existing = await getApiKeyProvider(client, credential.name);
+    if (existing.success) {
+      return {
+        providerName: credential.name,
+        status: 'linked',
+        credentialProviderArn: existing.credentialProviderArn,
+      };
+    }
+
     return {
       providerName: credential.name,
-      status: 'skipped',
-      error: new Error(`No ${envVarName} found in agentcore/.env.local`),
+      status: 'error',
+      error: new MissingCredentialsError(
+        `No ${envVarName} found in agentcore/.env.local and no existing AgentCore Identity API key credential provider named "${credential.name}" was found.`
+      ),
     };
   }
 
@@ -332,7 +348,7 @@ export function assertEnvFileExists(projectSpec: AgentCoreProjectSpec, configBas
 
 export interface OAuth2ProviderSetupResult {
   providerName: string;
-  status: 'created' | 'updated' | 'skipped' | 'error';
+  status: 'created' | 'updated' | 'linked' | 'skipped' | 'error';
   error?: Error;
   credentialProviderArn?: string;
   clientSecretArn?: string;
@@ -403,21 +419,48 @@ async function setupSingleOAuth2Provider(
   const clientSecret = credentials.get(clientSecretEnvVar);
 
   if (!clientId || !clientSecret) {
+    // No local secret to create/update from. Link an existing provider of the same
+    // name (created in the console, another project, or via IaC) so its ARN reaches
+    // deployed state for CDK/gateway wiring.
+    const existing = await getOAuth2Provider(client, credential.name);
+    if (existing.success) {
+      return {
+        providerName: credential.name,
+        status: 'linked',
+        credentialProviderArn: existing.credentialProviderArn,
+        clientSecretArn: existing.clientSecretArn,
+        callbackUrl: existing.callbackUrl,
+      };
+    }
+
     return {
       providerName: credential.name,
-      status: 'skipped',
-      error: new MissingCredentialsError(`Missing ${clientIdEnvVar} or ${clientSecretEnvVar} in agentcore/.env.local`),
+      status: 'error',
+      error: new MissingCredentialsError(
+        `Missing ${clientIdEnvVar} or ${clientSecretEnvVar} in agentcore/.env.local and no existing AgentCore Identity OAuth2 credential provider named "${credential.name}" was found.`
+      ),
     };
   }
 
   // Imported OAuth providers may not have a discoveryUrl (provider already exists in Identity service).
-  // Skip create/update since we can't build a valid config without it.
+  // We can't build a valid create/update config without it, so link the existing provider by name.
   if (!credential.discoveryUrl) {
+    const existing = await getOAuth2Provider(client, credential.name);
+    if (existing.success) {
+      return {
+        providerName: credential.name,
+        status: 'linked',
+        credentialProviderArn: existing.credentialProviderArn,
+        clientSecretArn: existing.clientSecretArn,
+        callbackUrl: existing.callbackUrl,
+      };
+    }
+
     return {
       providerName: credential.name,
-      status: 'skipped',
+      status: 'error',
       error: new MissingCredentialsError(
-        `No discoveryUrl configured for "${credential.name}". Provider already exists in Identity service — credentials in .env.local will be ignored.`
+        `No discoveryUrl configured for "${credential.name}" and no existing AgentCore Identity OAuth2 credential provider with that name was found.`
       ),
     };
   }
