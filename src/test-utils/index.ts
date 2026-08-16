@@ -11,6 +11,7 @@ export { exists } from './fs-helpers.js';
 export { hasCommand, hasAwsCredentials, prereqs } from './prereqs.js';
 export { createTestProject, type TestProject, type CreateTestProjectOptions } from './project-factory.js';
 export { readProjectConfig } from './config-reader.js';
+export { uniqueRunSuffix, uniqueRunName } from './run-naming.js';
 
 export async function runSuccess(args: string[], cwd: string): Promise<Record<string, unknown>> {
   const result = await runCLIImpl(args, cwd);
