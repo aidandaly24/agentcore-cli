@@ -1,4 +1,4 @@
-import { AgentCoreCLIError, SilentCLIError } from "../errors";
+import { AgentCoreCLIError, SilentCLIError, UserCancellationError } from "../errors";
 
 // ExitCode provides names for default Unix exit codes.
 export enum ExitCode {
@@ -6,6 +6,24 @@ export enum ExitCode {
   FAILURE = 1,
   USAGE = 2,
   INTERRUPTED = 130,
+}
+
+/** Runs a headless operation with process SIGINT mapped to UserCancellationError. */
+export async function withUserCancellation<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const interrupt = () => controller.abort(new UserCancellationError());
+  process.once("SIGINT", interrupt);
+  try {
+    const result = await fn(controller.signal);
+    controller.signal.throwIfAborted();
+    return result;
+  } catch (error) {
+    controller.signal.throwIfAborted();
+    throw error;
+  } finally {
+    controller.abort();
+    process.off("SIGINT", interrupt);
+  }
 }
 
 // Runnable can be implemented by any application's main entrypoint.

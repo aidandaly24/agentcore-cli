@@ -7,7 +7,13 @@ import {
   SilentCLIError,
   UserCancellationError,
 } from "../errors";
-import { ExitCode, runRunnable, runWithExitCode, type Runnable } from "./index.tsx";
+import {
+  ExitCode,
+  runRunnable,
+  runWithExitCode,
+  withUserCancellation,
+  type Runnable,
+} from "./index.tsx";
 
 async function captureErrors(run: () => Promise<number>) {
   const errors: string[] = [];
@@ -71,6 +77,49 @@ test("respects custom errors codes from known errors", async () => {
 
   expect(code).toBe(42);
   expect(errors).toEqual(["Error: custom failure"]);
+});
+
+test("withUserCancellation returns the result and removes its SIGINT listener", async () => {
+  const initialListeners = process.listenerCount("SIGINT");
+  let signal: AbortSignal | undefined;
+
+  const result = await withUserCancellation(async (current) => {
+    signal = current;
+    return "done";
+  });
+
+  expect(result).toBe("done");
+  expect(signal?.aborted).toBe(true);
+  expect(process.listenerCount("SIGINT")).toBe(initialListeners);
+});
+
+test("withUserCancellation replaces transport aborts with the shared reason", async () => {
+  const initialListeners = process.listenerCount("SIGINT");
+  let signal: AbortSignal | undefined;
+  const pending = withUserCancellation((current) => {
+    signal = current;
+    return new Promise<never>((_, reject) => {
+      const abort = () => reject(new Error("transport aborted"));
+      if (current.aborted) abort();
+      else current.addEventListener("abort", abort, { once: true });
+    });
+  });
+
+  process.emit("SIGINT", "SIGINT");
+
+  expect(signal?.reason).toBeInstanceOf(UserCancellationError);
+  await expect(pending).rejects.toBe(signal?.reason);
+  expect(process.listenerCount("SIGINT")).toBe(initialListeners);
+});
+
+test("withUserCancellation preserves non-cancellation failures", async () => {
+  const failure = new TypeError("operation failed");
+
+  await expect(
+    withUserCancellation(async () => {
+      throw failure;
+    }),
+  ).rejects.toBe(failure);
 });
 
 test.each([
