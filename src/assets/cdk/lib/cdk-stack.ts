@@ -204,14 +204,26 @@ export class AgentCoreStack extends Stack {
         // Create connectors for this manager
         for (const connector of payment.connectors) {
           const connId = toCdkId(connector.name);
-          const conn = new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
+          const baseConnectorProps = {
             projectName: spec.name,
             paymentManager: manager,
             connectorName: connector.name,
             connectorType: connector.provider,
-            provisionMode: connector.provisionMode,
-            credentialProviderArn: connector.credentialProviderArn,
-          });
+          };
+          const conn =
+            connector.provisionMode === 'QUICK_CREATE'
+              ? new AgentCorePaymentConnector(
+                  this,
+                  `Payment${mgrId}${connId}`,
+                  {
+                    ...baseConnectorProps,
+                    provisionMode: 'QUICK_CREATE',
+                  } as unknown as ConstructorParameters<typeof AgentCorePaymentConnector>[2]
+                )
+              : new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
+                  ...baseConnectorProps,
+                  credentialProviderArn: connector.credentialProviderArn!,
+                });
 
           // Wire first connector's ID as env var (eligible agents only)
           if (connector === payment.connectors[0]) {
@@ -224,12 +236,18 @@ export class AgentCoreStack extends Stack {
           new CfnOutput(this, `Payment${mgrId}${connId}ConnectorId`, {
             value: conn.paymentConnectorId,
           });
-          new CfnOutput(this, `Payment${mgrId}${connId}ConnectorStatus`, {
-            value: conn.paymentConnectorStatus,
-          });
-          new CfnOutput(this, `Payment${mgrId}${connId}AuthorizationUrl`, {
-            value: conn.authorizationUrl,
-          });
+          if (connector.provisionMode === 'QUICK_CREATE') {
+            const quickCreateConnector = conn as AgentCorePaymentConnector & {
+              paymentConnectorStatus: string;
+              authorizationUrl: string;
+            };
+            new CfnOutput(this, `Payment${mgrId}${connId}ConnectorStatus`, {
+              value: quickCreateConnector.paymentConnectorStatus,
+            });
+            new CfnOutput(this, `Payment${mgrId}${connId}AuthorizationUrl`, {
+              value: quickCreateConnector.authorizationUrl,
+            });
+          }
         }
 
         // CFN Outputs for post-deploy state parsing
