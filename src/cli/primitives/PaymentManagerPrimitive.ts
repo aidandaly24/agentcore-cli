@@ -222,10 +222,12 @@ export class PaymentManagerPrimitive extends BasePrimitive<AddPaymentManagerOpti
       const manager = project.payments[index]!;
 
       // Collect connector info before removal for cleanup
-      const connectorInfo = manager.connectors.map(c => ({
-        credentialName: c.credentialName,
-        provider: c.provider,
-      }));
+      const connectorInfo = manager.connectors
+        .filter(c => c.provisionMode !== 'QUICK_CREATE')
+        .map(c => ({
+          credentialName: c.credentialName,
+          provider: c.provider,
+        }));
 
       // Remove the manager (which removes all its nested connectors)
       project.payments.splice(index, 1);

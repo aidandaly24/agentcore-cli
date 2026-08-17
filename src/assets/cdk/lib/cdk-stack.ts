@@ -22,7 +22,8 @@ export type HarnessConfig = HarnessDeploymentConfig;
 export interface PaymentConnectorSpec {
   name: string;
   provider: 'CoinbaseCDP' | 'StripePrivy';
-  credentialProviderArn: string;
+  provisionMode?: 'MANUAL' | 'QUICK_CREATE';
+  credentialProviderArn?: string;
 }
 
 export interface PaymentSpec {
@@ -208,6 +209,7 @@ export class AgentCoreStack extends Stack {
             paymentManager: manager,
             connectorName: connector.name,
             connectorType: connector.provider,
+            provisionMode: connector.provisionMode,
             credentialProviderArn: connector.credentialProviderArn,
           });
 
@@ -221,6 +223,12 @@ export class AgentCoreStack extends Stack {
 
           new CfnOutput(this, `Payment${mgrId}${connId}ConnectorId`, {
             value: conn.paymentConnectorId,
+          });
+          new CfnOutput(this, `Payment${mgrId}${connId}ConnectorStatus`, {
+            value: conn.paymentConnectorStatus,
+          });
+          new CfnOutput(this, `Payment${mgrId}${connId}AuthorizationUrl`, {
+            value: conn.authorizationUrl,
           });
         }
 

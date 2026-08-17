@@ -186,7 +186,12 @@ async function main() {
             autoPayment?: boolean;
             paymentToolAllowlist?: string[];
             networkPreferences?: string[];
-            connectors: { name: string; provider?: string; credentialName: string }[];
+            connectors: {
+              name: string;
+              provider?: string;
+              provisionMode?: 'MANUAL' | 'QUICK_CREATE';
+              credentialName?: string;
+            }[];
           }) => ({
             name: p.name,
             description: p.description,
@@ -196,6 +201,19 @@ async function main() {
             paymentToolAllowlist: p.paymentToolAllowlist,
             networkPreferences: p.networkPreferences,
             connectors: p.connectors.map(c => {
+              if (c.provisionMode === 'QUICK_CREATE') {
+                return {
+                  name: c.name,
+                  provider: 'CoinbaseCDP' as const,
+                  provisionMode: 'QUICK_CREATE' as const,
+                };
+              }
+
+              if (!c.credentialName) {
+                throw new Error(
+                  \`Manual payment connector "\${c.name}" on manager "\${p.name}" is missing its credential name.\`
+                );
+              }
               const credentialProviderArn = paymentCredentials?.[c.credentialName]?.credentialProviderArn;
               if (!credentialProviderArn) {
                 // Fail fast with an actionable message rather than passing an empty
@@ -381,7 +399,8 @@ export type HarnessConfig = HarnessDeploymentConfig;
 export interface PaymentConnectorSpec {
   name: string;
   provider: 'CoinbaseCDP' | 'StripePrivy';
-  credentialProviderArn: string;
+  provisionMode?: 'MANUAL' | 'QUICK_CREATE';
+  credentialProviderArn?: string;
 }
 
 export interface PaymentSpec {
@@ -567,6 +586,7 @@ export class AgentCoreStack extends Stack {
             paymentManager: manager,
             connectorName: connector.name,
             connectorType: connector.provider,
+            provisionMode: connector.provisionMode,
             credentialProviderArn: connector.credentialProviderArn,
           });
 
@@ -580,6 +600,12 @@ export class AgentCoreStack extends Stack {
 
           new CfnOutput(this, \`Payment\${mgrId}\${connId}ConnectorId\`, {
             value: conn.paymentConnectorId,
+          });
+          new CfnOutput(this, \`Payment\${mgrId}\${connId}ConnectorStatus\`, {
+            value: conn.paymentConnectorStatus,
+          });
+          new CfnOutput(this, \`Payment\${mgrId}\${connId}AuthorizationUrl\`, {
+            value: conn.authorizationUrl,
           });
         }
 

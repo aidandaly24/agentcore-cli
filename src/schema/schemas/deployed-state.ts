@@ -290,7 +290,8 @@ export type RuntimeEndpointDeployedState = z.infer<typeof RuntimeEndpointDeploye
 
 export const PaymentConnectorDeployedStateSchema = z.object({
   connectorId: z.string().min(1),
-  credentialProviderArn: z.string().min(1),
+  provisionMode: z.enum(['MANUAL', 'QUICK_CREATE']).optional(),
+  credentialProviderArn: z.string().min(1).optional(),
   credentialProviderName: z.string().optional(),
 });
 
