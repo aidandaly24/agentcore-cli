@@ -1,7 +1,6 @@
 export {
   AgentCoreCLIError,
   CloudWatchQueryError,
-  CommandInterruptedError,
   DeserializationError,
   EmbeddedAssetNotFoundError,
   FileWriteError,
