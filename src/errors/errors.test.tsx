@@ -48,6 +48,18 @@ describe("AgentCoreCLIError", () => {
     });
   });
 
+  test("UserCancellationError resolves direct and signal-propagated cancellation", () => {
+    const cancellation = new UserCancellationError();
+    const controller = new AbortController();
+    controller.abort(cancellation);
+
+    expect(UserCancellationError.resolve(cancellation)).toBe(cancellation);
+    expect(UserCancellationError.resolve(new Error("transport aborted"), controller.signal)).toBe(
+      cancellation,
+    );
+    expect(UserCancellationError.resolve(new Error("failed"))).toBeUndefined();
+  });
+
   test.each([
     [
       "AccessDeniedException (403)",

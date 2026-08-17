@@ -159,6 +159,11 @@ export class UserCancellationError extends SilentCLIError {
       exitCode: 130,
     });
   }
+
+  static resolve(error: unknown, signal?: AbortSignal): UserCancellationError | undefined {
+    if (error instanceof UserCancellationError) return error;
+    return signal?.reason instanceof UserCancellationError ? signal.reason : undefined;
+  }
 }
 
 export class RuntimeInvokeResponseError extends SilentCLIError {
@@ -167,19 +172,7 @@ export class RuntimeInvokeResponseError extends SilentCLIError {
   }
 }
 
-export class GatewayInvokeInterruptedError extends AgentCoreCLIError {
-  readonly reported: boolean;
-
-  constructor(cause?: unknown, reported = false) {
-    super("The operation was aborted", { cause, exitCode: 130 });
-    this.name = "AbortError";
-    this.reported = reported;
-  }
-}
-
-export class GatewayInvokeResponseError extends AgentCoreCLIError {
-  readonly reported = true;
-
+export class GatewayInvokeResponseError extends SilentCLIError {
   constructor(message: string, cause?: unknown) {
     super(message, { cause });
   }

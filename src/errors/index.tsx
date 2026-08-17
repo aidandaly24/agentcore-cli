@@ -5,7 +5,6 @@ export {
   DeserializationError,
   EmbeddedAssetNotFoundError,
   FileWriteError,
-  GatewayInvokeInterruptedError,
   GatewayInvokeResponseError,
   InputValidationError,
   InvalidEnvironmentError,

@@ -1,8 +1,8 @@
 import z from "zod";
 import {
-  GatewayInvokeInterruptedError,
   GatewayInvokeResponseError,
   InputValidationError,
+  UserCancellationError,
 } from "../../../errors";
 import { SourceResolver, type AppIO } from "../../../io";
 import { ExitCode } from "../../../runnable";
@@ -109,7 +109,7 @@ export const createInvokeGatewayHandler = (
       }
 
       const controller = new AbortController();
-      const interrupt = () => controller.abort();
+      const interrupt = () => controller.abort(new UserCancellationError());
       process.once("SIGINT", interrupt);
       try {
         const applicationHeaders = parseGatewayInvokeHeaders(flags.header);
@@ -145,10 +145,7 @@ export const createInvokeGatewayHandler = (
           throw new GatewayInvokeResponseError(`HTTP ${response.statusCode}`);
         }
       } catch (error) {
-        if (controller.signal.aborted && (error as Error)?.name === "AbortError") {
-          if (error instanceof GatewayInvokeInterruptedError) throw error;
-          throw new GatewayInvokeInterruptedError(error);
-        }
+        controller.signal.throwIfAborted();
         throw error;
       } finally {
         controller.abort();

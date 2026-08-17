@@ -1,6 +1,6 @@
 import z from "zod";
 import { createHandler, flag } from "../../../../router";
-import { InputValidationError } from "../../../../errors";
+import { InputValidationError, UserCancellationError } from "../../../../errors";
 import type { AppIO } from "../../../../io";
 import { JsonRendererKey } from "../../../../tui";
 import type { Core } from "../../../types";
@@ -21,7 +21,7 @@ export const createUpdateDatasetHandler = (core: Core, io: AppIO) =>
       }
 
       const controller = new AbortController();
-      const interrupt = () => controller.abort();
+      const interrupt = () => controller.abort(new UserCancellationError());
       process.once("SIGINT", interrupt);
       try {
         ctx

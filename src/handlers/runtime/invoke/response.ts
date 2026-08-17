@@ -22,13 +22,8 @@ export async function writeRuntimeInvokeFile(
   await writeStreamingResponseFile(response, path, signal, onBytes);
 }
 
-function userCancellation(error: unknown, signal?: AbortSignal): UserCancellationError | undefined {
-  if (error instanceof UserCancellationError) return error;
-  return signal?.reason instanceof UserCancellationError ? signal.reason : undefined;
-}
-
 function failure(error: unknown, signal?: AbortSignal): never {
-  const cancellation = userCancellation(error, signal);
+  const cancellation = UserCancellationError.resolve(error, signal);
   if (cancellation) throw cancellation;
   throw new RuntimeInvokeResponseError(RESPONSE_STREAM_FAILED, error);
 }

@@ -658,6 +658,42 @@ describe("dataset update", () => {
     });
   });
 
+  test("SIGINT cancels an update with the shared user cancellation error", async () => {
+    const path = writeTempJsonl(EXAMPLE_A);
+    const { core, route } = testDatasetCommand();
+    core.eval.updateDatasetExamples = async (id, filePath, options, signal, onProgress) => {
+      core.eval.calls.push({
+        method: "updateDatasetExamples",
+        args: [id, filePath, options, signal, onProgress],
+      });
+      return new Promise<never>((_, reject) => {
+        const abort = () => reject(signal?.reason);
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+      });
+    };
+    const pending = route([
+      "eval",
+      "dataset",
+      "update",
+      "--id",
+      "dataset-orders-abc123",
+      "--file-path",
+      path,
+    ]);
+
+    try {
+      await waitFor(() => core.eval.calls.some((call) => call.method === "updateDatasetExamples"));
+      process.emit("SIGINT", "SIGINT");
+
+      const signal = core.eval.calls[0]!.args[3] as AbortSignal;
+      expect(signal.reason).toBeInstanceOf(UserCancellationError);
+      await expect(pending).rejects.toBe(signal.reason);
+    } finally {
+      await pending.catch(() => undefined);
+    }
+  });
+
   test("takes only --id and --file-path", async () => {
     const root = createRootHandler(new TestCoreClient(), {
       io: testIO().io,
