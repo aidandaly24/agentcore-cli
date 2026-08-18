@@ -82,6 +82,22 @@ describe('parsePaymentOutputs', () => {
       });
       expect(JSON.stringify(result)).not.toContain('example.com/authorize');
     });
+
+    it('does not store an invalid manual connector without a credential provider ARN', () => {
+      const outputs: StackOutputs = {
+        ...makeOutputs('MyManager'),
+        PaymentMyManagerManualConnectorId: 'conn-manual-001',
+      };
+
+      const result = parsePaymentOutputs(outputs, [
+        {
+          name: 'MyManager',
+          connectors: [{ name: 'Manual', provisionMode: 'MANUAL' }],
+        },
+      ]);
+
+      expect(result.MyManager!.connectors).toEqual({});
+    });
   });
 
   describe('missing required manager fields', () => {

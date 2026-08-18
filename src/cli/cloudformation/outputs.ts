@@ -686,12 +686,20 @@ export function parsePaymentOutputs(
       const connId = toPaymentCdkId(conn.name);
       const connectorId = outputs[`Payment${mgrId}${connId}ConnectorId`];
       if (connectorId) {
-        connectors[conn.name] = {
-          connectorId,
-          ...(conn.provisionMode && { provisionMode: conn.provisionMode }),
-          ...(conn.credentialProviderArn && { credentialProviderArn: conn.credentialProviderArn }),
-          ...(conn.credentialProviderName && { credentialProviderName: conn.credentialProviderName }),
-        };
+        if (conn.provisionMode === 'QUICK_CREATE') {
+          connectors[conn.name] = {
+            connectorId,
+            provisionMode: 'QUICK_CREATE',
+            ...(conn.credentialProviderName && { credentialProviderName: conn.credentialProviderName }),
+          };
+        } else if (conn.credentialProviderArn) {
+          connectors[conn.name] = {
+            connectorId,
+            ...(conn.provisionMode && { provisionMode: conn.provisionMode }),
+            credentialProviderArn: conn.credentialProviderArn,
+            ...(conn.credentialProviderName && { credentialProviderName: conn.credentialProviderName }),
+          };
+        }
       }
     }
 
