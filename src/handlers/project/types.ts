@@ -6,6 +6,7 @@ import type { ProjectSpecSchema } from "../../projectSchemas/project";
 import z from "zod";
 import type { RuntimeResourceConfig } from "./add/runtime/types";
 import type { OnlineEvalConfigSchema } from "../../projectSchemas/online-eval-config";
+import type { AgentCoreGateway, AgentCoreGatewayTarget } from "../../projectSchemas/gateway";
 
 /** Available runtime templates for scaffolding agent code. A subset of {@link PROJECT_TEMPLATES} describing runtimes only */
 export const RUNTIME_TEMPLATES = {
@@ -75,6 +76,19 @@ export type EnvLocalEntry = {
   comment: string;
 };
 
+export const GATEWAY_TARGET_INLINE_SCHEMA_FILENAMES = {
+  lambda: "tool-schema.json",
+  openapi: "openapi.json",
+  smithy: "smithy.json",
+} as const;
+
+export type GatewayTargetInlineSchemaKind = keyof typeof GATEWAY_TARGET_INLINE_SCHEMA_FILENAMES;
+
+export type GatewayTargetInlineSchema = {
+  kind: GatewayTargetInlineSchemaKind;
+  content: string;
+};
+
 /** Discriminated union input for {@link ProjectManager.addResource}. */
 export type AddResourceInput =
   | {
@@ -105,12 +119,22 @@ export type AddResourceInput =
   | {
       resourceType: "memory";
       resourceConfig: z.input<typeof MemorySchema>;
+    }
+  | {
+      resourceType: "gateway";
+      resourceConfig: AgentCoreGateway;
+    }
+  | {
+      resourceType: "gateway-target";
+      gatewayName: string;
+      resourceConfig: AgentCoreGatewayTarget;
+      inlineSchema?: GatewayTargetInlineSchema;
     };
 
 export type ProjectResource = AddResourceInput["resourceType"];
 
 export type RemoveResourceInput = {
-  resourceType: ProjectResource;
+  resourceType: Exclude<ProjectResource, "gateway" | "gateway-target">;
   name: string;
 };
 

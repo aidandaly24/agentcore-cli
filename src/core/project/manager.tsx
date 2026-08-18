@@ -153,10 +153,13 @@ export class FsProjectManager implements ProjectManager {
     const existingProjectSpec = await this.json.read(agentCoreSpecPath, ProjectSpecSchema);
 
     const existingResources = existingProjectSpec[projectSpecKey];
-    if (existingResources.find((r) => r.name === resourceConfig.name))
+    if (resourceType === "gateway-target") {
+      this.assertUniqueGatewayTargetName(existingProjectSpec, resourceConfig.name);
+    } else if (existingResources.find((resource) => resource.name === resourceConfig.name)) {
       throw new InputValidationError(
         `a ${resourceType} with name '${resourceConfig.name}' already exists`,
       );
+    }
 
     // Widened: arms push their own shapes; the whole-spec safeParse below validates.
     const newResources: unknown[] = [...existingResources];
@@ -164,7 +167,7 @@ export class FsProjectManager implements ProjectManager {
     // Non-file work that a failed spec write must also reverse.
     let envFile: EnvLocalFile | undefined;
 
-    switch (resourceType) {
+    switch (input.resourceType) {
       case "harness": {
         yield { message: `Scaffolding harness in project` };
         const outputPath = join(project.rootPath, "app", resourceConfig.name);
@@ -202,9 +205,25 @@ export class FsProjectManager implements ProjectManager {
       case "online-eval":
       case "online-insight":
       case "memory":
+      case "gateway":
         newResources.push(resourceConfig);
         break;
-
+      case "gateway-target": {
+        const gatewayIndex = existingProjectSpec.agentCoreGateways.findIndex(
+          (gateway) => gateway.name === input.gatewayName,
+        );
+        if (gatewayIndex < 0) {
+          throw new InputValidationError(
+            `gateway '${input.gatewayName}' does not exist in agentCoreGateways[]`,
+          );
+        }
+        const gateway = existingProjectSpec.agentCoreGateways[gatewayIndex]!;
+        newResources[gatewayIndex] = {
+          ...gateway,
+          targets: [...gateway.targets, resourceConfig],
+        };
+        break;
+      }
       default: {
         const unhandled: never = input;
         throw new NotImplementedError(`unsupported project resource: ${String(unhandled)}`);
@@ -288,6 +307,22 @@ export class FsProjectManager implements ProjectManager {
       ...project,
       spec: newProjectSpec,
     };
+  }
+
+  private assertUniqueGatewayTargetName(project: Project["spec"], name: string): void {
+    const gateway = project.agentCoreGateways.find((candidate) =>
+      candidate.targets.some((target) => target.name === name),
+    );
+    if (gateway) {
+      throw new InputValidationError(
+        `a gateway target with name '${name}' already exists in gateway '${gateway.name}'`,
+      );
+    }
+    if (project.unassignedTargets?.some((target) => target.name === name)) {
+      throw new InputValidationError(
+        `an unassigned gateway target with name '${name}' already exists`,
+      );
+    }
   }
 
   private async scaffoldHarness(
@@ -385,5 +420,8 @@ function toProjectSpecKey(resourceType: ProjectResource) {
       return "onlineEvalConfigs";
     case "memory":
       return "memories";
+    case "gateway":
+    case "gateway-target":
+      return "agentCoreGateways";
   }
 }
