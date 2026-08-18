@@ -19,12 +19,23 @@ import { Construct } from 'constructs';
  */
 export type HarnessConfig = HarnessDeploymentConfig;
 
-export interface PaymentConnectorSpec {
+export interface ManualPaymentConnectorSpec {
   name: string;
   provider: 'CoinbaseCDP' | 'StripePrivy';
-  provisionMode?: 'MANUAL' | 'QUICK_CREATE';
-  credentialProviderArn?: string;
+  provisionMode?: 'MANUAL';
+  credentialName: string;
+  credentialProviderArn: string;
 }
+
+export interface QuickCreatePaymentConnectorSpec {
+  name: string;
+  provider: 'CoinbaseCDP';
+  provisionMode: 'QUICK_CREATE';
+  credentialName?: never;
+  credentialProviderArn?: never;
+}
+
+export type PaymentConnectorSpec = ManualPaymentConnectorSpec | QuickCreatePaymentConnectorSpec;
 
 export interface PaymentSpec {
   name: string;
@@ -204,26 +215,31 @@ export class AgentCoreStack extends Stack {
         // Create connectors for this manager
         for (const connector of payment.connectors) {
           const connId = toCdkId(connector.name);
-          const baseConnectorProps = {
+          const schemaConnector =
+            connector.provisionMode === 'QUICK_CREATE'
+              ? connector
+              : {
+                  name: connector.name,
+                  provider: connector.provider,
+                  ...(connector.provisionMode && { provisionMode: connector.provisionMode }),
+                  credentialName: connector.credentialName,
+                };
+          const compatibilityProps = {
             projectName: spec.name,
             paymentManager: manager,
+            connector: schemaConnector,
+            // Remove these legacy manual fields after the new L3 release is pinned.
             connectorName: connector.name,
             connectorType: connector.provider,
+            ...(connector.provisionMode !== 'QUICK_CREATE' && {
+              credentialProviderArn: connector.credentialProviderArn,
+            }),
           };
-          const conn =
-            connector.provisionMode === 'QUICK_CREATE'
-              ? new AgentCorePaymentConnector(
-                  this,
-                  `Payment${mgrId}${connId}`,
-                  {
-                    ...baseConnectorProps,
-                    provisionMode: 'QUICK_CREATE',
-                  } as unknown as ConstructorParameters<typeof AgentCorePaymentConnector>[2]
-                )
-              : new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
-                  ...baseConnectorProps,
-                  credentialProviderArn: connector.credentialProviderArn!,
-                });
+          const conn = new AgentCorePaymentConnector(
+            this,
+            `Payment${mgrId}${connId}`,
+            compatibilityProps as unknown as ConstructorParameters<typeof AgentCorePaymentConnector>[2]
+          );
 
           // Wire first connector's ID as env var (eligible agents only)
           if (connector === payment.connectors[0]) {

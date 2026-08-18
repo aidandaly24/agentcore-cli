@@ -179,7 +179,13 @@ async function main() {
                     `Run \`agentcore deploy\` so the credential provider is created first.`
                 );
               }
-              return { name: c.name, provider: c.provider, credentialProviderArn };
+              return {
+                name: c.name,
+                provider: c.provider,
+                ...(c.provisionMode && { provisionMode: c.provisionMode }),
+                credentialName: c.credentialName,
+                credentialProviderArn,
+              };
             }),
           })
         )

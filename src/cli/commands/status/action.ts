@@ -753,7 +753,8 @@ export async function handleProjectStatus(
                     name: connectorName,
                     connectorId: connectorState.connectorId,
                     status: detail.status,
-                    ...(detail.authorizationUrl && { authorizationUrl: detail.authorizationUrl }),
+                    ...(detail.status === 'PENDING_AUTHENTICATION' &&
+                      detail.authorizationUrl && { authorizationUrl: detail.authorizationUrl }),
                     ...(credentialProviderArn && { credentialProviderArn }),
                   };
                 } catch (error) {

@@ -287,14 +287,24 @@ export class PaymentManagerPrimitive extends BasePrimitive<AddPaymentManagerOpti
     if (manager.connectors.length > 0) {
       summary.push(`Note: ${manager.connectors.length} connector(s) within this manager will also be removed`);
       for (const conn of manager.connectors) {
-        summary.push(`  - Connector: ${conn.name} (credential: ${conn.credentialName})`);
+        summary.push(
+          conn.provisionMode === 'QUICK_CREATE'
+            ? `  - Connector: ${conn.name} (Quick Create)`
+            : `  - Connector: ${conn.name} (credential: ${conn.credentialName})`
+        );
       }
     }
 
-    const credentialNames = manager.connectors.map(c => c.credentialName);
+    const credentialNames = manager.connectors
+      .filter(connector => connector.provisionMode !== 'QUICK_CREATE')
+      .map(connector => connector.credentialName);
     for (const credName of credentialNames) {
       const otherReferences = project.payments.some(
-        m => m.name !== name && m.connectors.some(c => c.credentialName === credName)
+        manager =>
+          manager.name !== name &&
+          manager.connectors.some(
+            connector => connector.provisionMode !== 'QUICK_CREATE' && connector.credentialName === credName
+          )
       );
       if (!otherReferences) {
         summary.push(`Associated credential "${credName}" will also be removed`);
