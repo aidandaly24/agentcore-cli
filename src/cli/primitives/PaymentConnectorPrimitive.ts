@@ -356,7 +356,7 @@ export class PaymentConnectorPrimitive extends BasePrimitive<AddPaymentConnector
   registerCommands(addCmd: Command, removeCmd: Command): void {
     addCmd
       .command('payment-connector')
-      .description('[preview] Add a payment connector to a payment manager')
+      .description('Add a payment connector to a payment manager')
       .option('--manager <name>', 'Payment manager name [non-interactive]')
       .option('--name <name>', 'Payment connector name [non-interactive]')
       .option('--provider <provider>', 'Payment provider: CoinbaseCDP, StripePrivy [non-interactive]')
@@ -602,7 +602,7 @@ export class PaymentConnectorPrimitive extends BasePrimitive<AddPaymentConnector
 
     removeCmd
       .command('payment-connector')
-      .description('[preview] Remove a payment connector from a payment manager')
+      .description('Remove a payment connector from a payment manager')
       .option('--name <name>', 'Name of connector to remove [non-interactive]')
       .option('--manager <manager>', 'Payment manager name [non-interactive]')
       .option('-y, --yes', 'Skip confirmation prompt [non-interactive]')
