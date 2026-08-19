@@ -4,7 +4,6 @@ import { harnessPrimitive, paymentManagerPrimitive } from '../../../primitives/r
 import { ErrorPrompt, Panel, Screen, SelectScreen } from '../../components';
 import {
   useRemovableAgents,
-  useRemovableCapacityProviders,
   useRemovableConfigBundles,
   useRemovableDatasets,
   useRemovableEvaluators,
@@ -21,7 +20,6 @@ import {
   useRemovableRuntimeEndpoints,
   useRemovalPreview,
   useRemoveAgent,
-  useRemoveCapacityProvider,
   useRemoveConfigBundle,
   useRemoveDataset,
   useRemoveEvaluator,
@@ -38,7 +36,6 @@ import {
 } from '../../hooks/useRemove';
 import { RemoveAgentScreen } from './RemoveAgentScreen';
 import { RemoveAllScreen } from './RemoveAllScreen';
-import { RemoveCapacityProviderScreen } from './RemoveCapacityProviderScreen';
 import { RemoveConfigBundleScreen } from './RemoveConfigBundleScreen';
 import { RemoveConfirmScreen } from './RemoveConfirmScreen';
 import { RemoveDatasetScreen } from './RemoveDatasetScreen';
@@ -78,7 +75,6 @@ type FlowState =
   | { name: 'select-config-bundle' }
   | { name: 'select-runtime-endpoint' }
   | { name: 'select-payment' }
-  | { name: 'select-capacity-provider' }
   | { name: 'confirm-agent'; agentName: string; preview: RemovalPreview }
   | { name: 'confirm-gateway'; gatewayName: string; preview: RemovalPreview }
   | { name: 'confirm-gateway-target'; tool: RemovableGatewayTarget; preview: RemovalPreview }
@@ -93,7 +89,6 @@ type FlowState =
   | { name: 'confirm-config-bundle'; bundleName: string; preview: RemovalPreview }
   | { name: 'confirm-runtime-endpoint'; endpointName: string; preview: RemovalPreview }
   | { name: 'confirm-payment'; managerName: string; preview: RemovalPreview }
-  | { name: 'confirm-capacity-provider'; capacityProviderName: string; preview: RemovalPreview }
   | { name: 'loading'; message: string }
   | { name: 'harness-success'; harnessName: string; logFilePath?: string }
   | { name: 'agent-success'; agentName: string; logFilePath?: string }
@@ -110,7 +105,6 @@ type FlowState =
   | { name: 'config-bundle-success'; bundleName: string; logFilePath?: string }
   | { name: 'runtime-endpoint-success'; endpointName: string; logFilePath?: string }
   | { name: 'payment-success'; managerName: string }
-  | { name: 'capacity-provider-success'; capacityProviderName: string; logFilePath?: string }
   | { name: 'remove-all' }
   | { name: 'error'; message: string };
 
@@ -142,7 +136,6 @@ interface RemoveFlowProps {
     | 'payment'
     | 'payment-manager'
     | 'payment-connector'
-    | 'capacity-provider'
     | 'all';
   /** Initial resource name to auto-select (for CLI --name flag) */
   initialResourceName?: string;
@@ -193,8 +186,6 @@ export function RemoveFlow({
       case 'payment-manager':
       case 'payment-connector':
         return { name: 'select-payment' };
-      case 'capacity-provider':
-        return { name: 'select-capacity-provider' };
       case 'all':
         return { name: 'remove-all' };
       default:
@@ -239,11 +230,6 @@ export function RemoveFlow({
     refresh: refreshRuntimeEndpoints,
   } = useRemovableRuntimeEndpoints();
   const { paymentManagers, isLoading: isLoadingPayments, refresh: refreshPayments } = useRemovablePaymentManagers();
-  const {
-    capacityProviders,
-    isLoading: isLoadingCapacityProviders,
-    refresh: refreshCapacityProviders,
-  } = useRemovableCapacityProviders();
 
   // Check if any data is still loading
   const isLoading =
@@ -261,8 +247,7 @@ export function RemoveFlow({
     isLoadingPolicies ||
     isLoadingConfigBundles ||
     isLoadingRuntimeEndpoints ||
-    isLoadingPayments ||
-    isLoadingCapacityProviders;
+    isLoadingPayments;
 
   // Preview hook
   const {
@@ -280,7 +265,6 @@ export function RemoveFlow({
     loadPolicyPreview,
     loadConfigBundlePreview,
     loadRuntimeEndpointPreview,
-    loadCapacityProviderPreview,
     reset: resetPreview,
   } = useRemovalPreview();
 
@@ -299,7 +283,6 @@ export function RemoveFlow({
   const { remove: removePolicyOp, reset: resetRemovePolicy } = useRemovePolicy();
   const { remove: removeConfigBundleOp, reset: resetRemoveConfigBundle } = useRemoveConfigBundle();
   const { remove: removeRuntimeEndpointOp, reset: resetRemoveRuntimeEndpoint } = useRemoveRuntimeEndpoint();
-  const { remove: removeCapacityProviderOp, reset: resetRemoveCapacityProvider } = useRemoveCapacityProvider();
 
   // Track pending result state
   const pendingResultRef = useRef<FlowState | null>(null);
@@ -336,7 +319,6 @@ export function RemoveFlow({
         'config-bundle-success',
         'runtime-endpoint-success',
         'payment-success',
-        'capacity-provider-success',
       ];
       if (successStates.includes(flow.name)) {
         onExit();
@@ -393,9 +375,6 @@ export function RemoveFlow({
         break;
       case 'payment':
         setFlow({ name: 'select-payment' });
-        break;
-      case 'capacity-provider':
-        setFlow({ name: 'select-capacity-provider' });
         break;
       case 'all':
         setFlow({ name: 'remove-all' });
@@ -597,28 +576,6 @@ export function RemoveFlow({
       }
     },
     [loadDatasetPreview, force, removeDatasetOp]
-  );
-
-  const handleSelectCapacityProvider = useCallback(
-    async (capacityProviderName: string) => {
-      const result = await loadCapacityProviderPreview(capacityProviderName);
-      if (result.ok) {
-        if (force) {
-          setFlow({ name: 'loading', message: `Removing capacity provider ${capacityProviderName}...` });
-          const removeResult = await removeCapacityProviderOp(capacityProviderName, result.preview);
-          if (removeResult.success) {
-            setFlow({ name: 'capacity-provider-success', capacityProviderName });
-          } else {
-            setFlow({ name: 'error', message: removeResult.error.message });
-          }
-        } else {
-          setFlow({ name: 'confirm-capacity-provider', capacityProviderName, preview: result.preview });
-        }
-      } else {
-        setFlow({ name: 'error', message: result.error });
-      }
-    },
-    [loadCapacityProviderPreview, force, removeCapacityProviderOp]
   );
 
   const handleSelectKnowledgeBase = useCallback(
@@ -833,9 +790,6 @@ export function RemoveFlow({
         case 'payment-manager':
           void handleSelectPaymentManager(initialResourceName);
           break;
-        case 'capacity-provider':
-          void handleSelectCapacityProvider(initialResourceName);
-          break;
       }
     }, 0);
   }, [
@@ -855,7 +809,6 @@ export function RemoveFlow({
     handleSelectConfigBundle,
     handleSelectRuntimeEndpoint,
     handleSelectPaymentManager,
-    handleSelectCapacityProvider,
   ]);
 
   // Confirm handlers - pass preview for logging
@@ -987,26 +940,6 @@ export function RemoveFlow({
     [removeDatasetOp]
   );
 
-  const handleConfirmCapacityProvider = useCallback(
-    async (capacityProviderName: string, preview: RemovalPreview) => {
-      pendingResultRef.current = null;
-      setResultReady(false);
-      setFlow({ name: 'loading', message: `Removing capacity provider ${capacityProviderName}...` });
-      const result = await removeCapacityProviderOp(capacityProviderName, preview);
-      if (result.success) {
-        pendingResultRef.current = {
-          name: 'capacity-provider-success',
-          capacityProviderName,
-          logFilePath: result.logFilePath,
-        };
-      } else {
-        pendingResultRef.current = { name: 'error', message: result.error.message };
-      }
-      setResultReady(true);
-    },
-    [removeCapacityProviderOp]
-  );
-
   const handleConfirmKnowledgeBase = useCallback(
     async (knowledgeBaseName: string, preview: RemovalPreview) => {
       pendingResultRef.current = null;
@@ -1123,7 +1056,6 @@ export function RemoveFlow({
     resetRemovePolicy();
     resetRemoveConfigBundle();
     resetRemoveRuntimeEndpoint();
-    resetRemoveCapacityProvider();
   }, [
     resetPreview,
     resetRemoveAgent,
@@ -1140,7 +1072,6 @@ export function RemoveFlow({
     resetRemovePolicy,
     resetRemoveConfigBundle,
     resetRemoveRuntimeEndpoint,
-    resetRemoveCapacityProvider,
   ]);
 
   const refreshAll = useCallback(async () => {
@@ -1160,7 +1091,6 @@ export function RemoveFlow({
       refreshConfigBundles(),
       refreshRuntimeEndpoints(),
       refreshPayments(),
-      refreshCapacityProviders(),
     ]);
   }, [
     refreshAgents,
@@ -1178,7 +1108,6 @@ export function RemoveFlow({
     refreshConfigBundles,
     refreshRuntimeEndpoints,
     refreshPayments,
-    refreshCapacityProviders,
   ]);
 
   // Select screen - wait for data to load to avoid arrow position issues
@@ -1205,7 +1134,6 @@ export function RemoveFlow({
         datasetCount={datasets.length}
         knowledgeBaseCount={knowledgeBases.length}
         paymentCount={paymentManagers.length}
-        capacityProviderCount={capacityProviders.length}
       />
     );
   }
@@ -1322,19 +1250,6 @@ export function RemoveFlow({
       <RemoveDatasetScreen
         datasets={datasets}
         onSelect={(name: string) => void handleSelectDataset(name)}
-        onExit={() => setFlow({ name: 'select' })}
-      />
-    );
-  }
-
-  if (flow.name === 'select-capacity-provider') {
-    if (initialResourceName && isLoading) {
-      return null;
-    }
-    return (
-      <RemoveCapacityProviderScreen
-        capacityProviders={capacityProviders}
-        onSelect={(name: string) => void handleSelectCapacityProvider(name)}
         onExit={() => setFlow({ name: 'select' })}
       />
     );
@@ -1565,17 +1480,6 @@ export function RemoveFlow({
     );
   }
 
-  if (flow.name === 'confirm-capacity-provider') {
-    return (
-      <RemoveConfirmScreen
-        title={`Remove Capacity Provider: ${flow.capacityProviderName}`}
-        preview={flow.preview}
-        onConfirm={() => void handleConfirmCapacityProvider(flow.capacityProviderName, flow.preview)}
-        onCancel={() => setFlow({ name: 'select-capacity-provider' })}
-      />
-    );
-  }
-
   if (flow.name === 'confirm-knowledge-base') {
     return (
       <RemoveConfirmScreen
@@ -1782,22 +1686,6 @@ export function RemoveFlow({
         isInteractive={isInteractive}
         message={`Removed dataset: ${flow.datasetName}`}
         detail="Dataset removed from agentcore.json. Deploy with `agentcore deploy` to apply changes. (Local JSONL is left on disk.)"
-        logFilePath={flow.logFilePath}
-        onRemoveAnother={() => {
-          resetAll();
-          void refreshAll().then(() => setFlow({ name: 'select' }));
-        }}
-        onExit={onExit}
-      />
-    );
-  }
-
-  if (flow.name === 'capacity-provider-success') {
-    return (
-      <RemoveSuccessScreen
-        isInteractive={isInteractive}
-        message={`Removed capacity provider: ${flow.capacityProviderName}`}
-        detail="Capacity provider removed from agentcore.json. Deploy with `agentcore deploy` to apply changes."
         logFilePath={flow.logFilePath}
         onRemoveAnother={() => {
           resetAll();

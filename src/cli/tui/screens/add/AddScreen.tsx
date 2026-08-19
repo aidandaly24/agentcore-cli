@@ -17,8 +17,7 @@ export type AddResourceType =
   | 'config-bundle'
   | 'dataset'
   | 'payment-manager'
-  | 'payment-connector'
-  | 'capacity-provider';
+  | 'payment-connector';
 
 const BASE_ADD_RESOURCES: { id: AddResourceType; title: string; description: string }[] = [
   { id: 'agent', title: 'Agent', description: 'Deploy an HTTP, MCP, A2A, or AG-UI agent' },
@@ -39,11 +38,6 @@ const BASE_ADD_RESOURCES: { id: AddResourceType; title: string; description: str
     id: 'payment-connector',
     title: 'Payment Connector [preview]',
     description: 'Link payment provider credentials to a manager',
-  },
-  {
-    id: 'capacity-provider',
-    title: 'Capacity Provider [preview]',
-    description: 'Customer-managed EC2 compute pool for runtimes',
   },
 ];
 

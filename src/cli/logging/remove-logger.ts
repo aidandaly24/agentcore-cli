@@ -24,8 +24,7 @@ export interface RemoveLoggerOptions {
     | 'dataset'
     | 'knowledge-base'
     | 'payment-manager'
-    | 'payment-connector'
-    | 'capacity-provider';
+    | 'payment-connector';
   /** Name of the resource being removed */
   resourceName: string;
 }
