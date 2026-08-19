@@ -4,6 +4,7 @@ import {
   updateGlobalConfig,
   validateGlobalConfig,
 } from '../../../lib/schemas/io/global-config.js';
+import { CONFIG_KEYS } from './constants.js';
 import type { ConfigResult } from './types.js';
 import { ValidationError } from '@/lib/index.js';
 
@@ -34,7 +35,11 @@ export async function handleConfigSet(key: string, raw: string): Promise<ConfigR
   const validation = validateGlobalConfig(partial);
 
   if (!validation.success) {
-    return { success: false, error: new ValidationError(`Invalid value "${raw}" for key "${key}".`) };
+    const validKeys = CONFIG_KEYS.map(k => k.key).join(', ');
+    return {
+      success: false,
+      error: new ValidationError(`Invalid value "${raw}" for key "${key}". Valid keys: ${validKeys}.`),
+    };
   }
 
   const ok = await updateGlobalConfig(partial);
