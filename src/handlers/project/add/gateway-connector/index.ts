@@ -1,14 +1,14 @@
-import type { TargetConfiguration } from "@aws-sdk/client-bedrock-agentcore-control";
 import z from "zod";
 import { InputValidationError } from "../../../../errors";
 import { SourceResolver } from "../../../../io";
-import { createHandler, flag, ProjectKey } from "../../../../router";
-import { parseJsonObjectFlag } from "../../../utils";
-import type { AddProjectResourceConfig } from "../types";
 import {
-  connectorTargetFromShortcut,
-  translateTargetConfiguration,
-} from "../gateway-target/configuration";
+  AgentCoreGatewayTargetSchema,
+  type AgentCoreGatewayTarget,
+} from "../../../../projectSchemas/gateway";
+import { createHandler, flag, ProjectKey } from "../../../../router";
+import { parseJsonFlagWithSchema } from "../../../utils";
+import type { AddProjectResourceConfig } from "../types";
+import { connectorTargetFromShortcut } from "../gateway-target/configuration";
 
 export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -16,7 +16,7 @@ export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfi
     description: "adds a connector-backed Target to a project Gateway",
     flags: [
       flag("gateway", "name of the parent Gateway in this project", z.string().optional()),
-      flag("name", "the connector Target name", z.string().optional()),
+      flag("name", "the Target name for a connector shortcut", z.string().optional()),
       flag(
         "connector",
         "curated connector",
@@ -24,7 +24,7 @@ export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfi
       ),
       flag(
         "connector-configuration",
-        "connector-backed Target configuration (JSON; inline, file://<path>, or - for stdin)",
+        "complete connector agentCoreGateways[].targets[] object (JSON; inline, file://<path>, or - for stdin)",
         z.string().optional(),
       ),
       flag(
@@ -37,13 +37,25 @@ export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfi
       if (!flags.gateway) {
         throw new InputValidationError("required option '--gateway <gateway>' not specified");
       }
-      if (!flags.name) {
-        throw new InputValidationError("required option '--name <name>' not specified");
-      }
       if ((flags.connector === undefined) === (flags["connector-configuration"] === undefined)) {
         throw new InputValidationError(
           "specify exactly one of '--connector' or '--connector-configuration'",
         );
+      }
+
+      const usesConfiguration = flags["connector-configuration"] !== undefined;
+      if (usesConfiguration && flags.name !== undefined) {
+        throw new InputValidationError(
+          "--name is part of --connector-configuration and cannot be supplied separately",
+        );
+      }
+      if (usesConfiguration && flags["knowledge-base"] !== undefined) {
+        throw new InputValidationError(
+          "--knowledge-base cannot be combined with --connector-configuration",
+        );
+      }
+      if (!usesConfiguration && !flags.name) {
+        throw new InputValidationError("required option '--name <name>' not specified");
       }
       if (flags["knowledge-base"] !== undefined && flags.connector !== "bedrock-knowledge-bases") {
         throw new InputValidationError(
@@ -52,22 +64,25 @@ export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfi
       }
 
       const project = ctx.require(ProjectKey);
-      let target;
-      if (flags.connector) {
-        target = connectorTargetFromShortcut(flags.name, flags.connector, flags["knowledge-base"]);
-      } else {
+      let target: AgentCoreGatewayTarget;
+      if (usesConfiguration) {
         const source = new SourceResolver({ stdin: config.io.stdin });
-        const connectorConfiguration = parseJsonObjectFlag<TargetConfiguration>(
+        target = parseJsonFlagWithSchema(
           "connector-configuration",
           await source.resolveText("connector-configuration", flags["connector-configuration"]),
+          AgentCoreGatewayTargetSchema,
         )!;
-        const translated = translateTargetConfiguration(flags.name, connectorConfiguration);
-        if (translated.target.targetType !== "connector") {
+        if (target.targetType !== "connector") {
           throw new InputValidationError(
-            "--connector-configuration must contain an MCP connector Target",
+            '--connector-configuration must have targetType: "connector"',
           );
         }
-        target = translated.target;
+      } else {
+        target = connectorTargetFromShortcut(
+          flags.name!,
+          flags.connector!,
+          flags["knowledge-base"],
+        );
       }
 
       for await (const event of config.projectManager.addResource(project, {
@@ -78,7 +93,7 @@ export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfi
         config.io.stderr.write(`${event.message}\n`);
       }
       config.io.stderr.write(
-        `added Connector Target '${flags.name}' to Gateway '${flags.gateway}' in '${project.name}'\n`,
+        `added Connector Target '${target.name}' to Gateway '${flags.gateway}' in '${project.name}'\n`,
       );
     },
   });

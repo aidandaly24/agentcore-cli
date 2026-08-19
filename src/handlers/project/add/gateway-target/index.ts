@@ -1,14 +1,17 @@
-import type { TargetConfiguration } from "@aws-sdk/client-bedrock-agentcore-control";
 import z from "zod";
 import { InputValidationError } from "../../../../errors";
 import { SourceResolver } from "../../../../io";
-import type { AgentCoreGatewayTarget, OutboundAuth } from "../../../../projectSchemas/gateway";
 import type { Credential } from "../../../../projectSchemas/credential";
+import {
+  AgentCoreGatewayTargetSchema,
+  type AgentCoreGatewayTarget,
+  type OutboundAuth,
+} from "../../../../projectSchemas/gateway";
 import { createHandler, flag, ProjectKey } from "../../../../router";
-import { parseJsonObjectFlag } from "../../../utils";
+import { parseJsonFlagWithSchema } from "../../../utils";
 import type { Project } from "../../types";
 import type { AddProjectResourceConfig } from "../types";
-import { httpsEndpoint, translateTargetConfiguration } from "./configuration";
+import { httpsEndpoint } from "./configuration";
 
 export const createAddGatewayTargetHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -16,18 +19,18 @@ export const createAddGatewayTargetHandler = (config: AddProjectResourceConfig) 
     description: "adds a Target to a project Gateway",
     flags: [
       flag("gateway", "name of the parent Gateway in this project", z.string().optional()),
-      flag("name", "the Target name", z.string().optional()),
+      flag("name", "the Target name for endpoint or Runtime shortcuts", z.string().optional()),
       flag("endpoint", "external MCP server HTTPS endpoint", z.string().optional()),
       flag("runtime", "name of a Runtime declared in this project", z.string().optional()),
       flag("runtime-endpoint", "named endpoint on the selected Runtime", z.string().optional()),
       flag(
         "target-configuration",
-        "complete Target configuration (JSON; inline, file://<path>, or - for stdin)",
+        "complete agentCoreGateways[].targets[] object (JSON; inline, file://<path>, or - for stdin)",
         z.string().optional(),
       ),
       flag(
         "outbound-auth",
-        "Target authentication: none, oauth, or api-key",
+        "shortcut Target authentication: none, oauth, or api-key",
         z.enum(["none", "oauth", "api-key"]).optional(),
       ),
       flag(
@@ -40,9 +43,6 @@ export const createAddGatewayTargetHandler = (config: AddProjectResourceConfig) 
     handle: async (ctx, flags) => {
       if (!flags.gateway) {
         throw new InputValidationError("required option '--gateway <gateway>' not specified");
-      }
-      if (!flags.name) {
-        throw new InputValidationError("required option '--name <name>' not specified");
       }
       const modes = [
         ["--endpoint", flags.endpoint],
@@ -58,57 +58,70 @@ export const createAddGatewayTargetHandler = (config: AddProjectResourceConfig) 
         throw new InputValidationError("--runtime-endpoint requires --runtime");
       }
 
-      const project = ctx.require(ProjectKey);
-      const outboundAuth = projectOutboundAuth(project, {
-        type: flags["outbound-auth"],
-        credentialName: flags["credential-name"],
-        scopes: flags.scope,
-      });
+      const usesConfiguration = flags["target-configuration"] !== undefined;
+      if (usesConfiguration && flags.name !== undefined) {
+        throw new InputValidationError(
+          "--name is part of --target-configuration and cannot be supplied separately",
+        );
+      }
+      if (
+        usesConfiguration &&
+        (flags["outbound-auth"] !== undefined ||
+          flags["credential-name"] !== undefined ||
+          flags.scope !== undefined)
+      ) {
+        throw new InputValidationError(
+          "outboundAuth is part of --target-configuration; shortcut auth flags cannot be combined with it",
+        );
+      }
+      if (!usesConfiguration && !flags.name) {
+        throw new InputValidationError("required option '--name <name>' not specified");
+      }
 
+      const project = ctx.require(ProjectKey);
       let target: AgentCoreGatewayTarget;
-      let inlineSchema;
-      if (flags.endpoint !== undefined) {
-        target = {
-          name: flags.name,
-          targetType: "mcpServer",
-          endpoint: httpsEndpoint(flags.endpoint, "--endpoint"),
-          outboundAuth,
-        };
-      } else if (flags.runtime !== undefined) {
-        target = {
-          name: flags.name,
-          targetType: "httpRuntime",
-          httpRuntime: {
-            runtime: flags.runtime,
-            runtimeEndpoint: flags["runtime-endpoint"],
-          },
-          outboundAuth,
-        };
-      } else {
+      if (usesConfiguration) {
         const source = new SourceResolver({ stdin: config.io.stdin });
-        const targetConfiguration = parseJsonObjectFlag<TargetConfiguration>(
+        target = parseJsonFlagWithSchema(
           "target-configuration",
           await source.resolveText("target-configuration", flags["target-configuration"]),
+          AgentCoreGatewayTargetSchema,
         )!;
-        const translated = translateTargetConfiguration(
-          flags.name,
-          targetConfiguration,
-          outboundAuth,
-        );
-        target = translated.target;
-        inlineSchema = translated.inlineSchema;
+        validateTargetCredential(project, target);
+      } else {
+        const outboundAuth = projectOutboundAuth(project, {
+          type: flags["outbound-auth"],
+          credentialName: flags["credential-name"],
+          scopes: flags.scope,
+        });
+        target =
+          flags.endpoint !== undefined
+            ? {
+                name: flags.name!,
+                targetType: "mcpServer",
+                endpoint: httpsEndpoint(flags.endpoint, "--endpoint"),
+                outboundAuth,
+              }
+            : {
+                name: flags.name!,
+                targetType: "httpRuntime",
+                httpRuntime: {
+                  runtime: flags.runtime!,
+                  runtimeEndpoint: flags["runtime-endpoint"],
+                },
+                outboundAuth,
+              };
       }
 
       for await (const event of config.projectManager.addResource(project, {
         resourceType: "gateway-target",
         gatewayName: flags.gateway,
         resourceConfig: target,
-        inlineSchema,
       })) {
         config.io.stderr.write(`${event.message}\n`);
       }
       config.io.stderr.write(
-        `added Target '${flags.name}' to Gateway '${flags.gateway}' in '${project.name}'\n`,
+        `added Target '${target.name}' to Gateway '${flags.gateway}' in '${project.name}'\n`,
       );
     },
   });
@@ -144,20 +157,30 @@ function projectOutboundAuth(project: Project, input: OutboundAuthInput): Outbou
     throw new InputValidationError("--scope is valid only with --outbound-auth oauth");
   }
 
-  const credential = project.spec.credentials.find(
-    (candidate) => candidate.name === input.credentialName,
-  );
-  if (!credential) {
-    throw new InputValidationError(
-      `credential '${input.credentialName}' does not exist in credentials[]`,
-    );
-  }
+  const credential = requireCredential(project, input.credentialName);
   assertCredentialType(credential, input.type);
   return {
     type: input.type === "oauth" ? "OAUTH" : "API_KEY",
     credentialName: input.credentialName,
     scopes: input.type === "oauth" ? input.scopes : undefined,
   };
+}
+
+function validateTargetCredential(project: Project, target: AgentCoreGatewayTarget): void {
+  const auth = target.outboundAuth;
+  if (!auth?.credentialName) return;
+
+  const credential = requireCredential(project, auth.credentialName);
+  if (auth.type === "OAUTH") assertCredentialType(credential, "oauth");
+  if (auth.type === "API_KEY") assertCredentialType(credential, "api-key");
+}
+
+function requireCredential(project: Project, name: string): Credential {
+  const credential = project.spec.credentials.find((candidate) => candidate.name === name);
+  if (!credential) {
+    throw new InputValidationError(`credential '${name}' does not exist in credentials[]`);
+  }
+  return credential;
 }
 
 function assertCredentialType(credential: Credential, auth: "oauth" | "api-key"): void {

@@ -75,13 +75,11 @@ describe("project add gateway", () => {
     expect(io.stderr()).toContain("added Gateway 'tools'");
   });
 
-  test("maps MCP, policy, role, exception, description, and tags", async () => {
+  test("maps scalar flags directly to Gateway project fields", async () => {
     const projectRoot = await inProject();
     const spec = await projectSpec(projectRoot);
     spec.policyEngines = [{ name: "Guardrails", policies: [] }];
     await writeProjectSpec(projectRoot, spec);
-    const protocolFile = join(projectRoot, "protocol.json");
-    await writeFile(protocolFile, '{"mcp":{"searchType":"SEMANTIC"}}');
 
     await run([
       "add",
@@ -90,8 +88,7 @@ describe("project add gateway", () => {
       "tools",
       "--protocol",
       "mcp",
-      "--protocol-configuration",
-      `file://${protocolFile}`,
+      "--enable-semantic-search",
       "--role-arn",
       "arn:aws:iam::123456789012:role/GatewayRole",
       "--description",
@@ -119,7 +116,7 @@ describe("project add gateway", () => {
     });
   });
 
-  test("reads CUSTOM_JWT configuration from stdin", async () => {
+  test("reads project authorizerConfiguration from stdin without translation", async () => {
     const projectRoot = await inProject();
     await run(
       [
@@ -133,7 +130,7 @@ describe("project add gateway", () => {
         "-",
       ],
       JSON.stringify({
-        customJWTAuthorizer: {
+        customJwtAuthorizer: {
           discoveryUrl: "https://idp.example.com/.well-known/openid-configuration",
           allowedAudience: ["agentcore"],
         },
@@ -151,27 +148,34 @@ describe("project add gateway", () => {
     });
   });
 
-  test("rejects unsupported protocol fields without writing a Gateway", async () => {
+  test("rejects the SDK authorizer shape", async () => {
     const projectRoot = await inProject();
     await expect(
       run([
         "add",
         "gateway",
         "--name",
-        "tools",
-        "--protocol",
-        "mcp",
-        "--protocol-configuration",
-        '{"mcp":{"instructions":"not persistable"}}',
+        "secure",
+        "--authorizer-type",
+        "CUSTOM_JWT",
+        "--authorizer-configuration",
+        '{"customJWTAuthorizer":{"discoveryUrl":"https://idp.example.com/.well-known/openid-configuration"}}',
       ]),
-    ).rejects.toThrow("mcp.instructions");
+    ).rejects.toThrow("customJWTAuthorizer");
 
     expect((await projectSpec(projectRoot)).agentCoreGateways ?? []).toEqual([]);
+  });
+
+  test("semantic search requires an MCP Gateway", async () => {
+    await inProject();
+    await expect(
+      run(["add", "gateway", "--name", "tools", "--enable-semantic-search"]),
+    ).rejects.toThrow("--protocol mcp");
   });
 });
 
 describe("project add gateway-target", () => {
-  test("adds endpoint and project Runtime modes", async () => {
+  test("adds endpoint and project Runtime shortcuts", async () => {
     const projectRoot = await inProject();
     await addGateway();
     await run([
@@ -211,56 +215,100 @@ describe("project add gateway-target", () => {
     ]);
   });
 
-  test("materializes an inline Lambda tool schema", async () => {
+  test("persists a complete project Target object without translation or asset creation", async () => {
     const projectRoot = await inProject();
     await addGateway();
+    const target = {
+      name: "search",
+      targetType: "lambdaFunctionArn",
+      lambdaFunctionArn: {
+        lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
+        toolSchemaFile: "schemas/tool-schema.json",
+      },
+    };
+
     await run([
       "add",
       "gateway-target",
       "--gateway",
       "tools",
-      "--name",
-      "search",
       "--target-configuration",
-      JSON.stringify({
-        mcp: {
-          lambda: {
-            lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
-            toolSchema: {
-              inlinePayload: [
-                {
-                  name: "search",
-                  description: "Search",
-                  inputSchema: { type: "object", properties: {} },
-                },
-              ],
-            },
-          },
-        },
-      }),
+      JSON.stringify(target),
     ]);
 
-    const managedPath = "agentcore/assets/gateways/tools/targets/search/tool-schema.json";
-    expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual({
-      name: "search",
-      targetType: "lambdaFunctionArn",
-      lambdaFunctionArn: {
-        lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
-        toolSchemaFile: managedPath,
-      },
-    });
-    expect(await Bun.file(join(projectRoot, managedPath)).json()).toEqual([
-      {
-        name: "search",
-        description: "Search",
-        inputSchema: { type: "object", properties: {} },
-      },
-    ]);
+    expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual(target);
+    expect(await Bun.file(join(projectRoot, "agentcore", "assets")).exists()).toBe(false);
   });
 
-  test("rejects an external MCP endpoint that does not use HTTPS", async () => {
+  test("accepts a project-owned compute Target represented by the project schema", async () => {
     const projectRoot = await inProject();
     await addGateway();
+    const target = {
+      name: "local-tool",
+      targetType: "lambda",
+      toolDefinitions: [
+        {
+          name: "search",
+          description: "Search documents",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+      compute: {
+        host: "Lambda",
+        implementation: {
+          language: "Python",
+          path: "app/search-tool",
+          handler: "handler.py:handler",
+        },
+        pythonVersion: "PYTHON_3_12",
+      },
+    };
+
+    await run([
+      "add",
+      "gateway-target",
+      "--gateway",
+      "tools",
+      "--target-configuration",
+      JSON.stringify(target),
+    ]);
+
+    expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual(target);
+  });
+
+  test.each(["file", "stdin"] as const)(
+    "reads a complete project Target from %s",
+    async (sourceKind) => {
+      const projectRoot = await inProject();
+      await addGateway();
+      const target = {
+        name: "source",
+        targetType: "mcpServer",
+        endpoint: "https://source.example.com",
+      };
+      const configuration = JSON.stringify(target);
+      const path = join(projectRoot, "target.json");
+      await writeFile(path, configuration);
+      const source = sourceKind === "file" ? `file://${path}` : "-";
+
+      await run(
+        ["add", "gateway-target", "--gateway", "tools", "--target-configuration", source],
+        sourceKind === "stdin" ? configuration : undefined,
+      );
+
+      expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual(target);
+    },
+  );
+
+  test("rejects separate name and auth flags with complete Target JSON", async () => {
+    await inProject();
+    await addGateway();
+    const target = JSON.stringify({
+      name: "source",
+      targetType: "mcpServer",
+      endpoint: "https://source.example.com",
+    });
+
     await expect(
       run([
         "add",
@@ -268,81 +316,52 @@ describe("project add gateway-target", () => {
         "--gateway",
         "tools",
         "--name",
-        "insecure",
-        "--endpoint",
-        "http://mcp.example.com",
+        "duplicate",
+        "--target-configuration",
+        target,
       ]),
-    ).rejects.toThrow("must use HTTPS");
-
-    expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets).toEqual([]);
+    ).rejects.toThrow("--name is part of --target-configuration");
+    await expect(
+      run([
+        "add",
+        "gateway-target",
+        "--gateway",
+        "tools",
+        "--target-configuration",
+        target,
+        "--outbound-auth",
+        "none",
+      ]),
+    ).rejects.toThrow("outboundAuth is part of --target-configuration");
   });
 
-  test.each(["file", "stdin"] as const)(
-    "reads Target configuration from %s",
-    async (sourceKind) => {
-      const projectRoot = await inProject();
-      await addGateway();
-      const configuration = JSON.stringify({
-        mcp: { mcpServer: { endpoint: "https://source.example.com" } },
-      });
-      const path = join(projectRoot, "target.json");
-      await writeFile(path, configuration);
-      const source = sourceKind === "file" ? `file://${path}` : "-";
-
-      await run(
-        [
-          "add",
-          "gateway-target",
-          "--gateway",
-          "tools",
-          "--name",
-          "source",
-          "--target-configuration",
-          source,
-        ],
-        sourceKind === "stdin" ? configuration : undefined,
-      );
-
-      expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toMatchObject({
-        name: "source",
-        targetType: "mcpServer",
-        endpoint: "https://source.example.com",
-      });
-    },
-  );
-
-  test("resolves compatible project credentials", async () => {
+  test("validates direct project credential references", async () => {
     const projectRoot = await inProject();
     const spec = await projectSpec(projectRoot);
-    spec.credentials = [
-      { authorizerType: "OAuthCredentialProvider", name: "search-oauth" },
-      { authorizerType: "ApiKeyCredentialProvider", name: "search-key" },
-    ];
+    spec.credentials = [{ authorizerType: "OAuthCredentialProvider", name: "search-oauth" }];
     await writeProjectSpec(projectRoot, spec);
     await addGateway();
+    const target = {
+      name: "oauth",
+      targetType: "mcpServer",
+      endpoint: "https://oauth.example.com",
+      outboundAuth: {
+        type: "OAUTH",
+        credentialName: "search-oauth",
+        scopes: ["read", "write"],
+      },
+    };
+
     await run([
       "add",
       "gateway-target",
       "--gateway",
       "tools",
-      "--name",
-      "oauth",
-      "--endpoint",
-      "https://oauth.example.com",
-      "--outbound-auth",
-      "oauth",
-      "--credential-name",
-      "search-oauth",
-      "--scope",
-      "read",
-      "write",
+      "--target-configuration",
+      JSON.stringify(target),
     ]);
 
-    expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0].outboundAuth).toEqual({
-      type: "OAUTH",
-      credentialName: "search-oauth",
-      scopes: ["read", "write"],
-    });
+    expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual(target);
   });
 
   test("allows equal Target names in different Gateways but not the same Gateway", async () => {
@@ -375,7 +394,6 @@ describe("project add gateway-target", () => {
     ).rejects.toThrow("already exists");
 
     const gateways = (await projectSpec(projectRoot)).agentCoreGateways;
-    expect(gateways.map((gateway: { targets: unknown[] }) => gateway.targets)).toHaveLength(2);
     expect(gateways[0].targets).toHaveLength(1);
     expect(gateways[1].targets).toHaveLength(1);
   });
@@ -425,43 +443,43 @@ describe("project add gateway-connector", () => {
   });
 
   test.each(["inline", "file", "stdin"] as const)(
-    "reads Connector configuration from %s JSON",
+    "reads a complete connector project Target from %s JSON",
     async (sourceKind) => {
       const projectRoot = await inProject();
       await addGateway();
-      const configuration = JSON.stringify({
-        mcp: {
-          connector: {
-            source: { connectorId: "web-search" },
-            configurations: [{ name: "WebSearch", parameterValues: { maxResults: 3 } }],
-          },
-        },
-      });
+      const target = {
+        name: "configured",
+        targetType: "connector",
+        connectorId: "web-search",
+        configurations: [{ name: "WebSearch", parameterValues: { maxResults: 3 } }],
+      };
+      const configuration = JSON.stringify(target);
       const path = join(projectRoot, "connector.json");
       await writeFile(path, configuration);
       const source =
         sourceKind === "inline" ? configuration : sourceKind === "file" ? `file://${path}` : "-";
 
       await run(
-        [
-          "add",
-          "gateway-connector",
-          "--gateway",
-          "tools",
-          "--name",
-          "configured",
-          "--connector-configuration",
-          source,
-        ],
+        ["add", "gateway-connector", "--gateway", "tools", "--connector-configuration", source],
         sourceKind === "stdin" ? configuration : undefined,
       );
 
-      expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toMatchObject({
-        name: "configured",
-        targetType: "connector",
-        connectorId: "web-search",
-        configurations: [{ name: "WebSearch", parameterValues: { maxResults: 3 } }],
-      });
+      expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual(target);
     },
   );
+
+  test("rejects a non-connector project Target", async () => {
+    await inProject();
+    await addGateway();
+    await expect(
+      run([
+        "add",
+        "gateway-connector",
+        "--gateway",
+        "tools",
+        "--connector-configuration",
+        '{"name":"server","targetType":"mcpServer","endpoint":"https://mcp.example.com"}',
+      ]),
+    ).rejects.toThrow('targetType: "connector"');
+  });
 });

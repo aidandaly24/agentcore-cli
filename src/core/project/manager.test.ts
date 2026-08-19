@@ -16,7 +16,6 @@ import {
 } from "../../handlers/project/types";
 import { createSilentLogger } from "../../testing";
 import type { DeployBackendInput, ProjectBackend } from "./backends/types";
-import { FsReadWriteJson, type ReadWriteJson } from "../../io";
 
 const originalCwd = process.cwd();
 const tempDirectories: string[] = [];
@@ -548,7 +547,7 @@ describe("FsProjectManager.addResource", () => {
     ).project;
   }
 
-  test("writes managed schema assets and stores a portable project-relative path", async () => {
+  test("adds a Target using its project-schema shape without creating assets", async () => {
     const directory = await inTempDirectory();
     const subject = manager().manager;
     const project = await projectWithGateway(subject);
@@ -561,29 +560,23 @@ describe("FsProjectManager.addResource", () => {
         targetType: "lambdaFunctionArn",
         lambdaFunctionArn: {
           lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
-          toolSchemaFile: "tool-schema.json",
+          toolSchemaFile: "schemas/tool-schema.json",
         },
       },
-      inlineSchema: { kind: "lambda", content: "[]" },
     });
 
-    const assetDirectory = join(
-      directory,
-      "example",
-      "agentcore",
-      "assets",
-      "gateways",
-      "tools",
-      "targets",
-      "search",
-    );
-    expect(await Bun.file(join(assetDirectory, "tool-schema.json")).text()).toBe("[]");
-    expect(
-      result.project.spec.agentCoreGateways[0]?.targets[0]?.lambdaFunctionArn?.toolSchemaFile,
-    ).toBe("agentcore/assets/gateways/tools/targets/search/tool-schema.json");
+    expect(result.project.spec.agentCoreGateways[0]?.targets[0]).toEqual({
+      name: "search",
+      targetType: "lambdaFunctionArn",
+      lambdaFunctionArn: {
+        lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
+        toolSchemaFile: "schemas/tool-schema.json",
+      },
+    });
+    expect(await Bun.file(join(directory, "example", "agentcore", "assets")).exists()).toBe(false);
   });
 
-  test("rolls back a managed asset when candidate validation fails", async () => {
+  test("rejects an invalid project Target before writing the project", async () => {
     const directory = await inTempDirectory();
     const subject = manager().manager;
     const project = await projectWithGateway(subject);
@@ -595,110 +588,13 @@ describe("FsProjectManager.addResource", () => {
         resourceConfig: {
           name: "search",
           targetType: "openApiSchema",
-          schemaSource: { inline: { path: "openapi.json" } },
-        },
-        inlineSchema: { kind: "openapi", content: '{"openapi":"3.0.0"}' },
+        } as never,
       }),
     ).rejects.toBeInstanceOf(InputValidationError);
 
-    const assetDirectory = join(
-      directory,
-      "example",
-      "agentcore",
-      "assets",
-      "gateways",
-      "tools",
-      "targets",
-      "search",
-    );
-    expect(await Bun.file(assetDirectory).exists()).toBe(false);
-  });
-
-  test("rolls back a managed asset when the project write fails", async () => {
-    const directory = await inTempDirectory();
-    const logger = createSilentLogger();
-    const realJson = new FsReadWriteJson({ logger });
-    const subject = manager().manager;
-    const project = await projectWithGateway(subject);
-    const failingJson: ReadWriteJson = {
-      read: (path, schema) => realJson.read(path, schema),
-      write: async () => {
-        throw new Error("write exploded");
-      },
-    };
-    const failing = new FsProjectManager({
-      logger,
-      runner: async () => {},
-      checkTool: async () => {},
-      json: failingJson,
-    });
-
-    await expect(
-      runAdd(failing, project, {
-        resourceType: "gateway-target",
-        gatewayName: "tools",
-        resourceConfig: {
-          name: "search",
-          targetType: "lambdaFunctionArn",
-          lambdaFunctionArn: {
-            lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
-            toolSchemaFile: "tool-schema.json",
-          },
-        },
-        inlineSchema: { kind: "lambda", content: "[]" },
-      }),
-    ).rejects.toThrow("write exploded");
-
-    const assetDirectory = join(
-      directory,
-      "example",
-      "agentcore",
-      "assets",
-      "gateways",
-      "tools",
-      "targets",
-      "search",
-    );
-    expect(await Bun.file(assetDirectory).exists()).toBe(false);
     const persisted = await Bun.file(
       join(directory, "example", "agentcore", "agentcore.json"),
     ).json();
     expect(persisted.agentCoreGateways[0].targets).toEqual([]);
-  });
-
-  test("refuses to overwrite an existing Target asset directory", async () => {
-    const directory = await inTempDirectory();
-    const subject = manager().manager;
-    const project = await projectWithGateway(subject);
-    const assetDirectory = join(
-      directory,
-      "example",
-      "agentcore",
-      "assets",
-      "gateways",
-      "tools",
-      "targets",
-      "search",
-    );
-    await mkdir(assetDirectory, { recursive: true });
-    await writeFile(join(assetDirectory, "keep.txt"), "keep");
-
-    await expect(
-      runAdd(subject, project, {
-        resourceType: "gateway-target",
-        gatewayName: "tools",
-        resourceConfig: {
-          name: "search",
-          targetType: "lambdaFunctionArn",
-          lambdaFunctionArn: {
-            lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
-            toolSchemaFile: "tool-schema.json",
-          },
-        },
-        inlineSchema: { kind: "lambda", content: "[]" },
-      }),
-    ).rejects.toThrow("asset directory already exists");
-
-    expect(await Bun.file(join(assetDirectory, "keep.txt")).text()).toBe("keep");
   });
 });

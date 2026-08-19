@@ -76,19 +76,6 @@ export type EnvLocalEntry = {
   comment: string;
 };
 
-export const GATEWAY_TARGET_INLINE_SCHEMA_FILENAMES = {
-  lambda: "tool-schema.json",
-  openapi: "openapi.json",
-  smithy: "smithy.json",
-} as const;
-
-export type GatewayTargetInlineSchemaKind = keyof typeof GATEWAY_TARGET_INLINE_SCHEMA_FILENAMES;
-
-export type GatewayTargetInlineSchema = {
-  kind: GatewayTargetInlineSchemaKind;
-  content: string;
-};
-
 /** Discriminated union input for {@link ProjectManager.addResource}. */
 export type AddResourceInput =
   | {
@@ -128,7 +115,6 @@ export type AddResourceInput =
       resourceType: "gateway-target";
       gatewayName: string;
       resourceConfig: AgentCoreGatewayTarget;
-      inlineSchema?: GatewayTargetInlineSchema;
     };
 
 export type ProjectResource = AddResourceInput["resourceType"];

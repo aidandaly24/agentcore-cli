@@ -1,15 +1,13 @@
-import type {
-  AuthorizerConfiguration as SdkAuthorizerConfiguration,
-  GatewayProtocolConfiguration,
-} from "@aws-sdk/client-bedrock-agentcore-control";
 import z from "zod";
 import { InputValidationError } from "../../../../errors";
 import { SourceResolver } from "../../../../io";
-import type { AuthorizerConfig } from "../../../../projectSchemas/auth";
+import { GatewayAuthorizerConfigSchema } from "../../../../projectSchemas/auth";
 import type { AgentCoreGateway } from "../../../../projectSchemas/gateway";
 import { createHandler, flag, ProjectKey } from "../../../../router";
-import { parseJsonObjectFlag, parseTags } from "../../../utils";
+import { parseJsonFlagWithSchema, parseTags } from "../../../utils";
 import type { AddProjectResourceConfig } from "../types";
+
+const GatewayAuthorizerConfigurationInputSchema = GatewayAuthorizerConfigSchema.strict();
 
 export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -28,19 +26,19 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
         z.enum(["mcp"]).optional(),
       ),
       flag(
+        "enable-semantic-search",
+        "enable semantic search for an MCP Gateway",
+        z.boolean().optional(),
+      ),
+      flag(
         "authorizer-type",
         "inbound authorizer: AWS_IAM, CUSTOM_JWT, or NONE",
         z.enum(["AWS_IAM", "CUSTOM_JWT", "NONE"]).optional(),
       ),
       flag("description", "Gateway description", z.string().optional()),
       flag(
-        "protocol-configuration",
-        "MCP protocol configuration (JSON; inline, file://<path>, or - for stdin)",
-        z.string().optional(),
-      ),
-      flag(
         "authorizer-configuration",
-        "CUSTOM_JWT configuration (JSON; inline, file://<path>, or - for stdin)",
+        "project authorizerConfiguration (JSON; inline, file://<path>, or - for stdin)",
         z.string().optional(),
       ),
       flag(
@@ -95,20 +93,17 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
       if (authorizerType !== "CUSTOM_JWT" && flags["authorizer-configuration"] !== undefined) {
         throw new InputValidationError("--authorizer-configuration is valid only with CUSTOM_JWT");
       }
-      if (!flags.protocol && flags["protocol-configuration"] !== undefined) {
+      if (flags["enable-semantic-search"] && !flags.protocol) {
         throw new InputValidationError(
-          "--protocol-configuration is valid only with --protocol mcp",
+          "--enable-semantic-search is valid only with --protocol mcp",
         );
       }
 
       const source = new SourceResolver({ stdin: config.io.stdin });
-      const protocolConfiguration = parseJsonObjectFlag<GatewayProtocolConfiguration>(
-        "protocol-configuration",
-        await source.resolveText("protocol-configuration", flags["protocol-configuration"]),
-      );
-      const authorizerConfiguration = parseJsonObjectFlag<SdkAuthorizerConfiguration>(
+      const authorizerConfiguration = parseJsonFlagWithSchema(
         "authorizer-configuration",
         await source.resolveText("authorizer-configuration", flags["authorizer-configuration"]),
+        GatewayAuthorizerConfigurationInputSchema,
       );
       const tags = await resolveTags(source, flags.tags);
 
@@ -116,14 +111,10 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
         name: flags.name,
         protocolType: flags.protocol ? "MCP" : "None",
         authorizerType,
-        authorizerConfiguration: authorizerConfiguration
-          ? toAuthorizerConfiguration(authorizerConfiguration)
-          : undefined,
+        authorizerConfiguration,
         description: flags.description,
         targets: [],
-        enableSemanticSearch: protocolConfiguration
-          ? semanticSearchEnabled(protocolConfiguration)
-          : false,
+        enableSemanticSearch: flags["enable-semantic-search"] ?? false,
         exceptionLevel: flags["exception-level"] ? "DEBUG" : "NONE",
         executionRoleArn: flags["role-arn"],
         policyEngineConfiguration:
@@ -146,90 +137,6 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
     },
   });
 
-function semanticSearchEnabled(configuration: GatewayProtocolConfiguration): boolean {
-  const root = configuration as unknown as Record<string, unknown>;
-  exactKeys(root, ["mcp"], "protocol-configuration");
-  if (!root.mcp) {
-    throw new InputValidationError("--protocol-configuration must contain mcp");
-  }
-  const mcp = object(root.mcp, "protocol-configuration.mcp");
-  exactKeys(
-    mcp,
-    [
-      "searchType",
-      "supportedVersions",
-      "instructions",
-      "sessionConfiguration",
-      "streamingConfiguration",
-    ],
-    "protocol-configuration.mcp",
-  );
-  for (const field of [
-    "supportedVersions",
-    "instructions",
-    "sessionConfiguration",
-    "streamingConfiguration",
-  ]) {
-    if (mcp[field] !== undefined) {
-      throw new InputValidationError(
-        `Unsupported --protocol-configuration field 'mcp.${field}'. ` +
-          "The current project schema cannot persist it.",
-      );
-    }
-  }
-  if (mcp.searchType !== undefined && mcp.searchType !== "SEMANTIC") {
-    throw new InputValidationError(
-      "Unsupported --protocol-configuration field 'mcp.searchType'. " +
-        "The current project schema supports only SEMANTIC.",
-    );
-  }
-  return mcp.searchType === "SEMANTIC";
-}
-
-function toAuthorizerConfiguration(configuration: SdkAuthorizerConfiguration): AuthorizerConfig {
-  const root = configuration as unknown as Record<string, unknown>;
-  exactKeys(root, ["customJWTAuthorizer"], "authorizer-configuration");
-  const custom = object(root.customJWTAuthorizer, "authorizer-configuration.customJWTAuthorizer");
-  exactKeys(
-    custom,
-    [
-      "discoveryUrl",
-      "allowedAudience",
-      "allowedClients",
-      "allowedScopes",
-      "advertisedScopeMapping",
-      "customClaims",
-      "privateEndpoint",
-      "privateEndpointOverrides",
-      "allowedWorkloadConfiguration",
-    ],
-    "authorizer-configuration.customJWTAuthorizer",
-  );
-  for (const field of ["advertisedScopeMapping", "allowedWorkloadConfiguration"]) {
-    if (custom[field] !== undefined) {
-      throw new InputValidationError(
-        `Unsupported --authorizer-configuration field 'customJWTAuthorizer.${field}'. ` +
-          "The current project schema cannot persist it.",
-      );
-    }
-  }
-  return {
-    customJwtAuthorizer: {
-      discoveryUrl: custom.discoveryUrl as string,
-      allowedAudience: custom.allowedAudience as string[] | undefined,
-      allowedClients: custom.allowedClients as string[] | undefined,
-      allowedScopes: custom.allowedScopes as string[] | undefined,
-      customClaims: custom.customClaims as
-        NonNullable<AuthorizerConfig["customJwtAuthorizer"]>["customClaims"] | undefined,
-      privateEndpoint: custom.privateEndpoint as
-        NonNullable<AuthorizerConfig["customJwtAuthorizer"]>["privateEndpoint"] | undefined,
-      privateEndpointOverrides: custom.privateEndpointOverrides as
-        | NonNullable<AuthorizerConfig["customJwtAuthorizer"]>["privateEndpointOverrides"]
-        | undefined,
-    },
-  };
-}
-
 async function resolveTags(
   source: SourceResolver,
   values: string[] | undefined,
@@ -244,21 +151,4 @@ async function resolveTags(
     return parseTags([resolved!]);
   }
   return parseTags(values);
-}
-
-function object(value: unknown, path: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new InputValidationError(`${path} must be a JSON object`);
-  }
-  return value as Record<string, unknown>;
-}
-
-function exactKeys(value: Record<string, unknown>, allowed: readonly string[], path: string): void {
-  for (const key of Object.keys(value)) {
-    if (!allowed.includes(key)) {
-      throw new InputValidationError(
-        `Unsupported --${path} field '${key}'. This field cannot be persisted without data loss.`,
-      );
-    }
-  }
 }
