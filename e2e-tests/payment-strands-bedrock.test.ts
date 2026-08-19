@@ -8,6 +8,7 @@
  *   - AWS credentials (via profile or env vars)
  *   - CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET (for connector creation)
  *   - CDK_TARBALL (optional — path to payment-aware CDK constructs tgz)
+ *   - E2E_COINBASE_MARKETPLACE_SUBSCRIBED=true (required for live deployment assertions)
  */
 import { hasAwsCredentials, parseJsonOutput, prereqs, retry } from '../src/test-utils/index.js';
 import { installCdkTarball, runAgentCoreCLI, teardownE2EProject, writeAwsTargets } from './e2e-helper.js';
@@ -21,6 +22,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const hasAws: boolean = hasAwsCredentials();
 const hasCdpCreds = !!(process.env.CDP_API_KEY_ID && process.env.CDP_API_KEY_SECRET && process.env.CDP_WALLET_SECRET);
 const canRun = prereqs.npm && prereqs.git && prereqs.uv && hasAws && hasCdpCreds;
+// Coinbase connector creation requires an account-level Marketplace entitlement.
+// Keep local CLI coverage running when the CI account cannot acquire that entitlement.
+const hasCoinbaseMarketplaceSubscription = process.env.E2E_COINBASE_MARKETPLACE_SUBSCRIBED === 'true';
+const canDeploy = canRun && hasCoinbaseMarketplaceSubscription;
 
 describe.sequential('e2e: payments — create → add payment → deploy → status', () => {
   let testDir: string;
@@ -97,7 +102,7 @@ describe.sequential('e2e: payments — create → add payment → deploy → sta
   }, 300000);
 
   afterAll(async () => {
-    if (projectPath && hasAws) {
+    if (projectPath && hasAws && canDeploy) {
       await teardownE2EProject(projectPath, agentName, 'Bedrock');
     }
     if (testDir) await rm(testDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 1000 });
@@ -156,7 +161,7 @@ describe.sequential('e2e: payments — create → add payment → deploy → sta
     expect(paymentsCode).toContain('session_id');
   });
 
-  it.skipIf(!canRun)(
+  it.skipIf(!canDeploy)(
     'deploys to AWS successfully',
     async () => {
       expect(projectPath).toBeTruthy();
@@ -182,7 +187,7 @@ describe.sequential('e2e: payments — create → add payment → deploy → sta
     600000
   );
 
-  it.skipIf(!canRun)('status shows payment manager', async () => {
+  it.skipIf(!canDeploy)('status shows payment manager', async () => {
     expect(projectPath).toBeTruthy();
 
     const result = await runAgentCoreCLI(['status', '--json'], projectPath);
@@ -200,7 +205,7 @@ describe.sequential('e2e: payments — create → add payment → deploy → sta
     expect(paymentResource!.deploymentState).toBe('deployed');
   });
 
-  it.skipIf(!canRun)('deployed-state.json has payment manager and connector info', async () => {
+  it.skipIf(!canDeploy)('deployed-state.json has payment manager and connector info', async () => {
     // Read deployed state from the CLI's internal state
     const statePath = join(projectPath, 'agentcore', '.cli', 'deployed-state.json');
     const state = JSON.parse(await readFile(statePath, 'utf-8'));
