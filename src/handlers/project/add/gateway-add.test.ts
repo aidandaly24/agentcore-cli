@@ -364,22 +364,54 @@ describe("project add gateway-target", () => {
     expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual(target);
   });
 
-  test("allows equal Target names in different Gateways but not the same Gateway", async () => {
+  test("rejects duplicate Target names across every Gateway in the project", async () => {
     const projectRoot = await inProject();
     await addGateway("tools");
     await addGateway("payments");
+    await run([
+      "add",
+      "gateway-target",
+      "--gateway",
+      "tools",
+      "--name",
+      "search",
+      "--endpoint",
+      "https://tools.example.com",
+    ]);
+
     for (const gateway of ["tools", "payments"]) {
-      await run([
-        "add",
-        "gateway-target",
-        "--gateway",
-        gateway,
-        "--name",
-        "search",
-        "--endpoint",
-        `https://${gateway}.example.com`,
-      ]);
+      await expect(
+        run([
+          "add",
+          "gateway-target",
+          "--gateway",
+          gateway,
+          "--name",
+          "search",
+          "--endpoint",
+          `https://${gateway}.example.com`,
+        ]),
+      ).rejects.toThrow("already exists in gateway 'tools'");
     }
+
+    const gateways = (await projectSpec(projectRoot)).agentCoreGateways;
+    expect(gateways[0].targets).toHaveLength(1);
+    expect(gateways[1].targets).toHaveLength(0);
+  });
+
+  test("rejects a Target name already present in unassignedTargets", async () => {
+    const projectRoot = await inProject();
+    const spec = await projectSpec(projectRoot);
+    spec.unassignedTargets = [
+      {
+        name: "search",
+        targetType: "mcpServer",
+        endpoint: "https://unassigned.example.com",
+      },
+    ];
+    await writeProjectSpec(projectRoot, spec);
+    await addGateway("tools");
+
     await expect(
       run([
         "add",
@@ -389,13 +421,9 @@ describe("project add gateway-target", () => {
         "--name",
         "search",
         "--endpoint",
-        "https://duplicate.example.com",
+        "https://tools.example.com",
       ]),
-    ).rejects.toThrow("already exists");
-
-    const gateways = (await projectSpec(projectRoot)).agentCoreGateways;
-    expect(gateways[0].targets).toHaveLength(1);
-    expect(gateways[1].targets).toHaveLength(1);
+    ).rejects.toThrow("unassigned gateway target");
   });
 });
 
