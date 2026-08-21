@@ -435,7 +435,11 @@ describe("project add gateway-target", () => {
     const projectRoot = await inProject();
     const spec = await projectSpec(projectRoot);
     spec.credentials = [
-      { authorizerType: "OAuthCredentialProvider", name: "search-oauth" },
+      {
+        authorizerType: "OAuthCredentialProvider",
+        name: "search-oauth",
+        discoveryUrl: "https://idp.example.com/.well-known/openid-configuration",
+      },
       { authorizerType: "ApiKeyCredentialProvider", name: "search-api-key" },
     ];
     await writeProjectSpec(projectRoot, spec);
@@ -484,7 +488,13 @@ describe("project add gateway-target", () => {
   test("adds an OAuth-authenticated endpoint shortcut", async () => {
     const projectRoot = await inProject();
     const spec = await projectSpec(projectRoot);
-    spec.credentials = [{ authorizerType: "OAuthCredentialProvider", name: "oauth" }];
+    spec.credentials = [
+      {
+        authorizerType: "OAuthCredentialProvider",
+        name: "oauth",
+        discoveryUrl: "https://idp.example.com/.well-known/openid-configuration",
+      },
+    ];
     await writeProjectSpec(projectRoot, spec);
     await addGateway();
 
@@ -697,7 +707,11 @@ describe("project add gateway-target", () => {
     const projectRoot = await inProject();
     const spec = await projectSpec(projectRoot);
     spec.credentials = [
-      { authorizerType: "OAuthCredentialProvider", name: "oauth" },
+      {
+        authorizerType: "OAuthCredentialProvider",
+        name: "oauth",
+        discoveryUrl: "https://idp.example.com/.well-known/openid-configuration",
+      },
       { authorizerType: "ApiKeyCredentialProvider", name: "api-key" },
     ];
     await writeProjectSpec(projectRoot, spec);
@@ -709,7 +723,13 @@ describe("project add gateway-target", () => {
   test("rejects a direct API-key credential with the wrong project credential type", async () => {
     const projectRoot = await inProject();
     const spec = await projectSpec(projectRoot);
-    spec.credentials = [{ authorizerType: "OAuthCredentialProvider", name: "oauth" }];
+    spec.credentials = [
+      {
+        authorizerType: "OAuthCredentialProvider",
+        name: "oauth",
+        discoveryUrl: "https://idp.example.com/.well-known/openid-configuration",
+      },
+    ];
     await writeProjectSpec(projectRoot, spec);
     await addGateway();
 
