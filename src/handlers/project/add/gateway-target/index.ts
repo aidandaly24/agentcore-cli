@@ -11,7 +11,6 @@ import { createHandler, flag, ProjectKey } from "../../../../router";
 import { parseJsonFlagWithSchema } from "../../../utils";
 import type { Project } from "../../types";
 import type { AddProjectResourceConfig } from "../types";
-import { httpsEndpoint } from "./configuration";
 
 export const createAddGatewayTargetHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -190,4 +189,16 @@ function assertCredentialType(credential: Credential, auth: "oauth" | "api-key")
       `credential '${credential.name}' is a ${credential.authorizerType}, not a ${expected}`,
     );
   }
+}
+
+function httpsEndpoint(value: string, option: string): string {
+  try {
+    if (new URL(value).protocol !== "https:") {
+      throw new InputValidationError(`${option} must use HTTPS`);
+    }
+  } catch (error) {
+    if (error instanceof InputValidationError) throw error;
+    throw new InputValidationError(`${option} must be a valid HTTPS URL`, { cause: error });
+  }
+  return value;
 }

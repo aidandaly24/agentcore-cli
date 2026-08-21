@@ -172,6 +172,99 @@ describe("project add gateway", () => {
       run(["add", "gateway", "--name", "tools", "--enable-semantic-search"]),
     ).rejects.toThrow("--protocol mcp");
   });
+
+  test("reads tags from file, stdin, and repeated key=value flags", async () => {
+    const projectRoot = await inProject();
+    const tagsPath = join(projectRoot, "tags.json");
+    await writeFile(tagsPath, '{"source":"file"}');
+
+    await run(["add", "gateway", "--name", "from-file", "--tags", `file://${tagsPath}`]);
+    await run(["add", "gateway", "--name", "from-stdin", "--tags", "-"], '{"source":"stdin"}');
+    await run(["add", "gateway", "--name", "from-pairs", "--tags", "source=pairs", "team=agents"]);
+
+    const gateways = (await projectSpec(projectRoot)).agentCoreGateways;
+    expect(gateways[0].tags).toEqual({ source: "file" });
+    expect(gateways[1].tags).toEqual({ source: "stdin" });
+    expect(gateways[2].tags).toEqual({ source: "pairs", team: "agents" });
+  });
+
+  test("maps log-only policy mode", async () => {
+    const projectRoot = await inProject();
+    const spec = await projectSpec(projectRoot);
+    spec.policyEngines = [{ name: "Guardrails", policies: [] }];
+    await writeProjectSpec(projectRoot, spec);
+
+    await run([
+      "add",
+      "gateway",
+      "--name",
+      "tools",
+      "--policy-engine-name",
+      "Guardrails",
+      "--policy-engine-mode",
+      "log-only",
+    ]);
+
+    expect((await projectSpec(projectRoot)).agentCoreGateways[0].policyEngineConfiguration).toEqual(
+      {
+        policyEngineName: "Guardrails",
+        mode: "LOG_ONLY",
+      },
+    );
+  });
+
+  test.each([
+    ["missing --name", ["add", "gateway"], "required option '--name"],
+    [
+      "service resource name exceeds 48 characters",
+      ["add", "gateway", "--name", "gateway-name-that-is-far-too-long-for-the-service"],
+      "exceeds the service limit",
+    ],
+    [
+      "policy engine name without mode",
+      ["add", "gateway", "--name", "tools", "--policy-engine-name", "Guardrails"],
+      "must be supplied together",
+    ],
+    [
+      "policy engine mode without name",
+      ["add", "gateway", "--name", "tools", "--policy-engine-mode", "enforce"],
+      "must be supplied together",
+    ],
+    [
+      "unknown policy engine",
+      [
+        "add",
+        "gateway",
+        "--name",
+        "tools",
+        "--policy-engine-name",
+        "Missing",
+        "--policy-engine-mode",
+        "enforce",
+      ],
+      "does not exist in policyEngines[]",
+    ],
+    [
+      "CUSTOM_JWT without configuration",
+      ["add", "gateway", "--name", "tools", "--authorizer-type", "CUSTOM_JWT"],
+      "CUSTOM_JWT requires --authorizer-configuration",
+    ],
+    [
+      "configuration without CUSTOM_JWT",
+      [
+        "add",
+        "gateway",
+        "--name",
+        "tools",
+        "--authorizer-configuration",
+        '{"customJwtAuthorizer":{"discoveryUrl":"https://idp.example.com"}}',
+      ],
+      "valid only with CUSTOM_JWT",
+    ],
+  ])("rejects %s", async (_label, args, message) => {
+    await inProject();
+    await expect(run(args)).rejects.toThrow(message);
+  });
 });
 
 describe("project add gateway-target", () => {
@@ -187,6 +280,8 @@ describe("project add gateway-target", () => {
       "external",
       "--endpoint",
       "https://mcp.example.com",
+      "--outbound-auth",
+      "none",
     ]);
     await run([
       "add",
@@ -206,6 +301,7 @@ describe("project add gateway-target", () => {
         name: "external",
         targetType: "mcpServer",
         endpoint: "https://mcp.example.com",
+        outboundAuth: { type: "NONE" },
       },
       {
         name: "runtime",
@@ -338,7 +434,10 @@ describe("project add gateway-target", () => {
   test("validates direct project credential references", async () => {
     const projectRoot = await inProject();
     const spec = await projectSpec(projectRoot);
-    spec.credentials = [{ authorizerType: "OAuthCredentialProvider", name: "search-oauth" }];
+    spec.credentials = [
+      { authorizerType: "OAuthCredentialProvider", name: "search-oauth" },
+      { authorizerType: "ApiKeyCredentialProvider", name: "search-api-key" },
+    ];
     await writeProjectSpec(projectRoot, spec);
     await addGateway();
     const target = {
@@ -360,8 +459,275 @@ describe("project add gateway-target", () => {
       "--target-configuration",
       JSON.stringify(target),
     ]);
+    await run([
+      "add",
+      "gateway-target",
+      "--gateway",
+      "tools",
+      "--target-configuration",
+      JSON.stringify({
+        name: "api-key",
+        targetType: "openApiSchema",
+        schemaSource: { inline: { path: "openapi.json" } },
+        outboundAuth: { type: "API_KEY", credentialName: "search-api-key" },
+      }),
+    ]);
 
-    expect((await projectSpec(projectRoot)).agentCoreGateways[0].targets[0]).toEqual(target);
+    const targets = (await projectSpec(projectRoot)).agentCoreGateways[0].targets;
+    expect(targets[0]).toEqual(target);
+    expect(targets[1].outboundAuth).toEqual({
+      type: "API_KEY",
+      credentialName: "search-api-key",
+    });
+  });
+
+  test("adds an OAuth-authenticated endpoint shortcut", async () => {
+    const projectRoot = await inProject();
+    const spec = await projectSpec(projectRoot);
+    spec.credentials = [{ authorizerType: "OAuthCredentialProvider", name: "oauth" }];
+    await writeProjectSpec(projectRoot, spec);
+    await addGateway();
+
+    await run([
+      "add",
+      "gateway-target",
+      "--gateway",
+      "tools",
+      "--name",
+      "oauth-target",
+      "--endpoint",
+      "https://oauth.example.com",
+      "--outbound-auth",
+      "oauth",
+      "--credential-name",
+      "oauth",
+      "--scope",
+      "read",
+      "write",
+    ]);
+
+    const targets = (await projectSpec(projectRoot)).agentCoreGateways[0].targets;
+    expect(targets[0].outboundAuth).toEqual({
+      type: "OAUTH",
+      credentialName: "oauth",
+      scopes: ["read", "write"],
+    });
+  });
+
+  test.each([
+    [
+      "missing parent Gateway",
+      ["--name", "target", "--endpoint", "https://mcp.example.com"],
+      "required option '--gateway",
+    ],
+    ["no Target mode", ["--gateway", "tools", "--name", "target"], "specify exactly one"],
+    [
+      "multiple Target modes",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--runtime",
+        "hello_world",
+      ],
+      "specify exactly one",
+    ],
+    [
+      "runtime endpoint without Runtime mode",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--runtime-endpoint",
+        "DEFAULT",
+      ],
+      "--runtime-endpoint requires --runtime",
+    ],
+    [
+      "shortcut without name",
+      ["--gateway", "tools", "--endpoint", "https://mcp.example.com"],
+      "required option '--name",
+    ],
+    [
+      "non-HTTPS endpoint",
+      ["--gateway", "tools", "--name", "target", "--endpoint", "http://mcp.example.com"],
+      "must use HTTPS",
+    ],
+    [
+      "invalid endpoint",
+      ["--gateway", "tools", "--name", "target", "--endpoint", "not-a-url"],
+      "must be a valid HTTPS URL",
+    ],
+    [
+      "credential without auth type",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--credential-name",
+        "oauth",
+      ],
+      "--credential-name requires --outbound-auth",
+    ],
+    [
+      "scope without auth type",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--scope",
+        "read",
+      ],
+      "--scope requires --outbound-auth oauth",
+    ],
+    [
+      "none auth with credential",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--outbound-auth",
+        "none",
+        "--credential-name",
+        "oauth",
+      ],
+      "cannot be combined",
+    ],
+    [
+      "OAuth without credential",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--outbound-auth",
+        "oauth",
+      ],
+      "requires --credential-name",
+    ],
+    [
+      "API key with OAuth scope",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--outbound-auth",
+        "api-key",
+        "--credential-name",
+        "api-key",
+        "--scope",
+        "read",
+      ],
+      "--scope is valid only with --outbound-auth oauth",
+    ],
+    [
+      "API-key endpoint shortcut unsupported by the project schema",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--outbound-auth",
+        "api-key",
+        "--credential-name",
+        "api-key",
+      ],
+      "mcpServer targets do not support API_KEY outbound auth",
+    ],
+    [
+      "unknown credential",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--outbound-auth",
+        "oauth",
+        "--credential-name",
+        "missing",
+      ],
+      "does not exist in credentials[]",
+    ],
+    [
+      "credential with wrong type",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "target",
+        "--endpoint",
+        "https://mcp.example.com",
+        "--outbound-auth",
+        "oauth",
+        "--credential-name",
+        "api-key",
+      ],
+      "not a OAuthCredentialProvider",
+    ],
+    [
+      "unknown Gateway",
+      ["--gateway", "missing", "--name", "target", "--endpoint", "https://mcp.example.com"],
+      "does not exist in agentCoreGateways[]",
+    ],
+  ])("rejects %s", async (_label, flags, message) => {
+    const projectRoot = await inProject();
+    const spec = await projectSpec(projectRoot);
+    spec.credentials = [
+      { authorizerType: "OAuthCredentialProvider", name: "oauth" },
+      { authorizerType: "ApiKeyCredentialProvider", name: "api-key" },
+    ];
+    await writeProjectSpec(projectRoot, spec);
+    await addGateway();
+
+    await expect(run(["add", "gateway-target", ...flags])).rejects.toThrow(message);
+  });
+
+  test("rejects a direct API-key credential with the wrong project credential type", async () => {
+    const projectRoot = await inProject();
+    const spec = await projectSpec(projectRoot);
+    spec.credentials = [{ authorizerType: "OAuthCredentialProvider", name: "oauth" }];
+    await writeProjectSpec(projectRoot, spec);
+    await addGateway();
+
+    await expect(
+      run([
+        "add",
+        "gateway-target",
+        "--gateway",
+        "tools",
+        "--target-configuration",
+        JSON.stringify({
+          name: "target",
+          targetType: "openApiSchema",
+          schemaSource: { inline: { path: "openapi.json" } },
+          outboundAuth: { type: "API_KEY", credentialName: "oauth" },
+        }),
+      ]),
+    ).rejects.toThrow("not a ApiKeyCredentialProvider");
   });
 
   test("rejects duplicate Target names across every Gateway in the project", async () => {
@@ -509,5 +875,80 @@ describe("project add gateway-connector", () => {
         '{"name":"server","targetType":"mcpServer","endpoint":"https://mcp.example.com"}',
       ]),
     ).rejects.toThrow('targetType: "connector"');
+  });
+
+  test.each([
+    [
+      "missing parent Gateway",
+      ["--name", "web", "--connector", "web-search"],
+      "required option '--gateway",
+    ],
+    ["no connector mode", ["--gateway", "tools", "--name", "web"], "specify exactly one"],
+    [
+      "both connector modes",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "web",
+        "--connector",
+        "web-search",
+        "--connector-configuration",
+        '{"name":"configured","targetType":"connector","connectorId":"web-search"}',
+      ],
+      "specify exactly one",
+    ],
+    [
+      "name with complete connector JSON",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "web",
+        "--connector-configuration",
+        '{"name":"configured","targetType":"connector","connectorId":"web-search"}',
+      ],
+      "--name is part of --connector-configuration",
+    ],
+    [
+      "knowledge base with complete connector JSON",
+      [
+        "--gateway",
+        "tools",
+        "--connector-configuration",
+        '{"name":"configured","targetType":"connector","connectorId":"web-search"}',
+        "--knowledge-base",
+        "ABCDEFGHIJ",
+      ],
+      "--knowledge-base cannot be combined",
+    ],
+    [
+      "shortcut without name",
+      ["--gateway", "tools", "--connector", "web-search"],
+      "required option '--name",
+    ],
+    [
+      "knowledge base with Web Search",
+      [
+        "--gateway",
+        "tools",
+        "--name",
+        "web",
+        "--connector",
+        "web-search",
+        "--knowledge-base",
+        "ABCDEFGHIJ",
+      ],
+      "--knowledge-base requires --connector bedrock-knowledge-bases",
+    ],
+    [
+      "Knowledge Base connector without Knowledge Base",
+      ["--gateway", "tools", "--name", "knowledge", "--connector", "bedrock-knowledge-bases"],
+      "requires --knowledge-base",
+    ],
+  ])("rejects %s", async (_label, flags, message) => {
+    await inProject();
+    await addGateway();
+    await expect(run(["add", "gateway-connector", ...flags])).rejects.toThrow(message);
   });
 });

@@ -4,11 +4,11 @@ import { SourceResolver } from "../../../../io";
 import {
   AgentCoreGatewayTargetSchema,
   type AgentCoreGatewayTarget,
+  type ConnectorId,
 } from "../../../../projectSchemas/gateway";
 import { createHandler, flag, ProjectKey } from "../../../../router";
 import { parseJsonFlagWithSchema } from "../../../utils";
 import type { AddProjectResourceConfig } from "../types";
-import { connectorTargetFromShortcut } from "../gateway-target/configuration";
 
 export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -97,3 +97,31 @@ export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfi
       );
     },
   });
+
+function connectorTargetFromShortcut(
+  name: string,
+  connectorId: ConnectorId,
+  knowledgeBase?: string,
+): AgentCoreGatewayTarget {
+  switch (connectorId) {
+    case "web-search":
+      return {
+        name,
+        targetType: "connector",
+        connectorId,
+        configurations: [{ name: "WebSearch", parameterValues: { maxResults: 10 } }],
+      };
+    case "bedrock-knowledge-bases":
+      if (!knowledgeBase) {
+        throw new InputValidationError(
+          "--connector bedrock-knowledge-bases requires --knowledge-base",
+        );
+      }
+      return {
+        name,
+        targetType: "connector",
+        connectorId,
+        configurations: [{ name: "Retrieve", parameterValues: { knowledgeBaseId: knowledgeBase } }],
+      };
+  }
+}

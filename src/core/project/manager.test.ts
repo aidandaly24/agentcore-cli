@@ -2,17 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import {
-  DeserializationError,
-  InputValidationError,
-  ProjectStateError,
-} from "../../errors/errors";
+import { DeserializationError, ProjectStateError } from "../../errors/errors";
 import type { AwsDeploymentTarget } from "../../projectSchemas/aws-targets";
 import { ProjectSpecSchema } from "../../projectSchemas/project";
 import { FsProjectManager } from "./manager";
 import {
   PROJECT_TEMPLATES,
-  type AddResourceInput,
   type CreateProjectInput,
   type DeployResult,
   type Project,
@@ -67,21 +62,6 @@ async function runCreate(
     if (next.done) {
       return { events, project: next.value };
     }
-    events.push(next.value);
-  }
-}
-
-async function runAdd(
-  subject: FsProjectManager,
-  project: Project,
-  input: AddResourceInput,
-): Promise<{ events: ProjectEvent[]; project: Project }> {
-  const iterator = subject.addResource(project, input);
-  const events: ProjectEvent[] = [];
-
-  while (true) {
-    const next = await iterator.next();
-    if (next.done) return { events, project: next.value };
     events.push(next.value);
   }
 }
@@ -525,80 +505,5 @@ describe("FsProjectManager.resolve", () => {
     await expect(manager().manager.resolve({ filePath: root })).rejects.toThrow(
       "runtimeVersion is required for CodeZip builds",
     );
-  });
-});
-
-describe("FsProjectManager.addResource", () => {
-  async function projectWithGateway(subject: FsProjectManager): Promise<Project> {
-    const { project } = await runCreate(subject, {
-      name: "example",
-      template: PROJECT_TEMPLATES.HELLO_WORLD_PYTHON,
-      skipInstall: true,
-      skipGit: true,
-    });
-    return (
-      await runAdd(subject, project, {
-        resourceType: "gateway",
-        resourceConfig: {
-          name: "tools",
-          protocolType: "None",
-          authorizerType: "NONE",
-          targets: [],
-          enableSemanticSearch: false,
-          exceptionLevel: "NONE",
-        },
-      })
-    ).project;
-  }
-
-  test("adds a Target using its project-schema shape without creating assets", async () => {
-    const directory = await inTempDirectory();
-    const subject = manager().manager;
-    const project = await projectWithGateway(subject);
-
-    const result = await runAdd(subject, project, {
-      resourceType: "gateway-target",
-      gatewayName: "tools",
-      resourceConfig: {
-        name: "search",
-        targetType: "lambdaFunctionArn",
-        lambdaFunctionArn: {
-          lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
-          toolSchemaFile: "schemas/tool-schema.json",
-        },
-      },
-    });
-
-    expect(result.project.spec.agentCoreGateways[0]?.targets[0]).toEqual({
-      name: "search",
-      targetType: "lambdaFunctionArn",
-      lambdaFunctionArn: {
-        lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:search",
-        toolSchemaFile: "schemas/tool-schema.json",
-      },
-    });
-    expect(await Bun.file(join(directory, "example", "agentcore", "assets")).exists()).toBe(false);
-  });
-
-  test("rejects an invalid project Target before writing the project", async () => {
-    const directory = await inTempDirectory();
-    const subject = manager().manager;
-    const project = await projectWithGateway(subject);
-
-    await expect(
-      runAdd(subject, project, {
-        resourceType: "gateway-target",
-        gatewayName: "tools",
-        resourceConfig: {
-          name: "search",
-          targetType: "openApiSchema",
-        } as never,
-      }),
-    ).rejects.toBeInstanceOf(InputValidationError);
-
-    const persisted = await Bun.file(
-      join(directory, "example", "agentcore", "agentcore.json"),
-    ).json();
-    expect(persisted.agentCoreGateways[0].targets).toEqual([]);
   });
 });
