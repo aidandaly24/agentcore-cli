@@ -221,6 +221,8 @@ export class PaymentConnectorPrimitive extends BasePrimitive<AddPaymentConnector
               }
             }
 
+            await this.writeProjectSpec(project);
+
             if (!stillReferenced) {
               try {
                 if (connector.provider === 'StripePrivy') {
@@ -239,9 +241,9 @@ export class PaymentConnectorPrimitive extends BasePrimitive<AddPaymentConnector
                 // Best-effort cleanup
               }
             }
+          } else {
+            await this.writeProjectSpec(project);
           }
-
-          await this.writeProjectSpec(project);
 
           return { success: true };
         }

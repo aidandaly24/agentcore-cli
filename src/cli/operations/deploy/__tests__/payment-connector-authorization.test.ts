@@ -124,4 +124,14 @@ describe('formatQuickCreateConnectorAuthorization', () => {
     expect(notice).toContain('is ready');
     expect(notice).not.toContain('http');
   });
+
+  it('requires connector recreation after authorization expires', () => {
+    const notice = formatQuickCreateConnectorAuthorization({
+      managerName: 'PayMgr',
+      connectorName: 'Quick',
+      status: 'AUTHENTICATION_EXPIRED',
+    });
+    expect(notice).toContain('Remove and deploy it, then add and deploy it again');
+    expect(notice).not.toContain('Re-deploy it');
+  });
 });

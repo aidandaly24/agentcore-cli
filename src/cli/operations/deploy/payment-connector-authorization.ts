@@ -86,7 +86,7 @@ export function formatQuickCreateConnectorAuthorization(result: QuickCreateConne
     return `Payment connector "${name}" is ready.`;
   }
   if (result.status === 'AUTHENTICATION_EXPIRED' || result.status === 'AUTHENTICATION_FAILED') {
-    return `Payment connector "${name}" is ${result.status}. Re-deploy it to generate a new authorization URL.`;
+    return `Payment connector "${name}" is ${result.status}. Remove and deploy it, then add and deploy it again to generate a new authorization URL.`;
   }
   return `Payment connector "${name}" status: ${result.status ?? 'unknown'}. Run \`agentcore status\` for the latest state.`;
 }

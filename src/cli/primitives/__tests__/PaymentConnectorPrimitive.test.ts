@@ -401,6 +401,9 @@ describe('PaymentConnectorPrimitive', () => {
           'AGENTCORE_CREDENTIAL_MGR1_CONN1_CDP_WALLET_SECRET',
         ])
       );
+      expect(mockWriteProjectSpec.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRemoveEnvVars.mock.invocationCallOrder[0]!
+      );
     });
 
     it('keeps shared credential in spec when still referenced by another connector', async () => {
