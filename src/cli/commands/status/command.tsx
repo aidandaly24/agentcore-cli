@@ -211,7 +211,8 @@ export const registerStatus = (program: Command) => {
         render(
           <Box flexDirection="column">
             <Text bold>
-              AgentCore Status (target: {result.targetName ?? 'No target configured'}
+              AgentCore Status (target:{' '}
+              {result.targetName && result.targetName.length > 0 ? result.targetName : 'No target configured'}
               {result.targetRegion ? `, ${result.targetRegion}` : ''})
             </Text>
 
