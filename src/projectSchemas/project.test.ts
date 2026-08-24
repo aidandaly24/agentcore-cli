@@ -76,6 +76,7 @@ describe("project custom validation", () => {
   it("validates HTTP runtime and endpoint references", () => {
     const gateway = {
       name: "gateway",
+      protocolType: "None" as const,
       targets: [
         {
           name: "runtime",

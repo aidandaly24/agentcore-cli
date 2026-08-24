@@ -467,10 +467,10 @@ export const AgentCoreGatewaySchema = z
   )
   .superRefine((gw, ctx) => {
     for (const target of gw.targets) {
-      if (gw.protocolType === "MCP" && NON_MCP_TARGET_TYPES.includes(target.targetType)) {
+      if (gw.protocolType !== "None" && NON_MCP_TARGET_TYPES.includes(target.targetType)) {
         ctx.addIssue({
           code: "custom",
-          message: `Target "${target.name}" is ${target.targetType} but the Gateway has protocolType: "MCP"`,
+          message: `Target "${target.name}" is ${target.targetType} but the Gateway does not have protocolType: "None"`,
         });
       }
     }

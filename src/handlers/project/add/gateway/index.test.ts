@@ -14,6 +14,7 @@ describe("project add gateway", () => {
     expect((await projectSpec(projectRoot)).agentCoreGateways).toEqual([
       {
         name: "tools",
+        protocolType: "None",
         targets: [],
         authorizerType: "NONE",
         enableSemanticSearch: false,
@@ -34,6 +35,8 @@ describe("project add gateway", () => {
       "gateway",
       "--name",
       "tools",
+      "--protocol-type",
+      "MCP",
       "--enable-semantic-search",
       "--role-arn",
       "arn:aws:iam::123456789012:role/GatewayRole",
@@ -51,6 +54,7 @@ describe("project add gateway", () => {
 
     expect((await projectSpec(projectRoot)).agentCoreGateways[0]).toMatchObject({
       name: "tools",
+      protocolType: "MCP",
       description: "Project tools",
       authorizerType: "NONE",
       enableSemanticSearch: true,
@@ -193,6 +197,11 @@ describe("project add gateway", () => {
         '{"customJwtAuthorizer":{"discoveryUrl":"https://idp.example.com"}}',
       ],
       "valid only with CUSTOM_JWT",
+    ],
+    [
+      "semantic search without an MCP-only Gateway",
+      ["add", "gateway", "--name", "tools", "--enable-semantic-search"],
+      "--protocol-type MCP",
     ],
   ])("rejects %s", async (_label, args, message) => {
     await inProject();

@@ -20,6 +20,7 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
         "IAM role the Gateway assumes; a default role is created when omitted",
         z.string().optional(),
       ),
+      flag("protocol-type", "restrict the Gateway to MCP Targets", z.enum(["MCP"]).optional()),
       flag(
         "enable-semantic-search",
         "enable semantic search for tools on the Gateway",
@@ -84,6 +85,9 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
       if (authorizerType !== "CUSTOM_JWT" && flags["authorizer-configuration"] !== undefined) {
         throw new InputValidationError("--authorizer-configuration is valid only with CUSTOM_JWT");
       }
+      if (flags["enable-semantic-search"] && flags["protocol-type"] !== "MCP") {
+        throw new InputValidationError("--enable-semantic-search requires --protocol-type MCP");
+      }
       const source = new SourceResolver({ stdin: config.io.stdin });
       const authorizerConfiguration = parseJsonFlagWithSchema(
         "authorizer-configuration",
@@ -93,6 +97,7 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
 
       const gateway: AgentCoreGateway = {
         name: flags.name,
+        protocolType: flags["protocol-type"] ?? "None",
         authorizerType,
         authorizerConfiguration,
         description: flags.description,
