@@ -190,14 +190,14 @@ describe("gateway custom validation", () => {
       }).success,
     ).toBe(true);
   });
-  it("allows HTTP targets only on protocolType None gateways", () => {
+  it("allows HTTP targets when protocolType is omitted or None, but not MCP", () => {
     const target = {
       name: "runtime",
       targetType: "httpRuntime",
       httpRuntime: { runtime: "agent" },
     };
     expect(AgentCoreGatewaySchema.safeParse({ name: "gateway", targets: [target] }).success).toBe(
-      false,
+      true,
     );
     expect(
       AgentCoreGatewaySchema.safeParse({
@@ -206,5 +206,12 @@ describe("gateway custom validation", () => {
         targets: [target],
       }).success,
     ).toBe(true);
+    expect(
+      AgentCoreGatewaySchema.safeParse({
+        name: "gateway",
+        protocolType: "MCP",
+        targets: [target],
+      }).success,
+    ).toBe(false);
   });
 });

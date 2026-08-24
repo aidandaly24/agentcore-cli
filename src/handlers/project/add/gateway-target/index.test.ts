@@ -326,7 +326,7 @@ describe("project add gateway-target", () => {
     [
       "unknown Gateway",
       ["--gateway", "missing", "--name", "target", "--endpoint", ENDPOINT],
-      "does not exist in agentCoreGateways[]",
+      "does not exist in this project; check agentCoreGateways in agentcore.json",
     ],
   ])("rejects %s", async (_label, flags, message) => {
     await projectWithCredentials();

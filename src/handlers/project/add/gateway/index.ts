@@ -21,13 +21,8 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
         z.string().optional(),
       ),
       flag(
-        "protocol",
-        "restrict Target protocols to MCP; omitted allows every Target protocol",
-        z.enum(["mcp"]).optional(),
-      ),
-      flag(
         "enable-semantic-search",
-        "enable semantic search for an MCP Gateway",
+        "enable semantic search for tools on the Gateway",
         z.boolean().optional(),
       ),
       flag(
@@ -52,11 +47,7 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
         z.enum(["log-only", "enforce"]).optional(),
       ),
       flag("exception-level", "exception detail level: debug", z.enum(["debug"]).optional()),
-      flag(
-        "tags",
-        "tags as repeated key=value or a JSON object (inline, file://<path>, or - for stdin)",
-        z.array(z.string()).optional(),
-      ),
+      flag("tags", "tags as repeated key=value or a JSON object", z.array(z.string()).optional()),
     ],
     handle: async (ctx, flags) => {
       if (!flags.name) {
@@ -93,23 +84,15 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
       if (authorizerType !== "CUSTOM_JWT" && flags["authorizer-configuration"] !== undefined) {
         throw new InputValidationError("--authorizer-configuration is valid only with CUSTOM_JWT");
       }
-      if (flags["enable-semantic-search"] && !flags.protocol) {
-        throw new InputValidationError(
-          "--enable-semantic-search is valid only with --protocol mcp",
-        );
-      }
-
       const source = new SourceResolver({ stdin: config.io.stdin });
       const authorizerConfiguration = parseJsonFlagWithSchema(
         "authorizer-configuration",
         await source.resolveText("authorizer-configuration", flags["authorizer-configuration"]),
         GatewayAuthorizerConfigurationInputSchema,
       );
-      const tags = await resolveTags(source, flags.tags);
 
       const gateway: AgentCoreGateway = {
         name: flags.name,
-        protocolType: flags.protocol ? "MCP" : "None",
         authorizerType,
         authorizerConfiguration,
         description: flags.description,
@@ -124,7 +107,7 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
                 mode: flags["policy-engine-mode"] === "enforce" ? "ENFORCE" : "LOG_ONLY",
               }
             : undefined,
-        tags,
+        tags: parseTags(flags.tags),
       };
 
       for await (const event of config.projectManager.addResource(project, {
@@ -136,19 +119,3 @@ export const createAddGatewayHandler = (config: AddProjectResourceConfig) =>
       config.io.stderr.write(`added Gateway '${flags.name}' to '${project.name}'\n`);
     },
   });
-
-async function resolveTags(
-  source: SourceResolver,
-  values: string[] | undefined,
-): Promise<Record<string, string> | undefined> {
-  const first = values?.[0];
-  if (
-    values?.length === 1 &&
-    first &&
-    (first === "-" || first.startsWith("file://") || first.trimStart().startsWith("{"))
-  ) {
-    const resolved = await source.resolveText("tags", first);
-    return parseTags([resolved!]);
-  }
-  return parseTags(values);
-}

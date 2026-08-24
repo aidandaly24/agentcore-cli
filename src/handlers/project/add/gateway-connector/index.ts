@@ -29,7 +29,7 @@ export const createAddGatewayConnectorHandler = (config: AddProjectResourceConfi
       ),
       flag(
         "knowledge-base",
-        "project Knowledge Base name or external ten-character Knowledge Base ID",
+        "project Knowledge Base name or external ten-character ID; only for bedrock-knowledge-bases",
         z.string().optional(),
       ),
     ],

@@ -119,10 +119,16 @@ export type AddResourceInput =
 
 export type ProjectResource = AddResourceInput["resourceType"];
 
-export type RemoveResourceInput = {
-  resourceType: Exclude<ProjectResource, "gateway" | "gateway-target">;
-  name: string;
-};
+export type RemoveResourceInput =
+  | {
+      resourceType: Exclude<ProjectResource, "gateway-target">;
+      name: string;
+    }
+  | {
+      resourceType: "gateway-target";
+      gatewayName: string;
+      name: string;
+    };
 
 /**
  * The primary interface for interacting with projects
