@@ -6,6 +6,8 @@ import type {
   CreateProjectInput,
   DeployProjectInput,
   DeployResult,
+  ResolveDeployedResourceInput,
+  ResolvedDeployedResource,
   ResolveProjectInput,
   Project,
   ProjectManager,
@@ -37,6 +39,7 @@ import z from "zod";
 import { CdkBackend } from "./backends/cdk";
 import type { ProjectBackend } from "./backends/types";
 import { AwsDeploymentTargetsSchema } from "../../projectSchemas/aws-targets";
+import type { AwsDeploymentTarget } from "../../projectSchemas/aws-targets";
 
 const TARGETS_EXAMPLE = '[{ "name": "default", "account": "111122223333", "region": "us-east-1" }]';
 
@@ -370,6 +373,24 @@ export class FsProjectManager implements ProjectManager {
     project: Project,
     input: DeployProjectInput,
   ): AsyncGenerator<ProjectEvent, DeployResult> {
+    const target = await this.resolveTarget(project, input.target);
+    return yield* this.backendFor(project).deploy(project, { target });
+  }
+
+  public async resolveDeployedResource(
+    project: Project,
+    input: ResolveDeployedResourceInput,
+  ): Promise<ResolvedDeployedResource> {
+    const target = await this.resolveTarget(project, input.target);
+    const id = await this.backendFor(project).resolveDeployedResource(project, {
+      target,
+      resourceType: input.resourceType,
+      name: input.name,
+    });
+    return { id, target };
+  }
+
+  private async resolveTarget(project: Project, name: string): Promise<AwsDeploymentTarget> {
     const targetsPath = join(project.rootPath, "agentcore", "aws-targets.json");
     if (!existsSync(targetsPath)) {
       throw new ProjectStateError(
@@ -387,15 +408,15 @@ export class FsProjectManager implements ProjectManager {
       );
     }
 
-    const target = targets.find((candidate) => candidate.name === input.target);
+    const target = targets.find((candidate) => candidate.name === name);
     if (!target) {
       throw new ProjectStateError(
-        `Project '${project.name}' has no deployment target named '${input.target}'. ` +
+        `Project '${project.name}' has no deployment target named '${name}'. ` +
           `${targetsPath} defines: ${targets.map(({ name }) => name).join(", ")}.`,
       );
     }
 
-    return yield* this.backendFor(project).deploy(project, { target });
+    return target;
   }
 
   private backendFor(project: Project): ProjectBackend {

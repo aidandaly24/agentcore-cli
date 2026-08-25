@@ -10,7 +10,12 @@ import {
   type ReadWriteJson,
 } from "../../../io";
 import type { Logger } from "../../../logging";
-import type { DeployBackendInput, ProjectBackend } from "./types";
+import type { AwsDeploymentTarget } from "../../../projectSchemas/aws-targets";
+import type {
+  DeployBackendInput,
+  ProjectBackend,
+  ResolveDeployedResourceBackendInput,
+} from "./types";
 import { stackArtifactIdForTarget } from "./cdk/assembly";
 import {
   probeBootstrap,
@@ -26,6 +31,12 @@ import {
   type CdkCredentialResolver,
   type CdkRunner,
 } from "./cdk/toolkit";
+import {
+  cdkStackName,
+  deployedResourceId,
+  readDeployedStack,
+  type DeployedStackReader,
+} from "./cdk/deployment";
 
 export type CdkBackendConfig = {
   logger: Logger;
@@ -37,6 +48,7 @@ export type CdkBackendConfig = {
   bootstrap?: BootstrapProbe;
   resolveAccount?: AccountResolver;
   loadBootstrapTemplate?: BootstrapTemplateLoader;
+  readStack?: DeployedStackReader;
 };
 
 /** Builds and deploys projects through the scaffolded CDK app. */
@@ -50,6 +62,7 @@ export class CdkBackend implements ProjectBackend {
   private readonly bootstrap: BootstrapProbe;
   private readonly resolveAccount: AccountResolver;
   private readonly loadBootstrapTemplate: BootstrapTemplateLoader;
+  private readonly readStack: DeployedStackReader;
 
   constructor(config: CdkBackendConfig) {
     this.logger = config.logger;
@@ -62,6 +75,7 @@ export class CdkBackend implements ProjectBackend {
     this.bootstrap = config.bootstrap ?? probeBootstrap;
     this.resolveAccount = config.resolveAccount ?? resolveAwsAccount;
     this.loadBootstrapTemplate = config.loadBootstrapTemplate ?? loadBootstrapTemplate;
+    this.readStack = config.readStack ?? readDeployedStack;
   }
 
   public async *build(project: Project): AsyncGenerator<ProjectEvent, void> {
@@ -91,14 +105,7 @@ export class CdkBackend implements ProjectBackend {
   ): AsyncGenerator<ProjectEvent, DeployResult> {
     const { target } = input;
     yield { message: `Verifying AWS account ${target.account}` };
-    const credentials = await this.resolveCredentials(target.region);
-    const account = await this.resolveAccount(target.region, credentials);
-    if (account !== target.account) {
-      throw new ProjectStateError(
-        `Deployment target '${target.name}' expects AWS account ${target.account}, ` +
-          `but the active credentials belong to ${account}.`,
-      );
-    }
+    const credentials = await this.credentialsFor(target);
 
     yield* this.build(project);
     const assemblyDirectory = this.assemblyDirectory(project);
@@ -140,6 +147,36 @@ export class CdkBackend implements ProjectBackend {
     yield { message: `Deploying ${stackArtifactId}` };
     const outputs = await this.cdk({ kind: "deploy", stackArtifactId }, options);
     return { outputs };
+  }
+
+  public async resolveDeployedResource(
+    project: Project,
+    input: ResolveDeployedResourceBackendInput,
+  ): Promise<string> {
+    const { target } = input;
+    const credentials = await this.credentialsFor(target);
+
+    const stackName = cdkStackName(project.name, target.name);
+    const stack = await this.readStack(stackName, target.region, credentials);
+    if (!stack) {
+      throw new ProjectStateError(
+        `Project '${project.name}' is not deployed to target '${target.name}'. ` +
+          `Run 'agentcore project deploy --target ${target.name}' first.`,
+      );
+    }
+    return deployedResourceId(stack, { stackName, targetName: target.name, ...input });
+  }
+
+  private async credentialsFor(target: AwsDeploymentTarget) {
+    const credentials = await this.resolveCredentials(target.region);
+    const account = await this.resolveAccount(target.region, credentials);
+    if (account !== target.account) {
+      throw new ProjectStateError(
+        `Deployment target '${target.name}' expects AWS account ${target.account}, ` +
+          `but the active credentials belong to ${account}.`,
+      );
+    }
+    return credentials;
   }
 
   private cdkDirectory(project: Project): string {

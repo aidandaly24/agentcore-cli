@@ -8,6 +8,7 @@ import type { RuntimeResourceConfig } from "./add/runtime/types";
 import type { OnlineEvalConfigSchema } from "../../projectSchemas/online-eval-config";
 import { AgentNameSchema, BuildTypeSchema } from "../../projectSchemas/runtime";
 import type { AgentCoreGateway, AgentCoreGatewayTarget } from "../../projectSchemas/gateway";
+import type { AwsDeploymentTarget } from "../../projectSchemas/aws-targets";
 
 export const RUNTIME_TEMPLATE_SHORTCUTS = {
   "hello-world-python": {
@@ -92,6 +93,17 @@ export type ResolveProjectInput = {
   filePath: string;
 };
 
+export type ResolveDeployedResourceInput = {
+  target: string;
+  resourceType: ProjectInvokableResource;
+  name: string;
+};
+
+export type ResolvedDeployedResource = {
+  id: string;
+  target: AwsDeploymentTarget;
+};
+
 export type Project = {
   name: string;
   /** Absolute path to the project root (the parent of agentcore/). */
@@ -151,6 +163,8 @@ export type AddResourceInput =
 
 export type ProjectResource = AddResourceInput["resourceType"];
 
+export type ProjectInvokableResource = Extract<ProjectResource, "harness" | "runtime">;
+
 export type RemoveResourceInput =
   | {
       resourceType: Exclude<ProjectResource, "gateway-target">;
@@ -177,6 +191,12 @@ export interface ProjectManager {
 
   /** Locate an existing AgentCore project. Returns undefined if no project can be found. */
   resolve(input: ResolveProjectInput): Promise<Project | undefined>;
+
+  /** Resolve a logical project resource to its deployed physical ID and target. */
+  resolveDeployedResource(
+    project: Project,
+    input: ResolveDeployedResourceInput,
+  ): Promise<ResolvedDeployedResource>;
 
   /** Add a resource to an existing AgentCore project. */
   addResource(project: Project, input: AddResourceInput): AsyncGenerator<ProjectEvent, Project>;

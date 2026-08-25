@@ -1,4 +1,9 @@
-import type { DeployResult, Project, ProjectEvent } from "../../../handlers/project/types";
+import type {
+  DeployResult,
+  Project,
+  ProjectEvent,
+  ProjectInvokableResource,
+} from "../../../handlers/project/types";
 import type { AwsDeploymentTarget } from "../../../projectSchemas/aws-targets";
 
 export type DeployBackendInput = {
@@ -6,8 +11,18 @@ export type DeployBackendInput = {
   target: AwsDeploymentTarget;
 };
 
+export type ResolveDeployedResourceBackendInput = {
+  target: AwsDeploymentTarget;
+  resourceType: ProjectInvokableResource;
+  name: string;
+};
+
 /** Builds the deployable artifacts owned by a project's selected backend. */
 export interface ProjectBackend {
   build(project: Project): AsyncGenerator<ProjectEvent, void>;
   deploy(project: Project, input: DeployBackendInput): AsyncGenerator<ProjectEvent, DeployResult>;
+  resolveDeployedResource(
+    project: Project,
+    input: ResolveDeployedResourceBackendInput,
+  ): Promise<string>;
 }

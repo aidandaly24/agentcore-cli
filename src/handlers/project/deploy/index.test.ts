@@ -40,6 +40,9 @@ function fakeBackend(result: DeployResult, events: ProjectEvent[] = []) {
       yield* events;
       return result;
     },
+    async resolveDeployedResource() {
+      return "unused";
+    },
   };
   return { calls, backend };
 }

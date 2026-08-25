@@ -338,6 +338,9 @@ describe("FsProjectManager.deploy", () => {
         yield { message: "Backend deployment started" };
         return { outputs: { RuntimeArn: "arn:runtime" } };
       },
+      async resolveDeployedResource() {
+        return "unused";
+      },
     };
     return {
       calls,
@@ -458,6 +461,97 @@ describe("FsProjectManager.deploy", () => {
       DeserializationError,
     );
     expect(subject.calls).toEqual([]);
+  });
+});
+
+describe("FsProjectManager.resolveDeployedResource", () => {
+  const targets: AwsDeploymentTarget[] = [
+    {
+      name: "default",
+      account: "111122223333",
+      region: "us-east-1",
+    },
+    {
+      name: "prod",
+      account: "444455556666",
+      region: "eu-west-1",
+    },
+  ];
+
+  async function projectWithTargets(rootPath: string): Promise<Project> {
+    await mkdir(join(rootPath, "agentcore"), { recursive: true });
+    await writeFile(join(rootPath, "agentcore", "aws-targets.json"), JSON.stringify(targets));
+    return {
+      name: "example",
+      rootPath,
+      spec: ProjectSpecSchema.parse({ name: "example", version: 1 }),
+    };
+  }
+
+  test("resolves the target and delegates physical ID lookup to the project backend", async () => {
+    const root = await inTempDirectory();
+    const project = await projectWithTargets(root);
+    const calls: unknown[] = [];
+    const backend = {
+      async *build() {},
+      async *deploy() {
+        yield* [];
+        return { outputs: {} };
+      },
+      async resolveDeployedResource(inputProject: Project, input: unknown) {
+        calls.push({ project: inputProject, input });
+        return "runtime-123";
+      },
+    } as ProjectBackend;
+    const subject = new FsProjectManager({
+      logger: createSilentLogger(),
+      backends: { CDK: backend },
+    });
+
+    const resolved = await subject.resolveDeployedResource(project, {
+      target: "prod",
+      resourceType: "runtime",
+      name: "checkout",
+    });
+
+    expect(resolved).toEqual({ id: "runtime-123", target: targets[1]! });
+    expect(calls).toEqual([
+      {
+        project,
+        input: {
+          target: targets[1],
+          resourceType: "runtime",
+          name: "checkout",
+        },
+      },
+    ]);
+  });
+
+  test("rejects an unknown target before invoking the backend", async () => {
+    const root = await inTempDirectory();
+    const project = await projectWithTargets(root);
+    const backend = {
+      async *build() {},
+      async *deploy() {
+        yield* [];
+        return { outputs: {} };
+      },
+      async resolveDeployedResource() {
+        throw new Error("backend should not be called");
+      },
+    } as ProjectBackend;
+    const subject = new FsProjectManager({
+      logger: createSilentLogger(),
+      backends: { CDK: backend },
+    });
+
+    await expect(
+      subject.resolveDeployedResource(project, {
+        target: "missing",
+        resourceType: "harness",
+        name: "support",
+      }),
+    ).rejects.toThrow(/no deployment target named 'missing'.*default, prod/s);
   });
 });
 
