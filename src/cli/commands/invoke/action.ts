@@ -389,116 +389,13 @@ export async function handleInvoke(context: InvokeContext, options: InvokeOption
 
   // Exec mode: run shell command in runtime container
   if (options.exec) {
-    const logger = new InvokeLogger({
-      agentName: agentSpec.name,
-      runtimeArn: runtimeArn,
+    return handleInvokeExec({
       region: targetConfig.region,
-      sessionId: options.sessionId,
+      runtimeArn,
+      agentName: agentSpec.name,
+      targetName: selectedTargetName,
+      options,
     });
-    const command = options.prompt;
-    if (!command) {
-      return { success: false, error: new ValidationError('--exec requires a command (prompt)') };
-    }
-    logger.logPrompt(command, options.sessionId, options.userId);
-
-    try {
-      const result = await executeBashCommand({
-        region: targetConfig.region,
-        runtimeArn: runtimeArn,
-        command,
-        sessionId: options.sessionId,
-        timeout: options.timeout,
-        headers: options.headers,
-        bearerToken: options.bearerToken,
-      });
-
-      let stdout = '';
-      let stderr = '';
-      let exitCode: number | undefined;
-      let status: string | undefined;
-
-      for await (const event of result.stream) {
-        switch (event.type) {
-          case 'stdout':
-            if (event.data) {
-              stdout += event.data;
-              if (!options.json) {
-                process.stdout.write(event.data);
-              }
-            }
-            break;
-          case 'stderr':
-            if (event.data) {
-              stderr += event.data;
-              if (!options.json) {
-                process.stderr.write(event.data);
-              }
-            }
-            break;
-          case 'stop':
-            exitCode = event.exitCode;
-            status = event.status;
-            break;
-        }
-      }
-
-      logger.logResponse(stdout || stderr || `exit code: ${exitCode}`);
-
-      if (options.json) {
-        if (exitCode === 0) {
-          return {
-            success: true,
-            exitCode,
-            agentName: agentSpec.name,
-            targetName: selectedTargetName,
-            response: JSON.stringify({ stdout, stderr, exitCode, status }),
-            logFilePath: logger.logFilePath,
-          };
-        }
-        return {
-          success: false,
-          exitCode,
-          error: new Error(`Command exited with code ${exitCode}`),
-          agentName: agentSpec.name,
-          targetName: selectedTargetName,
-          response: JSON.stringify({ stdout, stderr, exitCode, status }),
-          logFilePath: logger.logFilePath,
-        };
-      }
-
-      if (exitCode === undefined) {
-        return {
-          success: false,
-          error: new Error('Command stream ended without exit code'),
-          agentName: agentSpec.name,
-          targetName: selectedTargetName,
-          logFilePath: logger.logFilePath,
-        };
-      }
-
-      if (exitCode !== 0) {
-        return {
-          success: false,
-          exitCode,
-          error: new Error(`Command exited with code ${exitCode}${status === 'TIMED_OUT' ? ' (timed out)' : ''}`),
-          agentName: agentSpec.name,
-          targetName: selectedTargetName,
-          response: JSON.stringify({ stdout, stderr, exitCode, status }),
-          logFilePath: logger.logFilePath,
-        };
-      }
-
-      return {
-        success: true,
-        exitCode,
-        agentName: agentSpec.name,
-        targetName: selectedTargetName,
-        logFilePath: logger.logFilePath,
-      };
-    } catch (err) {
-      logger.logError(err, 'exec command failed');
-      throw err;
-    }
   }
 
   // MCP protocol handling
@@ -835,6 +732,128 @@ export function buildHarnessBaseOpts(
   return baseOpts;
 }
 
+interface InvokeExecParams {
+  region: string;
+  runtimeArn: string;
+  agentName: string;
+  targetName?: string;
+  options: InvokeOptions;
+}
+
+async function handleInvokeExec(params: InvokeExecParams): Promise<InvokeResult> {
+  const { region, runtimeArn, agentName, targetName, options } = params;
+  const logger = new InvokeLogger({
+    agentName,
+    runtimeArn,
+    region,
+    sessionId: options.sessionId,
+  });
+  const command = options.prompt;
+  if (!command) {
+    return { success: false, error: new ValidationError('--exec requires a command (prompt)') };
+  }
+  logger.logPrompt(command, options.sessionId, options.userId);
+
+  try {
+    const result = await executeBashCommand({
+      region,
+      runtimeArn,
+      command,
+      sessionId: options.sessionId,
+      timeout: options.timeout,
+      headers: options.headers,
+      bearerToken: options.bearerToken,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let exitCode: number | undefined;
+    let status: string | undefined;
+
+    for await (const event of result.stream) {
+      switch (event.type) {
+        case 'stdout':
+          if (event.data) {
+            stdout += event.data;
+            if (!options.json) {
+              process.stdout.write(event.data);
+            }
+          }
+          break;
+        case 'stderr':
+          if (event.data) {
+            stderr += event.data;
+            if (!options.json) {
+              process.stderr.write(event.data);
+            }
+          }
+          break;
+        case 'stop':
+          exitCode = event.exitCode;
+          status = event.status;
+          break;
+      }
+    }
+
+    logger.logResponse(stdout || stderr || `exit code: ${exitCode}`);
+
+    if (options.json) {
+      if (exitCode === 0) {
+        return {
+          success: true,
+          exitCode,
+          agentName,
+          targetName,
+          response: JSON.stringify({ stdout, stderr, exitCode, status }),
+          logFilePath: logger.logFilePath,
+        };
+      }
+      return {
+        success: false,
+        exitCode,
+        error: new Error(`Command exited with code ${exitCode}`),
+        agentName,
+        targetName,
+        response: JSON.stringify({ stdout, stderr, exitCode, status }),
+        logFilePath: logger.logFilePath,
+      };
+    }
+
+    if (exitCode === undefined) {
+      return {
+        success: false,
+        error: new Error('Command stream ended without exit code'),
+        agentName,
+        targetName,
+        logFilePath: logger.logFilePath,
+      };
+    }
+
+    if (exitCode !== 0) {
+      return {
+        success: false,
+        exitCode,
+        error: new Error(`Command exited with code ${exitCode}${status === 'TIMED_OUT' ? ' (timed out)' : ''}`),
+        agentName,
+        targetName,
+        response: JSON.stringify({ stdout, stderr, exitCode, status }),
+        logFilePath: logger.logFilePath,
+      };
+    }
+
+    return {
+      success: true,
+      exitCode,
+      agentName,
+      targetName,
+      logFilePath: logger.logFilePath,
+    };
+  } catch (err) {
+    logger.logError(err, 'exec command failed');
+    throw err;
+  }
+}
+
 export async function handleHarnessInvokeByArn(
   harnessArn: string,
   region: string,
@@ -850,6 +869,14 @@ export async function handleHarnessInvokeByArn(
   }
 
   const sessionId = options.sessionId ?? randomUUID();
+  if (options.exec) {
+    return handleInvokeExec({
+      region,
+      runtimeArn: harnessArn,
+      agentName: 'external-harness',
+      options: { ...options, sessionId },
+    });
+  }
   const logger = new InvokeLogger({ agentName: 'external-harness', runtimeArn: harnessArn, region, sessionId });
   logger.logPrompt(options.prompt, sessionId, options.userId);
 
@@ -983,13 +1010,7 @@ async function handleHarnessInvoke(
 
   const sessionId = options.sessionId ?? randomUUID();
   const region = targetConfig.region;
-
-  const logger = new InvokeLogger({
-    agentName: harnessName,
-    runtimeArn: harnessState.harnessArn,
-    region,
-    sessionId,
-  });
+  options = { ...options, sessionId };
 
   // Read harness spec for auth config
   const configIO = new ConfigIO();
@@ -1032,6 +1053,22 @@ async function handleHarnessInvoke(
     };
   }
 
+  if (options.exec) {
+    return handleInvokeExec({
+      region,
+      runtimeArn: harnessState.harnessArn,
+      agentName: harnessName,
+      targetName: selectedTargetName,
+      options,
+    });
+  }
+
+  const logger = new InvokeLogger({
+    agentName: harnessName,
+    runtimeArn: harnessState.harnessArn,
+    region,
+    sessionId,
+  });
   logger.logPrompt(options.prompt, sessionId, options.userId);
 
   const baseOpts = buildHarnessBaseOpts(options, harnessSpec?.model);
