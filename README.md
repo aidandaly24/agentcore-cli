@@ -31,6 +31,7 @@ Identity, and Gateway branches and leaves open their interactive flows.
 
 ```
 agentcore                          # interactive TUI
+├── invoke                         # invoke a Runtime or Harness in the current project
 ├── harness                        # manage agentcore harnesses
 │   ├── create                     # create a harness (auto-provisions a role if none given)
 │   ├── get                        # fetch a harness by id
@@ -115,6 +116,30 @@ Global flags (declared at the root, available on every command):
 | `--json`         | Emit machine-readable JSON instead of launching the TUI.             |
 | `--debug`        | Debug logging.                                                       |
 | `--endpoint-url` | Override the service endpoint URL (e.g. for testing against a stub). |
+
+### Invoke a project resource
+
+From anywhere inside an AgentCore project, invoke a deployed Runtime or Harness
+by its logical project name:
+
+```bash
+# A project with exactly one Runtime or Harness needs no selector.
+agentcore invoke "Summarize this repository."
+
+# Select explicitly when the project has multiple invokable resources.
+agentcore invoke --runtime checkout "Check order 123."
+agentcore invoke --harness support "Help with my account."
+
+# Select another deployment target.
+agentcore invoke --target staging --runtime checkout "Run a smoke test."
+
+# Omit content to open the selected resource's interactive console.
+agentcore invoke --runtime checkout
+```
+
+Project Runtime content is sent as `{"prompt": content}` with
+`application/json`. `--target` defaults to `default` and supplies the AWS
+account and region used for resource lookup and invocation.
 
 ### Examples
 
