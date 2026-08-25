@@ -2,6 +2,7 @@ import { contextKey } from "../../../router";
 
 export type RuntimeInvokeLaunchContext = {
   runtimeId: string;
+  inputMode?: "json" | "prompt";
   runtimeSessionId?: string;
   runtimeUserId?: string;
   applicationHeaders?: [string, string][];

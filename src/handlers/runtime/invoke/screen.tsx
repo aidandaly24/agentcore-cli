@@ -168,6 +168,7 @@ function RuntimeInvokeConsole({
   const [payload, setPayload] = useState("");
   const [inputError, setInputError] = useState<string>();
   const [requestContext, setRequestContext] = useState(initialContext);
+  const inputMode = initialContext?.inputMode ?? "json";
   const [runtimeSessionId, setRuntimeSessionId] = useState(
     () => initialContext?.runtimeSessionId ?? randomUUID(),
   );
@@ -190,12 +191,16 @@ function RuntimeInvokeConsole({
 
   const send = async () => {
     if (abortRef.current || !detail.data) return;
-    const requestPayload = payload;
-    try {
-      JSON.parse(requestPayload);
-    } catch {
-      setInputError("Enter a valid JSON payload");
-      return;
+    const displayedPayload = payload;
+    const requestPayload =
+      inputMode === "prompt" ? JSON.stringify({ prompt: displayedPayload }) : displayedPayload;
+    if (inputMode === "json") {
+      try {
+        JSON.parse(requestPayload);
+      } catch {
+        setInputError("Enter a valid JSON payload");
+        return;
+      }
     }
 
     setInputError(undefined);
@@ -203,7 +208,7 @@ function RuntimeInvokeConsole({
     const appendExchange = (response: string, state: ExchangeState) =>
       setHistory((current) => [
         ...current,
-        { payload: requestPayload, response, byteCount: 0, state },
+        { payload: displayedPayload, response, byteCount: 0, state },
       ]);
     setPayload("");
     appendExchange("", "connecting");
@@ -442,7 +447,7 @@ function RuntimeInvokeConsole({
                 setInputError(undefined);
               }}
               onSubmit={() => void send()}
-              placeholder="Enter JSON payload"
+              placeholder={inputMode === "prompt" ? "Enter prompt" : "Enter JSON payload"}
               submitDisabled={busy}
             />
             <Divider />

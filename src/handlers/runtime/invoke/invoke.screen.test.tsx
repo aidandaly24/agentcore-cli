@@ -925,3 +925,36 @@ describe("Runtime invoke JSON console", () => {
     }
   });
 });
+
+describe("Runtime invoke prompt console", () => {
+  test("accepts plain text and sends it as the project prompt payload", async () => {
+    const core = new TestCoreClient();
+    core.runtime
+      .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
+      .setInvokeResponse({
+        statusCode: 200,
+        contentType: "text/plain",
+        body: responseBody(Buffer.from("ok")),
+      });
+    const screen = renderScreen(CONSOLE_PATH, {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(RuntimeInvokeLaunchContextKey, {
+          runtimeId: RUNTIME_ID,
+          inputMode: "prompt",
+        }),
+    });
+
+    await waitForText(screen.lastFrame, "Enter prompt");
+    const content = 'say "hello"';
+    await screen.write(content);
+    await screen.press("return");
+    await waitFor(() => invokeRequests(core).length === 1);
+
+    expect(new TextDecoder().decode(invokeRequests(core)[0]!.payload)).toBe(
+      JSON.stringify({ prompt: content }),
+    );
+    await waitForText(screen.lastFrame, content);
+    expect(screen.lastFrame()).not.toContain("Enter a valid JSON payload");
+  });
+});
