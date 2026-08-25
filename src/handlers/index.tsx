@@ -8,8 +8,15 @@ import { createRuntimeHandler } from "./runtime/index.tsx";
 import { DebugKey, EndpointKey, JsonKey, RegionKey } from "./keys.tsx";
 import { createConfigHandler } from "./config/";
 import { createProjectHandler } from "./project/index.ts";
+import { createProjectInvokeHandler } from "./project/invoke";
 import { renderTui } from "../tui";
-import { withRegion, withJsonRenderer, withLogging, withGlobalConfigAccessor } from "../middleware";
+import {
+  withRegion,
+  withJsonRenderer,
+  withLogging,
+  withGlobalConfigAccessor,
+  withProject,
+} from "../middleware";
 import type { AppIO } from "../io";
 import type { Core } from "./types.tsx";
 import type { Logger } from "../logging";
@@ -50,6 +57,9 @@ export function createRootHandler(core: Core, config: RootHandlerConfig): Router
   root.handler(createGatewayHandler(core, io));
   root.handler(createEvalHandler(core, io));
   root.handler(createConfigHandler());
+  root.handler(
+    withProject({ projectManager: core.projectManager })(createProjectInvokeHandler(core, io)),
+  );
   root.handler(createProjectHandler({ projectManager: core.projectManager, io }));
 
   // Invoking with no subcommand launches the interactive TUI.

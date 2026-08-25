@@ -18,6 +18,7 @@ describe("createRootHandler", () => {
       "gateway",
       "eval",
       "config",
+      "invoke",
       "project",
     ]);
   });
