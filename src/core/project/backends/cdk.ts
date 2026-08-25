@@ -10,7 +10,12 @@ import {
   type ReadWriteJson,
 } from "../../../io";
 import type { Logger } from "../../../logging";
-import type { DeployBackendInput, ProjectBackend } from "./types";
+import type { AwsDeploymentTarget } from "../../../projectSchemas/aws-targets";
+import type {
+  DeployBackendInput,
+  ProjectBackend,
+  ResolveDeployedResourceBackendInput,
+} from "./types";
 import { createCloudFormationClient } from "../../factories";
 import type { CreateCloudFormationClient } from "../../types";
 import {
@@ -38,6 +43,12 @@ import {
   type CdkRunner,
   type CdkRunOptions,
 } from "./cdk/toolkit";
+import {
+  cdkStackName,
+  deployedResourceId,
+  readDeployedStack,
+  type DeployedStackReader,
+} from "./cdk/deployment";
 
 export type CdkBackendConfig = {
   logger: Logger;
@@ -51,6 +62,7 @@ export type CdkBackendConfig = {
   stack?: StackProbe;
   resolveAccount?: AccountResolver;
   loadBootstrapTemplate?: BootstrapTemplateLoader;
+  readStack?: DeployedStackReader;
 };
 
 /** Builds and deploys projects through the scaffolded CDK app. */
@@ -65,6 +77,7 @@ export class CdkBackend implements ProjectBackend {
   private readonly stack: StackProbe;
   private readonly resolveAccount: AccountResolver;
   private readonly loadBootstrapTemplate: BootstrapTemplateLoader;
+  private readonly readStack: DeployedStackReader;
 
   constructor(config: CdkBackendConfig) {
     this.logger = config.logger;
@@ -86,6 +99,7 @@ export class CdkBackend implements ProjectBackend {
       ((stackName, region, credentials) => probeStack(stackName, region, credentials, readStack));
     this.resolveAccount = config.resolveAccount ?? resolveAwsAccount;
     this.loadBootstrapTemplate = config.loadBootstrapTemplate ?? loadBootstrapTemplate;
+    this.readStack = config.readStack ?? readDeployedStack;
   }
 
   public async *build(project: Project): AsyncGenerator<ProjectEvent, void> {
@@ -115,14 +129,7 @@ export class CdkBackend implements ProjectBackend {
   ): AsyncGenerator<ProjectEvent, DeployResult> {
     const { target } = input;
     yield { message: `Verifying AWS account ${target.account}` };
-    const credentials = await this.resolveCredentials(target.region);
-    const account = await this.resolveAccount(target.region, credentials);
-    if (account !== target.account) {
-      throw new ProjectStateError(
-        `Deployment target '${target.name}' expects AWS account ${target.account}, ` +
-          `but the active credentials belong to ${account}.`,
-      );
-    }
+    const credentials = await this.credentialsFor(target);
 
     // Validate any existing deployed state before mutating AWS. A malformed file
     // must fail here — not after bootstrap/deploy — so we never leave AWS changed
@@ -239,6 +246,36 @@ export class CdkBackend implements ProjectBackend {
     await this.cdk({ kind: "destroy", stackArtifactId: artifact.id }, options);
     await removeTargetState(this.json, project.rootPath, target.name);
     return { outputs: {}, tornDown: true };
+  }
+
+  public async resolveDeployedResource(
+    project: Project,
+    input: ResolveDeployedResourceBackendInput,
+  ): Promise<string> {
+    const { target } = input;
+    const credentials = await this.credentialsFor(target);
+
+    const stackName = cdkStackName(project.name, target.name);
+    const stack = await this.readStack(stackName, target.region, credentials);
+    if (!stack) {
+      throw new ProjectStateError(
+        `Project '${project.name}' is not deployed to target '${target.name}'. ` +
+          `Run 'agentcore project deploy --target ${target.name}' first.`,
+      );
+    }
+    return deployedResourceId(stack, { stackName, targetName: target.name, ...input });
+  }
+
+  private async credentialsFor(target: AwsDeploymentTarget) {
+    const credentials = await this.resolveCredentials(target.region);
+    const account = await this.resolveAccount(target.region, credentials);
+    if (account !== target.account) {
+      throw new ProjectStateError(
+        `Deployment target '${target.name}' expects AWS account ${target.account}, ` +
+          `but the active credentials belong to ${account}.`,
+      );
+    }
+    return credentials;
   }
 
   private cdkDirectory(project: Project): string {

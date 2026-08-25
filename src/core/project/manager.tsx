@@ -8,6 +8,8 @@ import type {
   DeployResult,
   ExportHarnessInput,
   ExportHarnessResult,
+  ResolveDeployedResourceInput,
+  ResolvedDeployedResource,
   ResolveProjectInput,
   Project,
   ProjectManager,
@@ -871,6 +873,50 @@ export class FsProjectManager implements ProjectManager {
       target,
       confirmTeardown: input.confirmTeardown,
     });
+  }
+
+  public async resolveDeployedResource(
+    project: Project,
+    input: ResolveDeployedResourceInput,
+  ): Promise<ResolvedDeployedResource> {
+    const target = await this.resolveExistingTarget(project, input.target);
+    const id = await this.backendFor(project).resolveDeployedResource(project, {
+      target,
+      resourceType: input.resourceType,
+      name: input.name,
+    });
+    return { id, target };
+  }
+
+  private async resolveExistingTarget(
+    project: Project,
+    name: string,
+  ): Promise<AwsDeploymentTarget> {
+    const targetsPath = join(project.rootPath, "agentcore", "aws-targets.json");
+    if (!existsSync(targetsPath)) {
+      throw new ProjectStateError(
+        `No deployment targets are configured for project '${project.name}'. ` +
+          `Add ${targetsPath}, for example:\n\n${TARGETS_EXAMPLE}`,
+      );
+    }
+
+    const targets = await this.json.read(targetsPath, AwsDeploymentTargetsSchema);
+    if (targets.length === 0) {
+      throw new ProjectStateError(
+        `No deployment targets are configured for project '${project.name}'. ` +
+          `Add at least one to ${targetsPath}, for example:\n\n${TARGETS_EXAMPLE}`,
+      );
+    }
+
+    const target = targets.find((candidate) => candidate.name === name);
+    if (!target) {
+      throw new ProjectStateError(
+        `Project '${project.name}' has no deployment target named '${name}'. ` +
+          `${targetsPath} defines: ${targets.map(({ name }) => name).join(", ")}.`,
+      );
+    }
+
+    return target;
   }
 
   /**

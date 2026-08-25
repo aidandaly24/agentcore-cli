@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
+import type { Stack } from "@aws-sdk/client-cloudformation";
 import type { DeployResult, Project, ProjectEvent } from "../../../handlers/project/types";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
 import { createSilentLogger } from "../../../testing";
@@ -122,6 +123,7 @@ type HarnessOptions = {
   bootstrapError?: Error;
   /** Whether CloudFormation still holds the target's stack. Defaults to present. */
   stackExists?: boolean;
+  stack?: Stack;
 };
 
 function harness(options: HarnessOptions = {}) {
@@ -133,6 +135,8 @@ function harness(options: HarnessOptions = {}) {
   const accountRegions: string[] = [];
   const bootstrapRegions: string[] = [];
   const stackProbes: string[] = [];
+  const stackReads: { stackName: string; region: string; credentials: CdkCredentialProvider }[] =
+    [];
   let templateLoads = 0;
   let templateCleanups = 0;
   const credentials: CdkCredentialProvider = async () => ({
@@ -194,6 +198,10 @@ function harness(options: HarnessOptions = {}) {
         },
       };
     },
+    readStack: async (stackName, region, provider) => {
+      stackReads.push({ stackName, region, credentials: provider });
+      return options.stack;
+    },
   });
 
   return {
@@ -207,6 +215,7 @@ function harness(options: HarnessOptions = {}) {
     credentials,
     runs,
     stackProbes,
+    stackReads,
     templateLoads: () => templateLoads,
     templateCleanups: () => templateCleanups,
   };
@@ -561,5 +570,67 @@ describe("CdkBackend.deploy", () => {
     );
     expect(subject.templateCleanups()).toBe(1);
     expect(subject.runs.map(({ operation }) => operation.kind)).toEqual(["bootstrap"]);
+  });
+});
+
+describe("CdkBackend.resolveDeployedResource", () => {
+  test("reads the selected stack and resolves its Runtime ID output", async () => {
+    const input = await project();
+    const subject = harness({
+      stack: {
+        StackName: "AgentCore-example-default",
+        CreationTime: new Date(0),
+        StackStatus: "CREATE_COMPLETE",
+        Outputs: [
+          {
+            ExportName: "AgentCore-example-default-checkout-RuntimeId",
+            OutputValue: "checkout-AbCdEf1234",
+          },
+        ],
+      },
+    });
+
+    const id = await subject.backend.resolveDeployedResource(input, {
+      target: TARGET,
+      resourceType: "runtime",
+      name: "checkout",
+    });
+
+    expect(id).toBe("checkout-AbCdEf1234");
+    expect(subject.stackReads).toEqual([
+      {
+        stackName: "AgentCore-example-default",
+        region: TARGET.region,
+        credentials: subject.credentials,
+      },
+    ]);
+    expect(subject.accountCredentials).toEqual([subject.credentials]);
+  });
+
+  test("fails actionably when the project stack does not exist", async () => {
+    const input = await project();
+    const subject = harness();
+
+    await expect(
+      subject.backend.resolveDeployedResource(input, {
+        target: TARGET,
+        resourceType: "harness",
+        name: "support",
+      }),
+    ).rejects.toThrow(/not deployed.*project deploy --target default/s);
+  });
+
+  test("rejects the wrong account before reading CloudFormation", async () => {
+    const input = await project();
+    const subject = harness({ account: "999900001111" });
+
+    await expect(
+      subject.backend.resolveDeployedResource(input, {
+        target: TARGET,
+        resourceType: "runtime",
+        name: "checkout",
+      }),
+    ).rejects.toThrow(/expects AWS account 111122223333.*999900001111/s);
+    expect(subject.stackReads).toEqual([]);
   });
 });

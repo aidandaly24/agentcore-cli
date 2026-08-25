@@ -60,6 +60,9 @@ function fakeBackend(
       yield* events;
       return result;
     },
+    async resolveDeployedResource() {
+      return "unused";
+    },
   };
   return { calls, confirmations, backend };
 }
