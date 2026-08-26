@@ -31,6 +31,7 @@ export const createRemoveProjectHandler = (config: RemoveProjectResourceConfig) 
             "gateway-connector",
             "policy-engine",
             "policy",
+            "payment-manager",
           ])
           .optional(),
       ),

@@ -163,6 +163,37 @@ describe("project remove", () => {
     ).toEqual(["keep"]);
   });
 
+  test("removes a payment manager with its connectors while preserving reusable credentials", async () => {
+    const projectRoot = await inProject();
+    await run(["add", "credentials", "payment", "--name", "shared", "--provider", "CoinbaseCDP"]);
+    await run(["add", "payment-manager", "--name", "keep"]);
+    await run(["add", "payment-manager", "--name", "remove"]);
+    await run([
+      "add",
+      "payment-connector",
+      "--manager",
+      "remove",
+      "--name",
+      "connector",
+      "--credential",
+      "shared",
+    ]);
+
+    await run(["remove", "payment-manager", "--name", "remove"]);
+
+    const agentcoreJson = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
+    expect(agentcoreJson.payments.map((manager: { name: string }) => manager.name)).toEqual([
+      "keep",
+    ]);
+    expect(agentcoreJson.credentials).toEqual([
+      {
+        authorizerType: "PaymentCredentialProvider",
+        name: "shared",
+        provider: "CoinbaseCDP",
+      },
+    ]);
+  });
+
   // Verifies that missing required inputs are rejected before calling the manager.
   test.each<[string, string[]]>([
     ["missing resource argument", ["remove", "--name", "x"]],
