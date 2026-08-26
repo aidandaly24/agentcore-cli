@@ -967,4 +967,34 @@ describe("Runtime invoke prompt console", () => {
     expect(screen.lastFrame()).not.toContain("data:");
     expect(screen.lastFrame()).not.toContain("contentBlockDelta");
   });
+
+  test("reports an AgentCore error received after partial Strands text", async () => {
+    const core = new TestCoreClient();
+    core.runtime
+      .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
+      .setInvokeResponse({
+        statusCode: 200,
+        contentType: "text/event-stream",
+        body: responseBody(
+          Buffer.from('data: {"event":{"contentBlockDelta":{"delta":{"text":"partial"}}}}\n\n'),
+          Buffer.from('data: {"error":"Model access denied"}\n\n'),
+        ),
+      });
+    const screen = renderScreen(CONSOLE_PATH, {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(RuntimeInvokeLaunchContextKey, {
+          runtimeId: RUNTIME_ID,
+          inputMode: "prompt",
+        }),
+    });
+
+    await waitForText(screen.lastFrame, "Enter prompt");
+    await screen.write("hello");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "Model access denied");
+
+    expect(screen.lastFrame()).toContain("partial");
+    expect(screen.lastFrame()).toContain("failed · 7 bytes");
+  });
 });

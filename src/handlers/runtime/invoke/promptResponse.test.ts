@@ -52,7 +52,6 @@ describe("renderPromptResponseBody", () => {
     const chunks = [
       Buffer.from('data: "plain text"\n\n'),
       Buffer.from('data: {"text":"text chunk"}\n\n'),
-      Buffer.from('data: {"error":"failed"}\n\n'),
     ];
 
     expect(await read(renderPromptResponseBody("text/event-stream", body(...chunks)))).toBe(
@@ -60,18 +59,68 @@ describe("renderPromptResponseBody", () => {
     );
   });
 
-  test("falls back to the exact raw response when no Strands text is found", async () => {
+  test("passes through an unsupported SSE frame before the source completes", async () => {
+    const finish = Promise.withResolvers<void>();
+    const source = (async function* () {
+      yield Buffer.from('data: {"progress":1}\n\n');
+      await finish.promise;
+    })();
+    const iterator = renderPromptResponseBody("text/event-stream", source)[Symbol.asyncIterator]();
+
+    const first = await Promise.race([
+      iterator.next(),
+      Bun.sleep(50).then(() => ({ done: true, value: undefined })),
+    ]);
+    finish.resolve();
+    await iterator.next();
+
+    expect(first).toEqual({
+      done: false,
+      value: Uint8Array.from(Buffer.from('data: {"progress":1}\n\n')),
+    });
+  });
+
+  test("ignores non-text Strands frames", async () => {
     const chunks = [
       Buffer.from('data: {"event":{"messageStart":{"role":"assistant"}}}\r\n\r\n'),
       Buffer.from('data: {"event":{"messageStop":{"stopReason":"end_turn"}}}\r\n\r\n'),
     ];
 
-    expect(await read(renderPromptResponseBody("text/event-stream", body(...chunks)))).toBe(
-      new TextDecoder().decode(Buffer.concat(chunks)),
-    );
+    expect(await read(renderPromptResponseBody("text/event-stream", body(...chunks)))).toBe("");
   });
 
-  test("preserves buffered raw bytes before propagating a stream failure", async () => {
+  test("fails when AgentCore emits an error after partial Strands text", async () => {
+    const rendered = renderPromptResponseBody(
+      "text/event-stream",
+      body(
+        Buffer.from('data: {"event":{"contentBlockDelta":{"delta":{"text":"partial"}}}}\n\n'),
+        Buffer.from(
+          'data: {"error":"Model access denied","error_type":"AccessDeniedException"}\n\n',
+        ),
+      ),
+    );
+    const chunks: Uint8Array[] = [];
+
+    await expect(async () => {
+      for await (const chunk of rendered) chunks.push(Uint8Array.from(chunk));
+    }).toThrow("Model access denied");
+    expect(new TextDecoder().decode(Buffer.concat(chunks))).toBe("partial");
+  });
+
+  test("fails an initial AgentCore error without rendering its wire frame", async () => {
+    const rendered = renderPromptResponseBody(
+      "text/event-stream",
+      body(Buffer.from('data: {"error":"Model access denied"}\n\n')),
+    );
+    const chunks: Uint8Array[] = [];
+
+    await expect(async () => {
+      for await (const chunk of rendered) chunks.push(Uint8Array.from(chunk));
+    }).toThrow("Model access denied");
+    expect(chunks).toEqual([]);
+  });
+
+  test("propagates an upstream failure after recognizing a Strands stream", async () => {
     const source = (async function* () {
       yield Buffer.from('data: {"event":{"messageStart":{"role":"assistant"}}}\n\n');
       throw new Error("stream failed");
@@ -82,8 +131,6 @@ describe("renderPromptResponseBody", () => {
     await expect(async () => {
       for await (const chunk of rendered) chunks.push(Uint8Array.from(chunk));
     }).toThrow("stream failed");
-    expect(new TextDecoder().decode(Buffer.concat(chunks))).toBe(
-      'data: {"event":{"messageStart":{"role":"assistant"}}}\n\n',
-    );
+    expect(chunks).toEqual([]);
   });
 });

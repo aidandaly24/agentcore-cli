@@ -8,18 +8,38 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function parseStrandsTextDelta(line: string): string | undefined {
-  if (!line.startsWith("data:")) return undefined;
+type ParsedSseLine =
+  { kind: "strands"; text?: string } | { kind: "error"; message: string } | { kind: "unknown" };
+
+function parseSseLine(line: string): ParsedSseLine {
+  if (!line.startsWith("data:")) return { kind: "unknown" };
   const raw = line.slice(5).trimStart();
 
   try {
     const parsed: unknown = JSON.parse(raw);
-    const event = asRecord(asRecord(parsed)?.event);
+    const root = asRecord(parsed);
+    if (!root) return { kind: "unknown" };
+    if ("error" in root) {
+      return {
+        kind: "error",
+        message: String(root.error) || "Runtime response stream failed",
+      };
+    }
+
+    const event = asRecord(root.event);
+    if (!event) {
+      return root.init_event_loop === true || root.start === true || root.start_event_loop === true
+        ? { kind: "strands" }
+        : { kind: "unknown" };
+    }
+
     const contentBlockDelta = asRecord(event?.contentBlockDelta);
     const delta = asRecord(contentBlockDelta?.delta);
-    return typeof delta?.text === "string" ? delta.text : undefined;
+    return typeof delta?.text === "string"
+      ? { kind: "strands", text: delta.text }
+      : { kind: "strands" };
   } catch {
-    return undefined;
+    return { kind: "unknown" };
   }
 }
 
@@ -34,38 +54,85 @@ export function renderPromptResponseBody(
 async function* renderSseBody(body: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  const rawChunks: Uint8Array[] = [];
+  const pending: Uint8Array[] = [];
+  const maxSniffBytes = 64 * 1024;
   let buffer = "";
-  let rendered = false;
+  let pendingBytes = 0;
+  let mode: "sniffing" | "strands" | "raw" = "sniffing";
 
-  const processLines = function* (lines: string[]): Generator<Uint8Array> {
+  const processStrandsLines = function* (lines: string[]): Generator<Uint8Array> {
     for (const line of lines) {
-      const text = parseStrandsTextDelta(line);
-      if (text === undefined) continue;
-      if (!rendered) {
-        rendered = true;
-        rawChunks.length = 0;
+      if (line === "") continue;
+      const parsed = parseSseLine(line);
+      if (parsed.kind === "error") throw new Error(parsed.message);
+      if (parsed.kind === "strands" && parsed.text !== undefined) {
+        yield encoder.encode(parsed.text);
       }
-      yield encoder.encode(text);
     }
   };
 
   try {
     for await (const chunk of body) {
       const snapshot = Uint8Array.from(chunk);
-      if (!rendered) rawChunks.push(snapshot);
+      if (mode === "raw") {
+        yield snapshot;
+        continue;
+      }
 
       buffer += decoder.decode(snapshot, { stream: true });
       const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() ?? "";
-      yield* processLines(lines);
+
+      if (mode === "strands") {
+        yield* processStrandsLines(lines);
+        continue;
+      }
+
+      pending.push(snapshot);
+      pendingBytes += snapshot.byteLength;
+      const firstLine = lines.find((line) => line !== "");
+      if (firstLine !== undefined) {
+        const parsed = parseSseLine(firstLine);
+        if (parsed.kind === "error") {
+          mode = "strands";
+          pending.length = 0;
+          throw new Error(parsed.message);
+        }
+        if (parsed.kind === "strands") {
+          mode = "strands";
+          pending.length = 0;
+          yield* processStrandsLines(lines);
+          continue;
+        }
+        mode = "raw";
+      } else if (pendingBytes >= maxSniffBytes) {
+        mode = "raw";
+      }
+
+      if (mode === "raw") {
+        yield* pending;
+        pending.length = 0;
+        buffer = "";
+      }
     }
   } catch (error) {
-    if (!rendered) yield* rawChunks;
+    if (mode === "sniffing") yield* pending;
     throw error;
   }
 
+  if (mode === "raw") return;
+
   buffer += decoder.decode();
-  if (buffer) yield* processLines([buffer]);
-  if (!rendered) yield* rawChunks;
+  if (mode === "strands") {
+    if (buffer) yield* processStrandsLines([buffer]);
+    return;
+  }
+
+  const parsed = buffer ? parseSseLine(buffer) : { kind: "unknown" as const };
+  if (parsed.kind === "error") throw new Error(parsed.message);
+  if (parsed.kind === "strands") {
+    yield* processStrandsLines([buffer]);
+  } else {
+    yield* pending;
+  }
 }
