@@ -10,6 +10,7 @@ import {
   resolveRuntimeInvokeSources,
   resolveRuntimeInvokeTuiBearerToken,
 } from "../../runtime/invoke/request";
+import { renderPromptResponseBody } from "../../runtime/invoke/promptResponse";
 import { writeRuntimeInvokeResponse } from "../../runtime/invoke/response";
 import { invokeHarnessTurn } from "../../harness/invoke/operation";
 import { JsonKey, RegionKey } from "../../keys";
@@ -185,12 +186,18 @@ export const createProjectInvokeHandler = (
           options,
           signal,
         );
-        await writeRuntimeInvokeResponse(response, {
-          stdout: io.stdout,
-          stderr: io.stderr,
-          json: invokeCtx.require(JsonKey),
-          signal,
-        });
+        await writeRuntimeInvokeResponse(
+          {
+            ...response,
+            body: renderPromptResponseBody(response.contentType, response.body),
+          },
+          {
+            stdout: io.stdout,
+            stderr: io.stderr,
+            json: invokeCtx.require(JsonKey),
+            signal,
+          },
+        );
       });
     },
   });

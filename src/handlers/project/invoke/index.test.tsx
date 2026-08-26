@@ -151,6 +151,26 @@ describe("project invoke", () => {
     expect(core.runtime.calls[1]!.args[1]).toEqual({ region: TARGET.region });
   });
 
+  test("streams only assistant text from a Strands Runtime response", async () => {
+    const wire = [
+      'data: {"event":{"messageStart":{"role":"assistant"}}}\n\n',
+      'data: {"event":{"contentBlockDelta":{"delta":{"text":"Hello"}}}}\n\n',
+      'data: {"event":{"contentBlockDelta":{"delta":{"text":" world"}}}}\n\n',
+      'data: {"event":{"messageStop":{"stopReason":"end_turn"}}}\n\n',
+    ].join("");
+    const { io } = await run(["hello"], { runtimes: [RUNTIME] }, (core) =>
+      core.runtime.setInvokeResponse({
+        statusCode: 200,
+        contentType: "text/event-stream",
+        body: body(Buffer.from(wire.slice(0, 91)), Buffer.from(wire.slice(91))),
+      }),
+    );
+
+    expect(io.stdout()).toBe("Hello world");
+    expect(io.stdout()).not.toContain("data:");
+    expect(io.stdout()).not.toContain("contentBlockDelta");
+  });
+
   test("auto-selects one Harness and sends one user message", async () => {
     const { core, io } = await run(["hello"], { harnesses: [HARNESS] });
 
