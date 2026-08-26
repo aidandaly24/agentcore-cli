@@ -30,7 +30,19 @@ export interface RootHandlerConfig {
 
 export function createRootHandler(core: Core, config: RootHandlerConfig): Router {
   const { io, logger } = config;
-  const root = new Router("agentcore", "the platform for production AI agents");
+  const root = new Router(
+    "agentcore",
+    "the platform for production AI agents",
+  ).supportedTuiCommands(
+    "harness",
+    "identity",
+    "runtime",
+    "memory",
+    "gateway",
+    "eval",
+    "config",
+    "project",
+  );
 
   // Add global flags
   root.groupFlags(RegionKey, DebugKey, JsonKey, EndpointKey);

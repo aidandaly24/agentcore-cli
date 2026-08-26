@@ -32,6 +32,14 @@ describe("menu rendering", () => {
     r.unmount();
   });
 
+  test("does not offer project invoke without a root TUI route", async () => {
+    const r = renderScreen("/agentcore");
+    await waitForText(r.lastFrame, "harness");
+
+    expect(r.lastFrame()).not.toMatch(/^[❯ ]*invoke\s/m);
+    r.unmount();
+  });
+
   test("renders the harness subcommands when mounted at the harness path", async () => {
     const r = renderScreen("/agentcore/harness");
     await waitForText(r.lastFrame, "list");
