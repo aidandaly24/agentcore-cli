@@ -50,6 +50,22 @@ describe("credential schema", () => {
         clientSecretRef: SECRET_REF,
       },
     ],
+    [
+      "a Coinbase payment credential",
+      {
+        authorizerType: "PaymentCredentialProvider",
+        name: "coinbase",
+        provider: "CoinbaseCDP",
+      },
+    ],
+    [
+      "a StripePrivy payment credential",
+      {
+        authorizerType: "PaymentCredentialProvider",
+        name: "stripe",
+        provider: "StripePrivy",
+      },
+    ],
   ])("accepts %s and retains its fields", (_label, value) => {
     const result = CredentialSchema.safeParse(value);
     expect(result.success).toBe(true);
@@ -123,6 +139,15 @@ describe("credential schema", () => {
       "an invalid credential name",
       { authorizerType: "ApiKeyCredentialProvider", name: "bad name!" },
       /alphanumeric/,
+    ],
+    [
+      "an unsupported payment provider",
+      {
+        authorizerType: "PaymentCredentialProvider",
+        name: "payment",
+        provider: "Unsupported",
+      },
+      /provider/,
     ],
     [
       "a credential name shorter than 3 characters",

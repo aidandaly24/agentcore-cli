@@ -248,8 +248,26 @@ export const ProjectSpecSchema = z
         }
       }
     }
+    const credentialEnvironmentNames = new Map<string, string>();
+    for (const [credentialIndex, credential] of spec.credentials.entries()) {
+      const environmentName = credential.name.replace(/-/g, "_").toUpperCase();
+      const conflictingName = credentialEnvironmentNames.get(environmentName);
+      if (conflictingName) {
+        ctx.addIssue({
+          code: "custom",
+          message:
+            `Credential "${credential.name}" and "${conflictingName}" derive the same environment variable name; ` +
+            "choose names that differ by more than '-' and '_'",
+          path: ["credentials", credentialIndex, "name"],
+        });
+      } else {
+        credentialEnvironmentNames.set(environmentName, credential.name);
+      }
+    }
     for (const [paymentIndex, payment] of (spec.payments ?? []).entries()) {
       for (const [connectorIndex, connector] of payment.connectors.entries()) {
+        if (connector.provisionMode === "QUICK_CREATE") continue;
+
         const credential = spec.credentials.find((c) => c.name === connector.credentialName);
         if (!credential) {
           ctx.addIssue({
@@ -262,6 +280,14 @@ export const ProjectSpecSchema = z
             code: "custom",
             message: `Payment connector "${connector.name}" in manager "${payment.name}" references credential "${connector.credentialName}" which is a ${credential.authorizerType}, not a PaymentCredentialProvider`,
             path: ["payments", paymentIndex, "connectors", connectorIndex, "credentialName"],
+          });
+        } else if (credential.provider !== connector.provider) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              `Payment connector "${connector.name}" in manager "${payment.name}" uses provider "${connector.provider}", ` +
+              `but credential "${connector.credentialName}" uses provider "${credential.provider}"`,
+            path: ["payments", paymentIndex, "connectors", connectorIndex, "provider"],
           });
         }
       }

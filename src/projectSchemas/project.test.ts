@@ -244,4 +244,99 @@ describe("project custom validation", () => {
       }).success,
     ).toBe(true);
   });
+
+  it("validates payment connector credential providers and skips credentials for Quick Create", () => {
+    const credential = {
+      authorizerType: "PaymentCredentialProvider" as const,
+      name: "credential",
+      provider: "CoinbaseCDP" as const,
+    };
+    const manualPayment = {
+      name: "manual",
+      connectors: [
+        {
+          name: "stripe",
+          provider: "StripePrivy" as const,
+          credentialName: credential.name,
+        },
+      ],
+    };
+
+    expect(
+      ProjectSpecSchema.safeParse({
+        ...minimalProject,
+        credentials: [credential],
+        payments: [manualPayment],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ProjectSpecSchema.safeParse({
+        ...minimalProject,
+        payments: [
+          {
+            name: "quick",
+            connectors: [
+              {
+                name: "coinbase",
+                provider: "CoinbaseCDP",
+                provisionMode: "QUICK_CREATE",
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("allows the same payment connector name under different managers", () => {
+    const credential = {
+      authorizerType: "PaymentCredentialProvider" as const,
+      name: "credential",
+      provider: "CoinbaseCDP" as const,
+    };
+    const connector = {
+      name: "shared",
+      provider: "CoinbaseCDP" as const,
+      credentialName: credential.name,
+    };
+
+    expect(
+      ProjectSpecSchema.safeParse({
+        ...minimalProject,
+        credentials: [credential],
+        payments: [
+          {
+            name: "first",
+            connectors: [connector],
+          },
+          {
+            name: "second",
+            connectors: [connector],
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects credential names that derive the same environment variable prefix", () => {
+    const result = ProjectSpecSchema.safeParse({
+      ...minimalProject,
+      credentials: [
+        { authorizerType: "ApiKeyCredentialProvider", name: "service-key" },
+        {
+          authorizerType: "PaymentCredentialProvider",
+          name: "service_key",
+          provider: "CoinbaseCDP",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) => issue.message.includes("environment variable")),
+      ).toBe(true);
+    }
+  });
 });
