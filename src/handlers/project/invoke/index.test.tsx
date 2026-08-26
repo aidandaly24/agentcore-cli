@@ -18,6 +18,7 @@ import {
   createSilentLogger,
   TestCoreClient,
   TestGlobalConfigAccessor,
+  type TestIO,
   testIO,
 } from "../../../testing";
 import type { Project } from "../types";
@@ -56,7 +57,7 @@ function body(...chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
 async function inProject(resources: {
   runtimes?: unknown[];
   harnesses?: unknown[];
-}): Promise<void> {
+}): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "agentcore-project-invoke-"));
   temporaryDirectories.push(root);
   await mkdir(join(root, "agentcore"), { recursive: true });
@@ -69,6 +70,7 @@ async function inProject(resources: {
   await writeFile(join(root, "agentcore", "agentcore.json"), JSON.stringify(spec));
   await writeFile(join(root, "agentcore", "aws-targets.json"), JSON.stringify([TARGET]));
   process.chdir(root);
+  return root;
 }
 
 function testBackend() {
@@ -91,8 +93,9 @@ async function run(
   args: string[],
   resources: { runtimes?: unknown[]; harnesses?: unknown[] },
   configure?: (core: TestCoreClient) => void,
+  io: TestIO = testIO(),
 ) {
-  await inProject(resources);
+  const rootPath = await inProject(resources);
   const resolved = testBackend();
   const core = new TestCoreClient({ backends: { CDK: resolved.backend } });
   core.runtime
@@ -113,14 +116,13 @@ async function run(
       { messageStop: { stopReason: "end_turn" } },
     );
   configure?.(core);
-  const io = testIO();
   const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
   });
   await root.route(["node", "agentcore", "invoke", ...args, "--region", "us-east-2"]);
-  return { core, io, resolved };
+  return { core, io, resolved, rootPath };
 }
 
 afterEach(async () => {
@@ -169,6 +171,77 @@ describe("project invoke", () => {
     expect(io.stdout()).toBe("Hello world");
     expect(io.stdout()).not.toContain("data:");
     expect(io.stdout()).not.toContain("contentBlockDelta");
+  });
+
+  test("fails an incomplete Strands response after preserving partial text", async () => {
+    const io = testIO();
+
+    await expect(
+      run(
+        ["hello"],
+        { runtimes: [RUNTIME] },
+        (core) =>
+          core.runtime.setInvokeResponse({
+            statusCode: 200,
+            contentType: "text/event-stream",
+            body: body(
+              Buffer.from('data: {"event":{"contentBlockDelta":{"delta":{"text":"partial"}}}}\n\n'),
+              Buffer.from('data: {"error":"Model access denied"}\n\n'),
+            ),
+          }),
+        io,
+      ),
+    ).rejects.toThrow("response stream failed");
+
+    expect(io.stdout()).toBe("partial");
+    expect(io.stderr()).toContain("complete=false bytes=7 error=response-stream-failed");
+  });
+
+  test("preserves the Runtime wire response in JSON mode", async () => {
+    const wire = 'data: {"event":{"contentBlockDelta":{"delta":{"text":"hello"}}}}\n\n';
+    const { io } = await run(["hello", "--json"], { runtimes: [RUNTIME] }, (core) =>
+      core.runtime.setInvokeResponse({
+        statusCode: 200,
+        contentType: "text/event-stream; charset=utf-8",
+        body: body(Buffer.from(wire)),
+      }),
+    );
+
+    expect(JSON.parse(io.stdout())).toMatchObject({
+      contentType: "text/event-stream; charset=utf-8",
+      bodyEncoding: "utf8",
+      body: wire,
+      complete: true,
+    });
+  });
+
+  test("writes the exact Runtime wire response to --output-file", async () => {
+    const wire = Buffer.from([0, 255, 1]);
+    const { io, rootPath } = await run(
+      ["hello", "--output-file", "response.bin"],
+      { runtimes: [RUNTIME] },
+      (core) =>
+        core.runtime.setInvokeResponse({
+          statusCode: 200,
+          contentType: "application/octet-stream",
+          body: body(wire),
+        }),
+    );
+
+    expect(Buffer.from(await Bun.file(join(rootPath, "response.bin")).bytes())).toEqual(wire);
+    expect(io.stdout()).toBe("");
+  });
+
+  test("rejects --json with --output-file", async () => {
+    await expect(
+      run(["hello", "--json", "--output-file", "response.bin"], { runtimes: [RUNTIME] }),
+    ).rejects.toThrow("--json cannot be used with --output-file");
+  });
+
+  test("rejects --output-file for Harness invoke", async () => {
+    await expect(
+      run(["hello", "--output-file", "response.bin"], { harnesses: [HARNESS] }),
+    ).rejects.toThrow("--output-file is only valid with --runtime");
   });
 
   test("auto-selects one Harness and sends one user message", async () => {

@@ -92,6 +92,11 @@ export const createProjectInvokeHandler = (
       flag("target", "project deployment target", z.string().default("default")),
       flag("session-id", "session ID to continue", z.string().optional()),
       flag("qualifier", "endpoint qualifier", z.string().optional()),
+      flag(
+        "output-file",
+        "write the Runtime response body to a file",
+        z.string().min(1, "requires a nonempty path").optional(),
+      ),
       flag("bearer-token", "the CUSTOM_JWT bearer token", z.string().optional(), {
         sensitive: true,
       }),
@@ -99,8 +104,15 @@ export const createProjectInvokeHandler = (
     handle: async (ctx, flags, args) => {
       const project = ctx.require(ProjectKey);
       const selected = selectResource(project, flags.runtime, flags.harness);
+      const jsonOutput = ctx.require(JsonKey);
       if (selected.resourceType === "harness" && flags["bearer-token"] !== undefined) {
         throw new InputValidationError("--bearer-token is only valid with --runtime");
+      }
+      if (selected.resourceType === "harness" && flags["output-file"] !== undefined) {
+        throw new InputValidationError("--output-file is only valid with --runtime");
+      }
+      if (jsonOutput && flags["output-file"] !== undefined) {
+        throw new InputValidationError("--json cannot be used with --output-file");
       }
       if (
         selected.resourceType === "harness" &&
@@ -109,8 +121,10 @@ export const createProjectInvokeHandler = (
       ) {
         throw new InputValidationError("Harness session ID must be between 33 and 100 characters");
       }
-      if (args.content === undefined && ctx.require(JsonKey)) {
-        throw new InputValidationError("content is required with --json");
+      if (args.content === undefined && (jsonOutput || flags["output-file"] !== undefined)) {
+        throw new InputValidationError(
+          `content is required with ${jsonOutput ? "--json" : "--output-file"}`,
+        );
       }
 
       const deployed = await core.projectManager.resolveDeployedResource(project, {
@@ -186,15 +200,19 @@ export const createProjectInvokeHandler = (
           options,
           signal,
         );
+        const preserveWireResponse = jsonOutput || flags["output-file"] !== undefined;
         await writeRuntimeInvokeResponse(
-          {
-            ...response,
-            body: renderPromptResponseBody(response.contentType, response.body),
-          },
+          preserveWireResponse
+            ? response
+            : {
+                ...response,
+                body: renderPromptResponseBody(response.contentType, response.body),
+              },
           {
             stdout: io.stdout,
             stderr: io.stderr,
-            json: invokeCtx.require(JsonKey),
+            outputFile: flags["output-file"],
+            json: jsonOutput,
             signal,
           },
         );
