@@ -133,13 +133,20 @@ agentcore invoke --harness support "Help with my account."
 # Select another deployment target.
 agentcore invoke --target staging --runtime checkout "Run a smoke test."
 
+# Preserve the Runtime wire response in a JSON envelope or file.
+agentcore invoke --runtime checkout "Check order 123." --json
+agentcore invoke --runtime checkout "Check order 123." --output-file response.sse
+
 # Omit content to open the selected resource's interactive console.
 agentcore invoke --runtime checkout
 ```
 
 Project Runtime content is sent as `{"prompt": content}` with
 `application/json`. `--target` defaults to `default` and supplies the AWS
-account and region used for resource lookup and invocation.
+account and region used for resource lookup and invocation. Default output
+streams assistant text from supported Strands SSE responses and passes
+unsupported SSE responses through unchanged. `--json` and the Runtime-only
+`--output-file` preserve the exact wire response instead.
 
 ### Examples
 
