@@ -18,6 +18,7 @@ import { Spinner } from "../../../components/ui/spinner";
 import type { RuntimeInvokeResponse } from "../types";
 import { normalizeRuntimeInvokeRequest } from "./request";
 import { classifyRuntimeResponse } from "./response";
+import { renderPromptResponseBody } from "./promptResponse";
 import { RuntimeInvokeLaunchContextKey, type RuntimeInvokeLaunchContext } from "./launchContext";
 
 const theme = darkTheme;
@@ -247,7 +248,11 @@ function RuntimeInvokeConsole({
       const decoder = new TextDecoder();
       const chunks: Uint8Array[] = [];
       let responseText = "";
-      for await (const chunk of response.body) {
+      const responseBody =
+        inputMode === "prompt"
+          ? renderPromptResponseBody(response.contentType, response.body)
+          : response.body;
+      for await (const chunk of responseBody) {
         const snapshot = Uint8Array.from(chunk);
         chunks.push(snapshot);
         byteCount += snapshot.byteLength;

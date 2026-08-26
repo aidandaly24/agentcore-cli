@@ -927,14 +927,20 @@ describe("Runtime invoke JSON console", () => {
 });
 
 describe("Runtime invoke prompt console", () => {
-  test("accepts plain text and sends it as the project prompt payload", async () => {
+  test("sends a project prompt payload and renders its Strands response as text", async () => {
+    const wire = [
+      'data: {"event":{"messageStart":{"role":"assistant"}}}\n\n',
+      'data: {"event":{"contentBlockDelta":{"delta":{"text":"Hello"}}}}\n\n',
+      'data: {"event":{"contentBlockDelta":{"delta":{"text":" world"}}}}\n\n',
+      'data: {"event":{"messageStop":{"stopReason":"end_turn"}}}\n\n',
+    ].join("");
     const core = new TestCoreClient();
     core.runtime
       .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
       .setInvokeResponse({
         statusCode: 200,
-        contentType: "text/plain",
-        body: responseBody(Buffer.from("ok")),
+        contentType: "text/event-stream",
+        body: responseBody(Buffer.from(wire.slice(0, 87)), Buffer.from(wire.slice(87))),
       });
     const screen = renderScreen(CONSOLE_PATH, {
       core,
@@ -955,6 +961,10 @@ describe("Runtime invoke prompt console", () => {
       JSON.stringify({ prompt: content }),
     );
     await waitForText(screen.lastFrame, content);
+    await waitForText(screen.lastFrame, "Hello world");
+    await waitForText(screen.lastFrame, "complete · 11 bytes");
     expect(screen.lastFrame()).not.toContain("Enter a valid JSON payload");
+    expect(screen.lastFrame()).not.toContain("data:");
+    expect(screen.lastFrame()).not.toContain("contentBlockDelta");
   });
 });
