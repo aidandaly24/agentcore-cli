@@ -146,14 +146,12 @@ async function main() {
 
     // Extract credentials from deployed state for this target
     const targetState = (deployedState as Record<string, unknown>)?.targets as
-      | Record<string, Record<string, unknown>>
-      | undefined;
+      Record<string, Record<string, unknown>> | undefined;
     const targetResources = target
       ? (targetState?.[target.name]?.resources as Record<string, unknown> | undefined)
       : undefined;
     const credentials = targetResources?.credentials as
-      | Record<string, { credentialProviderArn: string; clientSecretArn?: string }>
-      | undefined;
+      Record<string, { credentialProviderArn: string; clientSecretArn?: string }> | undefined;
 
     // Payment credential provider ARNs live in the same credentials map as identity credentials
     const paymentCredentials = credentials;
@@ -168,7 +166,12 @@ async function main() {
             autoPayment?: boolean;
             paymentToolAllowlist?: string[];
             networkPreferences?: string[];
-            connectors: { name: string; provider?: string; credentialName: string }[];
+            connectors: {
+              name: string;
+              provider?: 'CoinbaseCDP' | 'StripePrivy';
+              provisionMode?: 'MANUAL' | 'QUICK_CREATE';
+              credentialName?: string;
+            }[];
           }) => ({
             name: p.name,
             description: p.description,
@@ -178,6 +181,19 @@ async function main() {
             paymentToolAllowlist: p.paymentToolAllowlist,
             networkPreferences: p.networkPreferences,
             connectors: p.connectors.map(c => {
+              if (c.provisionMode === 'QUICK_CREATE') {
+                return {
+                  name: c.name,
+                  provider: 'CoinbaseCDP' as const,
+                  provisionMode: 'QUICK_CREATE' as const,
+                };
+              }
+
+              if (!c.credentialName) {
+                throw new Error(
+                  `Manual payment connector "${c.name}" on manager "${p.name}" is missing its credential name.`
+                );
+              }
               const credentialProviderArn = paymentCredentials?.[c.credentialName]?.credentialProviderArn;
               if (!credentialProviderArn) {
                 // Fail fast with an actionable message rather than passing an empty
@@ -188,7 +204,13 @@ async function main() {
                     `Run \`agentcore deploy\` so the credential provider is created first.`
                 );
               }
-              return { name: c.name, provider: c.provider, credentialProviderArn };
+              return {
+                name: c.name,
+                provider: c.provider ?? ('CoinbaseCDP' as const),
+                ...(c.provisionMode && { provisionMode: c.provisionMode }),
+                credentialName: c.credentialName,
+                credentialProviderArn,
+              };
             }),
           })
         )

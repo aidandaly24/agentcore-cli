@@ -19,11 +19,23 @@ import { Construct } from 'constructs';
  */
 export type HarnessConfig = HarnessDeploymentConfig;
 
-export interface PaymentConnectorSpec {
+export interface ManualPaymentConnectorSpec {
   name: string;
   provider: 'CoinbaseCDP' | 'StripePrivy';
+  provisionMode?: 'MANUAL';
+  credentialName: string;
   credentialProviderArn: string;
 }
+
+export interface QuickCreatePaymentConnectorSpec {
+  name: string;
+  provider: 'CoinbaseCDP';
+  provisionMode: 'QUICK_CREATE';
+  credentialName?: never;
+  credentialProviderArn?: never;
+}
+
+export type PaymentConnectorSpec = ManualPaymentConnectorSpec | QuickCreatePaymentConnectorSpec;
 
 export interface PaymentSpec {
   name: string;
@@ -203,13 +215,24 @@ export class AgentCoreStack extends Stack {
         // Create connectors for this manager
         for (const connector of payment.connectors) {
           const connId = toCdkId(connector.name);
-          const conn = new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
-            projectName: spec.name,
-            paymentManager: manager,
-            connectorName: connector.name,
-            connectorType: connector.provider,
-            credentialProviderArn: connector.credentialProviderArn,
-          });
+          const conn =
+            connector.provisionMode === 'QUICK_CREATE'
+              ? new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
+                  projectName: spec.name,
+                  paymentManager: manager,
+                  connector,
+                })
+              : new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
+                  projectName: spec.name,
+                  paymentManager: manager,
+                  connector: {
+                    name: connector.name,
+                    provider: connector.provider,
+                    provisionMode: connector.provisionMode,
+                    credentialName: connector.credentialName,
+                  },
+                  credentialProviderArn: connector.credentialProviderArn,
+                });
 
           // Wire first connector's ID as env var (eligible agents only)
           if (connector === payment.connectors[0]) {
@@ -222,6 +245,14 @@ export class AgentCoreStack extends Stack {
           new CfnOutput(this, `Payment${mgrId}${connId}ConnectorId`, {
             value: conn.paymentConnectorId,
           });
+          if (connector.provisionMode === 'QUICK_CREATE') {
+            new CfnOutput(this, `Payment${mgrId}${connId}ConnectorStatus`, {
+              value: conn.paymentConnectorStatus,
+            });
+            new CfnOutput(this, `Payment${mgrId}${connId}AuthorizationUrl`, {
+              value: conn.authorizationUrl,
+            });
+          }
         }
 
         // CFN Outputs for post-deploy state parsing
