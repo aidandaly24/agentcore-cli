@@ -19,21 +19,21 @@ import { Construct } from 'constructs';
  */
 export type HarnessConfig = HarnessDeploymentConfig;
 
-export interface ManualPaymentConnectorSpec {
+export type ManualPaymentConnectorSpec = {
   name: string;
   provider: 'CoinbaseCDP' | 'StripePrivy';
   provisionMode?: 'MANUAL';
   credentialName: string;
   credentialProviderArn: string;
-}
+};
 
-export interface QuickCreatePaymentConnectorSpec {
+export type QuickCreatePaymentConnectorSpec = {
   name: string;
   provider: 'CoinbaseCDP';
   provisionMode: 'QUICK_CREATE';
   credentialName?: never;
   credentialProviderArn?: never;
-}
+};
 
 export type PaymentConnectorSpec = ManualPaymentConnectorSpec | QuickCreatePaymentConnectorSpec;
 
