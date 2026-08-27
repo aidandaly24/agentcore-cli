@@ -1,11 +1,6 @@
 {
   "name": "agentcore-cdk-app",
   "version": "0.1.0",
-  "agentcoreProject": {
-    "capabilities": [
-      "payment-connector-quick-create"
-    ]
-  },
   "bin": {
     "cdk": "dist/bin/cdk.js"
   },

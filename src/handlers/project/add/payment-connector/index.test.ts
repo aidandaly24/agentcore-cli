@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { join } from "node:path";
 import { createPaymentProjectTestHarness } from "../payment-test-support";
 
 const { cleanup, inProject, projectSpec, run, writeProjectSpec } =
@@ -67,29 +66,6 @@ describe("project add payment-connector", () => {
         provisionMode: "QUICK_CREATE",
       },
     ]);
-  });
-
-  test("rejects Quick Create when the project has legacy generated CDK assets", async () => {
-    const projectRoot = await inProject();
-    await addManager();
-    const packagePath = join(projectRoot, "agentcore", "cdk", "package.json");
-    const packageJson = await Bun.file(packagePath).json();
-    delete packageJson.agentcoreProject;
-    await Bun.write(packagePath, JSON.stringify(packageJson, undefined, 2));
-
-    await expect(
-      run([
-        "add",
-        "payment-connector",
-        "--manager",
-        "payments",
-        "--name",
-        "coinbase",
-        "--quick-create",
-      ]),
-    ).rejects.toThrow("generated CDK assets");
-
-    expect((await projectSpec(projectRoot)).payments[0].connectors).toEqual([]);
   });
 
   test.each([
