@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { createPaymentProjectTestHarness } from "../../payment-test-support";
 
 const { cleanup, inProject, projectSpec, run } =
@@ -30,8 +31,82 @@ describe("project add credentials payment", () => {
         },
       ]);
       expect(io.stderr()).toContain(`added credential '${provider.toLowerCase()}-credential'`);
+      const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+      const prefix = `AGENTCORE_CREDENTIAL_${provider.toUpperCase()}_CREDENTIAL`;
+      const suffixes =
+        provider === "CoinbaseCDP"
+          ? ["API_KEY_ID", "API_KEY_SECRET", "WALLET_SECRET"]
+          : ["APP_ID", "APP_SECRET", "AUTHORIZATION_PRIVATE_KEY", "AUTHORIZATION_ID"];
+      for (const suffix of suffixes) {
+        expect(env).toContain(`${prefix}_${suffix}=\n`);
+        expect(io.stderr()).toContain(`Set ${prefix}_${suffix} in agentcore/.env.local`);
+      }
     },
   );
+
+  test("stores source-aware Coinbase credential values outside the project schema", async () => {
+    const projectRoot = await inProject();
+    const apiKeySecretPath = join(projectRoot, "api-key-secret.txt");
+    const walletSecretPath = join(projectRoot, "wallet-secret.txt");
+    await Bun.write(apiKeySecretPath, "api-secret\n");
+    await Bun.write(walletSecretPath, "wallet-secret\n");
+
+    await run([
+      "add",
+      "credentials",
+      "payment",
+      "--name",
+      "coinbase-prod",
+      "--provider",
+      "CoinbaseCDP",
+      "--api-key-id",
+      "api-key-id",
+      "--api-key-secret",
+      `file://${apiKeySecretPath}`,
+      "--wallet-secret",
+      `file://${walletSecretPath}`,
+    ]);
+
+    expect((await projectSpec(projectRoot)).credentials).toEqual([
+      {
+        authorizerType: "PaymentCredentialProvider",
+        name: "coinbase-prod",
+        provider: "CoinbaseCDP",
+      },
+    ]);
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    expect(env).toContain("AGENTCORE_CREDENTIAL_COINBASE_PROD_API_KEY_ID='api-key-id'");
+    expect(env).toContain("AGENTCORE_CREDENTIAL_COINBASE_PROD_API_KEY_SECRET='api-secret'");
+    expect(env).toContain("AGENTCORE_CREDENTIAL_COINBASE_PROD_WALLET_SECRET='wallet-secret'");
+  });
+
+  test.each([
+    [
+      "inline Coinbase API key secret",
+      ["--provider", "CoinbaseCDP", "--api-key-secret", "inline-secret"],
+      "must come from stdin",
+    ],
+    [
+      "Stripe option with Coinbase",
+      ["--provider", "CoinbaseCDP", "--app-id", "privy-app"],
+      "not valid with --provider CoinbaseCDP",
+    ],
+    [
+      "Coinbase option with Stripe",
+      ["--provider", "StripePrivy", "--api-key-id", "coinbase-key"],
+      "not valid with --provider StripePrivy",
+    ],
+  ])("rejects %s without mutating the project", async (_label, flags, message) => {
+    const projectRoot = await inProject();
+
+    await expect(
+      run(["add", "credentials", "payment", "--name", "payment-credential", ...flags]),
+    ).rejects.toThrow(message);
+
+    expect((await projectSpec(projectRoot)).credentials ?? []).toEqual([]);
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    expect(env).not.toContain("AGENTCORE_CREDENTIAL_PAYMENT_CREDENTIAL");
+  });
 
   test.each([
     ["missing name", ["--provider", "CoinbaseCDP"], "required option '--name"],

@@ -4,6 +4,7 @@ import { PaymentProviderSchema } from "../../../../../projectSchemas/payment";
 import { createHandler, flag } from "../../../../../router";
 import type { AddProjectResourceConfig } from "../../types";
 import { addCredentialToProject } from "../shared";
+import { paymentCredentialInputFlags, resolvePaymentCredentialEnvEntries } from "./input";
 
 export const createAddPaymentCredentialHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -16,6 +17,7 @@ export const createAddPaymentCredentialHandler = (config: AddProjectResourceConf
         "the payment provider: CoinbaseCDP or StripePrivy",
         PaymentProviderSchema.optional(),
       ),
+      ...paymentCredentialInputFlags,
     ],
     handle: async (ctx, flags) => {
       if (!flags.name) {
@@ -25,12 +27,19 @@ export const createAddPaymentCredentialHandler = (config: AddProjectResourceConf
         throw new InputValidationError("required option '--provider <provider>' not specified");
       }
 
+      const envEntries = await resolvePaymentCredentialEnvEntries({
+        name: flags.name,
+        provider: flags.provider,
+        flags,
+        io: config.io,
+      });
       await addCredentialToProject(ctx, config, {
         resourceConfig: {
           authorizerType: "PaymentCredentialProvider",
           name: flags.name,
           provider: flags.provider,
         },
+        envEntries,
       });
     },
   });
