@@ -17,6 +17,8 @@ const TARGET = {
   account: "111122223333",
   region: "us-east-1",
 } as const;
+const STACK_ARN =
+  "arn:aws:cloudformation:us-east-1:111122223333:stack/AgentCore-example-default/abc";
 
 const tempDirectories: string[] = [];
 
@@ -74,6 +76,13 @@ async function writeAssembly(project: Project, targetNames: string[]): Promise<v
         ),
       },
     }),
+  );
+}
+
+async function writeDeployedState(input: Project, stackArn = STACK_ARN): Promise<void> {
+  await writeFile(
+    join(input.rootPath, DEPLOYED_STATE_RELATIVE_PATH),
+    JSON.stringify({ targets: { [TARGET.name]: { stackArn } } }),
   );
 }
 
@@ -145,7 +154,7 @@ function harness(options: HarnessOptions = {}) {
         },
       };
     },
-    readStack: async (stackName, region, provider) => {
+    describeStack: async (region, provider, stackName) => {
       stackReads.push({ stackName, region, credentials: provider });
       return options.stack;
     },
@@ -388,40 +397,57 @@ describe("CdkBackend.deploy", () => {
 });
 
 describe("CdkBackend.resolveDeployedResource", () => {
-  test("reads the selected stack and resolves its Runtime ID output", async () => {
-    const input = await project();
-    const subject = harness({
-      stack: {
-        StackName: "AgentCore-example-default",
-        CreationTime: new Date(0),
-        StackStatus: "CREATE_COMPLETE",
-        Outputs: [
-          {
-            ExportName: "AgentCore-example-default-checkout-RuntimeId",
-            OutputValue: "checkout-AbCdEf1234",
-          },
-        ],
-      },
-    });
+  test.each([
+    {
+      resourceType: "runtime" as const,
+      name: "checkout_agent",
+      exportName: "AgentCore-example-default-checkout-agent-RuntimeId",
+      id: "checkout_agent-AbCdEf1234",
+    },
+    {
+      resourceType: "harness" as const,
+      name: "support_agent",
+      exportName: "AgentCore-example-default-Harness-support-agent-Id",
+      id: "support_agent-AbCdEf1234",
+    },
+  ])(
+    "reads deployed state and resolves a $resourceType ID from its live stack",
+    async (example) => {
+      const input = await project();
+      await writeDeployedState(input);
+      const subject = harness({
+        stack: {
+          StackName: "AgentCore-example-default",
+          CreationTime: new Date(0),
+          StackStatus: "CREATE_COMPLETE",
+          Outputs: [
+            {
+              ExportName: example.exportName,
+              OutputValue: example.id,
+            },
+          ],
+        },
+      });
 
-    const id = await subject.backend.resolveDeployedResource(input, {
-      target: TARGET,
-      resourceType: "runtime",
-      name: "checkout",
-    });
+      const id = await subject.backend.resolveDeployedResource(input, {
+        target: TARGET,
+        resourceType: example.resourceType,
+        name: example.name,
+      });
 
-    expect(id).toBe("checkout-AbCdEf1234");
-    expect(subject.stackReads).toEqual([
-      {
-        stackName: "AgentCore-example-default",
-        region: TARGET.region,
-        credentials: subject.credentials,
-      },
-    ]);
-    expect(subject.accountCredentials).toEqual([subject.credentials]);
-  });
+      expect(id).toBe(example.id);
+      expect(subject.stackReads).toEqual([
+        {
+          stackName: STACK_ARN,
+          region: TARGET.region,
+          credentials: subject.credentials,
+        },
+      ]);
+      expect(subject.accountCredentials).toEqual([subject.credentials]);
+    },
+  );
 
-  test("fails actionably when the project stack does not exist", async () => {
+  test("fails without reading AWS when the target has no deployed stack ARN", async () => {
     const input = await project();
     const subject = harness();
 
@@ -432,10 +458,49 @@ describe("CdkBackend.resolveDeployedResource", () => {
         name: "support",
       }),
     ).rejects.toThrow(/not deployed.*project deploy --target default/s);
+    expect(subject.stackReads).toEqual([]);
+    expect(subject.accountCredentials).toEqual([]);
+  });
+
+  test("fails actionably when the recorded stack no longer exists", async () => {
+    const input = await project();
+    await writeDeployedState(input);
+    const subject = harness();
+
+    await expect(
+      subject.backend.resolveDeployedResource(input, {
+        target: TARGET,
+        resourceType: "harness",
+        name: "support",
+      }),
+    ).rejects.toThrow(/not deployed.*project deploy --target default/s);
+    expect(subject.stackReads[0]?.stackName).toBe(STACK_ARN);
+  });
+
+  test("fails when the live stack has no output for the selected resource", async () => {
+    const input = await project();
+    await writeDeployedState(input);
+    const subject = harness({
+      stack: {
+        StackName: "AgentCore-example-default",
+        CreationTime: new Date(0),
+        StackStatus: "CREATE_COMPLETE",
+        Outputs: [],
+      },
+    });
+
+    await expect(
+      subject.backend.resolveDeployedResource(input, {
+        target: TARGET,
+        resourceType: "runtime",
+        name: "checkout",
+      }),
+    ).rejects.toThrow(/Runtime 'checkout'.*not deployed.*default/s);
   });
 
   test("rejects the wrong account before reading CloudFormation", async () => {
     const input = await project();
+    await writeDeployedState(input);
     const subject = harness({ account: "999900001111" });
 
     await expect(

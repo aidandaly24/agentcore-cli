@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import type { Stack } from "@aws-sdk/client-cloudformation";
 import { ProjectStateError } from "../../../errors/errors";
 import type { DeployResult, Project, ProjectEvent } from "../../../handlers/project/types";
 import {
@@ -17,7 +18,7 @@ import type {
   ResolveDeployedResourceBackendInput,
 } from "./types";
 import { stackArtifactIdForTarget } from "./cdk/assembly";
-import { updateTargetState } from "./cdk/deployedState";
+import { readDeployedState, updateTargetState } from "./cdk/deployedState";
 import {
   probeBootstrap,
   resolveAwsAccount,
@@ -32,12 +33,26 @@ import {
   type CdkCredentialResolver,
   type CdkRunner,
 } from "./cdk/toolkit";
-import {
-  cdkStackName,
-  deployedResourceId,
-  readDeployedStack,
-  type DeployedStackReader,
-} from "./cdk/deployment";
+import { describeStack } from "./cdk/stackReader";
+
+type StackDescriber = typeof describeStack;
+
+function sanitizeName(name: string): string {
+  return name.replaceAll("_", "-");
+}
+
+function deployedResourceId(
+  stack: Stack,
+  input: ResolveDeployedResourceBackendInput,
+): string | undefined {
+  if (!stack.StackName) return undefined;
+  const resourceName = sanitizeName(input.name);
+  const exportName =
+    input.resourceType === "runtime"
+      ? `${stack.StackName}-${resourceName}-RuntimeId`
+      : `${stack.StackName}-Harness-${resourceName}-Id`;
+  return stack.Outputs?.find((output) => output.ExportName === exportName)?.OutputValue;
+}
 
 export type CdkBackendConfig = {
   logger: Logger;
@@ -49,7 +64,7 @@ export type CdkBackendConfig = {
   bootstrap?: BootstrapProbe;
   resolveAccount?: AccountResolver;
   loadBootstrapTemplate?: BootstrapTemplateLoader;
-  readStack?: DeployedStackReader;
+  describeStack?: StackDescriber;
 };
 
 /** Builds and deploys projects through the scaffolded CDK app. */
@@ -63,7 +78,7 @@ export class CdkBackend implements ProjectBackend {
   private readonly bootstrap: BootstrapProbe;
   private readonly resolveAccount: AccountResolver;
   private readonly loadBootstrapTemplate: BootstrapTemplateLoader;
-  private readonly readStack: DeployedStackReader;
+  private readonly describeStack: StackDescriber;
 
   constructor(config: CdkBackendConfig) {
     this.logger = config.logger;
@@ -76,7 +91,7 @@ export class CdkBackend implements ProjectBackend {
     this.bootstrap = config.bootstrap ?? probeBootstrap;
     this.resolveAccount = config.resolveAccount ?? resolveAwsAccount;
     this.loadBootstrapTemplate = config.loadBootstrapTemplate ?? loadBootstrapTemplate;
-    this.readStack = config.readStack ?? readDeployedStack;
+    this.describeStack = config.describeStack ?? describeStack;
   }
 
   public async *build(project: Project): AsyncGenerator<ProjectEvent, void> {
@@ -162,17 +177,32 @@ export class CdkBackend implements ProjectBackend {
     input: ResolveDeployedResourceBackendInput,
   ): Promise<string> {
     const { target } = input;
-    const credentials = await this.credentialsFor(target);
+    const deployedState = await readDeployedState(this.json, project.rootPath);
+    const stackArn = deployedState.targets[target.name]?.stackArn;
+    if (!stackArn) {
+      throw new ProjectStateError(
+        `Project '${project.name}' is not deployed to target '${target.name}'. ` +
+          `Run 'agentcore project deploy --target ${target.name}' first.`,
+      );
+    }
 
-    const stackName = cdkStackName(project.name, target.name);
-    const stack = await this.readStack(stackName, target.region, credentials);
+    const credentials = await this.credentialsFor(target);
+    const stack = await this.describeStack(target.region, credentials, stackArn);
     if (!stack) {
       throw new ProjectStateError(
         `Project '${project.name}' is not deployed to target '${target.name}'. ` +
           `Run 'agentcore project deploy --target ${target.name}' first.`,
       );
     }
-    return deployedResourceId(stack, { stackName, targetName: target.name, ...input });
+
+    const id = deployedResourceId(stack, input);
+    if (id) return id;
+
+    const label = input.resourceType === "runtime" ? "Runtime" : "Harness";
+    throw new ProjectStateError(
+      `${label} '${input.name}' is not deployed to target '${target.name}'. ` +
+        `Run 'agentcore project deploy --target ${target.name}' first.`,
+    );
   }
 
   private async credentialsFor(target: AwsDeploymentTarget) {
