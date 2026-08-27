@@ -76,8 +76,12 @@ export interface AgentCoreStackProps extends StackProps {
   paymentSpec?: PaymentSpec[];
 }
 
+function paymentManagerCdkId(managerName: string): string {
+  return `PaymentManagerM${managerName.length}${managerName}`;
+}
+
 function paymentConnectorCdkId(managerName: string, connectorName: string): string {
-  return `PaymentM${managerName.length}${managerName}C${connectorName.length}${connectorName}`;
+  return `PaymentConnectorM${managerName.length}${managerName}C${connectorName.length}${connectorName}`;
 }
 
 /**
@@ -139,8 +143,8 @@ export class AgentCoreStack extends Stack {
     // Create payment infrastructure via CFN constructs
     if (paymentSpec && paymentSpec.length > 0) {
       for (const payment of paymentSpec) {
-        const mgrId = payment.name;
-        const manager = new AgentCorePaymentManager(this, `Payment${mgrId}`, {
+        const managerCdkId = paymentManagerCdkId(payment.name);
+        const manager = new AgentCorePaymentManager(this, managerCdkId, {
           projectName: spec.name,
           name: payment.name,
           authorizerType: payment.authorizerType,
@@ -258,16 +262,16 @@ export class AgentCoreStack extends Stack {
         }
 
         // CFN Outputs for post-deploy state parsing
-        new CfnOutput(this, `Payment${mgrId}ManagerArn`, {
+        new CfnOutput(this, `${managerCdkId}Arn`, {
           value: manager.paymentManagerArn,
         });
-        new CfnOutput(this, `Payment${mgrId}ManagerId`, {
+        new CfnOutput(this, `${managerCdkId}Id`, {
           value: manager.paymentManagerId,
         });
-        new CfnOutput(this, `Payment${mgrId}ProcessPaymentRoleArn`, {
+        new CfnOutput(this, `${managerCdkId}ProcessPaymentRoleArn`, {
           value: manager.processPaymentRoleArn,
         });
-        new CfnOutput(this, `Payment${mgrId}ResourceRetrievalRoleArn`, {
+        new CfnOutput(this, `${managerCdkId}ResourceRetrievalRoleArn`, {
           value: manager.resourceRetrievalRoleArn,
         });
       }

@@ -98,10 +98,10 @@ test('AgentCoreStack synthesizes manual and Quick Create payment connectors', ()
     ProvisionMode: 'QUICK_CREATE',
     CredentialProviderConfigurations: [],
   });
-  template.hasOutput('PaymentM8PaymentsC5QuickAuthorizationUrl', {});
+  template.hasOutput('PaymentConnectorM8PaymentsC5QuickAuthorizationUrl', {});
 });
 
-test('AgentCoreStack preserves complete payment connector identities', () => {
+test('AgentCoreStack preserves complete and type-distinct payment resource identities', () => {
   const app = new cdk.App();
   const stack = new AgentCoreStack(app, 'TestStack', {
     spec: {
@@ -144,6 +144,11 @@ test('AgentCoreStack preserves complete payment connector identities', () => {
         authorizerType: 'AWS_IAM',
         connectors: [
           {
+            name: 'B',
+            provider: 'CoinbaseCDP',
+            provisionMode: 'QUICK_CREATE',
+          },
+          {
             name: 'BC',
             provider: 'CoinbaseCDP',
             provisionMode: 'QUICK_CREATE',
@@ -161,8 +166,13 @@ test('AgentCoreStack preserves complete payment connector identities', () => {
           },
         ],
       },
+      {
+        name: 'M1AC1B',
+        authorizerType: 'AWS_IAM',
+        connectors: [],
+      },
     ],
   });
 
-  Template.fromStack(stack).resourceCountIs('AWS::BedrockAgentCore::PaymentConnector', 4);
+  Template.fromStack(stack).resourceCountIs('AWS::BedrockAgentCore::PaymentConnector', 5);
 });
