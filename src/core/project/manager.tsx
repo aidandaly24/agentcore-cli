@@ -50,6 +50,14 @@ import type { TemplateRenderer } from "./templates/types";
 import { HandlebarsTemplateRenderer } from "./templates/renderer";
 
 const TARGETS_EXAMPLE = '[{ "name": "default", "account": "111122223333", "region": "us-east-1" }]';
+const PAYMENT_CONNECTOR_QUICK_CREATE_CAPABILITY = "payment-connector-quick-create";
+const GeneratedCdkPackageSchema = z.object({
+  agentcoreProject: z
+    .object({
+      capabilities: z.array(z.string()),
+    })
+    .optional(),
+});
 
 type ProjectManagerConfig = {
   logger: Logger;
@@ -326,6 +334,20 @@ export class FsProjectManager implements ProjectManager {
         break;
       }
       case "payment-connector": {
+        if (input.resourceConfig.provisionMode === "QUICK_CREATE") {
+          const cdkPackagePath = join(project.rootPath, "agentcore", "cdk", "package.json");
+          const cdkPackage = await this.json.read(cdkPackagePath, GeneratedCdkPackageSchema);
+          if (
+            !cdkPackage.agentcoreProject?.capabilities.includes(
+              PAYMENT_CONNECTOR_QUICK_CREATE_CAPABILITY,
+            )
+          ) {
+            throw new InputValidationError(
+              "Quick Create requires current generated CDK assets; update 'agentcore/cdk' from a project created by this CLI version, then retry",
+            );
+          }
+        }
+
         const manager = projectSpec.payments!.find(
           (candidate) => candidate.name === input.managerName,
         )!;
