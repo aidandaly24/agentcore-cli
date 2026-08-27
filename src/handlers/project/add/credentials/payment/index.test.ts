@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { generateKeyPairSync } from "node:crypto";
 import { join } from "node:path";
 import { createPaymentProjectTestHarness } from "../../payment-test-support";
 
@@ -48,8 +49,14 @@ describe("project add credentials payment", () => {
     const projectRoot = await inProject();
     const apiKeySecretPath = join(projectRoot, "api-key-secret.txt");
     const walletSecretPath = join(projectRoot, "wallet-secret.txt");
-    await Bun.write(apiKeySecretPath, "api-secret\n");
-    await Bun.write(walletSecretPath, "wallet-secret\n");
+    const apiKeySecret = generateKeyPairSync("ed25519")
+      .privateKey.export({ type: "pkcs8", format: "der" })
+      .toString("base64");
+    const walletSecret = generateKeyPairSync("ec", { namedCurve: "P-256" })
+      .privateKey.export({ type: "pkcs8", format: "der" })
+      .toString("base64");
+    await Bun.write(apiKeySecretPath, `${apiKeySecret}\n`);
+    await Bun.write(walletSecretPath, `${walletSecret}\n`);
 
     await run([
       "add",
@@ -76,8 +83,35 @@ describe("project add credentials payment", () => {
     ]);
     const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
     expect(env).toContain("AGENTCORE_CREDENTIAL_COINBASE_PROD_API_KEY_ID='api-key-id'");
-    expect(env).toContain("AGENTCORE_CREDENTIAL_COINBASE_PROD_API_KEY_SECRET='api-secret'");
-    expect(env).toContain("AGENTCORE_CREDENTIAL_COINBASE_PROD_WALLET_SECRET='wallet-secret'");
+    expect(env).toContain(`AGENTCORE_CREDENTIAL_COINBASE_PROD_API_KEY_SECRET='${apiKeySecret}'`);
+    expect(env).toContain(`AGENTCORE_CREDENTIAL_COINBASE_PROD_WALLET_SECRET='${walletSecret}'`);
+  });
+
+  test("normalizes the documented Stripe authorization key prefix", async () => {
+    const projectRoot = await inProject();
+    const privateKeyPath = join(projectRoot, "private-key.txt");
+    const privateKey = generateKeyPairSync("ec", { namedCurve: "P-256" })
+      .privateKey.export({ type: "pkcs8", format: "der" })
+      .toString("base64");
+    await Bun.write(privateKeyPath, `wallet-auth:${privateKey}\n`);
+
+    await run([
+      "add",
+      "credentials",
+      "payment",
+      "--name",
+      "stripe-prod",
+      "--provider",
+      "StripePrivy",
+      "--authorization-private-key",
+      `file://${privateKeyPath}`,
+    ]);
+
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    expect(env).toContain(
+      `AGENTCORE_CREDENTIAL_STRIPE_PROD_AUTHORIZATION_PRIVATE_KEY='${privateKey}'`,
+    );
+    expect(env).not.toContain("wallet-auth:");
   });
 
   test.each([

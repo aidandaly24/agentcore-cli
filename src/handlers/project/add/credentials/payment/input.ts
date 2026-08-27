@@ -5,6 +5,12 @@ import type { PaymentProvider } from "../../../../../projectSchemas/payment";
 import { flag } from "../../../../../router";
 import type { EnvLocalEntry } from "../../../types";
 import { credentialEnvVarName } from "../shared";
+import {
+  stripWalletAuthPrefix,
+  validateApiKeySecret,
+  validateAuthorizationPrivateKey,
+  validateWalletSecret,
+} from "./validation";
 
 export const paymentCredentialInputFlags = [
   flag("api-key-id", "Coinbase CDP API key ID", z.string().optional()),
@@ -79,10 +85,18 @@ export async function resolvePaymentCredentialEnvEntries(input: {
   const resolver = new SourceResolver({ stdin: io.stdin });
   if (provider === "StripePrivy") {
     const appSecret = await resolver.resolveSecret("app-secret", flags["app-secret"]);
-    const authorizationPrivateKey = await resolver.resolveSecret(
+    const resolvedAuthorizationPrivateKey = await resolver.resolveSecret(
       "authorization-private-key",
       flags["authorization-private-key"],
     );
+    const authorizationPrivateKey =
+      resolvedAuthorizationPrivateKey === undefined
+        ? undefined
+        : stripWalletAuthPrefix(resolvedAuthorizationPrivateKey);
+    if (authorizationPrivateKey !== undefined) {
+      const validation = validateAuthorizationPrivateKey(authorizationPrivateKey);
+      if (validation !== true) throw new InputValidationError(validation);
+    }
     return [
       {
         key: credentialEnvVarName(name, "_APP_ID"),
@@ -109,6 +123,14 @@ export async function resolvePaymentCredentialEnvEntries(input: {
 
   const apiKeySecret = await resolver.resolveSecret("api-key-secret", flags["api-key-secret"]);
   const walletSecret = await resolver.resolveSecret("wallet-secret", flags["wallet-secret"]);
+  if (apiKeySecret !== undefined) {
+    const validation = validateApiKeySecret(apiKeySecret);
+    if (validation !== true) throw new InputValidationError(validation);
+  }
+  if (walletSecret !== undefined) {
+    const validation = validateWalletSecret(walletSecret);
+    if (validation !== true) throw new InputValidationError(validation);
+  }
   return [
     {
       key: credentialEnvVarName(name, "_API_KEY_ID"),
