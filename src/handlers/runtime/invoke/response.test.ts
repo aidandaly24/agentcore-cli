@@ -465,4 +465,21 @@ describe("Runtime invoke response output", () => {
         "complete=false bytes=0\n",
     );
   });
+
+  test("uses caller-specific binary TTY guidance", async () => {
+    const stdout = capture();
+    const stderr = capture();
+    Object.defineProperty(stdout.stream, "isTTY", { value: true });
+
+    await expect(
+      writeRuntimeInvokeResponse(
+        response({ contentType: "application/octet-stream" }),
+        {
+          stdout: stdout.stream,
+          stderr: stderr.stream,
+        },
+        { binaryTtyError: "Binary project responses require --json" },
+      ),
+    ).rejects.toThrow("Binary project responses require --json");
+  });
 });

@@ -8,6 +8,11 @@ import {
 import type { RuntimeInvokeResponse } from "../types";
 
 const RESPONSE_STREAM_FAILED = "response stream failed";
+const BINARY_TTY_ERROR = "Binary or unknown response content requires --output-file or --json";
+
+type RuntimeInvokeResponseWriterOptions = {
+  binaryTtyError?: string;
+};
 
 export function classifyRuntimeResponse(contentType: string) {
   return classifyStreamingResponse(contentType);
@@ -49,11 +54,12 @@ function summary(
 export async function writeRuntimeInvokeResponse(
   response: RuntimeInvokeResponse,
   output: StreamingResponseOutput,
+  options: RuntimeInvokeResponseWriterOptions = {},
 ): Promise<void> {
   await writeStreamingResponse(response, output, {
     metadata: ({ body: _body, ...metadata }) => metadata,
     summary,
     fail: (error) => failure(error, output.signal),
-    binaryTtyError: "Binary or unknown response content requires --output-file or --json",
+    binaryTtyError: options.binaryTtyError ?? BINARY_TTY_ERROR,
   });
 }
