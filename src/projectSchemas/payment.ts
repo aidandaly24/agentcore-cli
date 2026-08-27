@@ -1,3 +1,4 @@
+import { AllowedScopeSchema, OidcDiscoveryUrlSchema } from "./auth";
 import { z } from "zod";
 export const PaymentProviderSchema = z.enum(["CoinbaseCDP", "StripePrivy"]);
 export type PaymentProvider = z.infer<typeof PaymentProviderSchema>;
@@ -44,6 +45,14 @@ export const PaymentConnectorSchema = z.union([
   ManualPaymentConnectorSchema,
 ]);
 export type PaymentConnector = z.infer<typeof PaymentConnectorSchema>;
+export const PaymentManagerDescriptionSchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .regex(
+    /^[a-zA-Z0-9\s]+$/,
+    "Payment manager description must contain only alphanumeric characters and whitespace",
+  );
 export const PaymentManagerSchema = z
   .object({
     name: PaymentManagerNameSchema,
@@ -51,21 +60,24 @@ export const PaymentManagerSchema = z
     authorizerConfiguration: z
       .object({
         customJWTAuthorizer: z.object({
-          discoveryUrl: z.string().url(),
-          allowedClients: z.array(z.string()).optional(),
-          allowedAudience: z.array(z.string()).optional(),
-          allowedScopes: z.array(z.string()).optional(),
+          discoveryUrl: OidcDiscoveryUrlSchema,
+          allowedClients: z.array(z.string()).min(1).optional(),
+          allowedAudience: z.array(z.string()).min(1).optional(),
+          allowedScopes: z.array(AllowedScopeSchema).min(1).optional(),
         }),
       })
       .optional(),
     connectors: z.array(PaymentConnectorSchema).default([]),
-    description: z.string().optional(),
+    description: PaymentManagerDescriptionSchema.optional(),
     autoPayment: z.boolean().default(DEFAULT_AUTO_PAYMENT),
     defaultSpendLimit: z
       .string()
-      .refine((value) => Number.isFinite(Number(value)) && Number(value) >= 0, {
-        message: "Default spend limit must be a non-negative number",
-      })
+      .refine(
+        (value) => value.trim().length > 0 && Number.isFinite(Number(value)) && Number(value) >= 0,
+        {
+          message: "Default spend limit must be a non-negative number",
+        },
+      )
       .default(DEFAULT_SPEND_LIMIT),
     paymentToolAllowlist: z.array(z.string()).optional(),
     networkPreferences: z.array(z.string()).optional(),

@@ -79,4 +79,39 @@ describe("payment manager custom validation", () => {
       }).success,
     ).toBe(false);
   });
+
+  it.each([
+    [
+      "a discovery URL without the OIDC well-known suffix",
+      {
+        authorizerType: "CUSTOM_JWT",
+        authorizerConfiguration: {
+          customJWTAuthorizer: { discoveryUrl: "https://example.com/discovery" },
+        },
+      },
+    ],
+    [
+      "an invalid scope",
+      {
+        authorizerType: "CUSTOM_JWT",
+        authorizerConfiguration: {
+          customJWTAuthorizer: {
+            discoveryUrl: "https://example.com/.well-known/openid-configuration",
+            allowedScopes: ["scope with spaces"],
+          },
+        },
+      },
+    ],
+    ["a description containing punctuation", { description: "Payments!" }],
+    ["a description longer than 4096 characters", { description: "a".repeat(4097) }],
+    ["a blank default spend limit", { defaultSpendLimit: "  " }],
+  ])("rejects %s", (_label, overrides) => {
+    expect(
+      PaymentManagerSchema.safeParse({
+        name: "payments",
+        connectors: [],
+        ...overrides,
+      }).success,
+    ).toBe(false);
+  });
 });
