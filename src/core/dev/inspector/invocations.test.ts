@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { type HttpRequestHandler, startHttpServer } from "../../../io/httpServer";
-import { parseAgentEvent } from "./invocations";
 import { ServerFarm, fakeSupervisor, post, runningAgent } from "./testkit";
 import type { InspectorDeps } from "./types";
 
@@ -63,17 +62,6 @@ describe("upstream connection failures", () => {
   });
 });
 
-describe("parseAgentEvent drops non-renderable frames", () => {
-  test.each([
-    { name: "a JSON primitive that is not text", data: JSON.stringify(42) },
-    { name: "a blank error field", data: JSON.stringify({ error: "" }) },
-    { name: "a blank text field", data: JSON.stringify({ text: "" }) },
-    { name: "an empty non-JSON token", data: "" },
-  ])("returns null for $name", ({ data }) => {
-    expect(parseAgentEvent(data)).toBeNull();
-  });
-});
-
 describe("HTTP agent SSE normalization", () => {
   test.each([
     { name: "a bedrock text event", frame: JSON.stringify({ text: "hello" }), expected: "hello" },
@@ -95,6 +83,18 @@ describe("HTTP agent SSE normalization", () => {
     const { url } = await inspectorFor(sseAgent([JSON.stringify({ error: "boom" })]));
     const response = await post(url, "/invocations", { agentName: "orders", prompt: "hi" });
     expect(await response.text()).toBe(`data: ${JSON.stringify({ error: "boom" })}\n\n`);
+  });
+
+  test.each([
+    {
+      name: "a recognized control event",
+      frame: JSON.stringify({ event: { messageStart: { role: "assistant" } } }),
+    },
+    { name: "an unsupported event", frame: JSON.stringify({ progress: 1 }) },
+  ])("does not emit $name", async ({ frame }) => {
+    const { url } = await inspectorFor(sseAgent([frame]));
+    const response = await post(url, "/invocations", { agentName: "orders", prompt: "hi" });
+    expect(await response.text()).toBe("");
   });
 
   test("passes a non-SSE response body through untouched", async () => {

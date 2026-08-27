@@ -12,6 +12,7 @@ import {
   sseEvent,
 } from "./respond";
 import type { InspectorDeps } from "./types";
+import { parseAgentEvent } from "../../project/agentEventParser";
 
 export async function handleInvocations(
   deps: InspectorDeps,
@@ -89,30 +90,10 @@ async function* transformAgentSse(
   stream: AsyncIterable<Uint8Array>,
 ): AsyncGenerator<Uint8Array, void> {
   for await (const data of sseData(stream)) {
-    const payload = parseAgentEvent(data);
-    if (payload !== null) yield sseEvent(payload);
+    const event = parseAgentEvent(data);
+    if (event.kind === "text") yield sseEvent(event.text);
+    if (event.kind === "error") yield sseEvent({ error: event.message });
   }
-}
-
-// Handles bedrock {text}, {error}, ConverseStream contentBlockDelta, bare JSON string, and non-JSON tokens.
-export function parseAgentEvent(data: string): string | { error: string } | null {
-  try {
-    const parsed: unknown = JSON.parse(data);
-    if (typeof parsed === "string") return parsed || null;
-    if (parsed && typeof parsed === "object") {
-      if ("error" in parsed) {
-        const error = String((parsed as { error: unknown }).error);
-        return error ? { error } : null;
-      }
-      if ("text" in parsed) return String((parsed as { text: unknown }).text) || null;
-      const event = (parsed as { event?: { contentBlockDelta?: { delta?: { text?: string } } } })
-        .event;
-      return event?.contentBlockDelta?.delta?.text || null;
-    }
-  } catch {
-    return data || null;
-  }
-  return null;
 }
 
 // A2A agents speak JSON-RPC at their root path, so {prompt} becomes a message/stream call reduced to text frames.
