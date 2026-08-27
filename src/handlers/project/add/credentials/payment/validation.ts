@@ -1,6 +1,5 @@
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+=*$/;
-const ED25519_MIN_BYTES = 32;
-const ED25519_MAX_BYTES = 64;
+const ED25519_KEY_LENGTHS = new Set([32, 64]);
 const P256_MIN_BYTES = 100;
 const P256_MAX_BYTES = 200;
 const WALLET_AUTH_PREFIX = "wallet-auth:";
@@ -13,7 +12,7 @@ function decodedBase64Length(value: string): number | undefined {
 export function validateApiKeySecret(value: string): true | string {
   const length = decodedBase64Length(value.trim());
   if (length === undefined) return "apiKeySecret must be a base64-encoded Ed25519 private key";
-  if (length < ED25519_MIN_BYTES || length > ED25519_MAX_BYTES) {
+  if (!ED25519_KEY_LENGTHS.has(length)) {
     return "apiKeySecret must be a base64-encoded Ed25519 private key (unexpected length)";
   }
   return true;

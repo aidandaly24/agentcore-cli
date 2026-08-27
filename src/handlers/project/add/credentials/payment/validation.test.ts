@@ -6,7 +6,7 @@ import {
   validateWalletSecret,
 } from "./validation";
 
-const ed25519Key = Buffer.alloc(48, 0x41).toString("base64");
+const ed25519Key = Buffer.alloc(64, 0x41).toString("base64");
 const p256Key = Buffer.alloc(138, 0x41).toString("base64");
 
 describe("payment credential key validation", () => {
@@ -17,6 +17,7 @@ describe("payment credential key validation", () => {
 
   test("rejects invalid Coinbase key formats", () => {
     expect(validateApiKeySecret("not-base64")).toContain("Ed25519");
+    expect(validateApiKeySecret(Buffer.alloc(48, 0x41).toString("base64"))).toContain("length");
     expect(validateWalletSecret(ed25519Key)).toContain("P-256");
   });
 

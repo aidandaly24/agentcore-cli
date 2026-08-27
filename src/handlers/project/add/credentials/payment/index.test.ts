@@ -8,6 +8,15 @@ const { cleanup, inProject, projectSpec, run } =
 
 afterEach(cleanup);
 
+function coinbaseApiKeySecret(): string {
+  const { privateKey } = generateKeyPairSync("ed25519");
+  const key = privateKey.export({ format: "jwk" });
+  return Buffer.concat([
+    Buffer.from(key.d!, "base64url"),
+    Buffer.from(key.x!, "base64url"),
+  ]).toString("base64");
+}
+
 describe("project add credentials payment", () => {
   test.each(["CoinbaseCDP", "StripePrivy"] as const)(
     "adds a reusable %s payment credential",
@@ -49,9 +58,7 @@ describe("project add credentials payment", () => {
     const projectRoot = await inProject();
     const apiKeySecretPath = join(projectRoot, "api-key-secret.txt");
     const walletSecretPath = join(projectRoot, "wallet-secret.txt");
-    const apiKeySecret = generateKeyPairSync("ed25519")
-      .privateKey.export({ type: "pkcs8", format: "der" })
-      .toString("base64");
+    const apiKeySecret = coinbaseApiKeySecret();
     const walletSecret = generateKeyPairSync("ec", { namedCurve: "P-256" })
       .privateKey.export({ type: "pkcs8", format: "der" })
       .toString("base64");
