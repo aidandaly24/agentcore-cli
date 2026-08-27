@@ -208,9 +208,7 @@ export class FsProjectManager implements ProjectManager {
           `payment manager '${input.managerName}' does not exist in this project`,
         );
       }
-      if (
-        manager.connectors.some((connector) => connector.name === input.resourceConfig.name)
-      ) {
+      if (manager.connectors.some((connector) => connector.name === input.resourceConfig.name)) {
         throw new InputValidationError(
           `a payment connector with name '${input.resourceConfig.name}' already exists in manager '${input.managerName}'`,
         );
