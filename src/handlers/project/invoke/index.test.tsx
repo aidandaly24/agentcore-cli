@@ -57,7 +57,7 @@ function body(...chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
 async function inProject(resources: {
   runtimes?: unknown[];
   harnesses?: unknown[];
-}): Promise<string> {
+}): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), "agentcore-project-invoke-"));
   temporaryDirectories.push(root);
   await mkdir(join(root, "agentcore"), { recursive: true });
@@ -70,7 +70,6 @@ async function inProject(resources: {
   await writeFile(join(root, "agentcore", "agentcore.json"), JSON.stringify(spec));
   await writeFile(join(root, "agentcore", "aws-targets.json"), JSON.stringify([TARGET]));
   process.chdir(root);
-  return root;
 }
 
 function testBackend() {
@@ -95,7 +94,7 @@ async function run(
   configure?: (core: TestCoreClient) => void,
   io: TestIO = testIO(),
 ) {
-  const rootPath = await inProject(resources);
+  await inProject(resources);
   const resolved = testBackend();
   const core = new TestCoreClient({ backends: { CDK: resolved.backend } });
   core.runtime
@@ -122,7 +121,7 @@ async function run(
     globalConfigAccessor: new TestGlobalConfigAccessor(),
   });
   await root.route(["node", "agentcore", "invoke", ...args, "--region", "us-east-2"]);
-  return { core, io, resolved, rootPath };
+  return { core, io, resolved };
 }
 
 afterEach(async () => {
@@ -215,33 +214,24 @@ describe("project invoke", () => {
     });
   });
 
-  test("writes the exact Runtime wire response to --output-file", async () => {
-    const wire = Buffer.from([0, 255, 1]);
-    const { io, rootPath } = await run(
-      ["hello", "--output-file", "response.bin"],
-      { runtimes: [RUNTIME] },
-      (core) =>
-        core.runtime.setInvokeResponse({
-          statusCode: 200,
-          contentType: "application/octet-stream",
-          body: body(wire),
-        }),
-    );
+  test("directs binary Runtime responses to the available JSON output mode", async () => {
+    const io = testIO({ isTTY: true });
 
-    expect(Buffer.from(await Bun.file(join(rootPath, "response.bin")).bytes())).toEqual(wire);
-    expect(io.stdout()).toBe("");
-  });
-
-  test("rejects --json with --output-file", async () => {
     await expect(
-      run(["hello", "--json", "--output-file", "response.bin"], { runtimes: [RUNTIME] }),
-    ).rejects.toThrow("--json cannot be used with --output-file");
-  });
+      run(
+        ["hello"],
+        { runtimes: [RUNTIME] },
+        (core) =>
+          core.runtime.setInvokeResponse({
+            statusCode: 200,
+            contentType: "application/octet-stream",
+            body: body(Buffer.from([0, 255, 1])),
+          }),
+        io,
+      ),
+    ).rejects.toThrow("Binary or unknown response content requires --json");
 
-  test("rejects --output-file for Harness invoke", async () => {
-    await expect(
-      run(["hello", "--output-file", "response.bin"], { harnesses: [HARNESS] }),
-    ).rejects.toThrow("--output-file is only valid with --runtime");
+    expect(io.stderr()).not.toContain("--output-file");
   });
 
   test("auto-selects one Harness and sends one user message", async () => {

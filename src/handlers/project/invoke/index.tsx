@@ -92,11 +92,6 @@ export const createProjectInvokeHandler = (
       flag("target", "project deployment target", z.string().default("default")),
       flag("session-id", "session ID to continue", z.string().optional()),
       flag("qualifier", "endpoint qualifier", z.string().optional()),
-      flag(
-        "output-file",
-        "write the Runtime response body to a file",
-        z.string().min(1, "requires a nonempty path").optional(),
-      ),
       flag("bearer-token", "the CUSTOM_JWT bearer token", z.string().optional(), {
         sensitive: true,
       }),
@@ -108,12 +103,6 @@ export const createProjectInvokeHandler = (
       if (selected.resourceType === "harness" && flags["bearer-token"] !== undefined) {
         throw new InputValidationError("--bearer-token is only valid with --runtime");
       }
-      if (selected.resourceType === "harness" && flags["output-file"] !== undefined) {
-        throw new InputValidationError("--output-file is only valid with --runtime");
-      }
-      if (jsonOutput && flags["output-file"] !== undefined) {
-        throw new InputValidationError("--json cannot be used with --output-file");
-      }
       if (
         selected.resourceType === "harness" &&
         flags["session-id"] !== undefined &&
@@ -121,10 +110,8 @@ export const createProjectInvokeHandler = (
       ) {
         throw new InputValidationError("Harness session ID must be between 33 and 100 characters");
       }
-      if (args.content === undefined && (jsonOutput || flags["output-file"] !== undefined)) {
-        throw new InputValidationError(
-          `content is required with ${jsonOutput ? "--json" : "--output-file"}`,
-        );
+      if (args.content === undefined && jsonOutput) {
+        throw new InputValidationError("content is required with --json");
       }
 
       const deployed = await core.projectManager.resolveDeployedResource(project, {
@@ -200,9 +187,8 @@ export const createProjectInvokeHandler = (
           options,
           signal,
         );
-        const preserveWireResponse = jsonOutput || flags["output-file"] !== undefined;
         await writeRuntimeInvokeResponse(
-          preserveWireResponse
+          jsonOutput
             ? response
             : {
                 ...response,
@@ -211,9 +197,11 @@ export const createProjectInvokeHandler = (
           {
             stdout: io.stdout,
             stderr: io.stderr,
-            outputFile: flags["output-file"],
             json: jsonOutput,
             signal,
+          },
+          {
+            binaryTtyError: "Binary or unknown response content requires --json",
           },
         );
       });
