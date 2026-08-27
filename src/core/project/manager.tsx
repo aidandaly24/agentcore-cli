@@ -429,6 +429,16 @@ export class FsProjectManager implements ProjectManager {
         gateways[gatewayIndex] = { ...gateway, targets };
       }
       newSpec = { ...existingProjectSpec, agentCoreGateways: gateways };
+    } else if (input.resourceType === "payment-connector") {
+      const payments = [...(existingProjectSpec.payments ?? [])];
+      const managerIndex = payments.findIndex((manager) => manager.name === input.managerName);
+      if (managerIndex >= 0) {
+        const manager = payments[managerIndex]!;
+        const connectors = manager.connectors.filter((connector) => connector.name !== input.name);
+        removed = connectors.length !== manager.connectors.length;
+        payments[managerIndex] = { ...manager, connectors };
+      }
+      newSpec = { ...existingProjectSpec, payments };
     } else {
       const projectSpecKey = toProjectSpecKey(input.resourceType);
       const existingResources = existingProjectSpec[projectSpecKey] ?? [];
