@@ -22,12 +22,14 @@ describe("project add payment-manager", () => {
       },
     ]);
     expect(io.stderr()).toContain("added payment manager 'payments'");
+    expect(io.stderr()).toContain("auto-payment is ENABLED");
+    expect(io.stderr()).toContain("does not modify runtime source code");
   });
 
   test("maps custom JWT and payment behavior flags", async () => {
     const projectRoot = await inProject();
 
-    await run([
+    const io = await run([
       "add",
       "payment-manager",
       "--name",
@@ -75,6 +77,8 @@ describe("project add payment-manager", () => {
       paymentToolAllowlist: ["checkout", "refund"],
       networkPreferences: ["eip155:8453", "eip155:1"],
     });
+    expect(io.stderr()).not.toContain("auto-payment is ENABLED");
+    expect(io.stderr()).toContain("does not modify runtime source code");
   });
 
   test.each([

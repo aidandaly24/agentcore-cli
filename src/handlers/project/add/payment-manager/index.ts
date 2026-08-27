@@ -94,5 +94,18 @@ export const createAddPaymentManagerHandler = (config: AddProjectResourceConfig)
         config.io.stderr.write(`${event.message}\n`);
       }
       config.io.stderr.write(`added payment manager '${flags.name}' to '${project.name}'\n`);
+      if (flags["auto-payment"]) {
+        config.io.stderr.write(
+          `Warning: auto-payment is ENABLED for manager '${flags.name}'. Agents can automatically settle ` +
+            `402 responses up to the per-session spend limit ($${flags["default-spend-limit"]}) without human approval. ` +
+            "Use --no-auto-payment to require manual approval.\n",
+        );
+      }
+      if (project.spec.runtimes.length > 0) {
+        config.io.stderr.write(
+          "Warning: project add payment-manager does not modify runtime source code. " +
+            "Configure the Payments SDK or plugin in supported runtimes before invoking payment-enabled agents.\n",
+        );
+      }
     },
   });
