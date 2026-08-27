@@ -21,7 +21,6 @@ describe("renderPromptResponseBody", () => {
 
   test("streams Strands text deltas across arbitrary chunk boundaries", async () => {
     const wire = [
-      'data: {"init_event_loop":true}\n\n',
       'data: {"event":{"messageStart":{"role":"assistant"}}}\n\n',
       'data: {"event":{"contentBlockDelta":{"delta":{"text":"Hello"},"contentBlockIndex":0}}}\n\n',
       'data: {"event":{"contentBlockDelta":{"delta":{"toolUse":{"input":"{}"}}}}}\n\n',

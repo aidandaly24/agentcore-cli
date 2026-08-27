@@ -27,11 +27,7 @@ function parseSseLine(line: string): ParsedSseLine {
     }
 
     const event = asRecord(root.event);
-    if (!event) {
-      return root.init_event_loop === true || root.start === true || root.start_event_loop === true
-        ? { kind: "strands" }
-        : { kind: "unknown" };
-    }
+    if (!event) return { kind: "unknown" };
 
     const contentBlockDelta = asRecord(event?.contentBlockDelta);
     const delta = asRecord(contentBlockDelta?.delta);
