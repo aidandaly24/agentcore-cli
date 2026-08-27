@@ -172,6 +172,22 @@ describe("project invoke", () => {
     expect(io.stdout()).not.toContain("contentBlockDelta");
   });
 
+  test.each([
+    { name: "JSON string", wire: 'data: "string token"\n\n', expected: "string token" },
+    { name: "text object", wire: 'data: {"text":"text token"}\n\n', expected: "text token" },
+    { name: "non-JSON token", wire: "data: raw token\n\n", expected: "raw token" },
+  ])("streams a $name Runtime response", async ({ wire, expected }) => {
+    const { io } = await run(["hello"], { runtimes: [RUNTIME] }, (core) =>
+      core.runtime.setInvokeResponse({
+        statusCode: 200,
+        contentType: "text/event-stream",
+        body: body(Buffer.from(wire)),
+      }),
+    );
+
+    expect(io.stdout()).toBe(expected);
+  });
+
   test("fails an incomplete Strands response after preserving partial text", async () => {
     const io = testIO();
 

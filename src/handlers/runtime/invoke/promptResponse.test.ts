@@ -47,14 +47,13 @@ describe("renderPromptResponseBody", () => {
     );
   });
 
-  test("does not recognize non-Strands SSE event shapes", async () => {
-    const chunks = [
-      Buffer.from('data: "plain text"\n\n'),
-      Buffer.from('data: {"text":"text chunk"}\n\n'),
-    ];
-
-    expect(await read(renderPromptResponseBody("text/event-stream", body(...chunks)))).toBe(
-      new TextDecoder().decode(Buffer.concat(chunks)),
+  test.each([
+    ['data: "JSON string"\n\n', "JSON string"],
+    ['data: {"text":"text object"}\n\n', "text object"],
+    ["data: non-JSON token\n\n", "non-JSON token"],
+  ])("streams a shared agent event shape %#", async (wire, expected) => {
+    expect(await read(renderPromptResponseBody("text/event-stream", body(Buffer.from(wire))))).toBe(
+      expected,
     );
   });
 

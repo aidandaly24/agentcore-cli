@@ -1,42 +1,13 @@
+import { parseAgentEvent, type AgentEvent } from "../../../core/project/agentEventParser";
+
 function mediaType(contentType: string): string {
   return contentType.split(";", 1)[0]!.trim().toLowerCase();
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-type ParsedSseLine =
-  { kind: "strands"; text?: string } | { kind: "error"; message: string } | { kind: "unknown" };
-
-function parseSseLine(line: string): ParsedSseLine {
-  if (!line.startsWith("data:")) return { kind: "unknown" };
-  const raw = line.slice(5).trimStart();
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    const root = asRecord(parsed);
-    if (!root) return { kind: "unknown" };
-    if ("error" in root) {
-      return {
-        kind: "error",
-        message: String(root.error) || "Runtime response stream failed",
-      };
-    }
-
-    const event = asRecord(root.event);
-    if (!event) return { kind: "unknown" };
-
-    const contentBlockDelta = asRecord(event?.contentBlockDelta);
-    const delta = asRecord(contentBlockDelta?.delta);
-    return typeof delta?.text === "string"
-      ? { kind: "strands", text: delta.text }
-      : { kind: "strands" };
-  } catch {
-    return { kind: "unknown" };
-  }
+function parseSseLine(line: string): AgentEvent {
+  return line.startsWith("data:")
+    ? parseAgentEvent(line.slice(5).trimStart())
+    : { kind: "unsupported" };
 }
 
 export function renderPromptResponseBody(
@@ -54,16 +25,14 @@ async function* renderSseBody(body: AsyncIterable<Uint8Array>): AsyncGenerator<U
   const maxSniffBytes = 64 * 1024;
   let buffer = "";
   let pendingBytes = 0;
-  let mode: "sniffing" | "strands" | "raw" = "sniffing";
+  let mode: "sniffing" | "parsed" | "raw" = "sniffing";
 
-  const processStrandsLines = function* (lines: string[]): Generator<Uint8Array> {
+  const processParsedLines = function* (lines: string[]): Generator<Uint8Array> {
     for (const line of lines) {
       if (line === "") continue;
-      const parsed = parseSseLine(line);
-      if (parsed.kind === "error") throw new Error(parsed.message);
-      if (parsed.kind === "strands" && parsed.text !== undefined) {
-        yield encoder.encode(parsed.text);
-      }
+      const event = parseSseLine(line);
+      if (event.kind === "error") throw new Error(event.message);
+      if (event.kind === "text") yield encoder.encode(event.text);
     }
   };
 
@@ -79,8 +48,8 @@ async function* renderSseBody(body: AsyncIterable<Uint8Array>): AsyncGenerator<U
       const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() ?? "";
 
-      if (mode === "strands") {
-        yield* processStrandsLines(lines);
+      if (mode === "parsed") {
+        yield* processParsedLines(lines);
         continue;
       }
 
@@ -88,16 +57,16 @@ async function* renderSseBody(body: AsyncIterable<Uint8Array>): AsyncGenerator<U
       pendingBytes += snapshot.byteLength;
       const firstLine = lines.find((line) => line !== "");
       if (firstLine !== undefined) {
-        const parsed = parseSseLine(firstLine);
-        if (parsed.kind === "error") {
-          mode = "strands";
+        const event = parseSseLine(firstLine);
+        if (event.kind === "error") {
+          mode = "parsed";
           pending.length = 0;
-          throw new Error(parsed.message);
+          throw new Error(event.message);
         }
-        if (parsed.kind === "strands") {
-          mode = "strands";
+        if (event.kind !== "unsupported") {
+          mode = "parsed";
           pending.length = 0;
-          yield* processStrandsLines(lines);
+          yield* processParsedLines(lines);
           continue;
         }
         mode = "raw";
@@ -119,15 +88,15 @@ async function* renderSseBody(body: AsyncIterable<Uint8Array>): AsyncGenerator<U
   if (mode === "raw") return;
 
   buffer += decoder.decode();
-  if (mode === "strands") {
-    if (buffer) yield* processStrandsLines([buffer]);
+  if (mode === "parsed") {
+    if (buffer) yield* processParsedLines([buffer]);
     return;
   }
 
-  const parsed = buffer ? parseSseLine(buffer) : { kind: "unknown" as const };
-  if (parsed.kind === "error") throw new Error(parsed.message);
-  if (parsed.kind === "strands") {
-    yield* processStrandsLines([buffer]);
+  const event = buffer ? parseSseLine(buffer) : { kind: "unsupported" as const };
+  if (event.kind === "error") throw new Error(event.message);
+  if (event.kind !== "unsupported") {
+    yield* processParsedLines([buffer]);
   } else {
     yield* pending;
   }
