@@ -8,7 +8,7 @@ import {
 } from "./gateway";
 import { ABTestSchema } from "./ab-test";
 import { ConfigBundleSchema } from "./config-bundle";
-import { CredentialSchema } from "./credential";
+import { CredentialSchema, credentialEnvironmentVariableNames } from "./credential";
 import { DatasetSchema } from "./dataset";
 import { EvaluatorSchema } from "./evaluator";
 import { HarnessRegistryEntrySchema } from "./harness";
@@ -251,18 +251,19 @@ export const ProjectSpecSchema = z
     }
     const credentialEnvironmentNames = new Map<string, string>();
     for (const [credentialIndex, credential] of spec.credentials.entries()) {
-      const environmentName = toEnvironmentName(credential.name);
-      const conflictingName = credentialEnvironmentNames.get(environmentName);
-      if (conflictingName) {
-        ctx.addIssue({
-          code: "custom",
-          message:
-            `Credential "${credential.name}" and "${conflictingName}" derive the same environment variable name; ` +
-            "choose names that differ by more than '-' and '_'",
-          path: ["credentials", credentialIndex, "name"],
-        });
-      } else {
-        credentialEnvironmentNames.set(environmentName, credential.name);
+      for (const environmentName of credentialEnvironmentVariableNames(credential)) {
+        const conflictingName = credentialEnvironmentNames.get(environmentName);
+        if (conflictingName) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              `Credential "${credential.name}" and "${conflictingName}" derive the same environment variable "${environmentName}"; ` +
+              "choose credential names that produce distinct environment variables",
+            path: ["credentials", credentialIndex, "name"],
+          });
+        } else {
+          credentialEnvironmentNames.set(environmentName, credential.name);
+        }
       }
     }
     const paymentManagerEnvironmentNames = new Map<string, string>();

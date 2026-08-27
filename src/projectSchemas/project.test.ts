@@ -343,11 +343,7 @@ describe("project custom validation", () => {
       ...minimalProject,
       credentials: [
         { authorizerType: "ApiKeyCredentialProvider", name: "service-key" },
-        {
-          authorizerType: "PaymentCredentialProvider",
-          name: "service_key",
-          provider: "CoinbaseCDP",
-        },
+        { authorizerType: "ApiKeyCredentialProvider", name: "service_key" },
       ],
     });
 
@@ -355,6 +351,29 @@ describe("project custom validation", () => {
     if (!result.success) {
       expect(
         result.error.issues.some((issue) => issue.message.includes("environment variable")),
+      ).toBe(true);
+    }
+  });
+
+  it("rejects different credential types that derive the same environment variable", () => {
+    const result = ProjectSpecSchema.safeParse({
+      ...minimalProject,
+      credentials: [
+        { authorizerType: "ApiKeyCredentialProvider", name: "stripe_app_id" },
+        {
+          authorizerType: "PaymentCredentialProvider",
+          name: "stripe",
+          provider: "StripePrivy",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) =>
+          issue.message.includes("AGENTCORE_CREDENTIAL_STRIPE_APP_ID"),
+        ),
       ).toBe(true);
     }
   });

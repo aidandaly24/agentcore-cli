@@ -134,12 +134,12 @@ describe("project add credentials payment", () => {
     expect((await projectSpec(projectRoot)).credentials).toHaveLength(1);
   });
 
-  test("rejects names that collide after environment normalization", async () => {
+  test("rejects credentials that generate overlapping environment variables", async () => {
     const projectRoot = await inProject();
-    await run(["add", "credentials", "api-key", "--name", "service-key"]);
+    await run(["add", "credentials", "api-key", "--name", "stripe_app_id"]);
 
     await expect(
-      run(["add", "credentials", "payment", "--name", "service_key", "--provider", "CoinbaseCDP"]),
+      run(["add", "credentials", "payment", "--name", "stripe", "--provider", "StripePrivy"]),
     ).rejects.toThrow("environment variable");
 
     expect((await projectSpec(projectRoot)).credentials).toHaveLength(1);

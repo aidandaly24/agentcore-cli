@@ -3,11 +3,12 @@ import { InputValidationError } from "../../../../errors";
 import { parseSecretReference } from "../../../identity/parser";
 import type { AddProjectResourceConfig } from "../types";
 import type { AddResourceInput } from "../../types";
+import {
+  credentialEnvironmentVariableNames,
+  credentialEnvVarName,
+} from "../../../../projectSchemas/credential";
 
-/** Derives the .env.local variable name a credential's secret is stored under. */
-export function credentialEnvVarName(credentialName: string, suffix = ""): string {
-  return `AGENTCORE_CREDENTIAL_${credentialName.replace(/-/g, "_").toUpperCase()}${suffix}`;
-}
+export { credentialEnvVarName };
 
 /** Parses a secret-reference flag, rejecting a directly supplied secret alongside it. */
 export function parseExclusiveSecretRef(
@@ -31,18 +32,21 @@ export async function addCredentialToProject(
 ): Promise<void> {
   const project = ctx.require(ProjectKey);
 
-  // Two names that differ only by '-' vs '_' derive the same environment
-  // variable, which would silently reuse one secret for both providers.
   const newName = input.resourceConfig.name;
-  const clash = project.spec.credentials.find(
-    (existing) =>
-      existing.name !== newName &&
-      credentialEnvVarName(existing.name) === credentialEnvVarName(newName),
-  );
-  if (clash) {
+  const existingEnvironmentNames = new Map<string, string>();
+  for (const credential of project.spec.credentials) {
+    for (const environmentName of credentialEnvironmentVariableNames(credential)) {
+      existingEnvironmentNames.set(environmentName, credential.name);
+    }
+  }
+  const conflictingEnvironmentName = input.envEntries?.find((entry) =>
+    existingEnvironmentNames.has(entry.key),
+  )?.key;
+  if (conflictingEnvironmentName) {
+    const conflictingName = existingEnvironmentNames.get(conflictingEnvironmentName)!;
     throw new InputValidationError(
-      `credential '${newName}' and '${clash.name}' derive the same environment variable name; ` +
-        "choose a name that differs by more than '-' and '_'",
+      `credential '${newName}' and '${conflictingName}' derive the same environment variable ` +
+        `'${conflictingEnvironmentName}'; choose credential names that produce distinct environment variables`,
     );
   }
 
