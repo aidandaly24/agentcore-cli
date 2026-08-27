@@ -289,6 +289,25 @@ describe("project custom validation", () => {
     ).toBe(true);
   });
 
+  it("rejects payment manager names that collide after environment normalization", () => {
+    const result = ProjectSpecSchema.safeParse({
+      ...minimalProject,
+      payments: [
+        { name: "Payments", connectors: [] },
+        { name: "payments", connectors: [] },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) =>
+          issue.message.includes("payment manager environment name"),
+        ),
+      ).toBe(true);
+    }
+  });
+
   it("allows the same payment connector name under different managers", () => {
     const credential = {
       authorizerType: "PaymentCredentialProvider" as const,
