@@ -1,15 +1,12 @@
 import {
   AgentCoreApplication,
   AgentCoreMcp,
-  AgentCorePaymentManager,
-  AgentCorePaymentConnector,
+  AgentCorePayments,
   type AgentCoreProjectSpec,
   type AgentCoreMcpSpec,
-  type CustomJWTAuthorizerConfig,
   type HarnessDeploymentConfig,
 } from '@aws/agentcore-cdk';
 import { CfnOutput, Stack, type StackProps } from 'aws-cdk-lib';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 /**
@@ -18,35 +15,6 @@ import { Construct } from 'constructs';
  * synthesize the AWS::BedrockAgentCore::Harness resource.
  */
 export type HarnessConfig = HarnessDeploymentConfig;
-
-export type ManualPaymentConnectorSpec = {
-  name: string;
-  provider: 'CoinbaseCDP' | 'StripePrivy';
-  provisionMode?: 'MANUAL';
-  credentialName: string;
-  credentialProviderArn: string;
-};
-
-export type QuickCreatePaymentConnectorSpec = {
-  name: string;
-  provider: 'CoinbaseCDP';
-  provisionMode: 'QUICK_CREATE';
-  credentialName?: never;
-  credentialProviderArn?: never;
-};
-
-export type PaymentConnectorSpec = ManualPaymentConnectorSpec | QuickCreatePaymentConnectorSpec;
-
-export interface PaymentSpec {
-  name: string;
-  description?: string;
-  authorizerType: 'AWS_IAM' | 'CUSTOM_JWT';
-  authorizerConfiguration?: { customJWTAuthorizer: CustomJWTAuthorizerConfig };
-  autoPayment?: boolean;
-  paymentToolAllowlist?: string[];
-  networkPreferences?: string[];
-  connectors: PaymentConnectorSpec[];
-}
 
 export interface AgentCoreStackProps extends StackProps {
   /**
@@ -70,34 +38,6 @@ export interface AgentCoreStackProps extends StackProps {
    * connectorConfigFile path. Forwarded to AgentCoreApplication.
    */
   connectorParametersByFile?: Record<string, Record<string, unknown>>;
-  /**
-   * Payment specifications with resolved credential provider ARNs.
-   */
-  paymentSpec?: PaymentSpec[];
-}
-
-function paymentManagerCdkId(managerName: string): string {
-  return `PaymentManagerM${managerName.length}${managerName}`;
-}
-
-function paymentConnectorCdkId(managerName: string, connectorName: string): string {
-  return `PaymentConnectorM${managerName.length}${managerName}C${connectorName.length}${connectorName}`;
-}
-
-/**
- * Decide whether a deployed runtime should receive payment env vars + IAM grants.
- * Payments today only ships a runtime shim for Python HTTP runtimes; injecting
- * AGENTCORE_PAYMENT_* env vars into TypeScript / MCP / A2A / AGUI runtimes
- * would surface env vars they cannot consume and would dilute least-privilege
- * IAM grants for runtimes that never call ProcessPayment.
- */
-function isPaymentEligibleAgent(agent: { entrypoint?: string; protocol?: string }): boolean {
-  if (agent.protocol && agent.protocol !== 'HTTP') {
-    return false;
-  }
-  const entrypoint = typeof agent.entrypoint === 'string' ? agent.entrypoint : '';
-  const entrypointFile = entrypoint.split(':')[0] ?? '';
-  return entrypointFile.endsWith('.py');
 }
 
 /**
@@ -113,7 +53,7 @@ export class AgentCoreStack extends Stack {
   constructor(scope: Construct, id: string, props: AgentCoreStackProps) {
     super(scope, id, props);
 
-    const { spec, mcpSpec, credentials, harnesses, connectorParametersByFile, paymentSpec } = props;
+    const { spec, mcpSpec, credentials, harnesses, connectorParametersByFile } = props;
 
     // Create AgentCoreApplication with all agents and harness roles
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,6 +68,11 @@ export class AgentCoreStack extends Stack {
       appProps.credentials = credentials;
     }
     this.application = new AgentCoreApplication(this, 'Application', appProps as any);
+    new AgentCorePayments(this, 'Payments', {
+      spec,
+      credentials,
+      agentCoreApplication: this.application,
+    });
 
     // Create AgentCoreMcp if there are gateways configured
     if (mcpSpec?.agentCoreGateways && mcpSpec.agentCoreGateways.length > 0) {
@@ -138,143 +83,6 @@ export class AgentCoreStack extends Stack {
         credentials,
         projectTags: spec.tags,
       });
-    }
-
-    // Create payment infrastructure via CFN constructs
-    if (paymentSpec && paymentSpec.length > 0) {
-      for (const payment of paymentSpec) {
-        const managerCdkId = paymentManagerCdkId(payment.name);
-        const manager = new AgentCorePaymentManager(this, managerCdkId, {
-          projectName: spec.name,
-          name: payment.name,
-          authorizerType: payment.authorizerType,
-          description: payment.description,
-          authorizerConfiguration: payment.authorizerConfiguration,
-          tags: spec.tags,
-        });
-
-        const prefix = `AGENTCORE_PAYMENT_${payment.name.toUpperCase().replace(/-/g, '_')}`;
-
-        // Wire env vars from construct output tokens into eligible agent environments only.
-        // See isPaymentEligibleAgent — non-Python or non-HTTP runtimes have no shim that
-        // can consume these env vars, and giving them sts:AssumeRole on the
-        // ProcessPaymentRole would broaden the privilege surface unnecessarily.
-        for (const env of this.application.environments.values()) {
-          if (!isPaymentEligibleAgent(env.agent)) {
-            continue;
-          }
-          env.runtime.addEnvironmentVariable(`${prefix}_MANAGER_ARN`, manager.paymentManagerArn);
-          env.runtime.addEnvironmentVariable(`${prefix}_PROCESS_PAYMENT_ROLE_ARN`, manager.processPaymentRoleArn);
-
-          // Grant runtime execution role permission to assume the ProcessPaymentRole.
-          // The ProcessPaymentRole's trust policy allows AccountRootPrincipal, but the
-          // caller still needs sts:AssumeRole on its own role to perform the assumption.
-          env.runtime.role.addToPrincipalPolicy(
-            new iam.PolicyStatement({
-              actions: ['sts:AssumeRole'],
-              resources: [manager.processPaymentRoleArn],
-            })
-          );
-
-          // Grant payment data-plane actions directly to the runtime role.
-          //
-          // NOTE: This deviates from the canonical role model in the AgentCore Payments
-          // beta guide, which assigns Get/List/Create instrument+session actions to a
-          // separate ManagementRole and limits the agent's role to ProcessPayment only.
-          // The current SDK plugin (AgentCorePaymentsPlugin.generate_payment_header)
-          // calls GetPaymentInstrument internally during the 402 auto-pay path, so the
-          // runtime role needs read access. CreatePaymentSession is included so
-          // `agentcore invoke --auto-session` works without a separate ManagementRole
-          // call. Tighten this if the SDK is updated to accept pre-fetched instrument
-          // details and split create-session into a backend-only flow.
-          env.runtime.role.addToPrincipalPolicy(
-            new iam.PolicyStatement({
-              actions: [
-                'bedrock-agentcore:GetPaymentInstrument',
-                'bedrock-agentcore:ListPaymentInstruments',
-                'bedrock-agentcore:GetPaymentInstrumentBalance',
-                'bedrock-agentcore:GetPaymentSession',
-                'bedrock-agentcore:ListPaymentSessions',
-                'bedrock-agentcore:CreatePaymentSession',
-                'bedrock-agentcore:ProcessPayment',
-              ],
-              resources: [manager.paymentManagerArn, `${manager.paymentManagerArn}/*`],
-            })
-          );
-
-          if (payment.autoPayment !== undefined) {
-            env.runtime.addEnvironmentVariable(`${prefix}_AUTO_PAYMENT`, String(payment.autoPayment));
-          }
-          if (payment.paymentToolAllowlist) {
-            env.runtime.addEnvironmentVariable(`${prefix}_TOOL_ALLOWLIST`, payment.paymentToolAllowlist.join(','));
-          }
-          if (payment.networkPreferences) {
-            env.runtime.addEnvironmentVariable(`${prefix}_NETWORK_PREFERENCES`, payment.networkPreferences.join(','));
-          }
-          if (payment.authorizerType === 'CUSTOM_JWT') {
-            env.runtime.addEnvironmentVariable(`${prefix}_AUTH_MODE`, 'bearer');
-          }
-        }
-
-        // Create connectors for this manager
-        for (const connector of payment.connectors) {
-          const connectorCdkId = paymentConnectorCdkId(payment.name, connector.name);
-          let conn: AgentCorePaymentConnector;
-          if (connector.provisionMode === 'QUICK_CREATE') {
-            conn = new AgentCorePaymentConnector(this, connectorCdkId, {
-              projectName: spec.name,
-              paymentManager: manager,
-              connector,
-            });
-          } else {
-            conn = new AgentCorePaymentConnector(this, connectorCdkId, {
-              projectName: spec.name,
-              paymentManager: manager,
-              connector: {
-                name: connector.name,
-                provider: connector.provider,
-                provisionMode: connector.provisionMode,
-                credentialName: connector.credentialName,
-              },
-              credentialProviderArn: connector.credentialProviderArn,
-            });
-          }
-
-          // Wire first connector's ID as env var (eligible agents only)
-          if (connector === payment.connectors[0]) {
-            for (const env of this.application.environments.values()) {
-              if (!isPaymentEligibleAgent(env.agent)) continue;
-              env.runtime.addEnvironmentVariable(`${prefix}_CONNECTOR_ID`, conn.paymentConnectorId);
-            }
-          }
-
-          new CfnOutput(this, `${connectorCdkId}ConnectorId`, {
-            value: conn.paymentConnectorId,
-          });
-          if (connector.provisionMode === 'QUICK_CREATE') {
-            new CfnOutput(this, `${connectorCdkId}ConnectorStatus`, {
-              value: conn.paymentConnectorStatus,
-            });
-            new CfnOutput(this, `${connectorCdkId}AuthorizationUrl`, {
-              value: conn.authorizationUrl,
-            });
-          }
-        }
-
-        // CFN Outputs for post-deploy state parsing
-        new CfnOutput(this, `${managerCdkId}Arn`, {
-          value: manager.paymentManagerArn,
-        });
-        new CfnOutput(this, `${managerCdkId}Id`, {
-          value: manager.paymentManagerId,
-        });
-        new CfnOutput(this, `${managerCdkId}ProcessPaymentRoleArn`, {
-          value: manager.processPaymentRoleArn,
-        });
-        new CfnOutput(this, `${managerCdkId}ResourceRetrievalRoleArn`, {
-          value: manager.resourceRetrievalRoleArn,
-        });
-      }
     }
 
     // Stack-level output
