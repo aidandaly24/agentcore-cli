@@ -5,10 +5,11 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Stack } from "@aws-sdk/client-cloudformation";
 import type { DeployResult, Project, ProjectEvent } from "../../../handlers/project/types";
+import { FsReadWriteJson } from "../../../io";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
 import { createSilentLogger } from "../../../testing";
 import { CdkBackend } from "./cdk";
-import { DEPLOYED_STATE_RELATIVE_PATH } from "./cdk/deployedState";
+import { DEPLOYED_STATE_RELATIVE_PATH, updateTargetState } from "./cdk/deployedState";
 import type { DeployBackendInput } from "./types";
 import type { BootstrapState } from "./cdk/environment";
 import type { CdkCredentialProvider, CdkOperation, CdkOutputs, CdkRunOptions } from "./cdk/toolkit";
@@ -20,6 +21,7 @@ const TARGET = {
 } as const;
 const STACK_ARN =
   "arn:aws:cloudformation:us-east-1:111122223333:stack/AgentCore-example-default/abc";
+const json = new FsReadWriteJson({ logger: createSilentLogger() });
 
 /** A template holding only what CDK adds itself, as an empty project synthesizes. */
 const METADATA_ONLY = { CDKMetadata: { Type: "AWS::CDK::Metadata" } };
@@ -115,10 +117,7 @@ async function writeAssembly(
 }
 
 async function writeDeployedState(input: Project, stackArn = STACK_ARN): Promise<void> {
-  await writeFile(
-    join(input.rootPath, DEPLOYED_STATE_RELATIVE_PATH),
-    JSON.stringify({ targets: { [TARGET.name]: { stackArn } } }),
-  );
+  await updateTargetState(json, input.rootPath, TARGET.name, { stackArn });
 }
 
 type HarnessOptions = {
