@@ -76,8 +76,8 @@ export interface AgentCoreStackProps extends StackProps {
   paymentSpec?: PaymentSpec[];
 }
 
-function toCdkId(name: string): string {
-  return name.replace(/_/g, '');
+function paymentConnectorCdkId(managerName: string, connectorName: string): string {
+  return `PaymentM${managerName.length}${managerName}C${connectorName.length}${connectorName}`;
 }
 
 /**
@@ -139,7 +139,7 @@ export class AgentCoreStack extends Stack {
     // Create payment infrastructure via CFN constructs
     if (paymentSpec && paymentSpec.length > 0) {
       for (const payment of paymentSpec) {
-        const mgrId = toCdkId(payment.name);
+        const mgrId = payment.name;
         const manager = new AgentCorePaymentManager(this, `Payment${mgrId}`, {
           projectName: spec.name,
           name: payment.name,
@@ -214,16 +214,16 @@ export class AgentCoreStack extends Stack {
 
         // Create connectors for this manager
         for (const connector of payment.connectors) {
-          const connId = toCdkId(connector.name);
+          const connectorCdkId = paymentConnectorCdkId(payment.name, connector.name);
           let conn: AgentCorePaymentConnector;
           if (connector.provisionMode === 'QUICK_CREATE') {
-            conn = new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
+            conn = new AgentCorePaymentConnector(this, connectorCdkId, {
               projectName: spec.name,
               paymentManager: manager,
               connector,
             });
           } else {
-            conn = new AgentCorePaymentConnector(this, `Payment${mgrId}${connId}`, {
+            conn = new AgentCorePaymentConnector(this, connectorCdkId, {
               projectName: spec.name,
               paymentManager: manager,
               connector: {
@@ -244,14 +244,14 @@ export class AgentCoreStack extends Stack {
             }
           }
 
-          new CfnOutput(this, `Payment${mgrId}${connId}ConnectorId`, {
+          new CfnOutput(this, `${connectorCdkId}ConnectorId`, {
             value: conn.paymentConnectorId,
           });
           if (connector.provisionMode === 'QUICK_CREATE') {
-            new CfnOutput(this, `Payment${mgrId}${connId}ConnectorStatus`, {
+            new CfnOutput(this, `${connectorCdkId}ConnectorStatus`, {
               value: conn.paymentConnectorStatus,
             });
-            new CfnOutput(this, `Payment${mgrId}${connId}AuthorizationUrl`, {
+            new CfnOutput(this, `${connectorCdkId}AuthorizationUrl`, {
               value: conn.authorizationUrl,
             });
           }
