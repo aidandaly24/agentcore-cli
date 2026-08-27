@@ -79,6 +79,55 @@ describe("project add payment-connector", () => {
         credentialName: `${name}-credential`,
       },
     ]);
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    const prefix = `AGENTCORE_CREDENTIAL_${name.toUpperCase()}_CREDENTIAL`;
+    const suffixes =
+      provider === "CoinbaseCDP"
+        ? ["API_KEY_ID", "API_KEY_SECRET", "WALLET_SECRET"]
+        : ["APP_ID", "APP_SECRET", "AUTHORIZATION_PRIVATE_KEY", "AUTHORIZATION_ID"];
+    for (const suffix of suffixes) {
+      expect(env).toContain(`${prefix}_${suffix}=\n`);
+    }
+  });
+
+  test("atomically stores supplied payment credential values with a connector", async () => {
+    const projectRoot = await inProject();
+    await addManager();
+    const appSecretPath = join(projectRoot, "app-secret.txt");
+    const privateKeyPath = join(projectRoot, "private-key.txt");
+    await Bun.write(appSecretPath, "app-secret\n");
+    await Bun.write(privateKeyPath, "private-key\n");
+
+    await run([
+      "add",
+      "payment-connector",
+      "--manager",
+      "payments",
+      "--name",
+      "stripe",
+      "--create-credential",
+      "stripe-credential",
+      "--provider",
+      "StripePrivy",
+      "--app-id",
+      "app-id",
+      "--app-secret",
+      `file://${appSecretPath}`,
+      "--authorization-private-key",
+      `file://${privateKeyPath}`,
+      "--authorization-id",
+      "authorization-id",
+    ]);
+
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    expect(env).toContain("AGENTCORE_CREDENTIAL_STRIPE_CREDENTIAL_APP_ID='app-id'");
+    expect(env).toContain("AGENTCORE_CREDENTIAL_STRIPE_CREDENTIAL_APP_SECRET='app-secret'");
+    expect(env).toContain(
+      "AGENTCORE_CREDENTIAL_STRIPE_CREDENTIAL_AUTHORIZATION_PRIVATE_KEY='private-key'",
+    );
+    expect(env).toContain(
+      "AGENTCORE_CREDENTIAL_STRIPE_CREDENTIAL_AUTHORIZATION_ID='authorization-id'",
+    );
   });
 
   test("adds Quick Create without a payment credential", async () => {
@@ -162,7 +211,20 @@ describe("project add payment-connector", () => {
         "--provider",
         "CoinbaseCDP",
       ],
-      "--provider is valid only with --create-credential",
+      "valid only with --create-credential",
+    ],
+    [
+      "credential values outside create mode",
+      [
+        "--manager",
+        "payments",
+        "--name",
+        "connector",
+        "--quick-create",
+        "--api-key-id",
+        "api-key-id",
+      ],
+      "valid only with --create-credential",
     ],
   ])("rejects %s", async (_label, flags, message) => {
     const projectRoot = await inProject();
@@ -255,6 +317,8 @@ describe("project add payment-connector", () => {
     const spec = await projectSpec(projectRoot);
     expect(spec.credentials).toEqual([]);
     expect(spec.payments[0].connectors).toHaveLength(1);
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    expect(env).not.toContain("AGENTCORE_CREDENTIAL_ORPHAN");
   });
 
   test("leaves no credential or connector after whole-project validation fails", async () => {
@@ -285,6 +349,8 @@ describe("project add payment-connector", () => {
       },
     ]);
     expect(spec.payments[0].connectors).toEqual([]);
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    expect(env).not.toContain("AGENTCORE_CREDENTIAL_SERVICE_KEY_API_KEY_ID");
   });
 
   test("rejects provider mismatches in complete project data", async () => {

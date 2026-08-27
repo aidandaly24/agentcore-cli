@@ -4,6 +4,11 @@ import type { PaymentCredential } from "../../../../projectSchemas/credential";
 import { PaymentProviderSchema } from "../../../../projectSchemas/payment";
 import { createHandler, flag, ProjectKey } from "../../../../router";
 import type { AddProjectResourceConfig } from "../types";
+import {
+  hasPaymentCredentialInput,
+  paymentCredentialInputFlags,
+  resolvePaymentCredentialEnvEntries,
+} from "../credentials/payment/input";
 
 export const createAddPaymentConnectorHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -24,6 +29,7 @@ export const createAddPaymentConnectorHandler = (config: AddProjectResourceConfi
         PaymentProviderSchema.optional(),
       ),
       flag("quick-create", "create a CoinbaseCDP connector through Quick Create", z.boolean()),
+      ...paymentCredentialInputFlags,
     ],
     handle: async (ctx, flags) => {
       if (!flags.manager) {
@@ -46,12 +52,15 @@ export const createAddPaymentConnectorHandler = (config: AddProjectResourceConfi
       if (flags["create-credential"] && !flags.provider) {
         throw new InputValidationError("--create-credential requires --provider");
       }
-      if (!flags["create-credential"] && flags.provider) {
-        throw new InputValidationError("--provider is valid only with --create-credential");
+      if (!flags["create-credential"] && (flags.provider || hasPaymentCredentialInput(flags))) {
+        throw new InputValidationError(
+          "--provider and payment credential options are valid only with --create-credential",
+        );
       }
 
       const project = ctx.require(ProjectKey);
       let credentialConfig: PaymentCredential | undefined;
+      let envEntries;
       let provider: PaymentCredential["provider"];
       let credentialName: string | undefined;
 
@@ -65,6 +74,12 @@ export const createAddPaymentConnectorHandler = (config: AddProjectResourceConfi
           name: credentialName,
           provider,
         };
+        envEntries = await resolvePaymentCredentialEnvEntries({
+          name: credentialName,
+          provider,
+          flags,
+          io: config.io,
+        });
       } else {
         credentialName = flags.credential!;
         const credential = project.spec.credentials.find(
@@ -98,6 +113,7 @@ export const createAddPaymentConnectorHandler = (config: AddProjectResourceConfi
               credentialName: credentialName!,
             },
         credentialConfig,
+        envEntries,
       })) {
         config.io.stderr.write(`${event.message}\n`);
       }
