@@ -53,6 +53,14 @@ export const PaymentManagerDescriptionSchema = z
     /^[a-zA-Z0-9\s]+$/,
     "Payment manager description must contain only alphanumeric characters and whitespace",
   );
+export const PaymentSpendLimitSchema = z
+  .string()
+  .refine(
+    (value) => value.trim().length > 0 && Number.isFinite(Number(value)) && Number(value) >= 0,
+    {
+      message: "Default spend limit must be a non-negative number",
+    },
+  );
 export const PaymentManagerSchema = z
   .object({
     name: PaymentManagerNameSchema,
@@ -70,15 +78,7 @@ export const PaymentManagerSchema = z
     connectors: z.array(PaymentConnectorSchema).default([]),
     description: PaymentManagerDescriptionSchema.optional(),
     autoPayment: z.boolean().default(DEFAULT_AUTO_PAYMENT),
-    defaultSpendLimit: z
-      .string()
-      .refine(
-        (value) => value.trim().length > 0 && Number.isFinite(Number(value)) && Number(value) >= 0,
-        {
-          message: "Default spend limit must be a non-negative number",
-        },
-      )
-      .default(DEFAULT_SPEND_LIMIT),
+    defaultSpendLimit: PaymentSpendLimitSchema.default(DEFAULT_SPEND_LIMIT),
     paymentToolAllowlist: z.array(z.string()).optional(),
     networkPreferences: z.array(z.string()).optional(),
   })

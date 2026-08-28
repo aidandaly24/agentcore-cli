@@ -4,6 +4,7 @@ import {
   DEFAULT_AUTO_PAYMENT,
   DEFAULT_SPEND_LIMIT,
   PaymentAuthorizerTypeSchema,
+  PaymentSpendLimitSchema,
 } from "../../../../projectSchemas/payment";
 import { createHandler, flag, ProjectKey } from "../../../../router";
 import type { AddProjectResourceConfig } from "../types";
@@ -36,7 +37,7 @@ export const createAddPaymentManagerHandler = (config: AddProjectResourceConfig)
       flag(
         "default-spend-limit",
         "default payment-session spend limit",
-        z.string().default(DEFAULT_SPEND_LIMIT),
+        PaymentSpendLimitSchema.default(DEFAULT_SPEND_LIMIT),
       ),
       flag(
         "tool-allowlist",
