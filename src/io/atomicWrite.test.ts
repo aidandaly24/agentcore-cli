@@ -6,6 +6,7 @@ import { Readable, Transform } from "node:stream";
 import { atomicWrite, atomicWriteStream } from "./atomicWrite";
 
 const dirs: string[] = [];
+const testPosix = process.platform === "win32" ? test.skip : test;
 afterEach(async () => {
   await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
 });
@@ -37,7 +38,7 @@ test("overwrites an existing file", async () => {
   expect(await readdir(dir)).toEqual(["out.txt"]);
 });
 
-test("creates the replacement file with the requested mode", async () => {
+testPosix("creates the replacement file with the requested mode", async () => {
   const dir = await tempDir();
   const target = join(dir, "secret.txt");
 

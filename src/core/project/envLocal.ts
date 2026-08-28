@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { chmod, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { atomicWrite, readTextFile } from "../../io";
 import { InputValidationError } from "../../errors";
@@ -36,6 +36,7 @@ export class EnvLocalFile {
    */
   async insertIfNew(entries: EnvLocalEntry[]): Promise<{ written: string[]; skipped: string[] }> {
     const existing = await this.readOrNull();
+    if (existing !== null) await this.enforcePermissions();
     const existingKeys = new Set(
       (existing ?? "")
         .split("\n")
@@ -78,6 +79,10 @@ export class EnvLocalFile {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
     }
+  }
+
+  private async enforcePermissions(): Promise<void> {
+    if (process.platform !== "win32") await chmod(this.path, SECRET_FILE_MODE);
   }
 }
 

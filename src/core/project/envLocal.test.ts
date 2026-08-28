@@ -20,11 +20,16 @@ async function tempRoot(): Promise<string> {
 }
 
 const ENTRY = { key: "SECRET", value: "v", comment: "c" };
+const testPosix = process.platform === "win32" ? test.skip : test;
 
-test("creates and replaces the secrets file with owner-only permissions", async () => {
+testPosix("creates and replaces the secrets file with owner-only permissions", async () => {
   const root = await tempRoot();
   const file = new EnvLocalFile(root);
 
+  await file.insertIfNew([ENTRY]);
+  expect((await stat(file.path)).mode & 0o777).toBe(0o600);
+
+  await chmod(file.path, 0o644);
   await file.insertIfNew([ENTRY]);
   expect((await stat(file.path)).mode & 0o777).toBe(0o600);
 
