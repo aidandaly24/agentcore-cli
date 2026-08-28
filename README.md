@@ -126,9 +126,13 @@ agentcore                          # interactive TUI
 │   │                              #   payment-manager, payment-connector — or `all`, which
 │   │                              #   empties every resource collection (y/N prompt; --yes
 │   │                              #   skips it for non-interactive use)
-│   ├── build                      # synthesize the project's CloudFormation templates
+│   ├── dev                        # run the project locally
 │   ├── deploy                     # deploy to AWS (auto-provisions the default target)
-│   └── dev                        # run the project's agents locally
+│   ├── invoke                     # invoke a deployed project resource
+│   │   ├── runtime                # use the existing Runtime invoke experience
+│   │   └── harness                # use the existing Harness invoke experience
+│   ├── status                     # inspect deployed project resources
+│   └── build                      # synthesize the project's CloudFormation templates
 └── config                         # read/write global config values
 ```
 
@@ -150,6 +154,26 @@ Global flags (declared at the root, available on every command):
 | `--json`         | Emit machine-readable JSON instead of launching the TUI.             |
 | `--debug`        | Debug logging.                                                       |
 | `--endpoint-url` | Override the service endpoint URL (e.g. for testing against a stub). |
+
+### Invoke a project resource
+
+Run `agentcore project invoke` from inside a project to choose a deployed
+Runtime or Harness interactively. Headless invocation keeps each resource's
+existing input contract:
+
+```bash
+agentcore project invoke runtime \
+  --name checkout \
+  --payload '{"prompt":"Check order 123."}' \
+  --content-type application/json
+
+agentcore project invoke harness \
+  --name support \
+  --prompt "Help with my account."
+```
+
+Use `--target` to select a deployment target. When a project declares exactly
+one resource of the requested type, `--name` may be omitted.
 
 ### Examples
 
