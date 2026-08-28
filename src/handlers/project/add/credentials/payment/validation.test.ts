@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   stripWalletAuthPrefix,
+  validateAppSecret,
   validateApiKeySecret,
   validateAuthorizationPrivateKey,
+  validatePaymentIdentifier,
   validateWalletSecret,
 } from "./validation";
 
@@ -28,5 +30,17 @@ describe("payment credential key validation", () => {
 
   test("rejects invalid Stripe authorization keys", () => {
     expect(validateAuthorizationPrivateKey("wallet-auth:not-base64")).toContain("base64");
+  });
+
+  test("rejects identifiers outside the Payment service contract", () => {
+    expect(validatePaymentIdentifier("apiKeyId", "valid_key-1")).toBe(true);
+    expect(validatePaymentIdentifier("apiKeyId", "invalid key!")).toContain("apiKeyId");
+    expect(validatePaymentIdentifier("apiKeyId", "a".repeat(513))).toContain("512");
+  });
+
+  test("rejects app secrets outside the Payment service contract", () => {
+    expect(validateAppSecret("valid+/=_-secret")).toBe(true);
+    expect(validateAppSecret("invalid!secret")).toContain("appSecret");
+    expect(validateAppSecret("a".repeat(2049))).toContain("2048");
   });
 });

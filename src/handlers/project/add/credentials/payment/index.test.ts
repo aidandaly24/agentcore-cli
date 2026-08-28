@@ -94,6 +94,39 @@ describe("project add credentials payment", () => {
     expect(env).toContain(`AGENTCORE_CREDENTIAL_COINBASE_PROD_WALLET_SECRET='${walletSecret}'`);
   });
 
+  test("normalizes Coinbase key whitespace before persistence", async () => {
+    const projectRoot = await inProject();
+    const apiKeySecretPath = join(projectRoot, "api-key-secret-padded.txt");
+    const walletSecretPath = join(projectRoot, "wallet-secret-padded.txt");
+    const apiKeySecret = coinbaseApiKeySecret();
+    const walletSecret = generateKeyPairSync("ec", { namedCurve: "P-256" })
+      .privateKey.export({ type: "pkcs8", format: "der" })
+      .toString("base64");
+    await Bun.write(apiKeySecretPath, `  ${apiKeySecret}  \n`);
+    await Bun.write(walletSecretPath, `  ${walletSecret}  \n`);
+
+    await run([
+      "add",
+      "credentials",
+      "payment",
+      "--name",
+      "coinbase-padded",
+      "--provider",
+      "CoinbaseCDP",
+      "--api-key-id",
+      "coinbase_key",
+      "--api-key-secret",
+      `file://${apiKeySecretPath}`,
+      "--wallet-secret",
+      `file://${walletSecretPath}`,
+    ]);
+
+    const env = await Bun.file(join(projectRoot, "agentcore", ".env.local")).text();
+    expect(env).toContain(`AGENTCORE_CREDENTIAL_COINBASE_PADDED_API_KEY_SECRET='${apiKeySecret}'`);
+    expect(env).toContain(`AGENTCORE_CREDENTIAL_COINBASE_PADDED_WALLET_SECRET='${walletSecret}'`);
+    expect(env).not.toContain(`'  ${apiKeySecret}  '`);
+  });
+
   test("normalizes the documented Stripe authorization key prefix", async () => {
     const projectRoot = await inProject();
     const privateKeyPath = join(projectRoot, "private-key.txt");
@@ -136,6 +169,11 @@ describe("project add credentials payment", () => {
       "Coinbase option with Stripe",
       ["--provider", "StripePrivy", "--api-key-id", "coinbase-key"],
       "not valid with --provider StripePrivy",
+    ],
+    [
+      "invalid Coinbase API key ID",
+      ["--provider", "CoinbaseCDP", "--api-key-id", "invalid key!"],
+      "apiKeyId",
     ],
   ])("rejects %s without mutating the project", async (_label, flags, message) => {
     const projectRoot = await inProject();

@@ -7,8 +7,10 @@ import type { EnvLocalEntry } from "../../../types";
 import { credentialEnvVarName } from "../shared";
 import {
   stripWalletAuthPrefix,
+  validateAppSecret,
   validateApiKeySecret,
   validateAuthorizationPrivateKey,
+  validatePaymentIdentifier,
   validateWalletSecret,
 } from "./validation";
 
@@ -64,6 +66,14 @@ export function hasPaymentCredentialInput(flags: PaymentCredentialInputFlags): b
   return [...COINBASE_FLAGS, ...STRIPE_FLAGS].some((name) => flags[name] !== undefined);
 }
 
+function normalizedIdentifier(name: string, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim();
+  const validation = validatePaymentIdentifier(name, normalized);
+  if (validation !== true) throw new InputValidationError(validation);
+  return normalized;
+}
+
 export async function resolvePaymentCredentialEnvEntries(input: {
   name: string;
   provider: PaymentProvider;
@@ -84,7 +94,13 @@ export async function resolvePaymentCredentialEnvEntries(input: {
 
   const resolver = new SourceResolver({ stdin: io.stdin });
   if (provider === "StripePrivy") {
+    const appId = normalizedIdentifier("appId", flags["app-id"]);
+    const authorizationId = normalizedIdentifier("authorizationId", flags["authorization-id"]);
     const appSecret = await resolver.resolveSecret("app-secret", flags["app-secret"]);
+    if (appSecret !== undefined) {
+      const validation = validateAppSecret(appSecret);
+      if (validation !== true) throw new InputValidationError(validation);
+    }
     const resolvedAuthorizationPrivateKey = await resolver.resolveSecret(
       "authorization-private-key",
       flags["authorization-private-key"],
@@ -100,7 +116,7 @@ export async function resolvePaymentCredentialEnvEntries(input: {
     return [
       {
         key: credentialEnvVarName(name, "_APP_ID"),
-        value: flags["app-id"],
+        value: appId,
         comment: `Privy application ID for payment credential provider '${name}' (set before deploy)`,
       },
       {
@@ -115,14 +131,23 @@ export async function resolvePaymentCredentialEnvEntries(input: {
       },
       {
         key: credentialEnvVarName(name, "_AUTHORIZATION_ID"),
-        value: flags["authorization-id"],
+        value: authorizationId,
         comment: `Stripe/Privy authorization ID for payment credential provider '${name}' (set before deploy)`,
       },
     ];
   }
 
-  const apiKeySecret = await resolver.resolveSecret("api-key-secret", flags["api-key-secret"]);
-  const walletSecret = await resolver.resolveSecret("wallet-secret", flags["wallet-secret"]);
+  const apiKeyId = normalizedIdentifier("apiKeyId", flags["api-key-id"]);
+  const resolvedApiKeySecret = await resolver.resolveSecret(
+    "api-key-secret",
+    flags["api-key-secret"],
+  );
+  const resolvedWalletSecret = await resolver.resolveSecret(
+    "wallet-secret",
+    flags["wallet-secret"],
+  );
+  const apiKeySecret = resolvedApiKeySecret?.trim();
+  const walletSecret = resolvedWalletSecret?.trim();
   if (apiKeySecret !== undefined) {
     const validation = validateApiKeySecret(apiKeySecret);
     if (validation !== true) throw new InputValidationError(validation);
@@ -134,7 +159,7 @@ export async function resolvePaymentCredentialEnvEntries(input: {
   return [
     {
       key: credentialEnvVarName(name, "_API_KEY_ID"),
-      value: flags["api-key-id"],
+      value: apiKeyId,
       comment: `Coinbase CDP API key ID for payment credential provider '${name}' (set before deploy)`,
     },
     {
