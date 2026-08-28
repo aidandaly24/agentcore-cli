@@ -48,20 +48,16 @@ import { describeStack } from "./cdk/stackReader";
 
 type StackDescriber = typeof describeStack;
 
-function sanitizeName(name: string): string {
-  return name.replaceAll("_", "-");
-}
-
-function deployedResourceId(
+function findDeployedResourceId(
   stack: Stack,
   input: ResolveDeployedResourceBackendInput,
 ): string | undefined {
   if (!stack.StackName) return undefined;
-  const resourceName = sanitizeName(input.name);
+  const exportResourceName = input.name.replaceAll("_", "-");
   const exportName =
     input.resourceType === "runtime"
-      ? `${stack.StackName}-${resourceName}-RuntimeId`
-      : `${stack.StackName}-Harness-${resourceName}-Id`;
+      ? `${stack.StackName}-${exportResourceName}-RuntimeId`
+      : `${stack.StackName}-Harness-${exportResourceName}-Id`;
   return stack.Outputs?.find((output) => output.ExportName === exportName)?.OutputValue;
 }
 
@@ -286,7 +282,7 @@ export class CdkBackend implements ProjectBackend {
       );
     }
 
-    const id = deployedResourceId(stack, input);
+    const id = findDeployedResourceId(stack, input);
     if (id) return id;
 
     const label = input.resourceType === "runtime" ? "Runtime" : "Harness";
