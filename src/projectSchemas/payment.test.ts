@@ -104,7 +104,7 @@ describe("payment manager custom validation", () => {
     ],
     ["a description containing punctuation", { description: "Payments!" }],
     ["a description longer than 4096 characters", { description: "a".repeat(4097) }],
-    ["a blank default spend limit", { defaultSpendLimit: "  " }],
+    ["a whitespace-only default spend limit", { defaultSpendLimit: "  " }],
   ])("rejects %s", (_label, overrides) => {
     expect(
       PaymentManagerSchema.safeParse({
@@ -113,5 +113,15 @@ describe("payment manager custom validation", () => {
         ...overrides,
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts an empty persisted spend limit from released projects", () => {
+    expect(
+      PaymentManagerSchema.safeParse({
+        name: "payments",
+        connectors: [],
+        defaultSpendLimit: "",
+      }).success,
+    ).toBe(true);
   });
 });

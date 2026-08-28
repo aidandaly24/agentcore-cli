@@ -78,7 +78,9 @@ export const PaymentManagerSchema = z
     connectors: z.array(PaymentConnectorSchema).default([]),
     description: PaymentManagerDescriptionSchema.optional(),
     autoPayment: z.boolean().default(DEFAULT_AUTO_PAYMENT),
-    defaultSpendLimit: PaymentSpendLimitSchema.default(DEFAULT_SPEND_LIMIT),
+    defaultSpendLimit: z
+      .union([z.literal(""), PaymentSpendLimitSchema])
+      .default(DEFAULT_SPEND_LIMIT),
     paymentToolAllowlist: z.array(z.string()).optional(),
     networkPreferences: z.array(z.string()).optional(),
   })

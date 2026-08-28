@@ -100,6 +100,11 @@ describe("project add payment-manager", () => {
       ["--name", "payments", "--default-spend-limit", "-1"],
       "non-negative",
     ],
+    [
+      "blank default spend limit",
+      ["--name", "payments", "--default-spend-limit", ""],
+      "non-negative",
+    ],
     ["invalid name", ["--name", "bad-name"], "alphanumeric"],
   ])("rejects %s", async (_label, flags, message) => {
     const projectRoot = await inProject();
