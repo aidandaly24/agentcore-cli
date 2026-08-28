@@ -109,6 +109,7 @@ import { GatewayRuleGetScreen } from "../handlers/gateway/rule/get/screen.tsx";
 import { GatewayInvokeScreen } from "../handlers/gateway/invoke/screen.tsx";
 import { ProjectScreen, ProjectCommandNotImplementedScreen } from "../handlers/project/screen.tsx";
 import { ProjectCreateScreen } from "../handlers/project/create/screen.tsx";
+import { ProjectInvokePickerScreen } from "../handlers/project/invoke/screen.tsx";
 import { RootScreen, HelpScreen } from "../handlers/screen.tsx";
 import type { Context } from "../router";
 
@@ -147,6 +148,10 @@ export function Root({ path, ctx, core, queryClient }: RootProps) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="agentcore" element={<RootScreen ctx={ctx} core={core} />} />
+          <Route
+            path="agentcore/project/invoke"
+            element={<ProjectInvokePickerScreen ctx={ctx} core={core} />}
+          />
           <Route path="agentcore/harness" element={<HarnessScreen ctx={ctx} core={core} />} />
           {/* Bare `get` (no id) has nothing to show — send the user to the list. */}
           <Route
