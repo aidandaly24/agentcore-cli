@@ -116,10 +116,6 @@ async function writeAssembly(
   );
 }
 
-async function writeDeployedState(input: Project, stackArn = STACK_ARN): Promise<void> {
-  await updateTargetState(json, input.rootPath, TARGET.name, { stackArn });
-}
-
 type HarnessOptions = {
   account?: string;
   bootstrap?: BootstrapState;
@@ -599,7 +595,7 @@ describe("CdkBackend.resolveDeployedResource", () => {
     "reads deployed state and resolves a $resourceType ID from its live stack",
     async (example) => {
       const input = await project();
-      await writeDeployedState(input);
+      await updateTargetState(json, input.rootPath, TARGET.name, { stackArn: STACK_ARN });
       const subject = harness({
         stack: {
           StackName: "AgentCore-example-default",
@@ -649,7 +645,7 @@ describe("CdkBackend.resolveDeployedResource", () => {
 
   test("fails actionably when the recorded stack no longer exists", async () => {
     const input = await project();
-    await writeDeployedState(input);
+    await updateTargetState(json, input.rootPath, TARGET.name, { stackArn: STACK_ARN });
     const subject = harness();
 
     await expect(
@@ -664,7 +660,7 @@ describe("CdkBackend.resolveDeployedResource", () => {
 
   test("fails when the live stack has no output for the selected resource", async () => {
     const input = await project();
-    await writeDeployedState(input);
+    await updateTargetState(json, input.rootPath, TARGET.name, { stackArn: STACK_ARN });
     const subject = harness({
       stack: {
         StackName: "AgentCore-example-default",
@@ -685,7 +681,7 @@ describe("CdkBackend.resolveDeployedResource", () => {
 
   test("rejects the wrong account before reading CloudFormation", async () => {
     const input = await project();
-    await writeDeployedState(input);
+    await updateTargetState(json, input.rootPath, TARGET.name, { stackArn: STACK_ARN });
     const subject = harness({ account: "999900001111" });
 
     await expect(
