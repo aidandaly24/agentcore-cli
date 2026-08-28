@@ -23,6 +23,8 @@ describe("project add payment-manager", () => {
     ]);
     expect(io.stderr()).toContain("added payment manager 'payments'");
     expect(io.stderr()).toContain("auto-payment is ENABLED");
+    expect(io.stderr()).not.toContain("$10.00");
+    expect(io.stderr()).not.toContain("spend limit");
     expect(io.stderr()).toContain("does not modify runtime source code");
   });
 

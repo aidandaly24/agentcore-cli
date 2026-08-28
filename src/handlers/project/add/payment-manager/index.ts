@@ -97,8 +97,7 @@ export const createAddPaymentManagerHandler = (config: AddProjectResourceConfig)
       if (flags["auto-payment"]) {
         config.io.stderr.write(
           `Warning: auto-payment is ENABLED for manager '${flags.name}'. Agents can automatically settle ` +
-            `402 responses up to the per-session spend limit ($${flags["default-spend-limit"]}) without human approval. ` +
-            "Use --no-auto-payment to require manual approval.\n",
+            "402 responses without human approval. Use --no-auto-payment to require manual approval.\n",
         );
       }
       if (project.spec.runtimes.length > 0) {
