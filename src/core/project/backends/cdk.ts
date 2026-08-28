@@ -140,7 +140,7 @@ export class CdkBackend implements ProjectBackend {
   ): AsyncGenerator<ProjectEvent, DeployResult> {
     const { target } = input;
     yield { message: `Verifying AWS account ${target.account}` };
-    const credentials = await this.credentialsFor(target);
+    const credentials = await this.credentialsForTarget(target);
 
     // Validate any existing deployed state before mutating AWS. A malformed file
     // must fail here — not after bootstrap/deploy — so we never leave AWS changed
@@ -273,7 +273,7 @@ export class CdkBackend implements ProjectBackend {
       );
     }
 
-    const credentials = await this.credentialsFor(target);
+    const credentials = await this.credentialsForTarget(target);
     const stack = await this.describeStack(target.region, credentials, stackArn);
     if (!stack) {
       throw new ProjectStateError(
@@ -292,7 +292,7 @@ export class CdkBackend implements ProjectBackend {
     );
   }
 
-  private async credentialsFor(target: AwsDeploymentTarget) {
+  private async credentialsForTarget(target: AwsDeploymentTarget) {
     const credentials = await this.resolveCredentials(target.region);
     const account = await this.resolveAccount(target.region, credentials);
     if (account !== target.account) {
