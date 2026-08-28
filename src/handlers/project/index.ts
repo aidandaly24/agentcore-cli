@@ -17,6 +17,7 @@ import { createBuildProjectHandler } from "./build";
 import type { ProjectManager } from "./types";
 import { createAddProjectResourceHandler } from "./add";
 import { createExportProjectResourceHandler } from "./export";
+import { createProjectInvokeHandler } from "./invoke";
 
 type ProjectHandlerConfig = {
   core: Core;
@@ -89,6 +90,7 @@ export function createProjectHandler({ core, io }: ProjectHandlerConfig): Router
       createDeployProjectHandler({ projectManager: config.projectManager, io: config.io }),
     ),
   );
+  project.handler(createProjectInvokeHandler(core, io));
   project.handler(createStatusProjectHandler());
   // withProject wraps only the commands that require an existing project, so
   // `create` (which refuses to nest inside one) stays unaffected.
