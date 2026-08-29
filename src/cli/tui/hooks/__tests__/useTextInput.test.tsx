@@ -1,14 +1,18 @@
 import { findNextWordBoundary, findPrevWordBoundary, useTextInput } from '../useTextInput.js';
 import { Text } from 'ink';
 import { render } from 'ink-testing-library';
+import { spawnSync } from 'node:child_process';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
 
 const ENTER = '\r';
 const ESCAPE = '\x1B';
 const BACKSPACE = '\x7f';
 const LEFT = '\x1B[D';
 const RIGHT = '\x1B[C';
+const CTRL_V = '\x16';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -365,5 +369,42 @@ describe('useTextInput keyboard shortcuts', () => {
 
     expect(lastFrame()).toContain('val:[hello]');
     expect(lastFrame()).toContain('cur:5');
+  });
+
+  it('Ctrl+V pastes clipboard text at the cursor', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'pasted-secret-123' } as never);
+    const { lastFrame, stdin } = render(<TextInputHarness initialValue="ab" />);
+
+    await delay();
+    stdin.write(LEFT); // cursor at 1, between 'a' and 'b'
+    await delay();
+    stdin.write(CTRL_V);
+    await delay();
+
+    expect(lastFrame()).toContain('val:[apasted-secret-123b]');
+    expect(lastFrame()).toContain('cur:18'); // 1 + 'pasted-secret-123'.length
+  });
+
+  it('Ctrl+V strips control chars from pasted text', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 0, stdout: 'a\rb\x7fc' } as never);
+    const { lastFrame, stdin } = render(<TextInputHarness />);
+
+    await delay();
+    stdin.write(CTRL_V);
+    await delay();
+
+    expect(lastFrame()).toContain('val:[abc]');
+  });
+
+  it('Ctrl+V is a no-op (not a swallowed keystroke) when clipboard read fails', async () => {
+    vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '' } as never);
+    const { lastFrame, stdin } = render(<TextInputHarness initialValue="keep" />);
+
+    await delay();
+    stdin.write(CTRL_V);
+    await delay();
+
+    expect(lastFrame()).toContain('val:[keep]');
+    expect(lastFrame()).toContain('cur:4');
   });
 });
