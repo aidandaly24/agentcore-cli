@@ -8,6 +8,7 @@ import {
 import { StaleCdkConstructError, ValidationError } from '../../../lib/errors/types';
 import type { AgentCoreProjectSpec, AwsDeploymentTarget } from '../../../schema';
 import { validateAwsCredentials } from '../../aws/account';
+import { getEvaluator } from '../../aws/agentcore-control';
 import { LocalCdkProject } from '../../cdk/local-cdk-project';
 import { CdkToolkitWrapper, createCdkToolkitWrapper, silentIoHost } from '../../cdk/toolkit-lib';
 import { checkBootstrapStatus, checkStacksStatus, formatCdkEnvironment } from '../../cloudformation';
@@ -155,6 +156,16 @@ export async function validateProject(selectedTarget?: AwsDeploymentTarget): Pro
     await validateAwsCredentials(selectedTarget ?? awsTargets[0]);
   }
 
+  // Validate that evaluators referenced by online eval configs but NOT managed by this project
+  // (Builtin.* IDs, ARNs, and custom names absent from projectSpec.evaluators) still exist in the
+  // account. Without this, a reference to an evaluator deleted out-of-band passes schema + synth and
+  // only fails at CloudFormation with an opaque resource error. Skipped on teardown (no creation) and
+  // when there are no targets to resolve against (credentials/region unavailable).
+  const evaluatorTarget = awsTargets[0];
+  if (!isTeardownDeploy && evaluatorTarget) {
+    await validateOnlineEvalEvaluators(projectSpec, evaluatorTarget.region);
+  }
+
   return { projectSpec, awsTargets, cdkProject, isTeardownDeploy, isFirstDeploy: !hasExistingStack };
 }
 
@@ -260,6 +271,41 @@ export async function validateHarnessSpecs(projectSpec: AgentCoreProjectSpec, co
   }
   if (errors.length > 0) {
     throw new ValidationError(`Invalid harness configuration:\n${errors.join('\n')}`);
+  }
+}
+
+/**
+ * Verify that every evaluator referenced by an online eval config which this project does NOT manage
+ * still exists in the account. Project-managed custom evaluators (those in projectSpec.evaluators)
+ * are skipped — this same deploy is about to create them, so checking would be a false positive.
+ * Builtin.* IDs, ARNs, and custom names absent from the project are resolved via getEvaluator; a
+ * missing one throws an actionable ValidationError naming the config and the offending evaluator,
+ * which gates before CDK synth instead of surfacing as an opaque CloudFormation rollback.
+ */
+export async function validateOnlineEvalEvaluators(projectSpec: AgentCoreProjectSpec, region: string): Promise<void> {
+  const configs = projectSpec.onlineEvalConfigs ?? [];
+  if (configs.length === 0) return;
+
+  const projectEvaluators = new Set((projectSpec.evaluators ?? []).map(e => e.name));
+  const errors: string[] = [];
+
+  for (const config of configs) {
+    for (const ref of config.evaluators ?? []) {
+      // Skip evaluators this deploy is about to create.
+      if (projectEvaluators.has(ref)) continue;
+      try {
+        await getEvaluator({ region, evaluatorId: ref });
+      } catch {
+        errors.push(
+          `Evaluator "${ref}" referenced by online eval config "${config.name}" no longer exists in ${region}. ` +
+            `Recreate it or remove the reference from agentcore.json, then deploy.`
+        );
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new ValidationError(errors.join('\n'));
   }
 }
 
