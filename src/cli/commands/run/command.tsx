@@ -85,7 +85,7 @@ export const registerRun = (program: Command) => {
     .option('-r, --runtime <name>', 'Runtime name from project config')
     .option('--runtime-arn <arn>', 'Runtime ARN — run outside a project directory')
     .option('-e, --evaluator <names...>', 'Evaluator name(s) — project evaluators or Builtin.* IDs')
-    .option('--evaluator-arn <arns...>', 'Evaluator ARN(s) — use with --runtime-arn for standalone mode')
+    .option('--evaluator-arn <arns...>', 'Evaluator ARN(s) or ID(s) — for Builtin.* evaluators prefer -e/--evaluator')
     .option('--region <region>', 'AWS region (required with --runtime-arn, auto-detected otherwise)')
     .option('-s, --session-id <id>', 'Evaluate a specific session only')
     .option('-t, --trace-id <id>', 'Evaluate a specific trace only')
@@ -120,7 +120,7 @@ export const registerRun = (program: Command) => {
         datasetVersion?: string;
         json?: boolean;
       }) => {
-        const isArnMode = !!(cliOptions.runtimeArn && cliOptions.evaluatorArn);
+        const isArnMode = !!cliOptions.runtimeArn;
         if (!isArnMode) {
           requireProject();
         }
