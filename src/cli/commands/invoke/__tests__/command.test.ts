@@ -1,6 +1,6 @@
 // Tests for invoke CLI mode — exitCode propagation and flag validation
 import { handleInvoke } from '../action.js';
-import { registerInvoke } from '../command.js';
+import { printInvokeResult, registerInvoke } from '../command.js';
 import { resolvePrompt } from '../resolve-prompt.js';
 import { Command } from '@commander-js/extra-typings';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -144,5 +144,30 @@ describe('invoke CLI mode — exitCode propagation', () => {
     expect(out).toContain('--additional-params must be a valid JSON object');
     // In --json mode the error must NOT go to console.error (would break JSON consumers).
     expect(erred.join('')).not.toContain('--additional-params');
+  });
+});
+
+describe('printInvokeResult resume hint', () => {
+  let erred: string[];
+
+  beforeEach(() => {
+    erred = [];
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => erred.push(args.join(' ')));
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('suppresses the "To resume" hint when the target has no memory', () => {
+    printInvokeResult({ success: true, response: 'hi', sessionId: 'abc', hasMemory: false }, {});
+    expect(erred.join('\n')).toContain('Session: abc');
+    expect(erred.join('\n')).not.toContain('To resume');
+  });
+
+  it('shows the "To resume" hint when the target has memory', () => {
+    printInvokeResult({ success: true, response: 'hi', sessionId: 'abc', hasMemory: true }, {});
+    expect(erred.join('\n')).toContain('To resume: agentcore invoke --session-id abc');
   });
 });

@@ -81,4 +81,10 @@ export type InvokeResult = Result & {
   response?: string;
   sessionId?: string;
   exitCode?: number;
+  /**
+   * True when the resolved target has memory configured. Without memory the
+   * agent is stateless per turn, so re-invoking with the same --session-id
+   * resumes nothing — the "To resume" hint is suppressed in that case.
+   */
+  hasMemory?: boolean;
 };

@@ -64,6 +64,11 @@ export interface InvokeConfig {
   target: AwsDeploymentTarget;
   targetName: string;
   projectName: string;
+  /**
+   * True when the project has memory configured. Without it the agent is
+   * stateless per turn, so the "To resume" exit hint is suppressed.
+   */
+  hasMemory: boolean;
 }
 
 export interface InvokeFlowOptions {
@@ -263,7 +268,14 @@ export function useInvokeFlow(options: InvokeFlowOptions = {}): InvokeFlowState 
             };
           }
 
-          setConfig({ runtimes, harnesses, target: targetConfig, targetName, projectName: project.name });
+          setConfig({
+            runtimes,
+            harnesses,
+            target: targetConfig,
+            targetName,
+            projectName: project.name,
+            hasMemory: (project.memories?.length ?? 0) > 0,
+          });
 
           if (initialHarnessName) {
             const harnessIdx = harnesses.findIndex(h => h.name === initialHarnessName);
