@@ -10,6 +10,7 @@
  *   - AWS credentials
  *   - npm, git, uv installed
  */
+import { SPAN_INGESTION_DELAY_MS } from '../src/cli/operations/eval/shared/span-collector.js';
 import { parseJsonOutput, retry } from '../src/test-utils/index.js';
 import {
   baseCanRun,
@@ -26,6 +27,10 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const canRun = baseCanRun && hasAws;
+
+// Per-`it` ceiling for the dataset eval run. Must cover the full retry budget
+// (see assertion in the test body); stays within the 600000ms e2e suite cap.
+const EVAL_IT_TIMEOUT_MS = 420000;
 
 describe.sequential('e2e: dataset eval integration', () => {
   let testDir: string;
@@ -158,6 +163,15 @@ describe.sequential('e2e: dataset eval integration', () => {
   it.skipIf(!canRun)(
     'runs evaluation using dataset as input',
     async () => {
+      // Each `run eval --dataset` attempt has a ~180s span-ingestion floor
+      // (SPAN_INGESTION_DELAY_MS), so the per-`it` timeout below must leave room
+      // for the whole retry budget: retries * (ingestion floor + gap).
+      const evalRetries = 2;
+      const evalRetryGapMs = 10000;
+      expect(EVAL_IT_TIMEOUT_MS).toBeGreaterThanOrEqual(
+        evalRetries * (SPAN_INGESTION_DELAY_MS + evalRetryGapMs)
+      );
+
       await retry(
         async () => {
           const result = await run([
@@ -178,10 +192,10 @@ describe.sequential('e2e: dataset eval integration', () => {
           expect(json).toHaveProperty('success', true);
           expect(json).toHaveProperty('run');
         },
-        18,
-        10000
+        evalRetries,
+        evalRetryGapMs
       );
     },
-    300000
+    EVAL_IT_TIMEOUT_MS
   );
 });

@@ -13,7 +13,7 @@ import type { DocumentType } from '@smithy/types';
  * Default delay before first span query (CloudWatch ingestion buffer).
  * Matches SDK's evaluation_delay_seconds default (180s).
  */
-const SPAN_INGESTION_DELAY_MS = 180_000;
+export const SPAN_INGESTION_DELAY_MS = 180_000;
 
 /** Maximum time to poll for spans after the ingestion delay. */
 const SPAN_POLL_TIMEOUT_MS = 60_000;
