@@ -1,5 +1,6 @@
 import { ValidationError, serializeResult } from '../../../lib';
-import { COMMAND_DESCRIPTIONS } from '../../constants';
+import { resolveEndpointName } from '../../aws';
+import { COMMAND_DESCRIPTIONS, DEFAULT_ENDPOINT_NAME } from '../../constants';
 import { getErrorMessage } from '../../errors';
 import { ADDITIONAL_PARAMS_JSON_ERROR } from '../../primitives/constants';
 import { withCommandRunTelemetry } from '../../telemetry/cli-command-run.js';
@@ -9,7 +10,7 @@ import { parseHeaderFlags } from '../shared/header-utils';
 import { type InvokeContext, handleHarnessInvokeByArn, handleInvoke, loadInvokeConfig } from './action';
 import { resolvePrompt } from './resolve-prompt';
 import type { InvokeOptions, InvokeResult } from './types';
-import { computeInvokeAttrs } from './utils';
+import { computeEndpointSource, computeInvokeAttrs } from './utils';
 import { validateInvokeOptions } from './validate';
 import type { Command } from '@commander-js/extra-typings';
 import { Text, render } from 'ink';
@@ -138,6 +139,10 @@ export const registerInvoke = (program: Command) => {
       'Read the prompt from a file (for long or structured payloads that exceed shell arg limits) [non-interactive]'
     )
     .option('--runtime <name>', 'Select specific runtime [non-interactive]')
+    .option(
+      '--runtime-endpoint <name>',
+      'Target a named runtime endpoint (version alias, e.g. prod/staging). Defaults to AGENTCORE_RUNTIME_ENDPOINT env var, then DEFAULT [non-interactive]'
+    )
     .option('--gateway <name>', 'Invoke through a gateway [non-interactive]')
     .option('--gateway-target-name <name>', 'HTTP runtime target on the gateway [non-interactive]')
     .option('--target <name>', 'Select deployment target [non-interactive]')
@@ -292,6 +297,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
         prompt?: string;
         promptFile?: string;
         runtime?: string;
+        runtimeEndpoint?: string;
         gateway?: string;
         gatewayTargetName?: string;
         target?: string;
@@ -355,6 +361,17 @@ Model & Runtime Overrides (harness only) [non-interactive]
           stdinPiped: !process.stdin.isTTY,
         });
 
+        // Resolve the named endpoint once, before the CLI-mode gate, so the
+        // AGENTCORE_RUNTIME_ENDPOINT env-var fallback is honored in BOTH flows:
+        // --runtime-endpoint flag → env var → DEFAULT. A non-DEFAULT resolution
+        // forces CLI mode (so `AGENTCORE_RUNTIME_ENDPOINT=staging agentcore invoke`
+        // does not silently drop into the TUI and hit DEFAULT) and is also threaded
+        // into the TUI route below for interactive parity. Leave it undefined for
+        // DEFAULT so the SigV4 qualifier is omitted rather than sent explicitly.
+        const resolvedEndpoint = resolveEndpointName(cliOptions.runtimeEndpoint);
+        const endpoint = resolvedEndpoint === DEFAULT_ENDPOINT_NAME ? undefined : resolvedEndpoint;
+        const endpointSource = computeEndpointSource(cliOptions.runtimeEndpoint);
+
         // CLI mode if any CLI-specific options provided, prompt resolved, or prompt resolution failed
         // (follows deploy command pattern)
         if (
@@ -365,6 +382,8 @@ Model & Runtime Overrides (harness only) [non-interactive]
           cliOptions.gatewayTargetName ||
           cliOptions.stream ||
           cliOptions.runtime ||
+          cliOptions.runtimeEndpoint ||
+          endpoint !== undefined ||
           cliOptions.gateway ||
           cliOptions.tool ||
           cliOptions.exec ||
@@ -389,6 +408,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
               hasSessionId: !!cliOptions.sessionId,
               bearerToken: cliOptions.bearerToken,
               agentProtocol: agentProtocol ?? (cliOptions.tool ? 'mcp' : undefined),
+              endpointSource,
             }),
             async (): Promise<InvokeResult> => {
               if (!resolved.success) {
@@ -418,6 +438,7 @@ Model & Runtime Overrides (harness only) [non-interactive]
               const options: InvokeOptions = {
                 prompt: resolved.prompt,
                 agentName: cliOptions.runtime,
+                runtimeEndpoint: endpoint,
                 gateway: cliOptions.gateway,
                 gatewayTarget: cliOptions.gatewayTargetName,
                 targetName: cliOptions.target ?? 'default',
@@ -492,6 +513,8 @@ Model & Runtime Overrides (harness only) [non-interactive]
               name: 'invoke',
               sessionId: cliOptions.sessionId,
               userId: cliOptions.userId,
+              endpoint,
+              endpointSource,
               headers,
               bearerToken: cliOptions.bearerToken,
               paymentInstrumentId: cliOptions.paymentInstrumentId,

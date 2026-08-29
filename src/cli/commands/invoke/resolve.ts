@@ -16,6 +16,8 @@ export interface ResolveInvokeInput {
   awsTargets: AwsDeploymentTargets;
   agentName?: string;
   targetName?: string;
+  /** Named runtime endpoint (version alias) to target. When omitted, the DEFAULT endpoint is used. */
+  endpointName?: string;
   bearerToken?: string;
   sessionId?: string;
   configIO?: ConfigIO;
@@ -27,6 +29,8 @@ export interface ResolvedInvokeTarget {
   targetConfig: AwsDeploymentTarget;
   region: string;
   runtimeArn: string;
+  /** Resolved runtime endpoint qualifier (the endpoint NAME). Undefined targets the DEFAULT endpoint. */
+  endpoint?: string;
   bearerToken?: string;
   sessionId?: string;
   baggage?: string;
@@ -99,6 +103,39 @@ export async function resolveInvokeTarget(input: ResolveInvokeInput): Promise<Re
     };
   }
 
+  // Resolve the optional named runtime endpoint (version alias) to its qualifier
+  // (the endpoint NAME, which is what the InvokeAgentRuntime API expects). Validate
+  // against the configured endpoints and/or the deployed runtimeEndpoints so an
+  // unknown name fails fast instead of silently hitting DEFAULT.
+  let endpoint: string | undefined;
+  if (input.endpointName) {
+    const configured = agentSpec.endpoints ?? {};
+    const deployedEndpoints = targetState?.resources?.runtimeEndpoints ?? {};
+    const isConfigured = Object.prototype.hasOwnProperty.call(configured, input.endpointName);
+    const isDeployed = Object.prototype.hasOwnProperty.call(
+      deployedEndpoints,
+      `${agentSpec.name}/${input.endpointName}`
+    );
+    if (!isConfigured && !isDeployed) {
+      const available = Array.from(
+        new Set([
+          ...Object.keys(configured),
+          ...Object.keys(deployedEndpoints)
+            .filter(k => k.startsWith(`${agentSpec.name}/`))
+            .map(k => k.slice(`${agentSpec.name}/`.length)),
+        ])
+      );
+      return {
+        success: false,
+        error: new ResourceNotFoundError(
+          `Endpoint '${input.endpointName}' not found for agent '${agentSpec.name}'.` +
+            (available.length > 0 ? ` Available: ${available.join(', ')}` : '')
+        ),
+      };
+    }
+    endpoint = input.endpointName;
+  }
+
   // Build config bundle baggage if a bundle is associated with this agent
   const deployedBundles = targetState?.resources?.configBundles ?? {};
   let baggage: string | undefined;
@@ -157,6 +194,7 @@ export async function resolveInvokeTarget(input: ResolveInvokeInput): Promise<Re
     targetConfig,
     region: targetConfig.region,
     runtimeArn: agentState.runtimeArn,
+    endpoint,
     bearerToken,
     sessionId,
     baggage,

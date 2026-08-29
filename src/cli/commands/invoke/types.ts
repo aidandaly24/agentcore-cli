@@ -11,6 +11,8 @@ export interface InvokeOptions {
   gatewayTarget?: string;
   /** AWS region (used with --harness-arn) */
   region?: string;
+  /** Named runtime endpoint (version alias) to target, e.g. prod/staging. Defaults to DEFAULT. */
+  runtimeEndpoint?: string;
   targetName?: string;
   prompt?: string;
   /** Path to a file containing the prompt (alternative to --prompt / positional) */

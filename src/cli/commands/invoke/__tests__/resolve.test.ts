@@ -257,6 +257,96 @@ describe('resolveInvokeTarget', () => {
     expect(result.runtimeArn).toContain('rt-b');
   });
 
+  describe('named runtime endpoint resolution', () => {
+    it('resolves an endpoint configured on the runtime to a qualifier', async () => {
+      const project = makeProject({
+        runtimes: [
+          {
+            name: 'my-agent',
+            build: 'CodeZip',
+            codeLocation: './agents/my-agent',
+            entrypoint: 'main.py',
+            runtimeVersion: '1.0',
+            networkMode: 'PUBLIC',
+            endpoints: { prod: { version: 2 } },
+          },
+        ] as unknown as AgentCoreProjectSpec['runtimes'],
+      });
+
+      const result = await resolveInvokeTarget({
+        project,
+        deployedState: makeDeployedState(),
+        awsTargets: makeAwsTargets(),
+        endpointName: 'prod',
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.endpoint).toBe('prod');
+    });
+
+    it('resolves an endpoint present only in deployed runtimeEndpoints', async () => {
+      const deployedState = {
+        targets: {
+          default: {
+            resources: {
+              runtimes: {
+                'my-agent': {
+                  runtimeId: 'rt-123',
+                  runtimeArn: 'arn:aws:bedrock-agentcore:us-east-1:123456789:runtime/rt-123',
+                  roleArn: 'arn:aws:iam::123456789:role/test-role',
+                },
+              },
+              runtimeEndpoints: {
+                'my-agent/staging': {
+                  endpointId: 'ep-1',
+                  endpointArn: 'arn:aws:bedrock-agentcore:us-east-1:123:runtime-endpoint/ep-1',
+                },
+              },
+            },
+          },
+        },
+      } as unknown as DeployedState;
+
+      const result = await resolveInvokeTarget({
+        project: makeProject(),
+        deployedState,
+        awsTargets: makeAwsTargets(),
+        endpointName: 'staging',
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.endpoint).toBe('staging');
+    });
+
+    it('returns ResourceNotFoundError for an unknown endpoint name', async () => {
+      const result = await resolveInvokeTarget({
+        project: makeProject(),
+        deployedState: makeDeployedState(),
+        awsTargets: makeAwsTargets(),
+        endpointName: 'nope',
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBeInstanceOf(ResourceNotFoundError);
+      expect(result.error.message).toContain("Endpoint 'nope' not found");
+    });
+
+    it('leaves endpoint undefined when no endpointName is provided', async () => {
+      const result = await resolveInvokeTarget({
+        project: makeProject(),
+        deployedState: makeDeployedState(),
+        awsTargets: makeAwsTargets(),
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.endpoint).toBeUndefined();
+    });
+  });
+
   describe('CUSTOM_JWT token resolution', () => {
     function makeJwtProject(): AgentCoreProjectSpec {
       return makeProject({
