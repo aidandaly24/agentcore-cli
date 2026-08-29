@@ -138,16 +138,25 @@ function AgentAddedSummary({
           </Text>
         </Box>
       )}
-      {!isCreate && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color="yellow">
-            Copy your agent code to <Text color="cyan">{config.codeLocation}</Text> before deploying.
-          </Text>
-          <Text dimColor>
-            Ensure <Text color="cyan">{config.entrypoint}</Text> is the entrypoint file in that folder.
-          </Text>
-        </Box>
-      )}
+      {!isCreate &&
+        (config.language === 'Python' || config.language === 'TypeScript' ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>
+              Your agent entrypoint is <Text color="cyan">{config.entrypoint}</Text> in{' '}
+              <Text color="cyan">{config.codeLocation}</Text>. A starter was added if it did not already exist — edit it
+              with your agent logic.
+            </Text>
+          </Box>
+        ) : (
+          <Box flexDirection="column" marginTop={1}>
+            <Text color="yellow">
+              Copy your agent code to <Text color="cyan">{config.codeLocation}</Text> before deploying.
+            </Text>
+            <Text dimColor>
+              Ensure <Text color="cyan">{config.entrypoint}</Text> is the entrypoint file in that folder.
+            </Text>
+          </Box>
+        ))}
       {isImport && config.bedrockAgentId && (
         <Box marginTop={1}>
           <Text dimColor>

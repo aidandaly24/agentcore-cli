@@ -272,6 +272,49 @@ describe('add agent command', () => {
       const agent = projectSpec.runtimes.find((a: { name: string }) => a.name === agentName);
       expect(agent, 'Agent should be in agentcore.json').toBeTruthy();
       expect(agent.codeLocation.includes(codeDir), `codeLocation should reference ${codeDir}`).toBeTruthy();
+
+      // Existing user code must not be overwritten by the starter stub
+      const entrypoint = await readFile(join(projectDir, codeDir, 'main.py'), 'utf-8');
+      expect(entrypoint).toBe('# existing code\n');
+    });
+
+    it('vends a runtime-contract starter at the resolved --entrypoint for a fresh Python BYO agent', async () => {
+      const agentName = `ByoStub${Date.now()}`;
+      const codeDir = `stub-agent-${Date.now()}`;
+
+      const result = await runCLI(
+        [
+          'add',
+          'agent',
+          '--name',
+          agentName,
+          '--type',
+          'byo',
+          '--code-location',
+          codeDir,
+          '--entrypoint',
+          'agent.py',
+          '--language',
+          'Python',
+          '--framework',
+          'Strands',
+          '--model-provider',
+          'Bedrock',
+          '--json',
+        ],
+        projectDir
+      );
+
+      expect(result.exitCode, `stdout: ${result.stdout}`).toBe(0);
+
+      // Honors --entrypoint: written to agent.py, not a hardcoded main.py
+      expect(await exists(join(projectDir, codeDir, 'main.py'))).toBe(false);
+      const entrypoint = await readFile(join(projectDir, codeDir, 'agent.py'), 'utf-8');
+      expect(entrypoint).toContain('from bedrock_agentcore.runtime import BedrockAgentCoreApp');
+      expect(entrypoint).toContain('app = BedrockAgentCoreApp()');
+      expect(entrypoint).toContain('@app.entrypoint');
+      expect(entrypoint).toContain('app.run()');
+      expect(entrypoint).not.toContain('def handler(event, context)');
     });
 
     it('requires code-location for BYO path', async () => {
