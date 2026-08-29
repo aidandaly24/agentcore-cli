@@ -1,4 +1,10 @@
-import { AUTHORIZER_TYPE_OPTIONS, ENTER_KB_ID_MANUALLY, SKIP_FOR_NOW, TARGET_TYPE_OPTIONS } from '../types.js';
+import {
+  AUTHORIZER_TYPE_OPTIONS,
+  ENTER_KB_ID_MANUALLY,
+  PYTHON_VERSION_OPTIONS,
+  SKIP_FOR_NOW,
+  TARGET_TYPE_OPTIONS,
+} from '../types.js';
 import { describe, expect, it } from 'vitest';
 
 describe('MCP types constants', () => {
@@ -25,5 +31,13 @@ describe('MCP types constants', () => {
     // Sentinel for the "Enter an existing KB ID manually..." picker entry —
     // the screen branches on this exact id when the user picks the manual path.
     expect(ENTER_KB_ID_MANUALLY).toBe('__enter_kb_id__');
+  });
+
+  it('PYTHON_VERSION_OPTIONS defaults to a universally-available runtime, not PYTHON_3_14', () => {
+    // 3.14 is not yet GA in every region, so it must not be the first/highlighted pick.
+    expect(PYTHON_VERSION_OPTIONS[0]?.id).toBe('PYTHON_3_13');
+    expect(PYTHON_VERSION_OPTIONS[0]?.id).not.toBe('PYTHON_3_14');
+    // 3.14 stays selectable for users in supported regions.
+    expect(PYTHON_VERSION_OPTIONS.some(opt => opt.id === 'PYTHON_3_14')).toBe(true);
   });
 });

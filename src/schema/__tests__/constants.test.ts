@@ -1,4 +1,5 @@
 import {
+  DEFAULT_PYTHON_VERSION,
   LANGUAGE_FRAMEWORK_MATRIX,
   ModelProviderSchema,
   NetworkModeSchema,
@@ -77,6 +78,11 @@ describe('RuntimeVersionSchemas', () => {
     expect(NodeRuntimeSchema.safeParse('NODE_16').success).toBe(false);
     expect(NodeRuntimeSchema.safeParse('NODE_24').success).toBe(false);
     expect(RuntimeVersionSchema.safeParse('RUBY_3_0').success).toBe(false);
+  });
+
+  it('defaults new agents to a universally-available Python runtime (not PYTHON_3_14)', () => {
+    expect(DEFAULT_PYTHON_VERSION).toBe('PYTHON_3_13');
+    expect(PythonRuntimeSchema.safeParse(DEFAULT_PYTHON_VERSION).success).toBe(true);
   });
 });
 
