@@ -130,9 +130,9 @@ export const CLI_ONLY_EXAMPLES: Record<string, { description: string; examples: 
   'run-insights': {
     description: '[preview] Run failure analysis on agent sessions. This command runs in the terminal.',
     examples: [
-      'agentcore run insights -r MyAgent -i FailureAnalysis',
-      'agentcore run insights -r MyAgent -i FailureAnalysis --lookback 7',
-      'agentcore run insights -r MyAgent -i FailureAnalysis --wait',
+      'agentcore run insights -r MyAgent --insights Builtin.Insight.FailureAnalysis',
+      'agentcore run insights -r MyAgent --insights Builtin.Insight.FailureAnalysis --lookback-days 7',
+      'agentcore run insights -r MyAgent --insights Builtin.Insight.FailureAnalysis --wait',
     ],
   },
   feedback: {

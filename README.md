@@ -310,6 +310,7 @@ Projects use JSON schema files in the `agentcore/` directory:
 - [Evaluations](docs/evals.md) - Evaluators, on-demand evals, and online monitoring
 - [Batch Evaluation](docs/batch-evaluation.md) - Run evaluators across sessions at scale
 - [Recommendations](docs/recommendations.md) - Optimize prompts and tool descriptions
+- [Insights](docs/insights.md) - Failure-pattern analysis and clustering across agent sessions
 - [A/B Tests](docs/ab-tests.md) - Split traffic between variants and promote the winner
 
 **Operations**
