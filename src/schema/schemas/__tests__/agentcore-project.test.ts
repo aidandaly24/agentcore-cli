@@ -637,6 +637,119 @@ describe('AgentCoreProjectSpecSchema', () => {
     }
   });
 
+  it('auto-migrates pre-v0.4.0 keys (agents -> runtimes, credential type -> authorizerType)', () => {
+    const result = AgentCoreProjectSpecSchema.safeParse({
+      ...minimalProject,
+      agents: [
+        {
+          name: 'MyAgent',
+          build: 'CodeZip',
+          entrypoint: 'main.py',
+          codeLocation: './agents/my-agent',
+          runtimeVersion: 'PYTHON_3_12',
+          protocol: 'HTTP',
+        },
+      ],
+      credentials: [{ type: 'ApiKeyCredentialProvider', name: 'MyCred' }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.runtimes).toHaveLength(1);
+      expect(result.data.runtimes[0]!.name).toBe('MyAgent');
+      expect('agents' in result.data).toBe(false);
+      expect(result.data.credentials[0]!.authorizerType).toBe('ApiKeyCredentialProvider');
+    }
+  });
+
+  // Canonical reproducer from GitHub issue #719: the "Before" example carries a legacy
+  // `type: "AgentCoreRuntime"` on every agent entry AND uses an OAuthCredentialProvider with the
+  // legacy `type` discriminator. Both must be tolerated and rewritten by the migration.
+  it('auto-migrates the canonical issue #719 shape (runtime type stripped, OAuth credential)', () => {
+    const result = AgentCoreProjectSpecSchema.safeParse({
+      ...minimalProject,
+      agents: [
+        {
+          type: 'AgentCoreRuntime',
+          name: 'MyAgent',
+          build: 'CodeZip',
+          entrypoint: 'main.py',
+          codeLocation: 'app/MyAgent/',
+          runtimeVersion: 'PYTHON_3_12',
+          networkMode: 'PUBLIC',
+          modelProvider: 'Bedrock',
+          protocol: 'HTTP',
+        },
+      ],
+      credentials: [
+        {
+          type: 'OAuthCredentialProvider',
+          name: 'my-oauth',
+          discoveryUrl: 'https://idp.example.com/.well-known/openid-configuration',
+          vendor: 'CustomOauth2',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect('agents' in result.data).toBe(false);
+      expect(result.data.runtimes).toHaveLength(1);
+      const runtime = result.data.runtimes[0]!;
+      expect(runtime.name).toBe('MyAgent');
+      // The dropped per-runtime `type: "AgentCoreRuntime"` discriminator must be removed, not just
+      // silently ignored — guards against AgentEnvSpecSchema later being tightened to `.strict()`.
+      expect('type' in runtime).toBe(false);
+
+      expect(result.data.credentials).toHaveLength(1);
+      const credential = result.data.credentials[0]!;
+      expect(credential.authorizerType).toBe('OAuthCredentialProvider');
+      expect('type' in credential).toBe(false);
+      if (credential.authorizerType === 'OAuthCredentialProvider') {
+        expect(credential.discoveryUrl).toBe('https://idp.example.com/.well-known/openid-configuration');
+        expect(credential.vendor).toBe('CustomOauth2');
+      }
+    }
+  });
+
+  it('auto-migrates a legacy PaymentCredentialProvider credential type', () => {
+    const result = AgentCoreProjectSpecSchema.safeParse({
+      ...minimalProject,
+      credentials: [
+        {
+          type: 'PaymentCredentialProvider',
+          name: 'my-payment',
+          provider: 'CoinbaseCDP',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const credential = result.data.credentials[0]!;
+      expect(credential.authorizerType).toBe('PaymentCredentialProvider');
+      expect('type' in credential).toBe(false);
+    }
+  });
+
+  it('strips legacy runtime type even when the array already uses the new `runtimes` key', () => {
+    const result = AgentCoreProjectSpecSchema.safeParse({
+      ...minimalProject,
+      runtimes: [
+        {
+          type: 'AgentCoreRuntime',
+          name: 'MyAgent',
+          build: 'CodeZip',
+          entrypoint: 'main.py',
+          codeLocation: './agents/my-agent',
+          runtimeVersion: 'PYTHON_3_12',
+          protocol: 'HTTP',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect('type' in result.data.runtimes[0]!).toBe(false);
+    }
+  });
+
   it('rejects httpRuntime target on MCP gateway (no protocolType None)', () => {
     const result = AgentCoreProjectSpecSchema.safeParse({
       ...minimalProject,

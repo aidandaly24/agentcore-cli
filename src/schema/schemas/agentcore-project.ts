@@ -387,7 +387,7 @@ export type HarnessRegistryEntry = z.infer<typeof HarnessRegistryEntrySchema>;
 const BUILTIN_EVALUATOR_PREFIX = 'Builtin.';
 const ARN_PREFIX = 'arn:';
 
-export const AgentCoreProjectSpecSchema = z
+const AgentCoreProjectSpecBaseSchema = z
   .object({
     $schema: z.string().optional(),
     name: ProjectNameSchema,
@@ -722,5 +722,90 @@ export const AgentCoreProjectSpecSchema = z
       }
     }
   });
+
+/** Legacy per-entry runtime discriminator dropped in v0.4.0 (PR #706). */
+const LEGACY_RUNTIME_TYPE = 'AgentCoreRuntime';
+
+/**
+ * Returns true when `spec` carries any pre-v0.4.0 key that `migrateLegacyProjectSpec`
+ * rewrites. Lets callers (e.g. the config loader) emit telemetry / deprecation notices
+ * only when a legacy file is actually being migrated.
+ */
+export function detectsLegacyProjectKeys(val: unknown): {
+  hadAgentsKey: boolean;
+  hadCredentialTypeKey: boolean;
+  hadRuntimeTypeKey: boolean;
+} {
+  const empty = { hadAgentsKey: false, hadCredentialTypeKey: false, hadRuntimeTypeKey: false };
+  if (val == null || typeof val !== 'object' || Array.isArray(val)) return empty;
+  const spec = val as Record<string, unknown>;
+  const hadAgentsKey = 'agents' in spec && !('runtimes' in spec);
+  const runtimeEntries = hadAgentsKey ? spec.agents : spec.runtimes;
+  const hadRuntimeTypeKey =
+    Array.isArray(runtimeEntries) &&
+    runtimeEntries.some(entry => entry != null && typeof entry === 'object' && 'type' in entry);
+  const hadCredentialTypeKey =
+    Array.isArray(spec.credentials) &&
+    spec.credentials.some(
+      cred => cred != null && typeof cred === 'object' && 'type' in cred && !('authorizerType' in cred)
+    );
+  return { hadAgentsKey, hadCredentialTypeKey, hadRuntimeTypeKey };
+}
+
+/**
+ * Renames pre-v0.4.0 keys in place so old agentcore.json files keep parsing without manual edits:
+ * the top-level `agents` array became `runtimes` (PR #706), the per-runtime discriminator
+ * `type: "AgentCoreRuntime"` was dropped (PR #706), and the credential discriminator `type` became
+ * `authorizerType` (PR #709). Without this the `.strict()` top-level schema rejects `agents` with a
+ * cryptic `unknown keys (remove): "agents"` and the credential union fails on the missing
+ * `authorizerType` — see GitHub issue #719. Mirrors the legacy-aware preprocess in primitives/harness.
+ *
+ * Pure and side-effect free: it never mutates its input and emits no telemetry/warnings. Observability
+ * for the migration is wired in at the loader (`ConfigIO.readProjectSpec`) via `detectsLegacyProjectKeys`,
+ * so this schema stays usable in any context (tests, library consumers) without logging surprises.
+ */
+function migrateLegacyProjectSpec(val: unknown): unknown {
+  if (val == null || typeof val !== 'object' || Array.isArray(val)) return val;
+  const spec = { ...(val as Record<string, unknown>) };
+  if ('agents' in spec && !('runtimes' in spec)) {
+    spec.runtimes = spec.agents;
+    delete spec.agents;
+  }
+  // Strip the legacy per-runtime `type: "AgentCoreRuntime"` discriminator. This works today only
+  // because AgentEnvSpecSchema is non-strict and silently drops unknown keys; doing it explicitly
+  // keeps legacy projects valid even if that schema is later tightened to `.strict()`.
+  if (Array.isArray(spec.runtimes)) {
+    spec.runtimes = (spec.runtimes as unknown[]).map((runtime): unknown => {
+      if (runtime == null || typeof runtime !== 'object' || Array.isArray(runtime)) return runtime;
+      const entry = runtime as Record<string, unknown>;
+      if (entry.type === LEGACY_RUNTIME_TYPE) {
+        const { type: _type, ...rest } = entry;
+        return rest;
+      }
+      return entry;
+    });
+  }
+  if (Array.isArray(spec.credentials)) {
+    spec.credentials = (spec.credentials as unknown[]).map((cred): unknown => {
+      if (cred == null || typeof cred !== 'object' || Array.isArray(cred)) return cred;
+      const entry = cred as Record<string, unknown>;
+      if ('type' in entry && !('authorizerType' in entry)) {
+        const { type, ...rest } = entry;
+        return { authorizerType: type, ...rest };
+      }
+      return entry;
+    });
+  }
+  return spec;
+}
+
+/**
+ * Underlying strict object schema, before the legacy-key preprocess wrapper. Exported so consumers
+ * that need `ZodObject` capabilities (`.shape`, `.extend`, `.pick`, …) still have access — wrapping
+ * the public export in `z.preprocess` changes its Zod kind to a pipe and hides those methods.
+ */
+export { AgentCoreProjectSpecBaseSchema };
+
+export const AgentCoreProjectSpecSchema = z.preprocess(migrateLegacyProjectSpec, AgentCoreProjectSpecBaseSchema);
 
 export type AgentCoreProjectSpec = z.infer<typeof AgentCoreProjectSpecSchema>;

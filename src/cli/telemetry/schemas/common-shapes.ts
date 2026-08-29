@@ -232,4 +232,7 @@ export const ATTRIBUTES = {
   skill_source_type: SkillSourceType,
   ui_mode: UiMode,
   policy_validation_mode: PolicyValidationMode,
+  had_agents_key: z.boolean(),
+  had_credential_type_key: z.boolean(),
+  had_runtime_type_key: z.boolean(),
 } as const;

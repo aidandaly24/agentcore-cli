@@ -12,6 +12,7 @@ import {
   AwsDeploymentTargetsSchema,
   HarnessSpecSchema,
   createValidatedDeployedStateSchema,
+  detectsLegacyProjectKeys,
 } from '../../../schema';
 import {
   ConfigNotFoundError,
@@ -40,6 +41,30 @@ const PROJECT_LOCK_STALE_MS = 60_000;
 
 export function getSchemaUrlForVersion(version: SchemaVersion): string {
   return `https://schema.agentcore.aws.dev/v${version}/agentcore.json`;
+}
+
+/** Which pre-v0.4.0 keys were present in an agentcore.json that the loader auto-migrated. */
+export interface LegacyProjectMigrationInfo {
+  /** Top-level `agents` key was rewritten to `runtimes` (PR #706). */
+  hadAgentsKey: boolean;
+  /** A credential used the legacy `type` discriminator instead of `authorizerType` (PR #709). */
+  hadCredentialTypeKey: boolean;
+  /** A runtime entry carried the dropped `type: "AgentCoreRuntime"` discriminator (PR #706). */
+  hadRuntimeTypeKey: boolean;
+}
+
+/**
+ * Optional observer invoked once whenever {@link ConfigIO.readProjectSpec} auto-migrates a
+ * pre-v0.4.0 agentcore.json. Lives in the lib layer so it stays free of any CLI/telemetry
+ * import; the CLI registers a reporter at startup (telemetry + a one-time deprecation notice).
+ */
+export type LegacyProjectMigrationReporter = (info: LegacyProjectMigrationInfo) => void;
+
+let legacyProjectMigrationReporter: LegacyProjectMigrationReporter | undefined;
+
+/** Register (or clear) the reporter invoked when a legacy agentcore.json is auto-migrated on read. */
+export function setLegacyProjectMigrationReporter(reporter: LegacyProjectMigrationReporter | undefined): void {
+  legacyProjectMigrationReporter = reporter;
 }
 
 /**
@@ -127,10 +152,29 @@ export class ConfigIO {
 
   /**
    * Read and validate the project configuration.
+   *
+   * Detects pre-v0.4.0 agentcore.json shapes (legacy `agents`/`type` keys) before validation and
+   * notifies the registered {@link LegacyProjectMigrationReporter} so the CLI can record telemetry
+   * and surface a deprecation notice. The schema itself transparently migrates the legacy keys.
    */
   async readProjectSpec(): Promise<AgentCoreProjectSpec> {
     const filePath = this.pathResolver.getAgentConfigPath();
-    return this.readAndValidate(filePath, 'AgentCore Project Config', AgentCoreProjectSpecSchema);
+    const raw = await this.readJson(filePath, 'AgentCore Project Config');
+
+    const legacy = detectsLegacyProjectKeys(raw);
+    if (legacy.hadAgentsKey || legacy.hadCredentialTypeKey || legacy.hadRuntimeTypeKey) {
+      try {
+        legacyProjectMigrationReporter?.(legacy);
+      } catch {
+        // Observability hook must never break a config read.
+      }
+    }
+
+    const result = AgentCoreProjectSpecSchema.safeParse(raw);
+    if (!result.success) {
+      throw new ConfigValidationError(filePath, 'AgentCore Project Config', result.error);
+    }
+    return result.data;
   }
 
   /**
@@ -332,9 +376,10 @@ export class ConfigIO {
   }
 
   /**
-   * Generic read and validate method
+   * Read a config file from disk and parse it as JSON, with typed errors for the
+   * not-found / read / parse failure modes. Does not validate against a schema.
    */
-  private async readAndValidate<T>(filePath: string, fileType: string, schema: ZodType<T>): Promise<T> {
+  private async readJson(filePath: string, fileType: string): Promise<unknown> {
     // Check if file exists
     if (!existsSync(filePath)) {
       throw new ConfigNotFoundError(filePath, fileType);
@@ -350,13 +395,19 @@ export class ConfigIO {
     }
 
     // Parse JSON
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(fileContent);
+      return JSON.parse(fileContent);
     } catch (err: unknown) {
       const normalizedError = err instanceof Error ? err : new Error('Invalid JSON');
       throw new ConfigParseError(filePath, normalizedError);
     }
+  }
+
+  /**
+   * Generic read and validate method
+   */
+  private async readAndValidate<T>(filePath: string, fileType: string, schema: ZodType<T>): Promise<T> {
+    const parsed = await this.readJson(filePath, fileType);
 
     // Validate with Zod schema
     const result = schema.safeParse(parsed);
