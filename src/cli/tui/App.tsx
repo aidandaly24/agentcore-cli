@@ -12,6 +12,7 @@ import { DatasetFlow } from './screens/dataset-hub';
 import { DeployScreen } from './screens/deploy/DeployScreen';
 import { EvalHubScreen, EvalScreen } from './screens/eval';
 import { ExportHarnessFlow } from './screens/export';
+import { FeedbackScreen } from './screens/feedback';
 import { FetchAccessScreen } from './screens/fetch-access';
 import { HelpScreen, HomeScreen } from './screens/home';
 import { ImportFlow } from './screens/import';
@@ -80,6 +81,7 @@ type Route =
   | { name: 'dataset' }
   | { name: 'import' }
   | { name: 'export-harness' }
+  | { name: 'feedback' }
   | { name: 'cli-only'; commandId: string };
 
 // Commands that don't require being at the project root
@@ -199,6 +201,8 @@ function AppContent({
         return;
       }
       setRoute({ name: 'export-harness' });
+    } else if (id === 'feedback') {
+      setRoute({ name: 'feedback' });
     }
   };
 
@@ -491,6 +495,10 @@ function AppContent({
         onDeploy={() => setRoute({ name: 'deploy' })}
       />
     );
+  }
+
+  if (route.name === 'feedback') {
+    return <FeedbackScreen onExit={handleBack} />;
   }
 
   if (route.name === 'cli-only') {
