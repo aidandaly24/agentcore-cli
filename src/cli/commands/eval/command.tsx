@@ -3,13 +3,38 @@ import { COMMAND_DESCRIPTIONS } from '../../constants';
 import { getErrorMessage } from '../../errors';
 import { handleListEvalRuns } from '../../operations/eval';
 import { getResultsPath } from '../../operations/eval/storage';
-import { requireProject } from '../../tui/guards';
+import { renderTUI } from '../../tui';
+import { requireProject, requireTTY } from '../../tui/guards';
 import type { Command } from '@commander-js/extra-typings';
 import { Text, render } from 'ink';
 import React from 'react';
 
 export const registerEval = (program: Command) => {
-  const evalCmd = program.command('evals').description(COMMAND_DESCRIPTIONS.evals);
+  const evalCmd = program
+    .command('evals')
+    .description(COMMAND_DESCRIPTIONS.evals)
+    .showHelpAfterError()
+    .showSuggestionAfterError();
+
+  // Catch-all for TUI fallback when no subcommand is specified.
+  // Commander matches named subcommands (e.g. history) first, so this is safe.
+  evalCmd.argument('[subcommand]').action(async (subcommand: string | undefined, _options, cmd) => {
+    if (subcommand) {
+      console.error(`error: '${subcommand}' is not a valid subcommand.`);
+      cmd.outputHelp();
+      process.exit(1);
+    }
+
+    requireProject();
+    requireTTY();
+
+    await renderTUI({
+      initialRoute: { name: 'evals' },
+      enterAltScreen: false,
+      actionOnBack: 'exit',
+      isInteractive: false,
+    });
+  });
 
   evalCmd
     .command('history')
