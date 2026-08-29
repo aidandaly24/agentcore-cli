@@ -1,5 +1,6 @@
 export { fetchGatewayToken } from './fetch-gateway-token';
 export { canFetchHarnessToken, fetchHarnessToken } from './fetch-harness-token';
+export { fetchRuntimeAccess } from './fetch-runtime-access';
 export { canFetchRuntimeToken, fetchRuntimeToken } from './fetch-runtime-token';
 export { fetchOAuthToken } from './oauth-token';
 export type { OAuthTokenResult } from './oauth-token';

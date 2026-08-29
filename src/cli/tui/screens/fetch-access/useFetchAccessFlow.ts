@@ -4,7 +4,7 @@ import type { OAuthTokenResult, ResourceInfo, TokenFetchResult } from '../../../
 import {
   fetchGatewayToken,
   fetchHarnessToken,
-  fetchRuntimeToken,
+  fetchRuntimeAccess,
   listAgents,
   listGateways,
   listHarnesses,
@@ -13,8 +13,8 @@ import { spawn } from 'node:child_process';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * Resolve token-bearing access for an agent runtime or harness. AWS_IAM resources have no token
- * to fetch (SigV4 signing is used instead); CUSTOM_JWT resources fetch an OAuth token directly,
+ * Resolve token-bearing access for a harness. AWS_IAM harnesses have no token to fetch
+ * (SigV4 signing is used instead); CUSTOM_JWT harnesses fetch an OAuth token directly,
  * with any error (missing credential, bad config) surfacing in the error phase.
  */
 async function fetchTokenAccess(
@@ -127,7 +127,7 @@ export function useFetchAccessFlow() {
         ? fetchGatewayToken(resource.name)
         : resource.resourceType === 'harness'
           ? fetchTokenAccess(resource, fetchHarnessToken)
-          : fetchTokenAccess(resource, fetchRuntimeToken);
+          : fetchRuntimeAccess(resource.name);
 
     fetchToken
       .then(result => {
