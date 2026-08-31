@@ -9,7 +9,9 @@ import type {
   ExportHarnessInput,
   ExportHarnessResult,
   ResolveDeployedResourceInput,
+  ResolveDeployedResourcesInput,
   ResolvedDeployedResource,
+  ResolvedDeployedResources,
   ResolveProjectInput,
   Project,
   ProjectManager,
@@ -879,13 +881,26 @@ export class FsProjectManager implements ProjectManager {
     project: Project,
     input: ResolveDeployedResourceInput,
   ): Promise<ResolvedDeployedResource> {
+    const resolved = await this.resolveDeployedResources(project, { target: input.target });
+    const resource = resolved.resources.find(
+      ({ resourceType, name }) => resourceType === input.resourceType && name === input.name,
+    );
+    if (resource) return { id: resource.id, target: resolved.target };
+
+    const label = input.resourceType === "runtime" ? "Runtime" : "Harness";
+    throw new ProjectStateError(
+      `${label} '${input.name}' is not deployed to target '${input.target}'. ` +
+        `Run 'agentcore project deploy --target ${input.target}' first.`,
+    );
+  }
+
+  public async resolveDeployedResources(
+    project: Project,
+    input: ResolveDeployedResourcesInput,
+  ): Promise<ResolvedDeployedResources> {
     const target = await this.resolveExistingTarget(project, input.target);
-    const id = await this.backendFor(project).resolveDeployedResource(project, {
-      target,
-      resourceType: input.resourceType,
-      name: input.name,
-    });
-    return { id, target };
+    const resources = await this.backendFor(project).resolveDeployedResources(project, { target });
+    return { resources, target };
   }
 
   private async resolveExistingTarget(

@@ -141,8 +141,23 @@ export type ResolveDeployedResourceInput = {
   name: string;
 };
 
+export type ResolveDeployedResourcesInput = {
+  target: string;
+};
+
+export type DeployedProjectResource = {
+  resourceType: ProjectInvokableResource;
+  name: string;
+  id: string;
+};
+
 export type ResolvedDeployedResource = {
   id: string;
+  target: AwsDeploymentTarget;
+};
+
+export type ResolvedDeployedResources = {
+  resources: DeployedProjectResource[];
   target: AwsDeploymentTarget;
 };
 
@@ -316,6 +331,12 @@ export interface ProjectManager {
     project: Project,
     input: ResolveDeployedResourceInput,
   ): Promise<ResolvedDeployedResource>;
+
+  /** Resolve every configured Runtime and Harness present in the deployed target stack. */
+  resolveDeployedResources(
+    project: Project,
+    input: ResolveDeployedResourcesInput,
+  ): Promise<ResolvedDeployedResources>;
 
   /** Add a resource to an existing AgentCore project. */
   addResource(project: Project, input: AddResourceInput): AsyncGenerator<ProjectEvent, Project>;

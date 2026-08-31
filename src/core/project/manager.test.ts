@@ -366,8 +366,8 @@ describe("FsProjectManager.deploy", () => {
         yield { message: "Backend deployment started" };
         return { outputs: { RuntimeArn: "arn:runtime" } };
       },
-      async resolveDeployedResource() {
-        return "unused";
+      async resolveDeployedResources() {
+        return [];
       },
     };
     return {
