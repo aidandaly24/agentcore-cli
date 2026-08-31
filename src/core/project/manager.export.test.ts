@@ -82,18 +82,24 @@ function exportInput(overrides: Partial<ExportHarnessInput> = {}): ExportHarness
 }
 
 describe("FsProjectManager.exportHarness rendered tree", () => {
-  test("includes hooks/ only when the harness sets execution limits", async () => {
+  test("renders invocation-scoped native Strands limits without a custom hook", async () => {
     const { manager: subject } = manager();
-    const project = await projectWithHarness(subject, { maxIterations: 3 });
+    const project = await projectWithHarness(subject, {
+      maxIterations: 3,
+      maxTokens: 128,
+      timeoutSeconds: 5,
+    });
 
     const result = await drain(subject.exportHarness(project, exportInput()));
 
-    expect(existsSync(join(result.agentPath, "hooks", "execution_limits.py"))).toBe(true);
+    expect(existsSync(join(result.agentPath, "hooks"))).toBe(false);
     const main = await Bun.file(join(result.agentPath, "main.py")).text();
-    expect(main).toContain(
-      "from hooks.execution_limits import ExecutionLimitExceeded, ExecutionLimitsHook",
-    );
-    expect(main).toContain("max_iterations=3,");
+    expect(main).toContain('"turns": 3');
+    expect(main).toContain('"output_tokens": 128');
+    expect(main).toContain("cancel_signal = threading.Event()");
+    expect(main).toContain("limits=limits");
+    expect(main).not.toContain("ExecutionLimitsHook");
+    expect(main).not.toContain("agent.cancel()");
   });
 
   test("leaves hooks/ and memory/ out of a plain export", async () => {
@@ -131,6 +137,135 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
       "from memory.session import get_memory_session_manager",
     );
     expect(result.notes).toEqual([]);
+  });
+
+  test("renders memory retrieval tuning and notes messagesCount", async () => {
+    const { manager: subject } = manager();
+    let project = await projectWithHarness(subject, {
+      memory: {
+        mode: "existing",
+        name: "chat_history",
+        messagesCount: 12,
+        retrievalConfig: { topK: 8, relevanceScore: 0.7 },
+      },
+    });
+    project = await drain(
+      subject.addResource(project, {
+        resourceType: "memory",
+        resourceConfig: {
+          name: "chat_history",
+          eventExpiryDuration: 30,
+          strategies: [{ type: "SEMANTIC" }],
+        },
+      }),
+    );
+
+    const result = await drain(subject.exportHarness(project, exportInput()));
+
+    const session = await Bun.file(join(result.agentPath, "memory", "session.py")).text();
+    expect(session).toContain("RetrievalConfig(top_k=8, relevance_score=0.7)");
+    expect(result.notes.map((note) => note.category)).toContain(
+      "Memory messagesCount is not directly portable to Strands",
+    );
+  });
+
+  test("renders OpenAI Responses settings with compatible Strands extras", async () => {
+    const { manager: subject } = manager();
+    const project = await projectWithHarness(subject, {
+      model: {
+        provider: "open_ai",
+        modelId: "gpt-4.1",
+        apiKeyArn:
+          "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/OpenAiKey",
+        apiFormat: "responses",
+        maxTokens: 512,
+        temperature: 0.2,
+        topP: 0.8,
+      },
+    });
+
+    const result = await drain(subject.exportHarness(project, exportInput()));
+
+    const loadModel = await Bun.file(join(result.agentPath, "model", "load.py")).text();
+    expect(loadModel).toContain("from strands.models.openai_responses import OpenAIResponsesModel");
+    expect(loadModel).toContain('params["max_output_tokens"] = 512');
+    expect(loadModel).toContain('params["temperature"] = 0.2');
+    expect(loadModel).toContain('params["top_p"] = 0.8');
+    const pyproject = await Bun.file(join(result.agentPath, "pyproject.toml")).text();
+    expect(pyproject).toContain('"strands-agents[openai] ~= 1.54.0"');
+    expect(pyproject).not.toContain('"openai ~= 1.0.0"');
+  });
+
+  test("renders Gemini sampling settings with the Gemini extra", async () => {
+    const { manager: subject } = manager();
+    const project = await projectWithHarness(subject, {
+      model: {
+        provider: "gemini",
+        modelId: "gemini-2.5-flash",
+        apiKeyArn:
+          "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GeminiKey",
+        maxTokens: 400,
+        temperature: 0.3,
+        topP: 0.9,
+        topK: 20,
+      },
+    });
+
+    const result = await drain(subject.exportHarness(project, exportInput()));
+
+    const loadModel = await Bun.file(join(result.agentPath, "model", "load.py")).text();
+    expect(loadModel).toContain('params["max_output_tokens"] = 400');
+    expect(loadModel).toContain('params["temperature"] = 0.3');
+    expect(loadModel).toContain('params["top_p"] = 0.9');
+    expect(loadModel).toContain('params["top_k"] = 20');
+    expect(await Bun.file(join(result.agentPath, "pyproject.toml")).text()).toContain(
+      '"strands-agents[gemini] ~= 1.54.0"',
+    );
+  });
+
+  test("renders LiteLLM settings with the LiteLLM extra", async () => {
+    const { manager: subject } = manager();
+    const project = await projectWithHarness(subject, {
+      model: {
+        provider: "lite_llm",
+        modelId: "bedrock/us.amazon.nova-lite-v1:0",
+        maxTokens: 300,
+        temperature: 0.1,
+        topP: 0.7,
+        additionalParams: { max_retries: 2 },
+      },
+    });
+
+    const result = await drain(subject.exportHarness(project, exportInput()));
+
+    const loadModel = await Bun.file(join(result.agentPath, "model", "load.py")).text();
+    expect(loadModel).toContain('params["max_tokens"] = 300');
+    expect(loadModel).toContain('params["temperature"] = 0.1');
+    expect(loadModel).toContain('params["top_p"] = 0.7');
+    expect(loadModel).toContain('json.loads("{\\"max_retries\\":2}")');
+    expect(await Bun.file(join(result.agentPath, "pyproject.toml")).text()).toContain(
+      '"strands-agents[litellm] ~= 1.54.0"',
+    );
+  });
+
+  test("renders released skills and sliding-window APIs", async () => {
+    const { manager: subject } = manager();
+    const project = await projectWithHarness(subject, {
+      skills: [{ path: "/opt/skills" }],
+      truncation: {
+        strategy: "sliding_window",
+        config: { slidingWindow: { messagesCount: 12 } },
+      },
+    });
+
+    const result = await drain(subject.exportHarness(project, exportInput({ build: "Container" })));
+
+    const main = await Bun.file(join(result.agentPath, "main.py")).text();
+    expect(main).toContain("from strands import AgentSkills");
+    expect(main).toContain('SlidingWindowConversationManager(**{"window_size":12}, per_turn=True)');
+    expect(await Bun.file(join(result.agentPath, "pyproject.toml")).text()).toContain(
+      '"strands-agents ~= 1.54.0"',
+    );
   });
 
   test("renders the template Dockerfile for a plain Container export", async () => {
@@ -196,12 +331,20 @@ describe("FsProjectManager.exportHarness side effects", () => {
 
     await drain(subject.exportHarness(project, exportInput()));
 
-    const envLocal = await Bun.file(join(project.rootPath, "agentcore", ".env.local")).text();
-    expect(envLocal).toContain("AGENTCORE_CREDENTIAL_ORDERSMCPINTERNALXAPIKEY='s3cret'");
     const spec = await Bun.file(join(project.rootPath, "agentcore", "agentcore.json")).json();
-    expect(spec.credentials).toEqual([
-      { authorizerType: "ApiKeyCredentialProvider", name: "ordersMcpinternalXApiKey" },
-    ]);
+    const credential = spec.credentials[0];
+    expect(credential.authorizerType).toBe("ApiKeyCredentialProvider");
+    expect(credential.name).toMatch(/^ordersMcpinternalX-Api-Key-[a-f0-9]{10}$/);
+    const envLocal = await Bun.file(join(project.rootPath, "agentcore", ".env.local")).text();
+    expect(envLocal).toContain(
+      `AGENTCORE_CREDENTIAL_${credential.name.replace(/-/g, "_").toUpperCase()}='s3cret'`,
+    );
+    const mcpClient = await Bun.file(
+      join(project.rootPath, "app", "assistantAgent", "mcp_client", "client.py"),
+    ).text();
+    expect(mcpClient).toMatch(
+      /def transport\(\):[\s\S]*headers = \{ "X-Api-Key": _get_[a-z0-9_]+_key\(\) \}[\s\S]*return streamablehttp_client/,
+    );
   });
 
   test("exports a prefetched (service) harness without touching harness files", async () => {

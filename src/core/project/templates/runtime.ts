@@ -184,10 +184,6 @@ const getTemplateResolvers = (assetSource: AssetSource, templateRenderer: Templa
         transformContent: (raw) => templateRenderer.render(raw, context),
         filter: (name, isDir) => {
           if (isDir && name === "memory") return memory !== undefined;
-          // hooks/ carries the execution-limits capability, which only
-          // `project export harness` renders (harnesses can cap
-          // iterations/tokens/time; scaffolded runtimes cannot).
-          if (isDir && name === "hooks") return false;
           if (name === "Dockerfile" || name === ".dockerignore") return isContainer;
           return true;
         },

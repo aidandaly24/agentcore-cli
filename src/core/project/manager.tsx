@@ -694,6 +694,7 @@ export class FsProjectManager implements ProjectManager {
       systemPrompt,
       projectSpec,
       build: input.build,
+      sourceNotes: input.prefetched?.notes,
       harnessDockerfileExists:
         spec.dockerfile !== undefined &&
         harnessDir !== undefined &&
@@ -710,7 +711,6 @@ export class FsProjectManager implements ProjectManager {
         transformContent: (raw) => this.templateRenderer.render(raw, plan.context),
         filter: (name, isDir) => {
           if (isDir && name === "memory") return plan.hasMemory;
-          if (isDir && name === "hooks") return plan.hasExecutionLimits;
           // The template's own Dockerfile is used only for a plain Container
           // export; containerUri/custom-Dockerfile harnesses replace it below.
           if (name === "Dockerfile")
@@ -1086,7 +1086,7 @@ function toProjectSpecKey(resourceType: ProjectResource) {
 async function readStrandsVersion(agentDir: string): Promise<string> {
   try {
     const pyproject = await readFile(join(agentDir, "pyproject.toml"), "utf-8");
-    const match = /strands-agents\s*([~><=]+\s*[\d.]+)/.exec(pyproject);
+    const match = /strands-agents(?:\[[^\]]+\])?\s*([~><=]+\s*[\d.]+)/.exec(pyproject);
     return match ? `strands-agents ${match[1]}` : "strands-agents (version unknown)";
   } catch {
     return "strands-agents (version unknown)";

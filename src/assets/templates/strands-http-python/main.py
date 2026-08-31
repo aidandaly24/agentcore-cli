@@ -17,23 +17,21 @@ from bedrock_agentcore.services.identity import IdentityClient
 {{/if}}
 {{/if}}
 import asyncio
+{{#if timeoutSeconds}}
+import threading
+{{/if}}
 {{#if hasShell}}
 import subprocess
 {{/if}}
 {{#if hasFileOperations}}
 import os
 {{/if}}
-{{#if hasExecutionLimits}}
-from strands.tools.executors import SequentialToolExecutor
-from strands.types.exceptions import EventLoopException
-from hooks.execution_limits import ExecutionLimitExceeded, ExecutionLimitsHook
-{{/if}}
 {{#if hasConfigBundle}}
 from strands.hooks import HookProvider, HookRegistry, BeforeInvocationEvent, BeforeToolCallEvent
 {{/if}}
 {{#if truncationStrategy}}
 {{#if (eq truncationStrategy "sliding_window")}}
-from strands.agent.conversation_manager.sliding_window_conversation_manager import SlidingWindowConversationManager
+from strands.agent.conversation_manager import SlidingWindowConversationManager
 {{/if}}
 {{#if (eq truncationStrategy "summarization")}}
 from strands.agent.conversation_manager.summarizing_conversation_manager import SummarizingConversationManager
@@ -413,18 +411,7 @@ def agent_factory():
                 {{#if hasSkillsFetcher}}
                 plugins=skill_plugins or None,
                 {{/if}}
-                {{#if hasExecutionLimits}}
-                tool_executor=SequentialToolExecutor(),
-                callback_handler=None,
-                {{/if}}
                 hooks=[
-                    {{#if hasExecutionLimits}}
-                    ExecutionLimitsHook(
-                        {{#if maxIterations}}max_iterations={{maxIterations}},{{/if}}
-                        {{#if maxTokens}}max_tokens={{maxTokens}},{{/if}}
-                        {{#if timeoutSeconds}}timeout_seconds={{timeoutSeconds}},{{/if}}
-                    ),
-                    {{/if}}
                     {{#if hasConfigBundle}}
                     ConfigBundleHook(),
                     {{/if}}
@@ -457,18 +444,7 @@ def agent_factory():
             {{#if hasSkillsFetcher}}
             plugins=skill_plugins or None,
             {{/if}}
-            {{#if hasExecutionLimits}}
-            tool_executor=SequentialToolExecutor(),
-            callback_handler=None,
-            {{/if}}
             hooks=[
-                {{#if hasExecutionLimits}}
-                ExecutionLimitsHook(
-                    {{#if maxIterations}}max_iterations={{maxIterations}},{{/if}}
-                    {{#if maxTokens}}max_tokens={{maxTokens}},{{/if}}
-                    {{#if timeoutSeconds}}timeout_seconds={{timeoutSeconds}},{{/if}}
-                ),
-                {{/if}}
                 {{#if hasConfigBundle}}
                 ConfigBundleHook(),
                 {{/if}}
@@ -639,24 +615,36 @@ async def invoke(payload, context):
     {{/if}}
 
     {{#if hasExecutionLimits}}
-    timeout_seconds = {{#if timeoutSeconds}}{{timeoutSeconds}}{{else}}None{{/if}}
+    limits = {
+        {{#if maxIterations}}"turns": {{maxIterations}},{{/if}}
+        {{#if maxTokens}}"output_tokens": {{maxTokens}},{{/if}}
+    } or None
+    cancel_signal = {{#if timeoutSeconds}}threading.Event(){{else}}None{{/if}}
     timeout_fired = False
     watchdog_task = None
-    if timeout_seconds is not None:
+    {{#if timeoutSeconds}}
+    if cancel_signal is not None:
         async def _timeout_watchdog():
             nonlocal timeout_fired
-            await asyncio.sleep(timeout_seconds)
+            await asyncio.sleep({{timeoutSeconds}})
             timeout_fired = True
-            agent.cancel()
+            cancel_signal.set()
         watchdog_task = asyncio.create_task(_timeout_watchdog())
+    {{/if}}
 
     try:
+        stop_reason = None
         {{#if inlineFunctionTools}}
         hit_inline_function = False
         {{/if}}
         async for event in agent.stream_async(
             prompt,
+            limits=limits,
+            cancel_signal=cancel_signal,
         ):
+            if isinstance(event, dict) and "result" in event:
+                stop_reason = getattr(event["result"], "stop_reason", None)
+                continue
             if not isinstance(event, dict) or "event" not in event:
                 continue
             cbs = event["event"].get("contentBlockStart")
@@ -674,11 +662,14 @@ async def invoke(payload, context):
 
         if timeout_fired:
             yield {"event": {"messageStop": {"stopReason": "timeout_exceeded"}}}
-    except EventLoopException as e:
-        if isinstance(e.original_exception, ExecutionLimitExceeded):
-            yield {"event": {"messageStop": {"stopReason": str(e.original_exception)}}}
-            return
-        raise
+        {{#if maxIterations}}
+        elif stop_reason == "limit_turns":
+            yield {"event": {"messageStop": {"stopReason": "Max iterations exceeded: {{maxIterations}}"}}}
+        {{/if}}
+        {{#if maxTokens}}
+        elif stop_reason == "limit_output_tokens":
+            yield {"event": {"messageStop": {"stopReason": "Max output tokens exceeded: {{maxTokens}}"}}}
+        {{/if}}
     finally:
         if watchdog_task is not None:
             watchdog_task.cancel()
