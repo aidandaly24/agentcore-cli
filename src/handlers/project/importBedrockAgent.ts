@@ -57,10 +57,10 @@ export async function resolveImportBedrockAgentInput(
   });
 
   const warnings: string[] = [];
-  if (metadata.agentStatus !== "PREPARED") {
+  if (metadata.agentAliasStatus !== "PREPARED") {
     warnings.push(
-      `Warning: Bedrock Agent '${metadata.agentName}' is in status ${metadata.agentStatus} ` +
-        `(not PREPARED); invocations may fail until it is prepared.`,
+      `Warning: Bedrock Agent alias '${metadata.agentAliasName}' is in status ` +
+        `${metadata.agentAliasStatus} (not PREPARED); invocations may fail until the alias is prepared.`,
     );
   }
 
