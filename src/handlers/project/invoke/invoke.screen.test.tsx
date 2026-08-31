@@ -7,7 +7,7 @@ import type {
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
 import { ProjectKey } from "../../../router";
 import { cleanupScreens, renderScreen, TestCoreClient, waitForText } from "../../../testing";
-import type { Project } from "../types";
+import type { DeployedProjectResource, Project } from "../types";
 
 afterEach(cleanupScreens);
 
@@ -44,12 +44,20 @@ function endpoint(name: string): AgentRuntimeEndpoint {
   };
 }
 
-function core(): TestCoreClient {
+const TARGET = { name: "default", account: "111122223333", region: "eu-west-1" } as const;
+
+const DEPLOYED_RESOURCES: DeployedProjectResource[] = [
+  { resourceType: "runtime", name: "checkout", id: "runtime-123" },
+  { resourceType: "harness", name: "support", id: "harness-123" },
+];
+
+function core(resources: DeployedProjectResource[] = DEPLOYED_RESOURCES): TestCoreClient {
   const value = new TestCoreClient();
   value.projectManager.resolveDeployedResource = async (_project, input) => ({
     id: input.resourceType === "runtime" ? "runtime-123" : "harness-123",
-    target: { name: "default", account: "111122223333", region: "eu-west-1" },
+    target: TARGET,
   });
+  value.projectManager.resolveDeployedResources = async () => ({ resources, target: TARGET });
   value.runtime
     .setListEndpointsResponse({ runtimeEndpoints: [endpoint("DEFAULT")] })
     .setGetResponse({
@@ -66,6 +74,30 @@ function core(): TestCoreClient {
 }
 
 describe("project invoke picker", () => {
+  test("lists only resources present in the deployed target", async () => {
+    const screen = renderScreen("/agentcore/project/invoke", {
+      core: core([{ resourceType: "harness", name: "support", id: "harness-123" }]),
+      withContext: (ctx) => ctx.withValue(ProjectKey, project),
+    });
+
+    await waitForText(screen.lastFrame, "support");
+    expect(screen.lastFrame()).not.toContain("checkout");
+  });
+
+  test("shows deployment errors without listing configured resources", async () => {
+    const value = core();
+    value.projectManager.resolveDeployedResources = async () => {
+      throw new Error("No deployment targets are configured for project 'orders'.");
+    };
+    const screen = renderScreen("/agentcore/project/invoke", {
+      core: value,
+      withContext: (ctx) => ctx.withValue(ProjectKey, project),
+    });
+
+    await waitForText(screen.lastFrame, "No deployment targets are configured");
+    expect(screen.lastFrame()).not.toContain("checkout");
+  });
+
   test("resolves the enclosing project when opened from the project menu", async () => {
     const value = core();
     value.projectManager.resolve = async () => project;
@@ -77,6 +109,7 @@ describe("project invoke picker", () => {
 
   test("lists project Runtime and Harness resources", async () => {
     const screen = renderScreen("/agentcore/project/invoke", {
+      core: core(),
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
     });
 
