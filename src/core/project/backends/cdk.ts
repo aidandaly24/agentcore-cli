@@ -2,7 +2,12 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Stack } from "@aws-sdk/client-cloudformation";
 import { MalformedServiceResponseError, ProjectStateError } from "../../../errors/errors";
-import type { DeployResult, Project, ProjectEvent } from "../../../handlers/project/types";
+import type {
+  DeployedProjectResource,
+  DeployResult,
+  Project,
+  ProjectEvent,
+} from "../../../handlers/project/types";
 import {
   FsReadWriteJson,
   requireTool,
@@ -15,7 +20,7 @@ import type { AwsDeploymentTarget } from "../../../projectSchemas/aws-targets";
 import type {
   DeployBackendInput,
   ProjectBackend,
-  ResolveDeployedResourceBackendInput,
+  ResolveDeployedResourcesBackendInput,
 } from "./types";
 import { createCloudFormationClient } from "../../factories";
 import type { CreateCloudFormationClient } from "../../types";
@@ -29,11 +34,9 @@ import {
   bootstrapStackReader,
   createCloudFormationStackReader,
   probeBootstrap,
-  probeStack,
   resolveAwsAccount,
   type AccountResolver,
   type BootstrapProbe,
-  type StackProbe,
 } from "./cdk/environment";
 import {
   createCdkCredentialResolver,
@@ -50,7 +53,7 @@ type StackDescriber = typeof describeStack;
 
 function findDeployedResourceId(
   stack: Stack,
-  input: ResolveDeployedResourceBackendInput,
+  input: Pick<DeployedProjectResource, "resourceType" | "name">,
 ): string | undefined {
   if (!stack.StackName) return undefined;
   const exportResourceName = input.name.replaceAll("_", "-");
@@ -70,7 +73,6 @@ export type CdkBackendConfig = {
   cdk?: CdkRunner;
   resolveCredentials?: CdkCredentialResolver;
   bootstrap?: BootstrapProbe;
-  stack?: StackProbe;
   resolveAccount?: AccountResolver;
   loadBootstrapTemplate?: BootstrapTemplateLoader;
   describeStack?: StackDescriber;
@@ -85,7 +87,6 @@ export class CdkBackend implements ProjectBackend {
   private readonly cdk: CdkRunner;
   private readonly resolveCredentials: CdkCredentialResolver;
   private readonly bootstrap: BootstrapProbe;
-  private readonly stack: StackProbe;
   private readonly resolveAccount: AccountResolver;
   private readonly loadBootstrapTemplate: BootstrapTemplateLoader;
   private readonly describeStack: StackDescriber;
@@ -105,12 +106,14 @@ export class CdkBackend implements ProjectBackend {
     this.bootstrap =
       config.bootstrap ??
       ((region, credentials) => probeBootstrap(region, credentials, readBootstrapStack));
-    this.stack =
-      config.stack ??
-      ((stackName, region, credentials) => probeStack(stackName, region, credentials, readStack));
     this.resolveAccount = config.resolveAccount ?? resolveAwsAccount;
     this.loadBootstrapTemplate = config.loadBootstrapTemplate ?? loadBootstrapTemplate;
-    this.describeStack = config.describeStack ?? describeStack;
+    this.describeStack =
+      config.describeStack ??
+      ((region, credentials, stackName) =>
+        describeStack(region, credentials, stackName, (name) =>
+          readStack(name, region, credentials),
+        ));
   }
 
   public async *build(project: Project): AsyncGenerator<ProjectEvent, void> {
@@ -230,7 +233,7 @@ export class CdkBackend implements ProjectBackend {
     options: CdkRunOptions;
   }): AsyncGenerator<ProjectEvent, DeployResult> {
     const { target } = input;
-    if (!(await this.stack(artifact.stackName, target.region, options.credentials))) {
+    if (!(await this.describeStack(target.region, options.credentials, artifact.stackName))) {
       throw new ProjectStateError(
         `Project '${project.name}' declares no resources to deploy, and no stack ` +
           `'${artifact.stackName}' exists in ${target.account}/${target.region} to remove. ` +
@@ -259,10 +262,10 @@ export class CdkBackend implements ProjectBackend {
     return { outputs: {}, tornDown: true };
   }
 
-  public async resolveDeployedResource(
+  public async resolveDeployedResources(
     project: Project,
-    input: ResolveDeployedResourceBackendInput,
-  ): Promise<string> {
+    input: ResolveDeployedResourcesBackendInput,
+  ): Promise<DeployedProjectResource[]> {
     const { target } = input;
     const deployedState = await readDeployedState(this.json, project.rootPath);
     const stackArn = deployedState.targets[target.name]?.stackArn;
@@ -282,14 +285,14 @@ export class CdkBackend implements ProjectBackend {
       );
     }
 
-    const id = findDeployedResourceId(stack, input);
-    if (id) return id;
-
-    const label = input.resourceType === "runtime" ? "Runtime" : "Harness";
-    throw new ProjectStateError(
-      `${label} '${input.name}' is not deployed to target '${target.name}'. ` +
-        `Run 'agentcore project deploy --target ${target.name}' first.`,
-    );
+    const resources = [
+      ...project.spec.runtimes.map(({ name }) => ({ resourceType: "runtime" as const, name })),
+      ...project.spec.harnesses.map(({ name }) => ({ resourceType: "harness" as const, name })),
+    ];
+    return resources.flatMap((resource) => {
+      const id = findDeployedResourceId(stack, resource);
+      return id ? [{ ...resource, id }] : [];
+    });
   }
 
   private async credentialsForTarget(target: AwsDeploymentTarget) {

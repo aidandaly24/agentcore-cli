@@ -3,5 +3,5 @@ export { CdkBackend, type CdkBackendConfig } from "./backends/cdk";
 export type {
   DeployBackendInput,
   ProjectBackend,
-  ResolveDeployedResourceBackendInput,
+  ResolveDeployedResourcesBackendInput,
 } from "./backends/types";
