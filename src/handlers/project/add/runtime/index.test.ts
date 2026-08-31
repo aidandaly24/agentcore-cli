@@ -809,6 +809,9 @@ describe("project add runtime --type import", () => {
     expect(main).toContain('"TSTALIASID"');
     expect(main).toContain('"us-east-1"');
     expect(main).toContain("invoke_agent");
+    expect(main).toContain("asyncio.to_thread");
+    expect(main).toContain("hashlib.sha256");
+    expect(main).toContain("isinstance(payload, dict)");
 
     const policy = await Bun.file(join(appDir, "bedrock-agent-policy.json")).json();
     expect(policy.Statement[0]).toMatchObject({
@@ -821,16 +824,48 @@ describe("project add runtime --type import", () => {
     expect(pyproject).toContain("boto3");
   });
 
-  test("warns when the agent is not PREPARED", async () => {
+  test("warns when the alias is not PREPARED", async () => {
     await inProject();
     const core = new TestCoreClient();
     core.bedrockAgentDescriptions["A1B2C3D4E5/TSTALIASID"] = {
       ...metadata,
-      agentStatus: "NOT_PREPARED",
+      agentAliasStatus: "FAILED",
     };
 
     const { io } = await run(importArgs, { core });
-    expect(io.stderr()).toContain("not PREPARED");
+    expect(io.stderr()).toContain("alias 'live' is in status FAILED");
+  });
+
+  test("rejects a non-HTTP protocol before describing the agent", async () => {
+    await inProject();
+    const core = new TestCoreClient();
+
+    await expect(run([...importArgs, "--protocol", "MCP"], { core })).rejects.toThrow(
+      /only supports HTTP/,
+    );
+    expect(core.describedBedrockAgents).toEqual([]);
+  });
+
+  test("makes caller-owned role permissions explicit", async () => {
+    const projectRoot = await inProject();
+    const core = new TestCoreClient();
+    core.bedrockAgentDescriptions["A1B2C3D4E5/TSTALIASID"] = metadata;
+    const roleArn = "arn:aws:iam::111122223333:role/ExistingRuntimeRole";
+
+    const { io } = await run([...importArgs, "--role-arn", roleArn], { core });
+
+    expect(io.stderr()).toContain(
+      `execution role '${roleArn}' must already allow bedrock:InvokeAgent on ${metadata.agentAliasArn}`,
+    );
+    const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
+    expect(spec.runtimes[0]).toMatchObject({ executionRoleArn: roleArn });
+    expect(spec.runtimes[0].additionalPolicies).toBeUndefined();
+
+    const appDir = join(projectRoot, "app", "support_proxy");
+    expect(await Bun.file(join(appDir, "bedrock-agent-policy.json")).exists()).toBe(true);
+    expect(await Bun.file(join(appDir, "README.md")).text()).toContain(
+      "attach `bedrock-agent-policy.json` to that role before deploying",
+    );
   });
 
   test("rejects a nonexistent agent with the describe error", async () => {

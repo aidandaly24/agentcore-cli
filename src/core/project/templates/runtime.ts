@@ -80,6 +80,7 @@ const importBedrockAgentResolver =
       agentRegion: imported.region,
       agentName: imported.agentName,
       agentAliasArn: imported.agentAliasArn,
+      usesExistingExecutionRole: input.executionRoleArn !== undefined,
     };
     const tree = await FsTreeNode.fromAssetSource(
       { assetSource },
@@ -98,7 +99,9 @@ const importBedrockAgentResolver =
           {
             ...base,
             protocol: "HTTP" as const,
-            additionalPolicies: [...(base.additionalPolicies ?? []), BEDROCK_AGENT_POLICY_FILE],
+            ...(base.executionRoleArn === undefined && {
+              additionalPolicies: [...(base.additionalPolicies ?? []), BEDROCK_AGENT_POLICY_FILE],
+            }),
           },
         ],
       },

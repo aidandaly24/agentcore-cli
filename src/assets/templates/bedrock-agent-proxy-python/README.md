@@ -10,7 +10,10 @@ and invoked through AgentCore without changing it.
   baked in at import time and can be overridden with the `BEDROCK_AGENT_ID`,
   `BEDROCK_AGENT_ALIAS_ID`, and `BEDROCK_AGENT_REGION` environment variables.
 - `bedrock-agent-policy.json` — grants the runtime's execution role
-  `bedrock:InvokeAgent` on the imported agent's alias. It is wired in through
-  the runtime's `additionalPolicies` entry in `agentcore/agentcore.json`.
+  `bedrock:InvokeAgent` on the imported agent's alias.
+  {{#if usesExistingExecutionRole}}This project uses a caller-owned execution
+  role, so attach `bedrock-agent-policy.json` to that role before deploying.
+  AgentCore CDK does not modify existing roles.{{else}}It is wired in through
+  the runtime's `additionalPolicies` entry in `agentcore/agentcore.json`.{{/if}}
 
 Invoke it with a JSON payload like `{"prompt": "hello"}`.

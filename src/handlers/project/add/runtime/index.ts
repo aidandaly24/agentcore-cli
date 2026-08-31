@@ -159,6 +159,9 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
       if (!isImport && (flags["agent-id"] !== undefined || flags["agent-alias-id"] !== undefined)) {
         throw new InputValidationError("--agent-id and --agent-alias-id require --type import");
       }
+      if (isImport && flags.protocol !== undefined && flags.protocol !== "HTTP") {
+        throw new InputValidationError("an imported Bedrock Agent proxy only supports HTTP");
+      }
 
       const isCustom = presentScaffoldingFlags.length > 0;
 
@@ -177,6 +180,13 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
         });
         importBedrockAgent = imported;
         for (const warning of warnings) config.io.stderr.write(`${warning}\n`);
+        if (flags["role-arn"]) {
+          config.io.stderr.write(
+            `Warning: execution role '${flags["role-arn"]}' must already allow ` +
+              `bedrock:InvokeAgent on ${imported.agentAliasArn}; deployment does not attach ` +
+              `generated policies to caller-owned roles.\n`,
+          );
+        }
       }
 
       const defaultMemory = flags.framework === "strands" ? "longAndShortTerm" : "none";
