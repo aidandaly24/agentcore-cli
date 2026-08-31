@@ -78,9 +78,7 @@ describe("project subcommands without a screen", () => {
   // instead of rejecting. Frames can't detect that — the catch-all exits before
   // painting, so it and this screen both render empty. `create` and `invoke`
   // are excluded because both have real screens.
-  test.each(
-    projectSubcommands().filter((command) => command !== "create" && command !== "invoke"),
-  )(
+  test.each(projectSubcommands().filter((command) => command !== "create" && command !== "invoke"))(
     "%s tears down the TUI with NotImplementedError",
     async (command) => {
       const { streams } = ttyTestIO();

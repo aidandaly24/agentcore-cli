@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Box, Text, useApp } from "ink";
+import { Box, Text, useInput } from "ink";
+import { useNavigate } from "react-router";
 import { Layout } from "../../../components/Layout";
 import { RuntimeEndpointPicker } from "../../../components/RuntimeEndpointPicker";
 import { DataTable, type DataTableColumn } from "../../../components/ui/data-table";
@@ -32,7 +33,7 @@ type Destination =
   | { resourceType: "harness"; id: string; ctx: Context };
 
 export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
-  const { exit } = useApp();
+  const navigate = useNavigate();
   const [project, setProject] = useState<Project | undefined>(() => ctx.value(ProjectKey));
   const [deployed, setDeployed] = useState<ResolvedDeployedResources>();
   const [destination, setDestination] = useState<Destination>();
@@ -112,6 +113,11 @@ export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
     });
   };
 
+  const goBack = () => navigate("/agentcore/project");
+  useInput((_input, key) => {
+    if (key.escape && (!project || !deployed || error !== undefined)) goBack();
+  });
+
   if (destination?.resourceType === "runtime") {
     if (!destination.qualifier) {
       return (
@@ -154,7 +160,10 @@ export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
       <Layout
         breadcrumb={["agentcore", "project", "invoke"]}
         description={project ? "resolving deployed resources" : "resolving the current project"}
-        keyHints={[{ key: "ctl+c", label: "quit" }]}
+        keyHints={[
+          { key: "esc", label: "back" },
+          { key: "ctl+c", label: "quit" },
+        ]}
       >
         <Spinner label={project ? "Resolving deployed resources…" : "Resolving project…"} />
       </Layout>
@@ -166,7 +175,10 @@ export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
       <Layout
         breadcrumb={["agentcore", "project", "invoke"]}
         description="unable to load deployed resources"
-        keyHints={[{ key: "ctl+c", label: "quit" }]}
+        keyHints={[
+          { key: "esc", label: "back" },
+          { key: "ctl+c", label: "quit" },
+        ]}
       >
         <Text color="red">{error}</Text>
       </Layout>
@@ -197,7 +209,7 @@ export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
           data={rows}
           emptyMessage="No deployed Runtimes or Harnesses were found on target default."
           onSelect={select}
-          onEscape={exit}
+          onEscape={goBack}
         />
       </Box>
     </Layout>

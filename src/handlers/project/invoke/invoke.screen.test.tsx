@@ -84,6 +84,18 @@ describe("project invoke picker", () => {
     expect(screen.lastFrame()).not.toContain("checkout");
   });
 
+  test("esc returns to the project command menu", async () => {
+    const screen = renderScreen("/agentcore/project/invoke", {
+      core: core(),
+      withContext: (ctx) => ctx.withValue(ProjectKey, project),
+    });
+
+    await waitForText(screen.lastFrame, "checkout");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    expect(screen.lastFrame()).toContain("invoke");
+  });
+
   test("shows deployment errors without listing configured resources", async () => {
     const value = core();
     value.projectManager.resolveDeployedResources = async () => {
@@ -96,6 +108,8 @@ describe("project invoke picker", () => {
 
     await waitForText(screen.lastFrame, "No deployment targets are configured");
     expect(screen.lastFrame()).not.toContain("checkout");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "manage an AgentCore project");
   });
 
   test("resolves the enclosing project when opened from the project menu", async () => {
