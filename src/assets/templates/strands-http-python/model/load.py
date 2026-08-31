@@ -1,6 +1,9 @@
 {{#if (eq modelProvider "Bedrock")}}
 {{#if bedrockMantle}}
 import os
+{{#if modelAdditionalParams}}
+import json
+{{/if}}
 
 from aws_bedrock_token_generator import provide_token
 {{#if (eq mantleApiFormat "chat_completions")}}
@@ -34,7 +37,7 @@ def load_model():
     {{/if}}
     client_args = {"api_key": token, "base_url": base_url}
 
-    params = {}
+    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
     {{#if modelMaxTokens}}
     {{#if (eq mantleApiFormat "chat_completions")}}
     params["max_completion_tokens"] = {{modelMaxTokens}}
@@ -60,12 +63,22 @@ def load_model():
     {{/if}}
     {{/if}}
 {{else}}
+{{#if modelAdditionalParams}}
+import json
+{{/if}}
 from strands.models.bedrock import BedrockModel
 
 
 def load_model() -> BedrockModel:
     """Get Bedrock model client using IAM credentials."""
-    return BedrockModel(model_id="{{#if modelId}}{{modelId}}{{else}}global.anthropic.claude-sonnet-4-5-20250929-v1:0{{/if}}"{{#if modelMaxTokens}}, max_tokens={{modelMaxTokens}}{{/if}}{{#if modelTemperature}}, temperature={{modelTemperature}}{{/if}}{{#if modelTopP}}, top_p={{modelTopP}}{{/if}})
+    return BedrockModel(
+        model_id="{{#if modelId}}{{modelId}}{{else}}global.anthropic.claude-sonnet-4-5-20250929-v1:0{{/if}}",
+        {{#if modelMaxTokens}}max_tokens={{modelMaxTokens}},
+        {{/if}}{{#if modelTemperature}}temperature={{modelTemperature}},
+        {{/if}}{{#if modelTopP}}top_p={{modelTopP}},
+        {{/if}}{{#if modelAdditionalParams}}additional_request_fields=json.loads({{pyJsonStr modelAdditionalParams}}),
+        {{/if}}
+    )
 {{/if}}
 {{/if}}
 {{#if (eq modelProvider "Anthropic")}}
@@ -109,8 +122,15 @@ def load_model() -> AnthropicModel:
 {{/if}}
 {{#if (eq modelProvider "OpenAI")}}
 import os
+{{#if modelAdditionalParams}}
+import json
+{{/if}}
 
+{{#if (eq modelApiFormat "responses")}}
+from strands.models.openai_responses import OpenAIResponsesModel
+{{else}}
 from strands.models.openai import OpenAIModel
+{{/if}}
 from bedrock_agentcore.identity.auth import requires_api_key
 
 IDENTITY_PROVIDER_NAME = "{{identityProviders.[0].name}}"
@@ -138,15 +158,29 @@ def _get_api_key() -> str:
     return _agentcore_identity_api_key_provider()
 
 
-def load_model() -> OpenAIModel:
+def load_model():
     """Get authenticated OpenAI model client."""
-    return OpenAIModel(
+    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
+    {{#if modelMaxTokens}}
+    params["{{#if (eq modelApiFormat "responses")}}max_output_tokens{{else}}max_completion_tokens{{/if}}"] = {{modelMaxTokens}}
+    {{/if}}
+    {{#if modelTemperature}}
+    params["temperature"] = {{modelTemperature}}
+    {{/if}}
+    {{#if modelTopP}}
+    params["top_p"] = {{modelTopP}}
+    {{/if}}
+    return {{#if (eq modelApiFormat "responses")}}OpenAIResponsesModel{{else}}OpenAIModel{{/if}}(
         client_args={"api_key": _get_api_key()},
         model_id="{{#if modelId}}{{modelId}}{{else}}gpt-4.1{{/if}}",
+        params=params,
     )
 {{/if}}
 {{#if (eq modelProvider "Gemini")}}
 import os
+{{#if modelAdditionalParams}}
+import json
+{{/if}}
 
 from strands.models.gemini import GeminiModel
 from bedrock_agentcore.identity.auth import requires_api_key
@@ -178,14 +212,28 @@ def _get_api_key() -> str:
 
 def load_model() -> GeminiModel:
     """Get authenticated Gemini model client."""
+    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
+    {{#if modelMaxTokens}}
+    params["max_output_tokens"] = {{modelMaxTokens}}
+    {{/if}}
+    {{#if modelTemperature}}
+    params["temperature"] = {{modelTemperature}}
+    {{/if}}
+    {{#if modelTopP}}
+    params["top_p"] = {{modelTopP}}
+    {{/if}}
+    {{#if modelTopK}}
+    params["top_k"] = {{modelTopK}}
+    {{/if}}
     return GeminiModel(
         client_args={"api_key": _get_api_key()},
         model_id="{{#if modelId}}{{modelId}}{{else}}gemini-2.5-flash{{/if}}",
+        params=params,
     )
 {{/if}}
 {{#if (eq modelProvider "LiteLLM")}}
 import os
-{{#if litellmAdditionalParams}}
+{{#if modelAdditionalParams}}
 import json
 {{/if}}
 
@@ -230,7 +278,16 @@ def load_model() -> LiteLLMModel:
     {{#if litellmApiBase}}
     client_args["api_base"] = {{safeJson litellmApiBase}}
     {{/if}}
-    params = {{#if litellmAdditionalParams}}json.loads({{pyJsonStr litellmAdditionalParams}}){{else}}{}{{/if}}
+    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
+    {{#if modelMaxTokens}}
+    params["max_tokens"] = {{modelMaxTokens}}
+    {{/if}}
+    {{#if modelTemperature}}
+    params["temperature"] = {{modelTemperature}}
+    {{/if}}
+    {{#if modelTopP}}
+    params["top_p"] = {{modelTopP}}
+    {{/if}}
     return LiteLLMModel(
         client_args=client_args,
         model_id="{{#if modelId}}{{modelId}}{{else}}bedrock/us.anthropic.claude-sonnet-4-5-20250514-v1:0{{/if}}",
