@@ -41,6 +41,21 @@ describe("harness custom validation", () => {
       }).success,
     ).toBe(false);
   });
+  it("accepts provider-specific additional parameters for every harness model", () => {
+    for (const model of [
+      { provider: "bedrock", modelId: "model" },
+      { provider: "open_ai", modelId: "gpt", apiKeyArn: "arn:key" },
+      { provider: "gemini", modelId: "gemini", apiKeyArn: "arn:key" },
+      { provider: "lite_llm", modelId: "bedrock/model" },
+    ]) {
+      expect(
+        HarnessModelSchema.safeParse({
+          ...model,
+          additionalParams: { custom_parameter: true },
+        }).success,
+      ).toBe(true);
+    }
+  });
   it("validates provider-specific API formats through the shared helper", () => {
     expect(validateApiFormat("responses", "open_ai")).toEqual({ valid: true });
     expect(validateApiFormat("converse_stream", "open_ai").valid).toBe(false);

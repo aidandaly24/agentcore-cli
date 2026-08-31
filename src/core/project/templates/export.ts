@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import type { z } from "zod";
 import type { BuildType, ProjectRuntime } from "../../../projectSchemas/runtime";
 import type {
   HarnessMemoryRef,
+  HarnessMemoryRetrievalConfig,
   HarnessSkill,
   HarnessSkillGitSource,
   HarnessSkillPathSource,
@@ -47,6 +49,8 @@ export interface HarnessExportInput {
   projectSpec: ProjectSpec;
   /** Build override from --build; when absent the harness spec decides. */
   build?: BuildType;
+  /** Notes collected while converting a service response into a local harness spec. */
+  sourceNotes?: ExportNote[];
   /**
    * Whether the harness directory holds the Dockerfile that `spec.dockerfile`
    * names (local harnesses only; the caller checks the filesystem).
@@ -79,8 +83,6 @@ export interface HarnessExportPlan {
   policyFiles: Record<string, unknown>;
   /** Whether the render includes the memory/ module. */
   hasMemory: boolean;
-  /** Whether the render includes hooks/execution_limits.py. */
-  hasExecutionLimits: boolean;
   buildType: BuildType;
   dockerfilePlan: DockerfilePlan;
   notes: ExportNote[];
@@ -98,6 +100,8 @@ export const CODE_INTERPRETER_TOOL_NOTE_CATEGORY =
 export const MEMORY_ARN_NOTE_CATEGORY = "External memory reference not exported";
 export const MEMORY_MANAGED_NOTE_CATEGORY = "Managed harness memory not exported";
 export const MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY = "Memory reference could not be resolved";
+export const MEMORY_MESSAGES_COUNT_NOTE_CATEGORY =
+  "Memory messagesCount is not directly portable to Strands";
 export const PATH_SKILLS_NOTE_CATEGORY = "path skills require container filesystem";
 export const GIT_SKILLS_CONTAINER_NOTE_CATEGORY = "git skills require git in container image";
 export const GIT_SKILLS_AUTH_NOTE_CATEGORY = "git skill credential provider referenced";
@@ -119,7 +123,7 @@ export const MISSING_DOCKERFILE_NOTE_CATEGORY = "Dockerfile not found — create
 
 export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExportPlan {
   const { spec, targetAgentName, projectSpec } = input;
-  const notes: ExportNote[] = [];
+  const notes: ExportNote[] = [...(input.sourceNotes ?? [])];
   const credentials: Credential[] = [];
   const envEntries: EnvLocalEntry[] = [];
   const policyFiles: Record<string, unknown> = {};
@@ -198,6 +202,12 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     hasMemory: memory.provider !== undefined,
     memoryEnvVarName: memory.provider?.envVarName,
     memoryStrategies: memory.provider?.strategies ?? [],
+    memoryRetrievalTopK:
+      memory.retrievalConfig?.topK !== undefined ? String(memory.retrievalConfig.topK) : undefined,
+    memoryRetrievalRelevanceScore:
+      memory.retrievalConfig?.relevanceScore !== undefined
+        ? String(memory.retrievalConfig.relevanceScore)
+        : undefined,
     actorId: memory.actorId,
     // Gateways are never exported as code (see resolveTools); the template still
     // needs the keys so its conditionals resolve.
@@ -269,7 +279,6 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     envEntries,
     policyFiles,
     hasMemory: memory.provider !== undefined,
-    hasExecutionLimits,
     buildType,
     dockerfilePlan,
     notes,
@@ -310,10 +319,13 @@ function resolveModel(
   const model = spec.model;
   const context: Record<string, unknown> = {
     modelId: model.modelId,
+    modelApiFormat: model.apiFormat,
+    modelAdditionalParams: model.additionalParams,
     // Stringified so a legal 0 (temperature/topP) stays truthy for {{#if}}.
     modelMaxTokens: model.maxTokens !== undefined ? String(model.maxTokens) : undefined,
     modelTemperature: model.temperature !== undefined ? String(model.temperature) : undefined,
     modelTopP: model.topP !== undefined ? String(model.topP) : undefined,
+    modelTopK: model.topK !== undefined ? String(model.topK) : undefined,
     hasIdentity: false,
     identityProviders: [] as { name: string; envVarName: string }[],
   };
@@ -323,6 +335,7 @@ function resolveModel(
       context.modelProvider = "Bedrock";
       if (isBedrockMantleModel(spec)) {
         context.bedrockMantle = true;
+        context.strandsExtras = "openai";
         context.mantleApiFormat = model.apiFormat;
         context.mantleProprietary = isProprietaryOpenAiModel(model.modelId);
         // Mantle is invoked via the bedrock-mantle service, not bedrock:InvokeModel,
@@ -354,6 +367,7 @@ function resolveModel(
     case "open_ai":
     case "gemini": {
       context.modelProvider = model.provider === "open_ai" ? "OpenAI" : "Gemini";
+      context.strandsExtras = model.provider === "open_ai" ? "openai" : "gemini";
       // The schema guarantees apiKeyArn for these providers.
       attachIdentityProvider(
         context,
@@ -367,10 +381,8 @@ function resolveModel(
     }
     case "lite_llm": {
       context.modelProvider = "LiteLLM";
+      context.strandsExtras = "litellm";
       if (model.apiBase) context.litellmApiBase = model.apiBase;
-      if (model.additionalParams && Object.keys(model.additionalParams).length > 0) {
-        context.litellmAdditionalParams = model.additionalParams;
-      }
       if (model.apiKeyArn) {
         attachIdentityProvider(
           context,
@@ -440,6 +452,7 @@ function attachIdentityProvider(
 interface MemoryResolution {
   provider?: { name: string; envVarName: string; strategies: string[] };
   actorId?: string;
+  retrievalConfig?: HarnessMemoryRetrievalConfig;
 }
 
 function resolveMemory(
@@ -474,6 +487,16 @@ function resolveMemory(
       });
       return { actorId: memory.actorId };
     }
+    if (memory.messagesCount !== undefined) {
+      notes.push({
+        category: MEMORY_MESSAGES_COUNT_NOTE_CATEGORY,
+        message:
+          `The harness restored at most ${memory.messagesCount} short-term memory messages. ` +
+          "AgentCoreMemorySessionManager restores the available session history and does not expose " +
+          "an equivalent message-count setting; use conversation truncation or customize " +
+          "memory/session.py if the exact restore limit is required.",
+      });
+    }
     return {
       provider: {
         name: entry.name,
@@ -482,6 +505,7 @@ function resolveMemory(
         strategies: entry.strategies.map(({ type }) => type),
       },
       actorId: memory.actorId,
+      retrievalConfig: memory.retrievalConfig,
     };
   }
 
@@ -511,8 +535,14 @@ interface ToolsResolution {
   }[];
   remoteMcpTools: {
     name: string;
+    pythonName: string;
     url: string;
-    headerCredentials?: { headerKey: string; credentialName: string; envVarName: string }[];
+    headerCredentials?: {
+      headerKey: string;
+      credentialName: string;
+      envVarName: string;
+      pythonName: string;
+    }[];
   }[];
   hasShell: boolean;
   hasFileOperations: boolean;
@@ -557,13 +587,18 @@ function resolveTools(
         if (!cfg) break;
         const headerKeys = Object.keys(cfg.headers ?? {});
         let headerCredentials: ToolsResolution["remoteMcpTools"][number]["headerCredentials"];
+        const toolPythonName = stablePythonIdentifier(tool.name);
         if (headerKeys.length > 0) {
           headerCredentials = [];
-          const toolPrefix = tool.name.replace(/[^A-Za-z0-9]/g, "");
           for (const headerKey of headerKeys) {
-            const credentialName = `${projectSpec.name}Mcp${toolPrefix}${headerKey.replace(/[^A-Za-z0-9]/g, "")}`;
+            const credentialName = remoteMcpCredentialName(projectSpec.name, tool.name, headerKey);
             const envVarName = credentialEnvVarName(credentialName);
-            headerCredentials.push({ headerKey, credentialName, envVarName });
+            headerCredentials.push({
+              headerKey,
+              credentialName,
+              envVarName,
+              pythonName: stablePythonIdentifier(`${tool.name}-${headerKey}`),
+            });
             if (
               !projectSpec.credentials.some((c) => c.name === credentialName) &&
               !credentials.some((c) => c.name === credentialName)
@@ -584,14 +619,20 @@ function resolveTools(
             message:
               `MCP tool "${tool.name}" sends request headers whose values are managed via ` +
               `AgentCore Identity. Credential entries were added to agentcore.json and the header ` +
-              `values written to agentcore/.env.local; they are provisioned on ` +
-              `\`agentcore project deploy\`.\n\n` +
+              `values written to agentcore/.env.local. Ensure each named API-key credential provider ` +
+              `exists in AgentCore Identity before invoking the exported runtime; deployment wires ` +
+              `the provider references and runtime permissions.\n\n` +
               headerCredentials
                 .map((h) => `  ${h.credentialName}  (env var: ${h.envVarName})`)
                 .join("\n"),
           });
         }
-        result.remoteMcpTools.push({ name: tool.name, url: cfg.url, headerCredentials });
+        result.remoteMcpTools.push({
+          name: tool.name,
+          pythonName: toolPythonName,
+          url: cfg.url,
+          headerCredentials,
+        });
         break;
       }
       case "agentcore_gateway": {
@@ -643,6 +684,25 @@ function undefinedIfEmpty<T>(values: T[]): T[] | undefined {
 function configOf(tool: HarnessTool, key: string): unknown {
   if (!tool.config || !(key in tool.config)) return undefined;
   return (tool.config as Record<string, unknown>)[key];
+}
+
+function stablePythonIdentifier(value: string): string {
+  const readable =
+    value
+      .replace(/[^a-zA-Z0-9]/g, "_")
+      .toLowerCase()
+      .slice(0, 48) || "value";
+  return `${readable}_${shortHash(value)}`;
+}
+
+function remoteMcpCredentialName(projectName: string, toolName: string, headerKey: string): string {
+  const readable = `${projectName}Mcp${toolName}${headerKey}`.replace(/[^a-zA-Z0-9_-]/g, "");
+  const suffix = `-${shortHash(`${toolName}\0${headerKey}`)}`;
+  return `${readable.slice(0, 128 - suffix.length)}${suffix}`;
+}
+
+function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 10);
 }
 
 // ============================================================================

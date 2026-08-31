@@ -3,6 +3,7 @@ import z from "zod";
 import { InputValidationError } from "../../../errors/errors";
 import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
+import { credentialEnvVarName } from "../../../projectSchemas/credential";
 import {
   ALLOWED_TOOLS_NOTE_CATEGORY,
   AWS_SKILLS_NOTE_CATEGORY,
@@ -17,6 +18,7 @@ import {
   MCP_HEADER_CREDS_NOTE_CATEGORY,
   MEMORY_ARN_NOTE_CATEGORY,
   MEMORY_MANAGED_NOTE_CATEGORY,
+  MEMORY_MESSAGES_COUNT_NOTE_CATEGORY,
   MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY,
   MISSING_DOCKERFILE_NOTE_CATEGORY,
   MODEL_API_KEY_NOTE_CATEGORY,
@@ -83,7 +85,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
     expect(result.context.modelTopP).toBe("0.9");
     expect(result.context.modelMaxTokens).toBe("512");
     expect(result.context.bedrockMantle).toBeUndefined();
-    expect(result.hasExecutionLimits).toBe(true);
+    expect(result.context.hasExecutionLimits).toBe(true);
     expect(result.context.maxIterations).toBe(5);
     expect(result.context.maxTokens).toBe(2048);
     expect(result.context.timeoutSeconds).toBe(60);
@@ -120,6 +122,11 @@ describe("mapHarnessToExportPlan model mapping", () => {
         model: {
           provider: "open_ai",
           modelId: "gpt-4.1",
+          apiFormat: "responses",
+          maxTokens: 768,
+          temperature: 0.2,
+          topP: 0.8,
+          additionalParams: { store: false },
           apiKeyArn:
             "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/MyOpenAiKey",
         },
@@ -127,6 +134,12 @@ describe("mapHarnessToExportPlan model mapping", () => {
     });
 
     expect(result.context.modelProvider).toBe("OpenAI");
+    expect(result.context.strandsExtras).toBe("openai");
+    expect(result.context.modelApiFormat).toBe("responses");
+    expect(result.context.modelMaxTokens).toBe("768");
+    expect(result.context.modelTemperature).toBe("0.2");
+    expect(result.context.modelTopP).toBe("0.8");
+    expect(result.context.modelAdditionalParams).toEqual({ store: false });
     expect(result.context.hasIdentity).toBe(true);
     expect(result.context.identityProviders).toEqual([
       { name: "MyOpenAiKey", envVarName: "AGENTCORE_CREDENTIAL_MYOPENAIKEY" },
@@ -153,6 +166,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
     });
 
     expect(result.context.modelProvider).toBe("Gemini");
+    expect(result.context.strandsExtras).toBe("gemini");
     expect(result.credentials).toEqual([]);
   });
 
@@ -163,14 +177,21 @@ describe("mapHarnessToExportPlan model mapping", () => {
           provider: "lite_llm",
           modelId: "bedrock/us.amazon.nova-lite-v1:0",
           apiBase: "https://litellm.example",
+          maxTokens: 300,
+          temperature: 0.1,
+          topP: 0.7,
           additionalParams: { max_retries: 2 },
         },
       }),
     });
 
     expect(result.context.modelProvider).toBe("LiteLLM");
+    expect(result.context.strandsExtras).toBe("litellm");
     expect(result.context.litellmApiBase).toBe("https://litellm.example");
-    expect(result.context.litellmAdditionalParams).toEqual({ max_retries: 2 });
+    expect(result.context.modelAdditionalParams).toEqual({ max_retries: 2 });
+    expect(result.context.modelMaxTokens).toBe("300");
+    expect(result.context.modelTemperature).toBe("0.1");
+    expect(result.context.modelTopP).toBe("0.7");
     expect(result.notes).toEqual([]);
   });
 
@@ -207,7 +228,12 @@ describe("mapHarnessToExportPlan tools", () => {
     });
 
     expect(result.context.remoteMcpTools).toEqual([
-      { name: "exa", url: "https://mcp.exa.ai/mcp", headerCredentials: undefined },
+      {
+        name: "exa",
+        pythonName: expect.stringMatching(/^exa_[a-f0-9]{10}$/),
+        url: "https://mcp.exa.ai/mcp",
+        headerCredentials: undefined,
+      },
     ]);
     expect(result.context.inlineFunctionTools).toEqual([
       {
@@ -238,26 +264,58 @@ describe("mapHarnessToExportPlan tools", () => {
     });
 
     const tools = result.context.remoteMcpTools as {
-      headerCredentials?: { headerKey: string; credentialName: string; envVarName: string }[];
+      headerCredentials?: {
+        headerKey: string;
+        credentialName: string;
+        envVarName: string;
+        pythonName: string;
+      }[];
     }[];
-    expect(tools[0]!.headerCredentials).toEqual([
-      {
-        headerKey: "X-Api-Key",
-        credentialName: "ordersMcpinternalXApiKey",
-        envVarName: "AGENTCORE_CREDENTIAL_ORDERSMCPINTERNALXAPIKEY",
-      },
-    ]);
+    const header = tools[0]!.headerCredentials![0]!;
+    expect(header.headerKey).toBe("X-Api-Key");
+    expect(header.credentialName).toMatch(/^ordersMcpinternalX-Api-Key-[a-f0-9]{10}$/);
+    expect(header.envVarName).toBe(credentialEnvVarName(header.credentialName));
+    expect(header.pythonName).toMatch(/^internal_x_api_key_[a-f0-9]{10}$/);
     expect(result.credentials).toEqual([
-      { authorizerType: "ApiKeyCredentialProvider", name: "ordersMcpinternalXApiKey" },
+      { authorizerType: "ApiKeyCredentialProvider", name: header.credentialName },
     ]);
     expect(result.envEntries).toEqual([
       {
-        key: "AGENTCORE_CREDENTIAL_ORDERSMCPINTERNALXAPIKEY",
+        key: header.envVarName,
         value: "s3cret",
         comment: '"X-Api-Key" header for MCP tool "internal" (exported from harness "assistant")',
       },
     ]);
     expect(categories(result)).toEqual([MCP_HEADER_CREDS_NOTE_CATEGORY]);
+    expect(result.notes[0]!.message).toContain("exists in AgentCore Identity");
+  });
+
+  test("keeps normalized header names distinct", () => {
+    const result = plan({
+      spec: harness({
+        tools: [
+          {
+            type: "remote_mcp",
+            name: "internal",
+            config: {
+              remoteMcp: {
+                url: "https://mcp.internal.example",
+                headers: { "X-Api-Key": "first", X_Api_Key: "second" },
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    const names = result.credentials.map((credential) => credential.name);
+    expect(names).toHaveLength(2);
+    expect(new Set(names).size).toBe(2);
+    expect(new Set(result.envEntries.map((entry) => entry.key)).size).toBe(2);
+    const tools = result.context.remoteMcpTools as {
+      headerCredentials: { pythonName: string }[];
+    }[];
+    expect(new Set(tools[0]!.headerCredentials.map(({ pythonName }) => pythonName)).size).toBe(2);
   });
 
   test("emits a follow-up note for each unmappable tool type instead of code", () => {
@@ -316,7 +374,12 @@ describe("mapHarnessToExportPlan tools", () => {
     expect(restricted.context.hasShell).toBe(true);
     expect(restricted.context.hasFileOperations).toBe(false);
     expect(restricted.context.remoteMcpTools).toEqual([
-      { name: "exa", url: "https://mcp.exa.ai/mcp", headerCredentials: undefined },
+      {
+        name: "exa",
+        pythonName: expect.stringMatching(/^exa_[a-f0-9]{10}$/),
+        url: "https://mcp.exa.ai/mcp",
+        headerCredentials: undefined,
+      },
     ]);
     expect(categories(restricted)).toEqual([ALLOWED_TOOLS_NOTE_CATEGORY]);
   });
@@ -353,6 +416,28 @@ describe("mapHarnessToExportPlan memory", () => {
     expect(result.context.memoryStrategies).toEqual(["SEMANTIC"]);
     expect(result.context.actorId).toBe("actor-1");
     expect(result.notes).toEqual([]);
+  });
+
+  test("preserves retrieval tuning and notes an unmappable messagesCount", () => {
+    const result = plan({
+      spec: harness({
+        memory: {
+          mode: "existing",
+          name: "chat_history",
+          messagesCount: 12,
+          retrievalConfig: { topK: 7, relevanceScore: 0 },
+        },
+      }),
+      projectSpec: projectSpec({
+        memories: [
+          { name: "chat_history", eventExpiryDuration: 30, strategies: [{ type: "SEMANTIC" }] },
+        ],
+      }),
+    });
+
+    expect(result.context.memoryRetrievalTopK).toBe("7");
+    expect(result.context.memoryRetrievalRelevanceScore).toBe("0");
+    expect(categories(result)).toEqual([MEMORY_MESSAGES_COUNT_NOTE_CATEGORY]);
   });
 
   test("notes a by-name memory that is not in the project", () => {
@@ -612,15 +697,21 @@ describe("mapHarnessToExportPlan runtime spec entry", () => {
 });
 
 describe("export notes rendering", () => {
+  test("keeps notes collected while mapping a service harness", () => {
+    const sourceNote = { category: "Service field", message: "Review it." };
+    const result = plan({ sourceNotes: [sourceNote] });
+    expect(result.notes).toContainEqual(sourceNote);
+  });
+
   test("buildExportNotesMarkdown lists each note under its category", () => {
     const markdown = buildExportNotesMarkdown(
       [{ category: "A category", message: "Do the thing." }],
       "assistant",
       "assistantAgent",
-      "strands-agents ~= 1.15.0",
+      "strands-agents ~= 1.54.0",
     );
     expect(markdown).toContain("# Export Notes — assistant → assistantAgent");
-    expect(markdown).toContain("Strands version: strands-agents ~= 1.15.0");
+    expect(markdown).toContain("Strands version: strands-agents ~= 1.54.0");
     expect(markdown).toContain("## Items requiring manual follow-up");
     expect(markdown).toContain("### A category");
     expect(markdown).toContain("Do the thing.");

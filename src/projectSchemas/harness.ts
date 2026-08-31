@@ -91,13 +91,6 @@ export const HarnessModelSchema = z
         path: ["apiBase"],
       });
     }
-    if (model.additionalParams !== undefined && model.provider !== "lite_llm") {
-      ctx.addIssue({
-        code: "custom",
-        message: 'additionalParams is only supported for the "lite_llm" provider',
-        path: ["additionalParams"],
-      });
-    }
   });
 export type HarnessModel = z.infer<typeof HarnessModelSchema>;
 export function validateApiFormat(
