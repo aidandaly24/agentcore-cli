@@ -5,26 +5,34 @@ import type {
 import z from "zod";
 import { InputValidationError, MalformedServiceResponseError } from "../../../errors";
 import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
+import type { ExportNote } from "../../../core/project/templates/export";
 
-/** Extract the harness id from a harness ARN (`.../harness/<id>` -> `<id>`). */
-export function harnessIdFromArn(arn: string): string {
-  const match = /:harness\/([^/]+)$/.exec(arn);
-  if (!match?.[1]) {
+export const SERVICE_FIELD_OMITTED_NOTE_CATEGORY = "Service harness field not exported";
+export const MEMORY_TUNING_NOTE_CATEGORY = "Harness memory tuning requires manual follow-up";
+
+function parseHarnessArn(arn: string): { region: string; harnessId: string } {
+  const match = /^arn:[^:]+:bedrock-agentcore:([a-z0-9-]+):(\d{12}):harness\/([^/]+)$/.exec(arn);
+  if (!match?.[1] || !match[2] || !match[3]) {
     throw new InputValidationError(
-      `"${arn}" is not a valid harness ARN (expected ...:harness/<id>)`,
+      `"${arn}" is not a valid harness ARN ` +
+        "(expected arn:<partition>:bedrock-agentcore:<region>:<account>:harness/<id>)",
     );
   }
-  return match[1];
+  return { region: match[1], harnessId: match[3] };
+}
+
+/** Extract the harness id from a validated harness ARN. */
+export function harnessIdFromArn(arn: string): string {
+  return parseHarnessArn(arn).harnessId;
 }
 
 /**
- * The region embedded in a harness ARN (`arn:<partition>:bedrock-agentcore:<region>:...`),
- * or undefined when the ARN carries none. The harness lives in this region, so
- * it takes precedence over the CLI's resolved region for the export fetch.
+ * The region embedded in a harness ARN (`arn:<partition>:bedrock-agentcore:<region>:...`).
+ * The harness lives in this region, so it takes precedence over the CLI's resolved
+ * region for the export fetch.
  */
-export function regionFromHarnessArn(arn: string): string | undefined {
-  const match = /^arn:[^:]+:bedrock-agentcore:([a-z0-9-]+):/.exec(arn);
-  return match?.[1] || undefined;
+export function regionFromHarnessArn(arn: string): string {
+  return parseHarnessArn(arn).region;
 }
 
 /**
@@ -36,7 +44,9 @@ export function regionFromHarnessArn(arn: string): string | undefined {
 export function mapServiceHarnessToSpec(harness: Harness): {
   spec: HarnessSpec;
   systemPrompt?: string;
+  notes: ExportNote[];
 } {
+  const notes: ExportNote[] = [];
   const joinedPrompt = (harness.systemPrompt ?? [])
     .map((block) => ("text" in block ? block.text : undefined))
     .filter((text): text is string => typeof text === "string" && text.length > 0)
@@ -53,18 +63,20 @@ export function mapServiceHarnessToSpec(harness: Harness): {
         config: tool.config,
       }),
     ),
-    skills: (harness.skills ?? []).map(mapSkill).filter((skill) => skill !== undefined),
+    skills: (harness.skills ?? [])
+      .map((skill) => mapSkill(skill, notes))
+      .filter((skill) => skill !== undefined),
     allowedTools: harness.allowedTools,
-    memory: mapMemory(harness.memory),
+    memory: mapMemory(harness.memory, notes),
     maxIterations: harness.maxIterations ?? undefined,
     maxTokens: harness.maxTokens ?? undefined,
     timeoutSeconds: harness.timeoutSeconds ?? undefined,
     truncation: harness.truncation,
-    containerUri: harness.environmentArtifact?.containerConfiguration?.containerUri,
+    containerUri: mapContainerUri(harness.environmentArtifact, notes),
     environmentVariables: harness.environmentVariables,
     // The harness's executionRoleArn is deliberately NOT carried: the exported
     // agent is a new runtime that gets its own CDK-managed execution role.
-    ...mapRuntimeEnvironment(harness),
+    ...mapRuntimeEnvironment(harness, notes),
   });
 
   const parsed = HarnessSpecSchema.safeParse(candidate);
@@ -74,7 +86,7 @@ export function mapServiceHarnessToSpec(harness: Harness): {
       { cause: parsed.error },
     );
   }
-  return { spec: parsed.data, systemPrompt };
+  return { spec: parsed.data, systemPrompt, notes };
 }
 
 function mapModel(model: Harness["model"]): Record<string, unknown> {
@@ -87,6 +99,7 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
       temperature: c.temperature,
       topP: c.topP,
       maxTokens: c.maxTokens,
+      additionalParams: c.additionalParams,
     });
   }
   if (model?.openAiModelConfig) {
@@ -99,6 +112,7 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
       temperature: c.temperature,
       topP: c.topP,
       maxTokens: c.maxTokens,
+      additionalParams: c.additionalParams,
     });
   }
   if (model?.geminiModelConfig) {
@@ -111,6 +125,7 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
       topP: c.topP,
       topK: c.topK,
       maxTokens: c.maxTokens,
+      additionalParams: c.additionalParams,
     });
   }
   if (model?.liteLlmModelConfig) {
@@ -131,8 +146,11 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
   );
 }
 
-/** Service skill union -> the flat local skill shape; unknown members are dropped. */
-function mapSkill(skill: ApiHarnessSkill): Record<string, unknown> | undefined {
+/** Service skill union -> the flat local skill shape. */
+function mapSkill(
+  skill: ApiHarnessSkill,
+  notes: ExportNote[],
+): Record<string, unknown> | undefined {
   if ("path" in skill && skill.path) return { path: skill.path };
   if ("s3" in skill && skill.s3?.uri) return { s3Uri: skill.s3.uri };
   if ("git" in skill && skill.git?.url) {
@@ -148,6 +166,13 @@ function mapSkill(skill: ApiHarnessSkill): Record<string, unknown> | undefined {
   if ("awsSkills" in skill && skill.awsSkills) {
     return { awsSkills: clean({ paths: skill.awsSkills.paths }) };
   }
+  const unknown = unknownMemberName(skill);
+  notes.push({
+    category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+    message:
+      `A harness skill${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
+      "its service payload was unknown or incomplete.",
+  });
   return undefined;
 }
 
@@ -157,10 +182,22 @@ function mapSkill(skill: ApiHarnessSkill): Record<string, unknown> | undefined {
  * bring-your-own memory; managed-without-ARN keeps the `managed` marker so the
  * export mapper can emit its follow-up note.
  */
-function mapMemory(memory: Harness["memory"]): Record<string, unknown> | undefined {
+function mapMemory(
+  memory: Harness["memory"],
+  notes: ExportNote[],
+): Record<string, unknown> | undefined {
   if (!memory) return undefined;
   if ("agentCoreMemoryConfiguration" in memory && memory.agentCoreMemoryConfiguration?.arn) {
-    const { arn, actorId, messagesCount } = memory.agentCoreMemoryConfiguration;
+    const { arn, actorId, messagesCount, retrievalConfig } = memory.agentCoreMemoryConfiguration;
+    if (messagesCount !== undefined || retrievalConfig !== undefined) {
+      notes.push({
+        category: MEMORY_TUNING_NOTE_CATEGORY,
+        message:
+          `The service harness configured external memory${messagesCount !== undefined ? ` messagesCount=${messagesCount}` : ""}` +
+          `${retrievalConfig !== undefined ? " with per-namespace retrieval tuning" : ""}. ` +
+          "The exported runtime cannot apply those settings until the external memory is wired manually.",
+      });
+    }
     return clean({ mode: "existing", arn, actorId, messagesCount });
   }
   if ("managedMemoryConfiguration" in memory && memory.managedMemoryConfiguration) {
@@ -169,6 +206,13 @@ function mapMemory(memory: Harness["memory"]): Record<string, unknown> | undefin
     return { mode: "managed" };
   }
   if ("disabled" in memory && memory.disabled) return { mode: "disabled" };
+  const unknown = unknownMemberName(memory);
+  notes.push({
+    category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+    message:
+      `The harness memory configuration${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
+      "the service payload was unknown or incomplete.",
+  });
   return undefined;
 }
 
@@ -178,11 +222,18 @@ function mapMemory(memory: Harness["memory"]): Record<string, unknown> | undefin
  * cannot be expressed locally; fail here — before anything is written — with a
  * clear message instead of a downstream schema error.
  */
-function mapRuntimeEnvironment(harness: Harness): Record<string, unknown> {
-  const env =
-    harness.environment && "agentCoreRuntimeEnvironment" in harness.environment
-      ? harness.environment.agentCoreRuntimeEnvironment
-      : undefined;
+function mapRuntimeEnvironment(harness: Harness, notes: ExportNote[]): Record<string, unknown> {
+  if (harness.environment && !("agentCoreRuntimeEnvironment" in harness.environment)) {
+    const unknown = unknownMemberName(harness.environment);
+    notes.push({
+      category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+      message:
+        `The harness environment${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
+        "the service payload is not an AgentCore Runtime environment.",
+    });
+    return {};
+  }
+  const env = harness.environment?.agentCoreRuntimeEnvironment;
   if (!env) return {};
   const out: Record<string, unknown> = {};
 
@@ -232,12 +283,44 @@ function mapRuntimeEnvironment(harness: Harness): Record<string, unknown> {
         accessPointArn: fs.s3FilesAccessPoint.accessPointArn,
         mountPath: fs.s3FilesAccessPoint.mountPath,
       });
+    } else {
+      const unknown = unknownMemberName(fs);
+      notes.push({
+        category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+        message:
+          `A filesystem configuration${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
+          "its service payload was unknown or incomplete.",
+      });
     }
   }
   if (efs.length) out.efsAccessPoints = efs;
   if (s3.length) out.s3AccessPoints = s3;
 
   return out;
+}
+
+function mapContainerUri(
+  artifact: Harness["environmentArtifact"],
+  notes: ExportNote[],
+): string | undefined {
+  if (!artifact) return undefined;
+  if ("containerConfiguration" in artifact) {
+    return artifact.containerConfiguration?.containerUri;
+  }
+  const unknown = unknownMemberName(artifact);
+  notes.push({
+    category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+    message:
+      `The harness environment artifact${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
+      "the service payload is not a container configuration.",
+  });
+  return undefined;
+}
+
+function unknownMemberName(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || !("$unknown" in value)) return undefined;
+  const unknown = (value as { $unknown?: unknown }).$unknown;
+  return Array.isArray(unknown) && typeof unknown[0] === "string" ? unknown[0] : undefined;
 }
 
 /** Drop undefined-valued keys so optional fields stay omitted. */

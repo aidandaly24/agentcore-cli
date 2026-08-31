@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { Harness } from "@aws-sdk/client-bedrock-agentcore-control";
 import { InputValidationError, MalformedServiceResponseError } from "../../../errors";
-import { harnessIdFromArn, mapServiceHarnessToSpec, regionFromHarnessArn } from "./serviceHarness";
+import {
+  MEMORY_TUNING_NOTE_CATEGORY,
+  SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+  harnessIdFromArn,
+  mapServiceHarnessToSpec,
+  regionFromHarnessArn,
+} from "./serviceHarness";
 
 const ARN = "arn:aws:bedrock-agentcore:us-west-2:111122223333:harness/h-abc123";
 
@@ -37,9 +43,17 @@ describe("harness ARN helpers", () => {
     expect(regionFromHarnessArn(ARN)).toBe("us-west-2");
   });
 
-  test("rejects a malformed harness ARN and tolerates a missing region", () => {
+  test("accepts other AWS partitions and rejects malformed or wrong-service ARNs", () => {
+    const chinaArn = "arn:aws-cn:bedrock-agentcore:cn-north-1:111122223333:harness/h-abc123";
+    expect(harnessIdFromArn(chinaArn)).toBe("h-abc123");
+    expect(regionFromHarnessArn(chinaArn)).toBe("cn-north-1");
     expect(() => harnessIdFromArn("arn:aws:foo:bar")).toThrow(InputValidationError);
-    expect(regionFromHarnessArn("not-an-arn")).toBeUndefined();
+    expect(() =>
+      harnessIdFromArn("arn:aws:lambda:us-east-1:111122223333:harness/h-abc123"),
+    ).toThrow(InputValidationError);
+    expect(() =>
+      harnessIdFromArn("arn:aws:bedrock-agentcore::111122223333:harness/h-abc123"),
+    ).toThrow(InputValidationError);
   });
 });
 
@@ -85,8 +99,8 @@ describe("mapServiceHarnessToSpec", () => {
     expect(spec.executionRoleArn).toBeUndefined();
   });
 
-  test("maps every skill source variant and drops unknown members", () => {
-    const { spec } = mapServiceHarnessToSpec(
+  test("maps every skill source variant and notes unknown members", () => {
+    const { spec, notes } = mapServiceHarnessToSpec(
       serviceHarness({
         skills: [
           { path: "local_skill" },
@@ -122,6 +136,7 @@ describe("mapServiceHarnessToSpec", () => {
       },
       { awsSkills: { paths: ["aws/foo"] } },
     ]);
+    expect(notes.map((note) => note.category)).toEqual([SERVICE_FIELD_OMITTED_NOTE_CATEGORY]);
   });
 
   test("maps tools by passing their config through", () => {
@@ -220,6 +235,46 @@ describe("mapServiceHarnessToSpec", () => {
         mountPath: "/mnt/tools",
       },
     ]);
+  });
+
+  test("notes incomplete filesystem members instead of silently dropping them", () => {
+    const { spec, notes } = mapServiceHarnessToSpec(
+      serviceHarness({
+        environment: {
+          agentCoreRuntimeEnvironment: {
+            filesystemConfigurations: [
+              { efsAccessPoint: { mountPath: "/mnt/incomplete" } },
+              { $unknown: ["futureFilesystem", {}] },
+            ],
+          },
+        },
+      } as Partial<Harness>),
+    );
+
+    expect(spec.efsAccessPoints).toBeUndefined();
+    expect(notes.map((note) => note.category)).toEqual([
+      SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+      SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+    ]);
+  });
+
+  test("notes external-memory tuning that cannot be wired automatically", () => {
+    const { spec, notes } = mapServiceHarnessToSpec(
+      serviceHarness({
+        memory: {
+          agentCoreMemoryConfiguration: {
+            arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-1",
+            messagesCount: 12,
+            retrievalConfig: {
+              "/users/{actorId}/facts": { topK: 8, relevanceScore: 0.7 },
+            },
+          },
+        },
+      } as Partial<Harness>),
+    );
+
+    expect(spec.memory).toMatchObject({ mode: "existing", messagesCount: 12 });
+    expect(notes.map((note) => note.category)).toEqual([MEMORY_TUNING_NOTE_CATEGORY]);
   });
 
   test("rejects a VPC harness without explicit subnets/security groups before anything is written", () => {

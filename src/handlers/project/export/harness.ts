@@ -4,6 +4,7 @@ import { createHandler, flag, ProjectKey } from "../../../router";
 import { JsonRendererKey } from "../../../tui";
 import { JsonKey } from "../../keys";
 import { AgentNameSchema, BuildTypeSchema } from "../../../projectSchemas/runtime";
+import { isContainerBuild } from "../../../projectSchemas/constants";
 import { formatExportNotes } from "../../../core/project/templates/export";
 import { coreOptsFromCtx } from "../../utils";
 import type { ExportHarnessInput } from "../types";
@@ -48,17 +49,28 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
       if (flags.arn) {
         config.io.stderr.write(`Fetching harness from the service\n`);
         const harnessId = harnessIdFromArn(flags.arn);
-        // The ARN names the region the harness lives in; fall back to the CLI's
-        // resolved region only when the ARN carries none.
+        // The ARN names the region the harness lives in and takes precedence over
+        // the CLI's resolved region, so service fetches never drift to ambient config.
         const coreOpts = coreOptsFromCtx(ctx);
-        const region = regionFromHarnessArn(flags.arn) ?? coreOpts.region;
+        const region = regionFromHarnessArn(flags.arn);
         const response = await config.core.harness.getHarness(harnessId, { ...coreOpts, region });
         if (!response.harness) {
           throw new InputValidationError(`the service returned no harness for "${flags.arn}"`);
         }
-        const { spec, systemPrompt } = mapServiceHarnessToSpec(response.harness);
+        const { spec, systemPrompt, notes } = mapServiceHarnessToSpec(response.harness);
+        if (
+          isContainerBuild(spec) &&
+          spec.networkMode === "VPC" &&
+          spec.networkConfig &&
+          !spec.networkConfig.vpcId
+        ) {
+          spec.networkConfig.vpcId = await config.core.harness.resolveVpcIdFromSubnets(
+            spec.networkConfig.subnets,
+            { region },
+          );
+        }
         input = {
-          prefetched: { spec, systemPrompt },
+          prefetched: { spec, systemPrompt, notes },
           targetAgentName: resolveTargetAgentName(flags["target-agent-name"], spec.name),
           build: flags.build,
         };

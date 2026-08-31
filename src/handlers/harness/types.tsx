@@ -55,6 +55,7 @@ export interface CoreHarnessClient {
     options: CoreOptions,
   ): Promise<DeleteHarnessEndpointResponse>;
   getHarness(id: string, options: CoreOptions): Promise<GetHarnessResponse>;
+  resolveVpcIdFromSubnets(subnetIds: string[], options: CoreOptions): Promise<string>;
   getHarnessVersion(id: string, version: string, options: CoreOptions): Promise<GetHarnessResponse>;
   getHarnessEndpoint(
     id: string,

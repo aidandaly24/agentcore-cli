@@ -106,9 +106,9 @@ describe("project export harness handler", () => {
     expect(await Bun.file(join(agentDir, "main.py")).text()).toContain(
       'DEFAULT_SYSTEM_PROMPT = """You are a terse assistant."""',
     );
-    expect(await Bun.file(join(agentDir, "model", "load.py")).text()).toContain(
-      'BedrockModel(model_id="us.amazon.nova-lite-v1:0", max_tokens=256)',
-    );
+    const loadModel = await Bun.file(join(agentDir, "model", "load.py")).text();
+    expect(loadModel).toContain('model_id="us.amazon.nova-lite-v1:0"');
+    expect(loadModel).toContain("max_tokens=256");
     expect(await Bun.file(join(agentDir, "EXPORT_NOTES.md")).text()).toContain(
       "# Export Notes — exportme → exportmeAgent",
     );
@@ -248,6 +248,45 @@ describe("project export harness handler", () => {
     expect(existsSync(join(projectRoot, "app", "remote_harnessAgent", "main.py"))).toBe(true);
   });
 
+  test("resolves and preserves the VPC ID for a service container harness", async () => {
+    const subject = testExportCommand();
+    const projectRoot = await inProjectWithHarness(subject);
+    subject.core.harness.setResolvedVpcId("vpc-0123456789abcdef0").setGetResponse({
+      harness: {
+        harnessName: "remote_container",
+        model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
+        environmentArtifact: {
+          containerConfiguration: {
+            containerUri: "111122223333.dkr.ecr.us-west-2.amazonaws.com/base:latest",
+          },
+        },
+        environment: {
+          agentCoreRuntimeEnvironment: {
+            networkConfiguration: {
+              networkMode: "VPC",
+              networkModeConfig: {
+                subnets: ["subnet-0123456789abcdef0"],
+                securityGroups: ["sg-0123456789abcdef0"],
+              },
+            },
+          },
+        },
+      },
+    } as never);
+
+    await subject.run(["--arn", HARNESS_ARN]);
+
+    expect(subject.core.harness.calls).toContainEqual({
+      method: "resolveVpcIdFromSubnets",
+      args: [["subnet-0123456789abcdef0"], { region: "us-west-2" }],
+    });
+    const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
+    const runtime = spec.runtimes.find(
+      (candidate: { name: string }) => candidate.name === "remote_containerAgent",
+    );
+    expect(runtime.networkConfig.vpcId).toBe("vpc-0123456789abcdef0");
+  });
+
   test("validates the project before fetching from the service", async () => {
     const subject = testExportCommand();
     await inTempDirectory(); // not a project
@@ -263,6 +302,11 @@ describe("project export harness handler", () => {
     await expect(subject.run(["--arn", "arn:aws:not-a-harness"])).rejects.toThrow(
       /not a valid harness ARN/,
     );
+    expect(subject.core.harness.calls).toEqual([]);
+
+    await expect(
+      subject.run(["--arn", "arn:aws:lambda:us-west-2:111122223333:harness/h-abc123"]),
+    ).rejects.toThrow(/not a valid harness ARN/);
     expect(subject.core.harness.calls).toEqual([]);
   });
 });

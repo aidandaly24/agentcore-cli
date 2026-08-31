@@ -250,6 +250,7 @@ export type ExportHarnessInput = {
   prefetched?: {
     spec: z.output<typeof HarnessSpecSchema>;
     systemPrompt?: string;
+    notes?: ExportNote[];
   };
   /** Name of the runtime agent to generate. */
   targetAgentName: string;
