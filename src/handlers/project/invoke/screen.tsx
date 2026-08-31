@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp } from "ink";
 import { Layout } from "../../../components/Layout";
 import { RuntimeEndpointPicker } from "../../../components/RuntimeEndpointPicker";
 import { DataTable, type DataTableColumn } from "../../../components/ui/data-table";
 import { Spinner } from "../../../components/ui/spinner";
+import { ProjectStateError } from "../../../errors/errors";
 import { ProjectKey, type Context } from "../../../router";
 import { HarnessChat } from "../../harness/invoke/screen";
 import { RegionKey } from "../../keys";
 import { RuntimeInvokeConsole } from "../../runtime/invoke/screen";
 import type { ScreenProps } from "../../types";
+import type { Project } from "../types";
 
 type ProjectInvokableRow = Record<string, unknown> & {
   resourceType: "runtime" | "harness";
@@ -31,20 +33,49 @@ type Destination =
 
 export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
   const { exit } = useApp();
-  const project = ctx.require(ProjectKey);
+  const [project, setProject] = useState<Project | undefined>(() => ctx.value(ProjectKey));
   const [destination, setDestination] = useState<Destination>();
   const [resolving, setResolving] = useState<string>();
   const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    if (project) return;
+    let active = true;
+    const from = process.cwd();
+    void core.projectManager
+      .resolve({ filePath: from })
+      .then((resolved) => {
+        if (!active) return;
+        if (!resolved) {
+          exit(
+            new ProjectStateError(
+              `No AgentCore project found at ${from} or any parent directory ` +
+                `(looked for agentcore/agentcore.json). ` +
+                `Run 'agentcore project create' to scaffold one.`,
+            ),
+          );
+          return;
+        }
+        setProject(resolved);
+      })
+      .catch((cause: unknown) => {
+        if (active) exit(cause instanceof Error ? cause : new Error(String(cause)));
+      });
+    return () => {
+      active = false;
+    };
+  }, [core.projectManager, exit, project]);
+
   const rows = useMemo<ProjectInvokableRow[]>(
     () => [
-      ...project.spec.runtimes.map(({ name, protocol, codeLocation }) => ({
+      ...(project?.spec.runtimes ?? []).map(({ name, protocol, codeLocation }) => ({
         resourceType: "runtime" as const,
         type: "Runtime" as const,
         name,
         protocol: protocol ?? "HTTP",
         source: codeLocation,
       })),
-      ...project.spec.harnesses.map(({ name, path }) => ({
+      ...(project?.spec.harnesses ?? []).map(({ name, path }) => ({
         resourceType: "harness" as const,
         type: "Harness" as const,
         name,
@@ -56,7 +87,7 @@ export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
   );
 
   const select = async (row: ProjectInvokableRow) => {
-    if (resolving) return;
+    if (!project || resolving) return;
     setError(undefined);
     setResolving(row.name);
     try {
@@ -111,6 +142,18 @@ export function ProjectInvokePickerScreen({ ctx, core }: ScreenProps) {
         variant="invoke"
         onBack={() => setDestination(undefined)}
       />
+    );
+  }
+
+  if (!project) {
+    return (
+      <Layout
+        breadcrumb={["agentcore", "project", "invoke"]}
+        description="resolving the current project"
+        keyHints={[{ key: "ctl+c", label: "quit" }]}
+      >
+        <Spinner label="Resolving project…" />
+      </Layout>
     );
   }
 

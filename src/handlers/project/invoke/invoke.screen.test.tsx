@@ -66,6 +66,15 @@ function core(): TestCoreClient {
 }
 
 describe("project invoke picker", () => {
+  test("resolves the enclosing project when opened from the project menu", async () => {
+    const value = core();
+    value.projectManager.resolve = async () => project;
+    const screen = renderScreen("/agentcore/project/invoke", { core: value });
+
+    await waitForText(screen.lastFrame, "checkout");
+    expect(screen.lastFrame()).toContain("support");
+  });
+
   test("lists project Runtime and Harness resources", async () => {
     const screen = renderScreen("/agentcore/project/invoke", {
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
