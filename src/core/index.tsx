@@ -2,6 +2,7 @@ import { BedrockAgentCoreControlClient } from "@aws-sdk/client-bedrock-agentcore
 import { BedrockAgentCoreClient } from "@aws-sdk/client-bedrock-agentcore";
 import { IAMClient } from "@aws-sdk/client-iam";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { EC2Client } from "@aws-sdk/client-ec2";
 import { EvalClient } from "./eval";
 import { GatewayClient } from "./gateway";
 import { HarnessClient } from "./harness";
@@ -17,6 +18,7 @@ import type {
   CreateCloudFormationClient,
   CreateControlClient,
   CreateDataClient,
+  CreateEc2Client,
   CreateIamClient,
   CreateLogsClient,
 } from "./types";
@@ -24,6 +26,7 @@ import type { Logger } from "../logging";
 import type { ProjectManager } from "../handlers/project/types";
 import { FsProjectManager } from "./project";
 import { describeBedrockAgent, type DescribeBedrockAgent } from "./project/bedrockAgent";
+import { createEc2Client as defaultCreateEc2Client } from "./factories";
 
 export type {
   AwsClients,
@@ -32,6 +35,7 @@ export type {
   CreateControlClient,
   CreateCloudFormationClient,
   CreateDataClient,
+  CreateEc2Client,
   CreateIamClient,
   CreateLogsClient,
 } from "./types";
@@ -40,6 +44,7 @@ type CoreClientConfig = {
   createCloudFormationClient?: CreateCloudFormationClient;
   createControlClient: CreateControlClient;
   createDataClient: CreateDataClient;
+  createEc2Client?: CreateEc2Client;
   createIamClient: CreateIamClient;
   createLogsClient: CreateLogsClient;
   logger: Logger;
@@ -56,11 +61,13 @@ type CoreClientConfig = {
 export class CoreClient implements AwsClients {
   private controlClients = new Map<string, BedrockAgentCoreControlClient>();
   private dataClients = new Map<string, BedrockAgentCoreClient>();
+  private ec2Clients = new Map<string, EC2Client>();
   private iamClients = new Map<string, IAMClient>();
   private logsClients = new Map<string, CloudWatchLogsClient>();
 
   private readonly createControlClient: CreateControlClient;
   private readonly createDataClient: CreateDataClient;
+  private readonly createEc2Client: CreateEc2Client;
   private readonly createIamClient: CreateIamClient;
   private readonly createLogsClient: CreateLogsClient;
   private logger: Logger;
@@ -80,6 +87,7 @@ export class CoreClient implements AwsClients {
   constructor(config: CoreClientConfig) {
     this.createControlClient = config.createControlClient;
     this.createDataClient = config.createDataClient;
+    this.createEc2Client = config.createEc2Client ?? defaultCreateEc2Client;
     this.createIamClient = config.createIamClient;
     this.createLogsClient = config.createLogsClient;
     this.logger = config.logger;
@@ -133,6 +141,16 @@ export class CoreClient implements AwsClients {
     if (!client) {
       client = this.createDataClient(config);
       this.dataClients.set(key, client);
+    }
+    return client;
+  }
+
+  ec2(config: ClientConfig): EC2Client {
+    const key = cacheKey(config);
+    let client = this.ec2Clients.get(key);
+    if (!client) {
+      client = this.createEc2Client(config);
+      this.ec2Clients.set(key, client);
     }
     return client;
   }

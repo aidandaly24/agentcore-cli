@@ -2,6 +2,7 @@ import type { BedrockAgentCoreControlClient } from "@aws-sdk/client-bedrock-agen
 import type { BedrockAgentCoreClient } from "@aws-sdk/client-bedrock-agentcore";
 import type { IAMClient } from "@aws-sdk/client-iam";
 import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import type { EC2Client } from "@aws-sdk/client-ec2";
 import type {
   CloudFormationClient,
   CloudFormationClientConfig,
@@ -36,6 +37,7 @@ export type CreateControlClient = (config: ClientConfig) => BedrockAgentCoreCont
 export type CreateDataClient = (config: ClientConfig) => BedrockAgentCoreClient;
 export type CreateIamClient = (config: ClientConfig) => IAMClient;
 export type CreateLogsClient = (config: ClientConfig) => CloudWatchLogsClient;
+export type CreateEc2Client = (config: ClientConfig) => EC2Client;
 export type CreateCloudFormationClient = (config: CredentialedClientConfig) => CloudFormationClient;
 export type CoreFetch = (
   ...args: Parameters<typeof globalThis.fetch>
@@ -54,4 +56,5 @@ export interface AwsClients {
   // results to. CloudWatch is a distinct service from the AgentCore data plane,
   // so it gets its own client/factory rather than reusing `data`.
   logs(config: ClientConfig): CloudWatchLogsClient;
+  ec2(config: ClientConfig): EC2Client;
 }
