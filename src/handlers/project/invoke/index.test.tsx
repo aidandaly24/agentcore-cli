@@ -7,7 +7,7 @@ import type {
   GetAgentRuntimeResponse,
   GetHarnessResponse,
 } from "@aws-sdk/client-bedrock-agentcore-control";
-import type { ProjectBackend, ResolveDeployedResourceBackendInput } from "../../../core/project";
+import type { ProjectBackend, ResolveDeployedResourcesBackendInput } from "../../../core/project";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
 import { ProjectKey, ValueContext, type Context } from "../../../router";
 import {
@@ -71,16 +71,27 @@ async function inProject(resources: {
 }
 
 function backend() {
-  const calls: ResolveDeployedResourceBackendInput[] = [];
+  const calls: ResolveDeployedResourcesBackendInput[] = [];
   const value: ProjectBackend = {
     async *build() {},
     async *deploy() {
       yield* [];
       return { outputs: {} };
     },
-    async resolveDeployedResource(_project, input) {
+    async resolveDeployedResources(project, input) {
       calls.push(input);
-      return input.resourceType === "runtime" ? RUNTIME_ID : HARNESS_ID;
+      return [
+        ...project.spec.runtimes.map(({ name }) => ({
+          resourceType: "runtime" as const,
+          name,
+          id: RUNTIME_ID,
+        })),
+        ...project.spec.harnesses.map(({ name }) => ({
+          resourceType: "harness" as const,
+          name,
+          id: HARNESS_ID,
+        })),
+      ];
     },
   };
   return { calls, value };
@@ -151,7 +162,7 @@ describe("project invoke", () => {
     expect(request.contentType).toBe("application/custom+json");
     expect(core.runtime.calls.at(-1)!.args[1]).toEqual({ region: TARGET.region });
     expect(io.stdout()).toBe("runtime response");
-    expect(resolved.calls).toEqual([{ target: TARGET, resourceType: "runtime", name: "checkout" }]);
+    expect(resolved.calls).toEqual([{ target: TARGET }]);
   });
 
   test("invokes a named Harness with its existing prompt contract in the target region", async () => {
