@@ -153,7 +153,7 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
   if (buildType === "Container" && networkConfig && networkConfig.vpcId === undefined) {
     throw new InputValidationError(
       `Harness "${spec.name}" runs in a VPC and exports as a Container build, which CodeBuild ` +
-        `cannot perform without an explicit VPC id. Re-export with --vpc-id vpc-xxxxxxxx.`,
+        `cannot perform without an explicit VPC id. Re-export with --vpc-id <vpcId>.`,
     );
   }
 

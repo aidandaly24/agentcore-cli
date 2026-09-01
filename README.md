@@ -145,6 +145,9 @@ mapped mechanically. Pass `--name <harness>` for an in-project harness or
 `--arn <harnessArn>` to fetch a deployed one (the fetch uses the region
 embedded in the ARN); `--target-agent-name` overrides the default
 `<harnessName>Agent`, and `--build CodeZip|Container` overrides the build type.
+A Container build in VPC mode also needs `--vpc-id <vpcId>`: the export layers
+the agent onto the harness image with a generated Dockerfile, and the CodeBuild
+project that builds it cannot infer the VPC from subnets alone.
 
 Global flags (declared at the root, available on every command):
 

@@ -617,6 +617,23 @@ describe("mapHarnessToExportPlan build types and Dockerfiles", () => {
     ).toThrow(InputValidationError);
   });
 
+  test("rejects a VPC container export with no vpcId and accepts one supplied by the caller", () => {
+    const vpcContainerHarness = harness({
+      containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
+      networkMode: "VPC",
+      networkConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
+    });
+
+    expect(() => plan({ spec: vpcContainerHarness })).toThrow(InputValidationError);
+
+    const result = plan({ spec: vpcContainerHarness, vpcId: "vpc-12345678" });
+    expect(result.runtime.networkConfig).toEqual({
+      subnets: ["subnet-12345678"],
+      securityGroups: ["sg-12345678"],
+      vpcId: "vpc-12345678",
+    });
+  });
+
   test("copies a custom harness Dockerfile with a build-layer note when it exists", () => {
     const result = plan({
       spec: harness({ dockerfile: "Dockerfile" }),

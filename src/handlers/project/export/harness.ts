@@ -3,8 +3,11 @@ import { InputValidationError } from "../../../errors";
 import { createHandler, flag, ProjectKey } from "../../../router";
 import { JsonRendererKey } from "../../../tui";
 import { JsonKey } from "../../keys";
-import { AgentNameSchema, BuildTypeSchema } from "../../../projectSchemas/runtime";
-import { VPC_ID_PATTERN } from "../../../projectSchemas/constants";
+import {
+  AgentNameSchema,
+  BuildTypeSchema,
+  NetworkConfigSchema,
+} from "../../../projectSchemas/runtime";
 import { formatExportNotes } from "../../../core/project/templates/export";
 import { coreOptsFromCtx } from "../../utils";
 import type { ExportHarnessInput } from "../types";
@@ -35,7 +38,7 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
       flag(
         "vpc-id",
         "VPC id for a Container build in VPC mode (CodeBuild cannot infer it from subnets)",
-        z.string().regex(VPC_ID_PATTERN, "Must be a VPC id (vpc-...)").optional(),
+        NetworkConfigSchema.shape.vpcId,
       ),
     ],
     handle: async (ctx, flags) => {

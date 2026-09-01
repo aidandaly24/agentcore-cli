@@ -309,9 +309,7 @@ describe("project export harness handler", () => {
     await inProjectWithHarness(subject);
     setVpcContainerHarness(subject);
 
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(
-      /runs in a VPC and exports as a Container build.*--vpc-id/s,
-    );
+    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/without an explicit VPC id/);
   });
 
   test("validates the project before fetching from the service", async () => {
