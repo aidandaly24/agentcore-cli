@@ -35,7 +35,6 @@ function stubClients(dataset: Record<string, unknown>): AwsClients {
   return {
     control: () => client,
     data: () => client,
-    ec2: () => client,
     iam: () => client,
     logs: () => client,
   };

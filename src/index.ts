@@ -12,7 +12,6 @@ import {
   createCloudFormationClient,
   createControlClient,
   createDataClient,
-  createEc2Client,
   createIamClient,
   createLogsClient,
 } from "./core/factories";
@@ -71,7 +70,6 @@ process.exit(
         createCloudFormationClient,
         createControlClient,
         createDataClient,
-        createEc2Client,
         createIamClient,
         createLogsClient,
         logger: rootLogger.child({ module: "core" }),

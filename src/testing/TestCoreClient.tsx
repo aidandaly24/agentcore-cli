@@ -356,7 +356,6 @@ export class TestHarnessClient implements CoreHarnessClient {
   private createEndpointResponse: CreateHarnessEndpointResponse = DEFAULT_CREATE_ENDPOINT_RESPONSE;
   private updateEndpointResponse: UpdateHarnessEndpointResponse = DEFAULT_UPDATE_ENDPOINT_RESPONSE;
   private deleteEndpointResponse: DeleteHarnessEndpointResponse = DEFAULT_DELETE_ENDPOINT_RESPONSE;
-  private resolvedVpcId = "vpc-0123456789abcdef0";
   private error?: Error;
 
   // setListResponse sets what listHarnesses resolves to (when not erroring).
@@ -469,11 +468,6 @@ export class TestHarnessClient implements CoreHarnessClient {
     return this;
   }
 
-  setResolvedVpcId(vpcId: string): this {
-    this.resolvedVpcId = vpcId;
-    return this;
-  }
-
   // setError makes every subsequent call reject with `error`. Pass undefined to
   // clear it.
   setError(error: Error | undefined): this {
@@ -539,12 +533,6 @@ export class TestHarnessClient implements CoreHarnessClient {
     this.calls.push({ method: "getHarness", args: [id, options] });
     if (this.error) throw this.error;
     return this.getResponse;
-  }
-
-  async resolveVpcIdFromSubnets(subnetIds: string[], options: CoreOptions): Promise<string> {
-    this.calls.push({ method: "resolveVpcIdFromSubnets", args: [subnetIds, options] });
-    if (this.error) throw this.error;
-    return this.resolvedVpcId;
   }
 
   async getHarnessVersion(

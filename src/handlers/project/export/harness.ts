@@ -4,7 +4,6 @@ import { createHandler, flag, ProjectKey } from "../../../router";
 import { JsonRendererKey } from "../../../tui";
 import { JsonKey } from "../../keys";
 import { AgentNameSchema, BuildTypeSchema } from "../../../projectSchemas/runtime";
-import { isContainerBuild } from "../../../projectSchemas/constants";
 import { formatExportNotes } from "../../../core/project/templates/export";
 import { coreOptsFromCtx } from "../../utils";
 import type { ExportHarnessInput } from "../types";
@@ -58,17 +57,6 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
           throw new InputValidationError(`the service returned no harness for "${flags.arn}"`);
         }
         const { spec, systemPrompt, notes } = mapServiceHarnessToSpec(response.harness);
-        if (
-          isContainerBuild(spec) &&
-          spec.networkMode === "VPC" &&
-          spec.networkConfig &&
-          !spec.networkConfig.vpcId
-        ) {
-          spec.networkConfig.vpcId = await config.core.harness.resolveVpcIdFromSubnets(
-            spec.networkConfig.subnets,
-            { region },
-          );
-        }
         input = {
           prefetched: { spec, systemPrompt, notes },
           targetAgentName: resolveTargetAgentName(flags["target-agent-name"], spec.name),

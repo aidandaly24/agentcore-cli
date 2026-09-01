@@ -207,9 +207,6 @@ function recordingGatewayClient(responses: unknown[]): {
     data: () => {
       throw new Error("unexpected data client");
     },
-    ec2: () => {
-      throw new Error("unexpected EC2 client");
-    },
     iam: () => {
       throw new Error("unexpected IAM client");
     },

@@ -35,13 +35,11 @@ import {
   type InvokeHarnessRequest,
   type InvokeHarnessResponse,
 } from "@aws-sdk/client-bedrock-agentcore";
-import { DescribeSubnetsCommand } from "@aws-sdk/client-ec2";
 import type { CoreHarnessClient, CreateHarnessInput } from "../handlers/harness/types";
 import type { AwsClients, CoreOptions } from "./types";
 import { abortable } from "./abortable";
 import { ensureDefaultExecutionRole } from "./executionRole";
 import { toClientConfig } from "./utils";
-import { InputValidationError, MalformedServiceResponseError } from "../errors";
 
 // HarnessClient implements the harness-facing operations on top of the shared AWS
 // clients provided by CoreClient. It owns no clients of its own; it borrows the
@@ -53,27 +51,6 @@ export class HarnessClient implements CoreHarnessClient {
     return this.clients
       .control(toClientConfig(options))
       .send(new GetHarnessCommand({ harnessId: id }));
-  }
-
-  async resolveVpcIdFromSubnets(subnetIds: string[], options: CoreOptions): Promise<string> {
-    const response = await this.clients
-      .ec2({ region: options.region })
-      .send(new DescribeSubnetsCommand({ SubnetIds: subnetIds }));
-    const vpcIds = new Set(
-      (response.Subnets ?? []).map((subnet) => subnet.VpcId).filter((vpcId) => vpcId !== undefined),
-    );
-    if (vpcIds.size === 0) {
-      throw new MalformedServiceResponseError(
-        `EC2 returned no VPC ID for subnet${subnetIds.length === 1 ? "" : "s"} ${subnetIds.join(", ")}`,
-      );
-    }
-    if (vpcIds.size > 1) {
-      throw new InputValidationError(
-        `the harness subnets span multiple VPCs (${[...vpcIds].join(", ")}); ` +
-          "a Container build requires all subnets to belong to one VPC",
-      );
-    }
-    return [...vpcIds][0]!;
   }
 
   async getHarnessVersion(

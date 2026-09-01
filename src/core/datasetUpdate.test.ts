@@ -84,7 +84,6 @@ function stubClients(options: {
   return {
     control: () => client,
     data: () => client,
-    ec2: () => client,
     iam: () => client,
     logs: () => client,
   };

@@ -5,7 +5,6 @@ import {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type { IAMClient } from "@aws-sdk/client-iam";
 import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
-import type { EC2Client } from "@aws-sdk/client-ec2";
 import {
   GetEventCommand,
   GetMemoryRecordCommand,
@@ -81,10 +80,6 @@ function fakeIam(config: ClientConfig): IAMClient {
 function fakeLogs(config: ClientConfig): CloudWatchLogsClient {
   return { config, kind: "logs" } as unknown as CloudWatchLogsClient;
 }
-function fakeEc2(config: ClientConfig): EC2Client {
-  return { config, kind: "ec2" } as unknown as EC2Client;
-}
-
 function coreWithDataSend(
   send: (command: unknown, options: unknown) => Promise<unknown>,
   logger: Logger = createSilentLogger(),
@@ -200,27 +195,6 @@ test("data() caches independently of control()", () => {
   expect(d1).toBe(d2);
   expect(controlBuilt).toBe(1);
   expect(dataBuilt).toBe(1);
-});
-
-test("ec2() constructs a client once per config and caches it", () => {
-  let built = 0;
-  const core = new CoreClient({
-    createControlClient: fakeControl,
-    createDataClient: fakeData,
-    createEc2Client: (config) => {
-      built++;
-      return fakeEc2(config);
-    },
-    createIamClient: fakeIam,
-    createLogsClient: fakeLogs,
-    logger: createSilentLogger(),
-  });
-
-  const first = core.ec2({ region: "us-east-1" });
-  const second = core.ec2({ region: "us-east-1" });
-
-  expect(first).toBe(second);
-  expect(built).toBe(1);
 });
 
 test("exposes feature sub-clients", () => {
