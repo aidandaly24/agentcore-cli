@@ -306,10 +306,17 @@ describe("project export harness handler", () => {
   // here rather than writing a project that dies at `project build`.
   test("requires --vpc-id for a container build in VPC mode", async () => {
     const subject = testExportCommand();
-    await inProjectWithHarness(subject);
+    const projectRoot = await inProjectWithHarness(subject);
     setVpcContainerHarness(subject);
+    const specBefore = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).text();
 
     await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/without an explicit VPC id/);
+
+    // The point is failing before anything is written, so moving the throw later must break this.
+    expect(await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).text()).toBe(
+      specBefore,
+    );
+    expect(existsSync(join(projectRoot, "app", "remote_containerAgent"))).toBe(false);
   });
 
   test("validates the project before fetching from the service", async () => {

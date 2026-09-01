@@ -54,6 +54,9 @@ describe("harness ARN helpers", () => {
     expect(() =>
       harnessIdFromArn("arn:aws:bedrock-agentcore::111122223333:harness/h-abc123"),
     ).toThrow(InputValidationError);
+    expect(() =>
+      harnessIdFromArn("arn:aws:bedrock-agentcore:us-west-2:12345:harness/h-abc123"),
+    ).toThrow(InputValidationError);
   });
 });
 
@@ -259,9 +262,10 @@ describe("mapServiceHarnessToSpec", () => {
   });
 
   // The pinned CDK only maps additionalParams for lite_llm, so carrying it on another provider
-  // would produce a harness.json that fails at synth. Drop it with a note; keep it for lite_llm.
-  test("notes additionalParams the CDK cannot map, and keeps them for lite_llm", () => {
-    const dropped = mapServiceHarnessToSpec(
+  // would produce a harness.json that fails at synth. The lite_llm keep-path is already asserted
+  // by "maps openai and litellm model configs" above.
+  test("notes additionalParams the CDK cannot map", () => {
+    const { spec, notes } = mapServiceHarnessToSpec(
       serviceHarness({
         model: {
           bedrockModelConfig: {
@@ -271,23 +275,9 @@ describe("mapServiceHarnessToSpec", () => {
         },
       } as Partial<Harness>),
     );
-    expect(dropped.spec.model.additionalParams).toBeUndefined();
-    expect(dropped.notes.map((note) => note.category)).toEqual([
-      SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
-    ]);
 
-    const kept = mapServiceHarnessToSpec(
-      serviceHarness({
-        model: {
-          liteLlmModelConfig: {
-            modelId: "bedrock/us.amazon.nova-lite-v1:0",
-            additionalParams: { max_retries: 2 },
-          },
-        },
-      } as Partial<Harness>),
-    );
-    expect(kept.spec.model.additionalParams).toEqual({ max_retries: 2 });
-    expect(kept.notes).toEqual([]);
+    expect(spec.model.additionalParams).toBeUndefined();
+    expect(notes.map((note) => note.category)).toEqual([SERVICE_FIELD_OMITTED_NOTE_CATEGORY]);
   });
 
   test("notes external-memory tuning that cannot be wired automatically", () => {
