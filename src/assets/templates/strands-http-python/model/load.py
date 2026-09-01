@@ -1,9 +1,6 @@
 {{#if (eq modelProvider "Bedrock")}}
 {{#if bedrockMantle}}
 import os
-{{#if modelAdditionalParams}}
-import json
-{{/if}}
 
 from aws_bedrock_token_generator import provide_token
 {{#if (eq mantleApiFormat "chat_completions")}}
@@ -37,7 +34,7 @@ def load_model():
     {{/if}}
     client_args = {"api_key": token, "base_url": base_url}
 
-    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
+    params = {}
     {{#if modelMaxTokens}}
     {{#if (eq mantleApiFormat "chat_completions")}}
     params["max_completion_tokens"] = {{modelMaxTokens}}
@@ -63,9 +60,6 @@ def load_model():
     {{/if}}
     {{/if}}
 {{else}}
-{{#if modelAdditionalParams}}
-import json
-{{/if}}
 from strands.models.bedrock import BedrockModel
 
 
@@ -76,7 +70,6 @@ def load_model() -> BedrockModel:
         {{#if modelMaxTokens}}max_tokens={{modelMaxTokens}},
         {{/if}}{{#if modelTemperature}}temperature={{modelTemperature}},
         {{/if}}{{#if modelTopP}}top_p={{modelTopP}},
-        {{/if}}{{#if modelAdditionalParams}}additional_request_fields=json.loads({{pyJsonStr modelAdditionalParams}}),
         {{/if}}
     )
 {{/if}}
@@ -122,9 +115,6 @@ def load_model() -> AnthropicModel:
 {{/if}}
 {{#if (eq modelProvider "OpenAI")}}
 import os
-{{#if modelAdditionalParams}}
-import json
-{{/if}}
 
 {{#if (eq modelApiFormat "responses")}}
 from strands.models.openai_responses import OpenAIResponsesModel
@@ -160,7 +150,7 @@ def _get_api_key() -> str:
 
 def load_model():
     """Get authenticated OpenAI model client."""
-    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
+    params = {}
     {{#if modelMaxTokens}}
     params["{{#if (eq modelApiFormat "responses")}}max_output_tokens{{else}}max_completion_tokens{{/if}}"] = {{modelMaxTokens}}
     {{/if}}
@@ -178,9 +168,6 @@ def load_model():
 {{/if}}
 {{#if (eq modelProvider "Gemini")}}
 import os
-{{#if modelAdditionalParams}}
-import json
-{{/if}}
 
 from strands.models.gemini import GeminiModel
 from bedrock_agentcore.identity.auth import requires_api_key
@@ -212,7 +199,7 @@ def _get_api_key() -> str:
 
 def load_model() -> GeminiModel:
     """Get authenticated Gemini model client."""
-    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
+    params = {}
     {{#if modelMaxTokens}}
     params["max_output_tokens"] = {{modelMaxTokens}}
     {{/if}}
@@ -233,7 +220,7 @@ def load_model() -> GeminiModel:
 {{/if}}
 {{#if (eq modelProvider "LiteLLM")}}
 import os
-{{#if modelAdditionalParams}}
+{{#if litellmAdditionalParams}}
 import json
 {{/if}}
 
@@ -278,7 +265,7 @@ def load_model() -> LiteLLMModel:
     {{#if litellmApiBase}}
     client_args["api_base"] = {{safeJson litellmApiBase}}
     {{/if}}
-    params = {{#if modelAdditionalParams}}json.loads({{pyJsonStr modelAdditionalParams}}){{else}}{}{{/if}}
+    params = {{#if litellmAdditionalParams}}json.loads({{pyJsonStr litellmAdditionalParams}}){{else}}{}{{/if}}
     {{#if modelMaxTokens}}
     params["max_tokens"] = {{modelMaxTokens}}
     {{/if}}
