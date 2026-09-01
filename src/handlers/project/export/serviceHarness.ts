@@ -47,11 +47,22 @@ export function mapServiceHarnessToSpec(harness: Harness): {
   notes: ExportNote[];
 } {
   const notes: ExportNote[] = [];
-  const joinedPrompt = (harness.systemPrompt ?? [])
+  const promptBlocks = harness.systemPrompt ?? [];
+  const joinedPrompt = promptBlocks
     .map((block) => ("text" in block ? block.text : undefined))
     .filter((text): text is string => typeof text === "string" && text.length > 0)
     .join("\n");
   const systemPrompt = joinedPrompt.length > 0 ? joinedPrompt : undefined;
+  for (const block of promptBlocks) {
+    if ("text" in block && typeof block.text === "string" && block.text.length > 0) continue;
+    const unknown = unknownMemberName(block);
+    notes.push({
+      category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+      message:
+        `A system prompt block${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
+        "its service payload was unknown or incomplete.",
+    });
+  }
 
   const candidate = clean({
     name: harness.harnessName,

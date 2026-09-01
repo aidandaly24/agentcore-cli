@@ -102,6 +102,26 @@ describe("mapServiceHarnessToSpec", () => {
     expect(spec.executionRoleArn).toBeUndefined();
   });
 
+  test("notes unknown system prompt blocks while preserving recognized text", () => {
+    const { systemPrompt, notes } = mapServiceHarnessToSpec(
+      serviceHarness({
+        systemPrompt: [
+          { text: "Be terse." },
+          { $unknown: ["futurePrompt", {}] },
+        ] as Harness["systemPrompt"],
+      }),
+    );
+
+    expect(systemPrompt).toBe("Be terse.");
+    expect(notes).toEqual([
+      {
+        category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+        message:
+          'A system prompt block of type "futurePrompt" was omitted because its service payload was unknown or incomplete.',
+      },
+    ]);
+  });
+
   test("maps every skill source variant and notes unknown members", () => {
     const { spec, notes } = mapServiceHarnessToSpec(
       serviceHarness({
