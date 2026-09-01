@@ -80,6 +80,7 @@ function fakeIam(config: ClientConfig): IAMClient {
 function fakeLogs(config: ClientConfig): CloudWatchLogsClient {
   return { config, kind: "logs" } as unknown as CloudWatchLogsClient;
 }
+
 function coreWithDataSend(
   send: (command: unknown, options: unknown) => Promise<unknown>,
   logger: Logger = createSilentLogger(),
