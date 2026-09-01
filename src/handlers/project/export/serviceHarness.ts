@@ -110,7 +110,7 @@ function mapModel(model: Harness["model"], notes: ExportNote[]): Record<string, 
       temperature: c.temperature,
       topP: c.topP,
       maxTokens: c.maxTokens,
-      additionalParams: mapAdditionalParams("bedrock", c.additionalParams, notes),
+      additionalParams: omitUnsupportedAdditionalParams("bedrock", c.additionalParams, notes),
     });
   }
   if (model?.openAiModelConfig) {
@@ -123,7 +123,7 @@ function mapModel(model: Harness["model"], notes: ExportNote[]): Record<string, 
       temperature: c.temperature,
       topP: c.topP,
       maxTokens: c.maxTokens,
-      additionalParams: mapAdditionalParams("open_ai", c.additionalParams, notes),
+      additionalParams: omitUnsupportedAdditionalParams("open_ai", c.additionalParams, notes),
     });
   }
   if (model?.geminiModelConfig) {
@@ -136,7 +136,7 @@ function mapModel(model: Harness["model"], notes: ExportNote[]): Record<string, 
       topP: c.topP,
       topK: c.topK,
       maxTokens: c.maxTokens,
-      additionalParams: mapAdditionalParams("gemini", c.additionalParams, notes),
+      additionalParams: omitUnsupportedAdditionalParams("gemini", c.additionalParams, notes),
     });
   }
   if (model?.liteLlmModelConfig) {
@@ -162,9 +162,12 @@ function mapModel(model: Harness["model"], notes: ExportNote[]): Record<string, 
  * field on every other provider, so mapping it verbatim would produce a spec that fails at synth.
  * Drop it with a note instead of writing an undeployable harness.
  */
-function mapAdditionalParams(provider: string, value: unknown, notes: ExportNote[]): unknown {
+function omitUnsupportedAdditionalParams(
+  provider: "bedrock" | "open_ai" | "gemini",
+  value: unknown,
+  notes: ExportNote[],
+): undefined {
   if (value === undefined) return undefined;
-  if (provider === "lite_llm") return value;
   notes.push({
     category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
     message:

@@ -186,7 +186,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
     expect(result.context.modelProvider).toBe("LiteLLM");
     expect(result.context.strandsExtras).toBe("litellm");
     expect(result.context.litellmApiBase).toBe("https://litellm.example");
-    expect(result.context.modelAdditionalParams).toEqual({ max_retries: 2 });
+    expect(result.context.litellmAdditionalParams).toEqual({ max_retries: 2 });
     expect(result.context.modelMaxTokens).toBe("300");
     expect(result.context.modelTemperature).toBe("0.1");
     expect(result.context.modelTopP).toBe("0.7");

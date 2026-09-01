@@ -337,7 +337,6 @@ function resolveModel(
   const context: Record<string, unknown> = {
     modelId: model.modelId,
     modelApiFormat: model.apiFormat,
-    modelAdditionalParams: model.additionalParams,
     // Stringified so a legal 0 (temperature/topP) stays truthy for {{#if}}.
     modelMaxTokens: model.maxTokens !== undefined ? String(model.maxTokens) : undefined,
     modelTemperature: model.temperature !== undefined ? String(model.temperature) : undefined,
@@ -400,6 +399,9 @@ function resolveModel(
       context.modelProvider = "LiteLLM";
       context.strandsExtras = "litellm";
       if (model.apiBase) context.litellmApiBase = model.apiBase;
+      if (model.additionalParams && Object.keys(model.additionalParams).length > 0) {
+        context.litellmAdditionalParams = model.additionalParams;
+      }
       if (model.apiKeyArn) {
         attachIdentityProvider(
           context,
