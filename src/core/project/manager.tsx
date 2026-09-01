@@ -694,6 +694,7 @@ export class FsProjectManager implements ProjectManager {
       systemPrompt,
       projectSpec,
       build: input.build,
+      vpcId: input.vpcId,
       sourceNotes: input.prefetched?.notes,
       harnessDockerfileExists:
         spec.dockerfile !== undefined &&

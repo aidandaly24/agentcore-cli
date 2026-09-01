@@ -256,6 +256,8 @@ export type ExportHarnessInput = {
   targetAgentName: string;
   /** Build override; when absent the harness spec decides (CodeZip unless it demands Container). */
   build?: BuildType;
+  /** VPC id for a Container build in VPC mode; CodeBuild cannot infer one from subnets. */
+  vpcId?: string;
 };
 
 /** Result of {@link ProjectManager.exportHarness}. */

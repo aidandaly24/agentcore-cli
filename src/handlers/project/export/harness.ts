@@ -4,6 +4,7 @@ import { createHandler, flag, ProjectKey } from "../../../router";
 import { JsonRendererKey } from "../../../tui";
 import { JsonKey } from "../../keys";
 import { AgentNameSchema, BuildTypeSchema } from "../../../projectSchemas/runtime";
+import { VPC_ID_PATTERN } from "../../../projectSchemas/constants";
 import { formatExportNotes } from "../../../core/project/templates/export";
 import { coreOptsFromCtx } from "../../utils";
 import type { ExportHarnessInput } from "../types";
@@ -30,6 +31,11 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
         "build",
         "build type for the exported agent: CodeZip or Container",
         BuildTypeSchema.optional(),
+      ),
+      flag(
+        "vpc-id",
+        "VPC id for a Container build in VPC mode (CodeBuild cannot infer it from subnets)",
+        z.string().regex(VPC_ID_PATTERN, "Must be a VPC id (vpc-...)").optional(),
       ),
     ],
     handle: async (ctx, flags) => {
@@ -61,12 +67,14 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
           prefetched: { spec, systemPrompt, notes },
           targetAgentName: resolveTargetAgentName(flags["target-agent-name"], spec.name),
           build: flags.build,
+          vpcId: flags["vpc-id"],
         };
       } else {
         input = {
           harnessName: flags.name!,
           targetAgentName: resolveTargetAgentName(flags["target-agent-name"], flags.name!),
           build: flags.build,
+          vpcId: flags["vpc-id"],
         };
       }
 

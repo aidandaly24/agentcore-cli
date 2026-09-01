@@ -49,6 +49,8 @@ export interface HarnessExportInput {
   projectSpec: ProjectSpec;
   /** Build override from --build; when absent the harness spec decides. */
   build?: BuildType;
+  /** VPC id from --vpc-id, for Container builds in VPC mode (see mapHarnessToExportPlan). */
+  vpcId?: string;
   /** Notes collected while converting a service response into a local harness spec. */
   sourceNotes?: ExportNote[];
   /**
@@ -137,6 +139,21 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     throw new InputValidationError(
       `Harness "${spec.name}" uses ${what}, which requires a Container build. ` +
         `Re-export with --build Container.`,
+    );
+  }
+
+  // A Container build is produced by CodeBuild, whose CreateProject API needs an explicit vpcId
+  // and cannot infer one from subnets. Neither source of a harness carries one: the service's
+  // VpcConfig has no vpcId field, and a local containerUri harness is never built (so its schema
+  // rightly does not demand one). Export is what turns it into a build, so export must ask.
+  const networkConfig =
+    spec.networkMode === "VPC" && spec.networkConfig
+      ? { ...spec.networkConfig, ...(input.vpcId !== undefined && { vpcId: input.vpcId }) }
+      : undefined;
+  if (buildType === "Container" && networkConfig && networkConfig.vpcId === undefined) {
+    throw new InputValidationError(
+      `Harness "${spec.name}" runs in a VPC and exports as a Container build, which CodeBuild ` +
+        `cannot perform without an explicit VPC id. Re-export with --vpc-id vpc-xxxxxxxx.`,
     );
   }
 
@@ -257,7 +274,7 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     ...(buildType === "Container" && { dockerfile: "Dockerfile" }),
     ...(envVars.length > 0 && { envVars }),
     ...(spec.networkMode && { networkMode: spec.networkMode }),
-    ...(spec.networkMode === "VPC" && spec.networkConfig && { networkConfig: spec.networkConfig }),
+    ...(networkConfig && { networkConfig }),
     ...(spec.authorizerType && { authorizerType: spec.authorizerType }),
     ...(spec.authorizerConfiguration && {
       authorizerConfiguration: spec.authorizerConfiguration,

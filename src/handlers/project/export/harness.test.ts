@@ -248,9 +248,8 @@ describe("project export harness handler", () => {
     expect(existsSync(join(projectRoot, "app", "remote_harnessAgent", "main.py"))).toBe(true);
   });
 
-  test("preserves service VPC configuration without additional lookups", async () => {
-    const subject = testExportCommand();
-    const projectRoot = await inProjectWithHarness(subject);
+  /** A container harness in VPC mode, whose service VpcConfig carries no vpcId (the API has none). */
+  function setVpcContainerHarness(subject: ReturnType<typeof testExportCommand>) {
     subject.core.harness.setGetResponse({
       harness: {
         harnessName: "remote_container",
@@ -273,9 +272,17 @@ describe("project export harness handler", () => {
         },
       },
     } as never);
+  }
 
-    await subject.run(["--arn", HARNESS_ARN]);
+  test("preserves service VPC configuration without additional lookups", async () => {
+    const subject = testExportCommand();
+    const projectRoot = await inProjectWithHarness(subject);
+    setVpcContainerHarness(subject);
 
+    await subject.run(["--arn", HARNESS_ARN, "--vpc-id", "vpc-0123456789abcdef0"]);
+
+    // The vpcId comes from the flag, never from an extra AWS call: the harness API's VpcConfig
+    // has no vpcId field, so getHarness must remain the only request.
     expect(subject.core.harness.calls).toEqual([
       {
         method: "getHarness",
@@ -290,7 +297,21 @@ describe("project export harness handler", () => {
     expect(runtime.networkConfig).toEqual({
       subnets: ["subnet-0123456789abcdef0"],
       securityGroups: ["sg-0123456789abcdef0"],
+      vpcId: "vpc-0123456789abcdef0",
     });
+  });
+
+  // Export turns a containerUri harness into a Dockerfile build so the agent code can be layered
+  // in, which makes CodeBuild's vpcId mandatory where the source harness never needed one. Fail
+  // here rather than writing a project that dies at `project build`.
+  test("requires --vpc-id for a container build in VPC mode", async () => {
+    const subject = testExportCommand();
+    await inProjectWithHarness(subject);
+    setVpcContainerHarness(subject);
+
+    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(
+      /runs in a VPC and exports as a Container build.*--vpc-id/s,
+    );
   });
 
   test("validates the project before fetching from the service", async () => {
