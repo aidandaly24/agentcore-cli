@@ -55,7 +55,7 @@ export function mapServiceHarnessToSpec(harness: Harness): {
 
   const candidate = clean({
     name: harness.harnessName,
-    model: mapModel(harness.model),
+    model: mapModel(harness.model, notes),
     tools: (harness.tools ?? []).map((tool) =>
       clean({
         type: tool.type,
@@ -89,7 +89,7 @@ export function mapServiceHarnessToSpec(harness: Harness): {
   return { spec: parsed.data, systemPrompt, notes };
 }
 
-function mapModel(model: Harness["model"]): Record<string, unknown> {
+function mapModel(model: Harness["model"], notes: ExportNote[]): Record<string, unknown> {
   if (model?.bedrockModelConfig) {
     const c = model.bedrockModelConfig;
     return clean({
@@ -99,7 +99,7 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
       temperature: c.temperature,
       topP: c.topP,
       maxTokens: c.maxTokens,
-      additionalParams: c.additionalParams,
+      additionalParams: mapAdditionalParams("bedrock", c.additionalParams, notes),
     });
   }
   if (model?.openAiModelConfig) {
@@ -112,7 +112,7 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
       temperature: c.temperature,
       topP: c.topP,
       maxTokens: c.maxTokens,
-      additionalParams: c.additionalParams,
+      additionalParams: mapAdditionalParams("open_ai", c.additionalParams, notes),
     });
   }
   if (model?.geminiModelConfig) {
@@ -125,7 +125,7 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
       topP: c.topP,
       topK: c.topK,
       maxTokens: c.maxTokens,
-      additionalParams: c.additionalParams,
+      additionalParams: mapAdditionalParams("gemini", c.additionalParams, notes),
     });
   }
   if (model?.liteLlmModelConfig) {
@@ -144,6 +144,24 @@ function mapModel(model: Harness["model"]): Record<string, unknown> {
   throw new MalformedServiceResponseError(
     "The fetched harness has no recognized model configuration.",
   );
+}
+
+/**
+ * Only lite_llm carries additionalParams through to CFN — the CDK's harness schema rejects the
+ * field on every other provider, so mapping it verbatim would produce a spec that fails at synth.
+ * Drop it with a note instead of writing an undeployable harness.
+ */
+function mapAdditionalParams(provider: string, value: unknown, notes: ExportNote[]): unknown {
+  if (value === undefined) return undefined;
+  if (provider === "lite_llm") return value;
+  notes.push({
+    category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+    message:
+      `The harness model's additionalParams were omitted because they are only supported for ` +
+      `the "lite_llm" provider (this harness uses "${provider}"). Set the equivalent options ` +
+      `directly in the generated model/load.py if the exported agent needs them.`,
+  });
+  return undefined;
 }
 
 /** Service skill union -> the flat local skill shape. */

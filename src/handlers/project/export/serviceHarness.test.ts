@@ -258,6 +258,38 @@ describe("mapServiceHarnessToSpec", () => {
     ]);
   });
 
+  // The pinned CDK only maps additionalParams for lite_llm, so carrying it on another provider
+  // would produce a harness.json that fails at synth. Drop it with a note; keep it for lite_llm.
+  test("notes additionalParams the CDK cannot map, and keeps them for lite_llm", () => {
+    const dropped = mapServiceHarnessToSpec(
+      serviceHarness({
+        model: {
+          bedrockModelConfig: {
+            modelId: "us.amazon.nova-lite-v1:0",
+            additionalParams: { custom_parameter: true },
+          },
+        },
+      } as Partial<Harness>),
+    );
+    expect(dropped.spec.model.additionalParams).toBeUndefined();
+    expect(dropped.notes.map((note) => note.category)).toEqual([
+      SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+    ]);
+
+    const kept = mapServiceHarnessToSpec(
+      serviceHarness({
+        model: {
+          liteLlmModelConfig: {
+            modelId: "bedrock/us.amazon.nova-lite-v1:0",
+            additionalParams: { max_retries: 2 },
+          },
+        },
+      } as Partial<Harness>),
+    );
+    expect(kept.spec.model.additionalParams).toEqual({ max_retries: 2 });
+    expect(kept.notes).toEqual([]);
+  });
+
   test("notes external-memory tuning that cannot be wired automatically", () => {
     const { spec, notes } = mapServiceHarnessToSpec(
       serviceHarness({

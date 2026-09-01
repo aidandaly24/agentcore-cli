@@ -126,7 +126,6 @@ describe("mapHarnessToExportPlan model mapping", () => {
           maxTokens: 768,
           temperature: 0.2,
           topP: 0.8,
-          additionalParams: { store: false },
           apiKeyArn:
             "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/MyOpenAiKey",
         },
@@ -139,7 +138,6 @@ describe("mapHarnessToExportPlan model mapping", () => {
     expect(result.context.modelMaxTokens).toBe("768");
     expect(result.context.modelTemperature).toBe("0.2");
     expect(result.context.modelTopP).toBe("0.8");
-    expect(result.context.modelAdditionalParams).toEqual({ store: false });
     expect(result.context.hasIdentity).toBe(true);
     expect(result.context.identityProviders).toEqual([
       { name: "MyOpenAiKey", envVarName: "AGENTCORE_CREDENTIAL_MYOPENAIKEY" },
