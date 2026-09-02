@@ -1,5 +1,8 @@
 import type { BedrockAgentImportNote, BedrockAgentSnapshot } from "./types";
 
+// Renders IMPORT_NOTES.md, the file telling the customer what the import could not translate and
+// must be finished by hand: action groups generated as stubs, IAM permissions the deployment does
+// not grant, and framework gaps. What goes in it is decided by baseTranslator's addCommonNotes.
 export const IMPORT_NOTES_FILE = "IMPORT_NOTES.md";
 
 export function renderImportNotes(

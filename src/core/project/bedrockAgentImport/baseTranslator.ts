@@ -1,4 +1,4 @@
-import { IMPORT_NOTES_FILE, renderImportNotes } from "./notes";
+import { IMPORT_NOTES_FILE, renderImportNotes } from "./importNotes";
 import { generateImportPyproject } from "./pyproject";
 import type {
   BedrockAgentImportNote,
