@@ -72,7 +72,7 @@ const HARNESS_ONLY_FLAGS = [
 const ModelProviderFlagSchema = z.union([z.literal("Bedrock"), HarnessModelProviderSchema]);
 type ModelProviderFlag = z.infer<typeof ModelProviderFlagSchema>;
 
-const HARNESS_DEFAULT_MODEL_IDS: Record<HarnessModelProvider, string> = {
+export const HARNESS_DEFAULT_MODEL_IDS: Record<HarnessModelProvider, string> = {
   bedrock: DEFAULT_HARNESS_MODEL.modelId,
   open_ai: "gpt-5",
   gemini: "gemini-2.5-flash",

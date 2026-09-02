@@ -6,13 +6,12 @@ import { ProjectNameSchema } from "../../../projectSchemas/project";
 import type { HarnessModelProvider } from "../../../projectSchemas/harness";
 import type { ScreenProps } from "../../types";
 import type { CreateProjectInput } from "../types";
-import { DEFAULT_HARNESS_MODEL } from "../add/harness";
 import {
   resolveRuntimeTemplateShortcut,
   type MemoryShortcutName,
   type RuntimeTemplateShortcutName,
 } from "../shortcuts";
-import { resolveScaffoldHarnessInput } from "./index";
+import { HARNESS_DEFAULT_MODEL_IDS, resolveScaffoldHarnessInput } from "./index";
 import { Layout } from "../../../components/Layout";
 import { FormTextInput } from "../../../components/FormTextInput";
 import { FormRadioGroup, type FormRadioOption } from "../../../components/FormRadioGroup";
@@ -50,35 +49,32 @@ interface CreateProjectFormValues {
   memory: MemoryShortcutName;
 }
 
+// defaultModelId is not declared here: the wizard and the flag path must offer
+// the same default, so both read HARNESS_DEFAULT_MODEL_IDS.
 const MODEL_PROVIDERS: {
   provider: HarnessModelProvider;
   label: string;
   description: string;
-  defaultModelId: string;
 }[] = [
   {
     provider: "bedrock",
     label: "bedrock (recommended)",
     description: "an Amazon Bedrock model or inference profile",
-    defaultModelId: DEFAULT_HARNESS_MODEL.modelId,
   },
   {
     provider: "open_ai",
     label: "openai",
     description: "an OpenAI model using an API-key credential ARN",
-    defaultModelId: "gpt-5",
   },
   {
     provider: "gemini",
     label: "gemini",
     description: "a Google Gemini model using an API-key credential ARN",
-    defaultModelId: "gemini-2.5-flash",
   },
   {
     provider: "lite_llm",
     label: "litellm",
     description: "a third-party provider through LiteLLM",
-    defaultModelId: "anthropic/claude-sonnet-4-5",
   },
 ];
 
@@ -86,9 +82,9 @@ function emptyProjectModel(): ProjectModelValues {
   return {
     provider: "bedrock",
     configs: Object.fromEntries(
-      MODEL_PROVIDERS.map(({ provider, defaultModelId }) => [
+      MODEL_PROVIDERS.map(({ provider }) => [
         provider,
-        { modelId: defaultModelId, apiKeyArn: "", apiBase: "" },
+        { modelId: HARNESS_DEFAULT_MODEL_IDS[provider], apiKeyArn: "", apiBase: "" },
       ]),
     ) as Record<HarnessModelProvider, ProjectModelConfig>,
   };
@@ -553,7 +549,6 @@ interface ModelField {
 }
 
 function modelFields(provider: HarnessModelProvider): ModelField[] {
-  const option = MODEL_PROVIDERS.find((candidate) => candidate.provider === provider)!;
   const fields: ModelField[] = [
     {
       key: "modelId",
@@ -562,7 +557,7 @@ function modelFields(provider: HarnessModelProvider): ModelField[] {
         provider === "bedrock"
           ? "a Bedrock model or inference profile id"
           : `the ${providerLabel(provider)} model to use`,
-      placeholder: option.defaultModelId,
+      placeholder: HARNESS_DEFAULT_MODEL_IDS[provider],
       required: true,
       requiredError: `enter a model id for ${providerLabel(provider)}`,
     },

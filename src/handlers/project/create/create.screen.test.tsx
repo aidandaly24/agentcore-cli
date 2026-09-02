@@ -22,6 +22,7 @@ import { InputValidationError } from "../../../errors";
 import type { AppIO } from "../../../io";
 import { resolveRuntimeTemplateShortcut } from "../shortcuts";
 import type { CreateProjectInput } from "../types";
+import { HARNESS_DEFAULT_MODEL_IDS } from "./index";
 
 afterEach(cleanupScreens);
 
@@ -217,6 +218,47 @@ describe("project create wizard", () => {
       modelId: "gpt-5",
       apiKeyArn,
     });
+    r.unmount();
+  }, 10000);
+
+  // The wizard pre-fills a model id, so pressing through it deploys that value.
+  // It must therefore match the flag path's default rather than a second literal
+  // — a keyless bedrock/ id, not one that needs an Anthropic key it never asks for.
+  test("the litellm default offered by the wizard matches the flag path", async () => {
+    const core = new TestCoreClient();
+    const inputs = spyOnCreate(core);
+    const r = renderScreen("/agentcore/project/create", { core });
+    await inTempDirectory();
+
+    await waitForText(r.lastFrame, "name your project");
+    await r.write("LiteLlmDefaultApp");
+    await r.press("return");
+    await waitForText(r.lastFrame, "what should the project be built around?");
+    await r.press("return");
+
+    await waitForText(r.lastFrame, "choose a model");
+    await r.press("down");
+    await r.press("down");
+    await r.press("down");
+    expect(r.lastFrame()).toContain("● litellm");
+
+    await r.press("return"); // focus model id, pre-filled with the shared default
+    expect(r.lastFrame()).toContain(HARNESS_DEFAULT_MODEL_IDS.lite_llm);
+    await r.press("return"); // accept it; api key arn and api base are optional
+    await r.press("return");
+    await r.press("return");
+
+    await waitForText(r.lastFrame, "this project will be created");
+    await r.press("return");
+    await waitForText(r.lastFrame, "project created in ./LiteLlmDefaultApp", 5000);
+
+    expect(inputs[0]?.scaffoldHarnessInput?.model).toEqual({
+      provider: "lite_llm",
+      modelId: HARNESS_DEFAULT_MODEL_IDS.lite_llm,
+    });
+    // bedrock/ is the property that makes the default keyless; an anthropic/ id
+    // would deploy READY and then fail its first invoke.
+    expect(HARNESS_DEFAULT_MODEL_IDS.lite_llm).toStartWith("bedrock/");
     r.unmount();
   }, 10000);
 
