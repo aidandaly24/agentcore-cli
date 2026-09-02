@@ -377,12 +377,13 @@ function hasPromptOverrides(agentVersion: AgentVersion): boolean {
   const configuration = agentVersion.promptOverrideConfiguration;
   return (
     configuration?.overrideLambda !== undefined ||
+    // Only an explicit OVERRIDDEN mode means the customer customized anything. Bedrock populates
+    // additionalModelRequestFields on the ORCHESTRATION prompt of even a fully default agent, so
+    // its presence is not evidence of customization and would raise a note about nothing.
     (configuration?.promptConfigurations ?? []).some(
       (prompt) =>
         prompt.promptState !== "DISABLED" &&
-        (prompt.promptCreationMode === "OVERRIDDEN" ||
-          prompt.parserMode === "OVERRIDDEN" ||
-          prompt.additionalModelRequestFields !== undefined),
+        (prompt.promptCreationMode === "OVERRIDDEN" || prompt.parserMode === "OVERRIDDEN"),
     )
   );
 }

@@ -189,6 +189,51 @@ describe("BedrockAgentSnapshotLoader", () => {
     expect(result.inferenceConfiguration).toBeUndefined();
   });
 
+  // Shape observed live from GetAgentVersion for an agent with no customization at all: Bedrock
+  // reports every prompt type with DEFAULT modes and still populates additionalModelRequestFields
+  // on ORCHESTRATION. None of that is customer intent, so it must not raise a follow-up note.
+  test("reports no prompt overrides for an agent the customer never customized", async () => {
+    const subject = loaderWith((command) => {
+      if (command instanceof GetAgentVersionCommand) {
+        const agentVersion = validAgentVersion(command.input.agentId, command.input.agentVersion);
+        agentVersion.promptOverrideConfiguration = {
+          promptConfigurations: [
+            {
+              promptType: "POST_PROCESSING",
+              promptState: "DISABLED",
+              promptCreationMode: "DEFAULT",
+              parserMode: "DEFAULT",
+            },
+            {
+              promptType: "PRE_PROCESSING",
+              promptState: "DISABLED",
+              promptCreationMode: "DEFAULT",
+              parserMode: "DEFAULT",
+            },
+            {
+              promptType: "ORCHESTRATION",
+              promptState: "ENABLED",
+              promptCreationMode: "DEFAULT",
+              parserMode: "DEFAULT",
+              additionalModelRequestFields: { anthropic_beta: ["computer-use-2024-10-22"] },
+            },
+          ],
+        };
+        return { agentVersion };
+      }
+      return defaultHandler(command);
+    });
+
+    const result = await subject.loader.load({
+      region: "us-east-1",
+      agentId: AGENT_ID,
+      agentAliasId: ALIAS_ID,
+    });
+
+    expect(result.hasPromptOverrides).toBe(false);
+    expect(result.inferenceConfiguration).toBeUndefined();
+  });
+
   test("carries ORCHESTRATION inference settings the customer overrode", async () => {
     const subject = loaderWith((command) => {
       if (command instanceof GetAgentVersionCommand) {
