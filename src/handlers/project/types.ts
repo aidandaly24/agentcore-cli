@@ -1,5 +1,4 @@
 import { HarnessSpecSchema } from "../../projectSchemas/harness";
-import type { BuildType } from "../../projectSchemas/runtime";
 import type { ExportNote } from "../../core/project/templates/export";
 import type { CredentialSchema } from "../../projectSchemas/credential";
 import type { PaymentConnectorSchema, PaymentManagerSchema } from "../../projectSchemas/payment";
@@ -282,10 +281,6 @@ export type ExportHarnessInput = {
   };
   /** Name of the runtime agent to generate. */
   targetAgentName: string;
-  /** Build override; when absent the harness spec decides (CodeZip unless it demands Container). */
-  build?: BuildType;
-  /** VPC id for a Container build in VPC mode; CodeBuild cannot infer one from subnets. */
-  vpcId?: string;
 };
 
 /** Result of {@link ProjectManager.exportHarness}. */

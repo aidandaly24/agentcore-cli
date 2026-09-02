@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { z } from "zod";
-import type { BuildType, ProjectRuntime } from "../../../projectSchemas/runtime";
+import type { ProjectRuntime } from "../../../projectSchemas/runtime";
 import type {
   HarnessMemoryRef,
   HarnessMemoryRetrievalConfig,
@@ -47,29 +47,9 @@ export interface HarnessExportInput {
   systemPrompt: string;
   /** The current project spec, for memory lookups and credential dedup. */
   projectSpec: ProjectSpec;
-  /** Build override from --build; when absent the harness spec decides. */
-  build?: BuildType;
-  /** VPC id from --vpc-id, for Container builds in VPC mode (see mapHarnessToExportPlan). */
-  vpcId?: string;
   /** Notes collected while converting a service response into a local harness spec. */
   sourceNotes?: ExportNote[];
-  /**
-   * Whether the harness directory holds the Dockerfile that `spec.dockerfile`
-   * names (local harnesses only; the caller checks the filesystem).
-   */
-  harnessDockerfileExists?: boolean;
 }
-
-/** How the exported agent's Dockerfile is produced (Container builds only). */
-export type DockerfilePlan =
-  /** Render the stock template Dockerfile (plain --build Container). */
-  | { source: "template" }
-  /** Write a FROM-<containerUri> stub extending the harness's prebuilt image. */
-  | { source: "stub"; containerUri: string }
-  /** Copy the harness's own Dockerfile from the harness directory. */
-  | { source: "harnessCopy" }
-  /** CodeZip — no Dockerfile at all. */
-  | { source: "none" };
 
 /** The pure mapping result; the project manager executes it against the filesystem. */
 export interface HarnessExportPlan {
@@ -85,8 +65,6 @@ export interface HarnessExportPlan {
   policyFiles: Record<string, unknown>;
   /** Whether the render includes the memory/ module. */
   hasMemory: boolean;
-  buildType: BuildType;
-  dockerfilePlan: DockerfilePlan;
   notes: ExportNote[];
 }
 
@@ -114,10 +92,7 @@ export const MALFORMED_S3_SKILL_NOTE_CATEGORY =
 export const MCP_HEADER_CREDS_NOTE_CATEGORY = "MCP tool header credentials";
 export const LITELLM_NO_API_KEY_NOTE_CATEGORY = "LiteLLM model may require an API key";
 export const MODEL_API_KEY_NOTE_CATEGORY = "Model API key credential referenced";
-export const CONTAINER_URI_NOTE_CATEGORY = "containerUri: verify Python in base image";
-export const CUSTOM_DOCKERFILE_NOTE_CATEGORY =
-  "Custom harness Dockerfile needs the agent build layer";
-export const MISSING_DOCKERFILE_NOTE_CATEGORY = "Dockerfile not found — create it before deploying";
+export const CONTAINER_IMAGE_NOTE_CATEGORY = "Container image not carried over";
 
 // ============================================================================
 // Public entry point
@@ -131,31 +106,26 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
   const policyFiles: Record<string, unknown> = {};
   const additionalPolicies: string[] = [];
 
-  const buildType = resolveBuildType(spec, input.build);
-  if (buildType === "CodeZip" && (spec.containerUri || spec.dockerfile)) {
+  // Export always emits a CodeZip runtime. The generated agent is a self-contained Strands
+  // application whose dependencies come from its own pyproject.toml, so it needs no image build
+  // and never reaches CodeBuild. A source image or Dockerfile is reported rather than rebuilt.
+  if (spec.containerUri || spec.dockerfile) {
     const what = spec.containerUri
-      ? `containerUri (${spec.containerUri})`
-      : `dockerfile (${spec.dockerfile})`;
-    throw new InputValidationError(
-      `Harness "${spec.name}" uses ${what}, which requires a Container build. ` +
-        `Re-export with --build Container.`,
-    );
+      ? `a pre-built container image (${spec.containerUri})`
+      : `a custom Dockerfile (${spec.dockerfile})`;
+    notes.push({
+      category: CONTAINER_IMAGE_NOTE_CATEGORY,
+      message:
+        `The harness used ${what} as its execution environment. The exported agent does not ` +
+        `rebuild it: the generated Strands application declares its own dependencies and runs ` +
+        `on the managed Python runtime. If that image supplied anything the agent needs at ` +
+        `runtime — system packages, certificates, or files read from disk — add it to the ` +
+        `generated project yourself.`,
+    });
   }
 
-  // A Container build is produced by CodeBuild, whose CreateProject API needs an explicit vpcId
-  // and cannot infer one from subnets. Neither source of a harness carries one: the service's
-  // VpcConfig has no vpcId field, and a local containerUri harness is never built (so its schema
-  // rightly does not demand one). Export is what turns it into a build, so export must ask.
   const networkConfig =
-    spec.networkMode === "VPC" && spec.networkConfig
-      ? { ...spec.networkConfig, ...(input.vpcId !== undefined && { vpcId: input.vpcId }) }
-      : undefined;
-  if (buildType === "Container" && networkConfig && networkConfig.vpcId === undefined) {
-    throw new InputValidationError(
-      `Harness "${spec.name}" runs in a VPC and exports as a Container build, which CodeBuild ` +
-        `cannot perform without an explicit VPC id. Re-export with --vpc-id <vpcId>.`,
-    );
-  }
+    spec.networkMode === "VPC" && spec.networkConfig ? spec.networkConfig : undefined;
 
   const allowedToolPatterns = spec.allowedTools ?? ["*"];
   if (!(allowedToolPatterns.length === 1 && allowedToolPatterns[0] === "*")) {
@@ -178,7 +148,7 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     envEntries,
     notes,
   );
-  const skills = resolveSkills(spec, buildType, targetAgentName, credentials, notes);
+  const skills = resolveSkills(spec, credentials, notes);
   for (const [file, doc] of Object.entries(skills.policyFiles)) policyFiles[file] = doc;
   if (model.policyFile) policyFiles[model.policyFile.name] = model.policyFile.doc;
   additionalPolicies.push(...Object.keys(policyFiles));
@@ -187,14 +157,6 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     spec.maxIterations !== undefined ||
     spec.maxTokens !== undefined ||
     spec.timeoutSeconds !== undefined;
-
-  const dockerfilePlan = resolveDockerfilePlan(
-    spec,
-    buildType,
-    targetAgentName,
-    input.harnessDockerfileExists ?? false,
-    notes,
-  );
 
   const filesystemConfigurations = buildFilesystemConfigurations(spec);
   const envVars = Object.entries(spec.environmentVariables ?? {}).map(([name, value]) => ({
@@ -266,12 +228,11 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
 
   const runtime: ProjectRuntime = {
     name: targetAgentName,
-    build: buildType,
+    build: "CodeZip",
     entrypoint: "main.py",
     codeLocation: `app/${targetAgentName}` as ProjectRuntime["codeLocation"],
     protocol: "HTTP",
-    ...(buildType === "CodeZip" && { runtimeVersion: "PYTHON_3_14" as const }),
-    ...(buildType === "Container" && { dockerfile: "Dockerfile" }),
+    runtimeVersion: "PYTHON_3_14",
     ...(envVars.length > 0 && { envVars }),
     ...(spec.networkMode && { networkMode: spec.networkMode }),
     ...(networkConfig && { networkConfig }),
@@ -296,8 +257,6 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     envEntries,
     policyFiles,
     hasMemory: memory.provider !== undefined,
-    buildType,
-    dockerfilePlan,
     notes,
   };
 }
@@ -755,8 +714,6 @@ function isAwsSkill(skill: HarnessSkill): skill is HarnessSkillAwsSkillsSource {
 
 function resolveSkills(
   spec: HarnessSpec,
-  buildType: BuildType,
-  targetAgentName: string,
   credentials: Credential[],
   notes: ExportNote[],
 ): SkillsResolution {
@@ -766,25 +723,14 @@ function resolveSkills(
   const awsSkills = spec.skills.filter(isAwsSkill);
   const policyFiles: Record<string, unknown> = {};
 
-  if (pathSkills.length > 0 && buildType === "CodeZip") {
-    notes.push({
-      category: PATH_SKILLS_NOTE_CATEGORY,
-      message:
-        `The following skill paths must exist on the container filesystem at runtime: ` +
-        `${pathSkills.join(", ")}. For CodeZip builds, path skills are not supported — switch to ` +
-        `a Container build and COPY the skill directory into app/${targetAgentName}/, or use ` +
-        `s3/git skill variants.`,
-    });
-  }
-
-  if (gitSkillSources.length > 0 && buildType === "Container") {
-    notes.push({
-      category: GIT_SKILLS_CONTAINER_NOTE_CATEGORY,
-      message:
-        "The agent clones git skill repositories at runtime using `git`. The default Container " +
-        "base image does not include git. Add it to your Dockerfile before deploying:\n\n" +
-        "  RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*",
-    });
+  // A path skill is a directory on the harness image's filesystem. The exported agent runs on the
+  // managed runtime with no such image, so the files would simply be absent at invocation.
+  if (pathSkills.length > 0) {
+    throw new InputValidationError(
+      `Harness "${spec.name}" uses path-based skills (${pathSkills.join(", ")}), which export ` +
+        `does not support: the exported agent has no container filesystem to read them from. ` +
+        `Republish those skills from s3 or git, then export again.`,
+    );
   }
 
   // The agent fetches S3 skills with boto3 at runtime, so the runtime execution
@@ -891,101 +837,6 @@ export function parseS3SkillArns(
   const prefix = prefixParts.join("/").replace(/\/+$/, "");
   const objectArn = prefix ? `${bucketArn}/${prefix}/*` : `${bucketArn}/*`;
   return { bucket, bucketArn, objectArn };
-}
-
-// ============================================================================
-// Build type + Dockerfile
-// ============================================================================
-
-function resolveBuildType(spec: HarnessSpec, override?: BuildType): BuildType {
-  if (override) return override;
-  if (spec.containerUri || spec.dockerfile) return "Container";
-  return "CodeZip";
-}
-
-function resolveDockerfilePlan(
-  spec: HarnessSpec,
-  buildType: BuildType,
-  targetAgentName: string,
-  harnessDockerfileExists: boolean,
-  notes: ExportNote[],
-): DockerfilePlan {
-  if (buildType !== "Container") return { source: "none" };
-  if (spec.containerUri) {
-    notes.push({
-      category: CONTAINER_URI_NOTE_CATEGORY,
-      message:
-        `The harness used a pre-built container image as its execution environment ` +
-        `(${spec.containerUri}). The generated Dockerfile extends that image directly ` +
-        `(FROM <containerUri>) and layers the Strands agent code on top. If your base image does ` +
-        `not include Python 3.12+ or uv, add an install step before the \`uv sync\` steps. If ` +
-        `the base image is a private ECR repository, also grant the CodeBuild project that ` +
-        `builds this agent permission to pull it.`,
-    });
-    return { source: "stub", containerUri: spec.containerUri };
-  }
-  if (spec.dockerfile) {
-    if (!harnessDockerfileExists) {
-      notes.push({
-        category: MISSING_DOCKERFILE_NOTE_CATEGORY,
-        message:
-          `The harness declares a custom Dockerfile, but no Dockerfile was found in its ` +
-          `directory, so nothing was copied. Create app/${targetAgentName}/Dockerfile ` +
-          `(including the Strands agent build layer) before \`agentcore project deploy\`.`,
-      });
-      return { source: "none" };
-    }
-    notes.push({
-      category: CUSTOM_DOCKERFILE_NOTE_CATEGORY,
-      message:
-        `The harness used a custom Dockerfile that describes its execution environment. It has ` +
-        `been copied to app/${targetAgentName}/Dockerfile unchanged, but the exported agent will ` +
-        `NOT run as-is: a harness Dockerfile has no dependency install, code copy, or startup ` +
-        `command (the harness runtime supplied those). Append the Strands agent build layer ` +
-        `before \`agentcore project deploy\` (adjust if your base image is not Python 3.12+/uv):\n\n` +
-        `  WORKDIR /app\n` +
-        `  RUN pip install --no-cache-dir uv\n` +
-        `  COPY pyproject.toml uv.lock ./\n` +
-        `  RUN uv sync --frozen --no-dev --no-install-project\n` +
-        `  COPY . .\n` +
-        `  RUN uv sync --frozen --no-dev\n` +
-        `  EXPOSE 8080\n` +
-        `  CMD ["opentelemetry-instrument", "python", "-m", "main"]`,
-    });
-    return { source: "harnessCopy" };
-  }
-  return { source: "template" };
-}
-
-/** Dockerfile stub for a containerUri harness: extend the image, layer the agent on top. */
-export function buildDockerfileStub(containerUri: string): string {
-  return [
-    `# Base image from the source harness: ${containerUri}`,
-    "# The generated Strands agent is layered on top. If the base image does not",
-    "# include Python 3.12+ or uv, add install steps before the COPY/RUN below.",
-    `FROM ${containerUri}`,
-    "",
-    "RUN pip install --no-cache-dir uv",
-    "",
-    "WORKDIR /app",
-    "",
-    "ENV UV_SYSTEM_PYTHON=1 \\",
-    "    UV_COMPILE_BYTECODE=1 \\",
-    "    UV_NO_PROGRESS=1 \\",
-    "    PYTHONUNBUFFERED=1 \\",
-    '    PATH="/app/.venv/bin:$PATH"',
-    "",
-    "COPY pyproject.toml uv.lock ./",
-    "RUN uv sync --frozen --no-dev --no-install-project",
-    "",
-    "COPY . .",
-    "RUN uv sync --frozen --no-dev",
-    "",
-    "EXPOSE 8080 8000 9000",
-    "",
-    'CMD ["opentelemetry-instrument", "python", "-m", "main"]',
-    "",
-  ].join("\n");
 }
 
 // ============================================================================

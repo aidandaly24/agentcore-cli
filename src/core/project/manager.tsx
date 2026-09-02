@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
   AddResourceInput,
@@ -37,7 +37,6 @@ import { getRuntimeTemplateResolver } from "./templates/runtime";
 import {
   DEFAULT_EXPORT_SYSTEM_PROMPT,
   EXPORT_NOTES_FILENAME,
-  buildDockerfileStub,
   buildExportNotesMarkdown,
   mapHarnessToExportPlan,
 } from "./templates/export";
@@ -726,16 +725,9 @@ export class FsProjectManager implements ProjectManager {
       spec,
       systemPrompt,
       projectSpec,
-      build: input.build,
-      vpcId: input.vpcId,
       sourceNotes: input.prefetched?.notes,
-      harnessDockerfileExists:
-        spec.dockerfile !== undefined &&
-        harnessDir !== undefined &&
-        existsSync(join(harnessDir, spec.dockerfile)),
     });
 
-    const isContainer = plan.buildType === "Container";
     yield { type: "step", message: `Rendering agent code at 'app/${targetAgentName}'` };
     const tree = await FsTreeNode.fromAssetSource(
       { assetSource: this.assetSource },
@@ -745,11 +737,8 @@ export class FsProjectManager implements ProjectManager {
         transformContent: (raw) => this.templateRenderer.render(raw, plan.context),
         filter: (name, isDir) => {
           if (isDir && name === "memory") return plan.hasMemory;
-          // The template's own Dockerfile is used only for a plain Container
-          // export; containerUri/custom-Dockerfile harnesses replace it below.
-          if (name === "Dockerfile")
-            return isContainer && plan.dockerfilePlan.source === "template";
-          if (name === ".dockerignore") return isContainer;
+          // Export always emits a CodeZip runtime, so the template's container files are never used.
+          if (name === "Dockerfile" || name === ".dockerignore") return false;
           return true;
         },
       },
@@ -770,14 +759,6 @@ export class FsProjectManager implements ProjectManager {
       await tree.write(join(project.rootPath, "app"));
 
       // Post-render files the template cannot express.
-      if (plan.dockerfilePlan.source === "stub") {
-        await writeFile(
-          join(agentDir, "Dockerfile"),
-          buildDockerfileStub(plan.dockerfilePlan.containerUri),
-        );
-      } else if (plan.dockerfilePlan.source === "harnessCopy") {
-        await copyFile(join(harnessDir!, spec.dockerfile!), join(agentDir, "Dockerfile"));
-      }
       for (const [fileName, policyDoc] of Object.entries(plan.policyFiles)) {
         await writeFile(join(agentDir, fileName), `${JSON.stringify(policyDoc, null, 2)}\n`);
       }

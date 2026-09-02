@@ -252,14 +252,14 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
   test("renders released skills and sliding-window APIs", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
-      skills: [{ path: "/opt/skills" }],
+      skills: [{ s3Uri: "s3://skills-bucket/team/" }],
       truncation: {
         strategy: "sliding_window",
         config: { slidingWindow: { messagesCount: 12 } },
       },
     });
 
-    const result = await drain(subject.exportHarness(project, exportInput({ build: "Container" })));
+    const result = await drain(subject.exportHarness(project, exportInput()));
 
     const main = await Bun.file(join(result.agentPath, "main.py")).text();
     expect(main).toContain("from strands import AgentSkills");
@@ -269,21 +269,22 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     );
   });
 
-  test("renders the template Dockerfile for a plain Container export", async () => {
+  test("emits a CodeZip runtime with no container files", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject);
 
-    const result = await drain(subject.exportHarness(project, exportInput({ build: "Container" })));
+    const result = await drain(subject.exportHarness(project, exportInput()));
 
-    expect(await Bun.file(join(result.agentPath, "Dockerfile")).text()).toContain("uv sync");
-    expect(existsSync(join(result.agentPath, ".dockerignore"))).toBe(true);
+    expect(existsSync(join(result.agentPath, "Dockerfile"))).toBe(false);
+    expect(existsSync(join(result.agentPath, ".dockerignore"))).toBe(false);
     const spec = await Bun.file(join(project.rootPath, "agentcore", "agentcore.json")).json();
     const runtime = spec.runtimes.find((r: { name: string }) => r.name === "assistantAgent");
-    expect(runtime.build).toBe("Container");
-    expect(runtime.dockerfile).toBe("Dockerfile");
+    expect(runtime.build).toBe("CodeZip");
+    expect(runtime.runtimeVersion).toBe("PYTHON_3_14");
+    expect(runtime.dockerfile).toBeUndefined();
   });
 
-  test("writes a FROM stub for a containerUri harness", async () => {
+  test("exports a containerUri harness as CodeZip and reports the dropped image", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
       containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
@@ -291,12 +292,11 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
 
     const result = await drain(subject.exportHarness(project, exportInput()));
 
-    expect(await Bun.file(join(result.agentPath, "Dockerfile")).text()).toContain(
-      "FROM 111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
-    );
-    expect(result.notes.map((note) => note.category)).toEqual([
-      "containerUri: verify Python in base image",
-    ]);
+    expect(existsSync(join(result.agentPath, "Dockerfile"))).toBe(false);
+    expect(result.notes.map((note) => note.category)).toEqual(["Container image not carried over"]);
+    const spec = await Bun.file(join(project.rootPath, "agentcore", "agentcore.json")).json();
+    const runtime = spec.runtimes.find((r: { name: string }) => r.name === "assistantAgent");
+    expect(runtime.build).toBe("CodeZip");
   });
 
   test("writes generated IAM policy files next to the code", async () => {

@@ -9,8 +9,7 @@ import {
   AWS_SKILLS_NOTE_CATEGORY,
   BROWSER_TOOL_NOTE_CATEGORY,
   CODE_INTERPRETER_TOOL_NOTE_CATEGORY,
-  CONTAINER_URI_NOTE_CATEGORY,
-  CUSTOM_DOCKERFILE_NOTE_CATEGORY,
+  CONTAINER_IMAGE_NOTE_CATEGORY,
   GATEWAY_TOOL_NOTE_CATEGORY,
   GIT_SKILLS_AUTH_NOTE_CATEGORY,
   LITELLM_NO_API_KEY_NOTE_CATEGORY,
@@ -20,9 +19,7 @@ import {
   MEMORY_MANAGED_NOTE_CATEGORY,
   MEMORY_MESSAGES_COUNT_NOTE_CATEGORY,
   MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY,
-  MISSING_DOCKERFILE_NOTE_CATEGORY,
   MODEL_API_KEY_NOTE_CATEGORY,
-  PATH_SKILLS_NOTE_CATEGORY,
   buildExportNotesMarkdown,
   formatExportNotes,
   mapHarnessToExportPlan,
@@ -471,12 +468,11 @@ describe("mapHarnessToExportPlan memory", () => {
 });
 
 describe("mapHarnessToExportPlan skills", () => {
-  test("maps path, s3, and git skills and generates the S3 read policy", () => {
+  test("maps s3 and git skills and generates the S3 read policy", () => {
     const result = plan({
       spec: harness({
         build: undefined,
         skills: [
-          { path: "local_skill" },
           { s3Uri: "s3://skills-bucket/team/" },
           { gitUrl: "https://github.com/example/skills.git", path: "subdir" },
         ],
@@ -485,7 +481,6 @@ describe("mapHarnessToExportPlan skills", () => {
 
     expect(result.context.hasSkillsFetcher).toBe(true);
     expect(result.context.hasFetchedSkills).toBe(true);
-    expect(result.context.pathSkills).toEqual(["local_skill"]);
     expect(result.context.s3Skills).toEqual(["s3://skills-bucket/team/"]);
     expect(result.context.gitSkills).toEqual([
       { url: "https://github.com/example/skills.git", path: "subdir" },
@@ -502,8 +497,7 @@ describe("mapHarnessToExportPlan skills", () => {
       ],
     });
     expect(result.runtime.additionalPolicies).toEqual(["s3-skills-policy.json"]);
-    // CodeZip path skills need the container filesystem — flagged for follow-up.
-    expect(categories(result)).toEqual([PATH_SKILLS_NOTE_CATEGORY]);
+    expect(result.notes).toEqual([]);
   });
 
   test("notes a malformed s3 URI instead of generating IAM for it", () => {
@@ -575,83 +569,50 @@ describe("mapHarnessToExportPlan truncation", () => {
   });
 });
 
-describe("mapHarnessToExportPlan build types and Dockerfiles", () => {
-  test("defaults to CodeZip with the PYTHON_3_14 runtime", () => {
+describe("mapHarnessToExportPlan always exports a CodeZip runtime", () => {
+  const CONTAINER_URI = "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest";
+
+  test("emits CodeZip with the PYTHON_3_14 runtime and no Dockerfile", () => {
     const result = plan({});
-    expect(result.buildType).toBe("CodeZip");
-    expect(result.dockerfilePlan).toEqual({ source: "none" });
+    expect(result.runtime.build).toBe("CodeZip");
     expect(result.runtime.runtimeVersion).toBe("PYTHON_3_14");
     expect(result.runtime.dockerfile).toBeUndefined();
   });
 
-  test("a plain --build Container uses the template Dockerfile", () => {
-    const result = plan({ build: "Container" });
-    expect(result.buildType).toBe("Container");
-    expect(result.dockerfilePlan).toEqual({ source: "template" });
-    expect(result.runtime.dockerfile).toBe("Dockerfile");
-    expect(result.runtime.runtimeVersion).toBeUndefined();
+  test("a containerUri harness still exports as CodeZip, with a note that the image was dropped", () => {
+    const result = plan({ spec: harness({ containerUri: CONTAINER_URI }) });
+    expect(result.runtime.build).toBe("CodeZip");
+    expect(result.runtime.dockerfile).toBeUndefined();
+    expect(categories(result)).toEqual([CONTAINER_IMAGE_NOTE_CATEGORY]);
+    expect(result.notes[0]?.message).toContain(CONTAINER_URI);
   });
 
-  test("a containerUri harness gets a FROM-stub Dockerfile and a verify note", () => {
+  test("a custom-Dockerfile harness also exports as CodeZip with the same note", () => {
+    const result = plan({ spec: harness({ dockerfile: "Dockerfile" }) });
+    expect(result.runtime.build).toBe("CodeZip");
+    expect(result.runtime.dockerfile).toBeUndefined();
+    expect(categories(result)).toEqual([CONTAINER_IMAGE_NOTE_CATEGORY]);
+  });
+
+  test("a VPC harness keeps its subnets and security groups and needs no vpcId", () => {
     const result = plan({
       spec: harness({
-        containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
+        containerUri: CONTAINER_URI,
+        networkMode: "VPC",
+        networkConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
       }),
     });
-    expect(result.buildType).toBe("Container");
-    expect(result.dockerfilePlan).toEqual({
-      source: "stub",
-      containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
-    });
-    expect(categories(result)).toEqual([CONTAINER_URI_NOTE_CATEGORY]);
-  });
-
-  test("rejects forcing CodeZip onto a containerUri harness", () => {
-    expect(() =>
-      plan({
-        build: "CodeZip",
-        spec: harness({
-          containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
-        }),
-      }),
-    ).toThrow(InputValidationError);
-  });
-
-  test("rejects a VPC container export with no vpcId and accepts one supplied by the caller", () => {
-    const vpcContainerHarness = harness({
-      containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
-      networkMode: "VPC",
-      networkConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
-    });
-
-    expect(() => plan({ spec: vpcContainerHarness })).toThrow(InputValidationError);
-
-    const result = plan({ spec: vpcContainerHarness, vpcId: "vpc-12345678" });
+    expect(result.runtime.build).toBe("CodeZip");
     expect(result.runtime.networkConfig).toEqual({
       subnets: ["subnet-12345678"],
       securityGroups: ["sg-12345678"],
-      vpcId: "vpc-12345678",
     });
   });
 
-  test("copies a custom harness Dockerfile with a build-layer note when it exists", () => {
-    const result = plan({
-      spec: harness({ dockerfile: "Dockerfile" }),
-      harnessDockerfileExists: true,
-    });
-    expect(result.dockerfilePlan).toEqual({ source: "harnessCopy" });
-    expect(categories(result)).toEqual([CUSTOM_DOCKERFILE_NOTE_CATEGORY]);
-  });
-
-  test("notes a declared-but-missing harness Dockerfile", () => {
-    const result = plan({
-      spec: harness({ dockerfile: "Dockerfile" }),
-      harnessDockerfileExists: false,
-    });
-    expect(result.dockerfilePlan).toEqual({ source: "none" });
-    expect(categories(result)).toEqual([MISSING_DOCKERFILE_NOTE_CATEGORY]);
-    // The runtime entry still expects the Dockerfile the user will create.
-    expect(result.runtime.dockerfile).toBe("Dockerfile");
+  test("rejects path-based skills, which have no container filesystem to read from", () => {
+    expect(() => plan({ spec: harness({ skills: [{ path: "/opt/skills/research" }] }) })).toThrow(
+      InputValidationError,
+    );
   });
 });
 

@@ -274,15 +274,15 @@ describe("project export harness handler", () => {
     } as never);
   }
 
-  test("preserves service VPC configuration without additional lookups", async () => {
+  // A container harness in a VPC exports as CodeZip: no image build, so no CodeBuild and no vpcId
+  // to supply. The service's subnets and security groups still carry over verbatim.
+  test("exports a VPC container harness as CodeZip without additional lookups", async () => {
     const subject = testExportCommand();
     const projectRoot = await inProjectWithHarness(subject);
     setVpcContainerHarness(subject);
 
-    await subject.run(["--arn", HARNESS_ARN, "--vpc-id", "vpc-0123456789abcdef0"]);
+    await subject.run(["--arn", HARNESS_ARN]);
 
-    // The vpcId comes from the flag, never from an extra AWS call: the harness API's VpcConfig
-    // has no vpcId field, so getHarness must remain the only request.
     expect(subject.core.harness.calls).toEqual([
       {
         method: "getHarness",
@@ -293,30 +293,13 @@ describe("project export harness handler", () => {
     const runtime = spec.runtimes.find(
       (candidate: { name: string }) => candidate.name === "remote_containerAgent",
     );
-    expect(runtime.build).toBe("Container");
+    expect(runtime.build).toBe("CodeZip");
+    expect(runtime.dockerfile).toBeUndefined();
     expect(runtime.networkConfig).toEqual({
       subnets: ["subnet-0123456789abcdef0"],
       securityGroups: ["sg-0123456789abcdef0"],
-      vpcId: "vpc-0123456789abcdef0",
     });
-  });
-
-  // Export turns a containerUri harness into a Dockerfile build so the agent code can be layered
-  // in, which makes CodeBuild's vpcId mandatory where the source harness never needed one. Fail
-  // here rather than writing a project that dies at `project build`.
-  test("requires --vpc-id for a container build in VPC mode", async () => {
-    const subject = testExportCommand();
-    const projectRoot = await inProjectWithHarness(subject);
-    setVpcContainerHarness(subject);
-    const specBefore = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).text();
-
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/without an explicit VPC id/);
-
-    // The point is failing before anything is written, so moving the throw later must break this.
-    expect(await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).text()).toBe(
-      specBefore,
-    );
-    expect(existsSync(join(projectRoot, "app", "remote_containerAgent"))).toBe(false);
+    expect(existsSync(join(projectRoot, "app", "remote_containerAgent", "Dockerfile"))).toBe(false);
   });
 
   test("validates the project before fetching from the service", async () => {
