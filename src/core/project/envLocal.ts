@@ -1,5 +1,6 @@
 import { chmod, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { parseEnv } from "node:util";
 import { atomicWrite, readTextFile } from "../../io";
 import { InputValidationError } from "../../errors";
 import type { EnvLocalEntry } from "../../handlers/project/types";
@@ -64,6 +65,17 @@ export class EnvLocalFile {
       await atomicWrite(this.path, content, { mode: SECRET_FILE_MODE });
     }
     return { written, skipped };
+  }
+
+  /**
+   * Reads the file's entries as a key/value map, returning {} when the file
+   * does not exist. Values are read back with the same parser `agentcore dev`
+   * uses, so quoting written by {@link insertIfNew} round-trips.
+   */
+  async read(): Promise<Record<string, string | undefined>> {
+    const content = await this.readOrNull();
+    if (content === null) return {};
+    return parseEnv(content);
   }
 
   /**

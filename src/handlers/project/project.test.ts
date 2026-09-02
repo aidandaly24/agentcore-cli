@@ -517,6 +517,62 @@ describe("project create", () => {
     });
   });
 
+  test("scaffolds an MCP server from the py-mcp template (CodeZip default)", async () => {
+    const directory = await inTempDirectory();
+    await run([
+      "create",
+      "--name",
+      "MyProject",
+      "--template",
+      "py-mcp",
+      "--skip-install",
+      "--skip-git",
+    ]);
+
+    const projectRoot = join(directory, "MyProject");
+    const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
+    expect(spec.runtimes[0]).toMatchObject({
+      name: "mcp_server",
+      build: "CodeZip",
+      protocol: "MCP",
+      codeLocation: "app/mcp_server",
+      runtimeVersion: "PYTHON_3_14",
+    });
+    const runtimeRoot = join(projectRoot, "app", "mcp_server");
+    const mainPy = await Bun.file(join(runtimeRoot, "main.py")).text();
+    expect(mainPy).toContain("FastMCP");
+    expect(mainPy).toContain('mcp.run(transport="streamable-http")');
+    expect(await Bun.file(join(runtimeRoot, "Dockerfile")).exists()).toBe(false);
+  });
+
+  test("scaffolds a Container MCP server from the py-mcp template", async () => {
+    const directory = await inTempDirectory();
+    await run([
+      "create",
+      "--name",
+      "MyProject",
+      "--template",
+      "py-mcp",
+      "--build",
+      "Container",
+      "--skip-install",
+      "--skip-git",
+    ]);
+
+    const projectRoot = join(directory, "MyProject");
+    const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
+    expect(spec.runtimes[0]).toMatchObject({
+      name: "mcp_server",
+      build: "Container",
+      protocol: "MCP",
+      dockerfile: "Dockerfile",
+    });
+    expect(spec.runtimes[0].runtimeVersion).toBeUndefined();
+    expect(await Bun.file(join(projectRoot, "app", "mcp_server", "Dockerfile")).exists()).toBe(
+      true,
+    );
+  });
+
   test.each([
     ["default", [], ["SEMANTIC", "USER_PREFERENCE", "SUMMARIZATION", "EPISODIC"]],
     ["none", ["--memory", "none"], []],
@@ -1092,6 +1148,24 @@ describe("project add credentials", () => {
     await run(["add", "credentials", "api-key", "--name", "svc-key"]);
     await expect(run(["add", "credentials", "api-key", "--name", "svc_key"])).rejects.toThrow(
       /same environment variable/,
+    );
+  });
+
+  test("rejects different credential types that collide on one secret variable", async () => {
+    await inProject();
+    // OAuth 'foo' → AGENTCORE_CREDENTIAL_FOO_CLIENT_SECRET; api-key 'foo_client_secret' → the same.
+    await run(["add", "credentials", "oauth", "--name", "foo", "--discovery-url", discoveryUrl]);
+    await expect(
+      run(["add", "credentials", "api-key", "--name", "foo_client_secret"]),
+    ).rejects.toThrow(/same environment variable/);
+  });
+
+  test("rejects a name ending in a field suffix even with nothing to collide with", async () => {
+    await inProject();
+    // Nothing in the spec derives AGENTCORE_CREDENTIAL_SVC_CLIENT_ID, but a pre-0.29
+    // OAuth credential named 'svc' would read it as its client id.
+    await expect(run(["add", "credentials", "api-key", "--name", "svc-client-id"])).rejects.toThrow(
+      /_CLIENT_ID/,
     );
   });
 

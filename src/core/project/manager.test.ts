@@ -22,13 +22,17 @@ import {
   type Project,
   type ProjectEvent,
 } from "../../handlers/project/types";
-import { createSilentLogger } from "../../testing";
+import { createSilentLogger, TestIdentityClient } from "../../testing";
 import type { DeployBackendInput, ProjectBackend } from "./backends/types";
 
 const HELLO_WORLD_PYTHON = resolveRuntimeTemplateShortcut("hello-world-python");
 const HELLO_WORLD_PYTHON_CONTAINER = resolveRuntimeTemplateShortcut("hello-world-python-container");
 const STRANDS_PYTHON = resolveRuntimeTemplateShortcut("strands-python");
 const STRANDS_TS = resolveRuntimeTemplateShortcut("strands-ts");
+const STRANDS_PY_A2A = resolveRuntimeTemplateShortcut("strands-py-a2a");
+const STRANDS_PY_A2A_CONTAINER = resolveRuntimeTemplateShortcut("strands-py-a2a", {
+  build: "Container",
+});
 
 const originalCwd = process.cwd();
 const tempDirectories: string[] = [];
@@ -55,6 +59,7 @@ function manager(): { manager: FsProjectManager; commands: { command: string[]; 
   return {
     manager: new FsProjectManager({
       logger: createSilentLogger(),
+      identity: new TestIdentityClient(),
       runner: async (command, { cwd }) => {
         commands.push({ command, cwd });
       },
@@ -129,6 +134,58 @@ describe("FsProjectManager.create", () => {
       runtimes: spec.runtimes,
       memories: spec.memories,
     }).toMatchSnapshot();
+  });
+
+  test("snapshots the Strands A2A project manifest and runtime spec", async () => {
+    const directory = await inTempDirectory();
+    await runCreate(manager().manager, {
+      name: "example",
+      scaffoldRuntimeInput: STRANDS_PY_A2A,
+    });
+
+    const projectRoot = join(directory, "example");
+    const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
+    expect({
+      manifest: await projectManifest(projectRoot),
+      runtimes: spec.runtimes,
+      memories: spec.memories,
+    }).toMatchSnapshot();
+  });
+
+  test("scaffolds the Strands A2A runtime with the A2A protocol", async () => {
+    const directory = await inTempDirectory();
+    await runCreate(manager().manager, {
+      name: "example",
+      scaffoldRuntimeInput: STRANDS_PY_A2A,
+    });
+
+    const spec = await Bun.file(join(directory, "example", "agentcore", "agentcore.json")).json();
+    expect(spec.runtimes[0]).toMatchObject({
+      name: "a2a_agent",
+      build: "CodeZip",
+      protocol: "A2A",
+      entrypoint: "main.py",
+    });
+    expect(spec.memories).toMatchObject([{ name: "a2a_agentMemory" }]);
+  });
+
+  test("scaffolds the Strands A2A runtime as a container with --build Container", async () => {
+    const directory = await inTempDirectory();
+    await runCreate(manager().manager, {
+      name: "example",
+      scaffoldRuntimeInput: STRANDS_PY_A2A_CONTAINER,
+    });
+
+    const appDir = join(directory, "example", "app", "a2a_agent");
+    expect(await Bun.file(join(appDir, "Dockerfile")).exists()).toBe(true);
+    expect(await Bun.file(join(appDir, ".dockerignore")).exists()).toBe(true);
+
+    const spec = await Bun.file(join(directory, "example", "agentcore", "agentcore.json")).json();
+    expect(spec.runtimes[0]).toMatchObject({
+      build: "Container",
+      dockerfile: "Dockerfile",
+      protocol: "A2A",
+    });
   });
 
   test("writes a deploy-ready agentcore.json registering the template agent", async () => {
@@ -229,6 +286,35 @@ describe("FsProjectManager.create", () => {
     expect(commands).toEqual([{ command: ["git", "init"], cwd: join(directory, "example") }]);
   });
 
+  test.each([
+    [
+      "Python",
+      resolveRuntimeTemplateShortcut("strands-python", { build: "Container" }),
+      ["uv", "lock"],
+    ],
+    [
+      "TypeScript",
+      resolveRuntimeTemplateShortcut("strands-ts", { build: "Container" }),
+      ["npm", "install", "--package-lock-only"],
+    ],
+  ])(
+    "skipInstall still generates the container lockfile for %s",
+    async (_label, scaffoldRuntimeInput, lockCommand) => {
+      const directory = await inTempDirectory();
+      const { manager: subject, commands } = manager();
+      await runCreate(subject, {
+        name: "example",
+        scaffoldRuntimeInput,
+        skipInstall: true,
+        skipGit: true,
+      });
+
+      expect(commands).toEqual([
+        { command: lockCommand, cwd: join(directory, "example", "app", "strands_agent") },
+      ]);
+    },
+  );
+
   test("skipGit skips git init", async () => {
     await inTempDirectory();
     const { manager: subject, commands } = manager();
@@ -248,7 +334,7 @@ describe("FsProjectManager.create", () => {
       scaffoldRuntimeInput: HELLO_WORLD_PYTHON,
     });
 
-    expect(events.map((event) => event.message)).toEqual([
+    expect(events.flatMap((event) => (event.type === "step" ? [event.message] : []))).toEqual([
       "Creating project tree",
       "Installing CDK dependencies with npm",
       "Syncing Python dependencies with uv",
@@ -263,6 +349,7 @@ describe("FsProjectManager.create", () => {
     const directory = await inTempDirectory();
     const failing = new FsProjectManager({
       logger: createSilentLogger(),
+      identity: new TestIdentityClient(),
       runner: async () => {
         throw new Error("npm exploded");
       },
@@ -345,7 +432,7 @@ describe("FsProjectManager.build", () => {
         cwd: join(directory, "example", "agentcore", "cdk"),
       },
     ]);
-    expect(events).toEqual([{ message: "Synthesizing CloudFormation templates" }]);
+    expect(events).toEqual([{ type: "step", message: "Synthesizing CloudFormation templates" }]);
   });
 
   test("fails actionably when the CDK dependencies are missing", async () => {
@@ -379,6 +466,7 @@ describe("FsProjectManager.build", () => {
     const project = await scaffolded(subject, directory);
     const failing = new FsProjectManager({
       logger: createSilentLogger(),
+      identity: new TestIdentityClient(),
       runner: async () => {
         throw new Error("cdk synth exploded");
       },
@@ -401,7 +489,7 @@ describe("FsProjectManager.deploy", () => {
       async *build() {},
       async *deploy(project, input) {
         calls.push({ project, input });
-        yield { message: "Backend deployment started" };
+        yield { type: "step" as const, message: "Backend deployment started" };
         return { outputs: { RuntimeArn: "arn:runtime" } };
       },
       async resolveDeployedResources() {
@@ -413,6 +501,7 @@ describe("FsProjectManager.deploy", () => {
       accountCalls,
       manager: new FsProjectManager({
         logger: createSilentLogger(),
+        identity: new TestIdentityClient(),
         backends: { CDK: backend },
         resolveAccount: async (region) => {
           accountCalls.push(region);
@@ -483,7 +572,7 @@ describe("FsProjectManager.deploy", () => {
     expect(subject.calls).toHaveLength(1);
     expect(subject.calls[0]?.project).toBe(project);
     expect(subject.calls[0]?.input.target).toEqual(targets[1]);
-    expect(deployed.events).toEqual([{ message: "Backend deployment started" }]);
+    expect(deployed.events).toEqual([{ type: "step", message: "Backend deployment started" }]);
     expect(deployed.result).toEqual({
       outputs: { RuntimeArn: "arn:runtime" },
     });
@@ -571,8 +660,8 @@ describe("FsProjectManager.deploy", () => {
     expect(subject.calls).toHaveLength(1);
     expect(subject.calls[0]?.input.target).toEqual(SYNTHESIZED);
     expect(deployed.events).toEqual([
-      { message: CREATED_MESSAGE },
-      { message: "Backend deployment started" },
+      { type: "step", message: CREATED_MESSAGE },
+      { type: "step", message: "Backend deployment started" },
     ]);
     expect(await Bun.file(targetsFile(root)).json()).toEqual([SYNTHESIZED]);
   });
@@ -672,7 +761,7 @@ describe("FsProjectManager.deploy", () => {
 
     expect(subject.accountCalls).toEqual([]);
     expect(subject.calls[0]?.input.target).toEqual(configured[0]!);
-    expect(deployed.events).toEqual([{ message: "Backend deployment started" }]);
+    expect(deployed.events).toEqual([{ type: "step", message: "Backend deployment started" }]);
     expect(await Bun.file(targetsFile(root)).text()).toBe(contents);
   });
 });

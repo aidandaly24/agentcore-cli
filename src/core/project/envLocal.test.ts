@@ -96,6 +96,19 @@ test("rejects a value that contains a single quote", async () => {
   );
 });
 
+test("read returns {} when the file does not exist", async () => {
+  const root = await tempRoot();
+  expect(await new EnvLocalFile(root).read()).toEqual({});
+});
+
+test("read parses back the entries insertIfNew wrote", async () => {
+  const root = await tempRoot();
+  const file = new EnvLocalFile(root);
+  await file.insertIfNew([{ key: "SECRET", value: "s k", comment: "c" }]);
+
+  expect(await file.read()).toEqual({ SECRET: "s k" });
+});
+
 test("removeKeys deletes an entry and its comment while leaving neighbors", async () => {
   const root = await tempRoot();
   const file = new EnvLocalFile(root);

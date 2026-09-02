@@ -1,14 +1,18 @@
 import {
   CreateApiKeyCredentialProviderCommand,
   CreateOauth2CredentialProviderCommand,
+  CreatePaymentCredentialProviderCommand,
   DeleteApiKeyCredentialProviderCommand,
   DeleteOauth2CredentialProviderCommand,
+  DeletePaymentCredentialProviderCommand,
   GetApiKeyCredentialProviderCommand,
   GetOauth2CredentialProviderCommand,
+  GetPaymentCredentialProviderCommand,
   ListApiKeyCredentialProvidersCommand,
   ListOauth2CredentialProvidersCommand,
   UpdateApiKeyCredentialProviderCommand,
   UpdateOauth2CredentialProviderCommand,
+  UpdatePaymentCredentialProviderCommand,
   type CreateApiKeyCredentialProviderResponse,
   type CreateOauth2CredentialProviderResponse,
   type DeleteApiKeyCredentialProviderResponse,
@@ -19,19 +23,27 @@ import {
   type ListOauth2CredentialProvidersResponse,
   type UpdateApiKeyCredentialProviderResponse,
   type UpdateOauth2CredentialProviderResponse,
+  type CreatePaymentCredentialProviderResponse,
+  type DeletePaymentCredentialProviderResponse,
+  type GetPaymentCredentialProviderResponse,
+  type UpdatePaymentCredentialProviderResponse,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type {
   CoreIdentityClient,
   CreateApiKeyCredentialProviderInput,
   CreateOauth2CredentialProviderInput,
+  CreatePaymentCredentialProviderInput,
   UpdateApiKeyCredentialProviderInput,
   UpdateOauth2CredentialProviderInput,
+  UpdatePaymentCredentialProviderInput,
 } from "../handlers/identity/types";
 import type { AwsClients, CoreOptions } from "./types";
 import { toClientConfig } from "./utils";
 
 export class IdentityClient implements CoreIdentityClient {
-  constructor(private readonly clients: AwsClients) {}
+  // Narrowed to `control` so any holder of a cached control client satisfies it;
+  // CoreClient passes itself.
+  constructor(private readonly clients: Pick<AwsClients, "control">) {}
 
   async createApiKeyCredentialProvider(
     input: CreateApiKeyCredentialProviderInput,
@@ -123,5 +135,41 @@ export class IdentityClient implements CoreIdentityClient {
     return this.clients
       .control(toClientConfig(options))
       .send(new DeleteOauth2CredentialProviderCommand({ name }));
+  }
+
+  async createPaymentCredentialProvider(
+    input: CreatePaymentCredentialProviderInput,
+    options: CoreOptions,
+  ): Promise<CreatePaymentCredentialProviderResponse> {
+    return this.clients
+      .control(toClientConfig(options))
+      .send(new CreatePaymentCredentialProviderCommand(input));
+  }
+
+  async getPaymentCredentialProvider(
+    name: string,
+    options: CoreOptions,
+  ): Promise<GetPaymentCredentialProviderResponse> {
+    return this.clients
+      .control(toClientConfig(options))
+      .send(new GetPaymentCredentialProviderCommand({ name }));
+  }
+
+  async updatePaymentCredentialProvider(
+    input: UpdatePaymentCredentialProviderInput,
+    options: CoreOptions,
+  ): Promise<UpdatePaymentCredentialProviderResponse> {
+    return this.clients
+      .control(toClientConfig(options))
+      .send(new UpdatePaymentCredentialProviderCommand(input));
+  }
+
+  async deletePaymentCredentialProvider(
+    name: string,
+    options: CoreOptions,
+  ): Promise<DeletePaymentCredentialProviderResponse> {
+    return this.clients
+      .control(toClientConfig(options))
+      .send(new DeletePaymentCredentialProviderCommand({ name }));
   }
 }

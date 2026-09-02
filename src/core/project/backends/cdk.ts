@@ -3,18 +3,20 @@ import { join } from "node:path";
 import type { Stack } from "@aws-sdk/client-cloudformation";
 import { MalformedServiceResponseError, ProjectStateError } from "../../../errors/errors";
 import type {
-  DeployedProjectResource,
   DeployResult,
   Project,
   ProjectEvent,
+  ResolvedDeployedResource,
 } from "../../../handlers/project/types";
 import {
+  createLineSplitter,
   FsReadWriteJson,
   requireTool,
   runProcess,
   type ProcessRunner,
   type ReadWriteJson,
 } from "../../../io";
+import { withOutputEvents } from "../events";
 import type { Logger } from "../../../logging";
 import type { AwsDeploymentTarget } from "../../../projectSchemas/aws-targets";
 import type {
@@ -24,6 +26,14 @@ import type {
 } from "./types";
 import { createCloudFormationClient } from "../../factories";
 import type { CreateCloudFormationClient } from "../../types";
+import {
+  createCredentialProvisioner,
+  createPaymentCredentialRemover,
+  type CredentialProviderCalls,
+  type CredentialProvisioner,
+  type DeployedCredentials,
+  type PaymentCredentialRemover,
+} from "./cdk/credentials";
 import {
   countDeployableResources,
   stackArtifactForTarget,
@@ -44,16 +54,24 @@ import {
   loadBootstrapTemplate,
   type BootstrapTemplateLoader,
   type CdkCredentialResolver,
+  type CdkOperation,
   type CdkRunner,
   type CdkRunOptions,
+  type CdkRunResult,
 } from "./cdk/toolkit";
 import { describeStack } from "./cdk/stackReader";
 
 type StackDescriber = typeof describeStack;
 
+/**
+ * How many trailing Toolkit lines an operation keeps for error context. Matches
+ * the cap streamProcess uses for a failed subprocess's captured output.
+ */
+const MAX_ERROR_OUTPUT_LINES = 20;
+
 function findDeployedResourceId(
   stack: Stack,
-  input: Pick<DeployedProjectResource, "resourceType" | "name">,
+  input: Pick<ResolvedDeployedResource, "resourceType" | "name">,
 ): string | undefined {
   if (!stack.StackName) return undefined;
   const exportResourceName = input.name.replaceAll("_", "-");
@@ -70,11 +88,15 @@ export type CdkBackendConfig = {
   checkTool?: typeof requireTool;
   json?: ReadWriteJson;
   createCloudFormationClient?: CreateCloudFormationClient;
+  /** Identity client used to provision the project's credential providers. */
+  identity: CredentialProviderCalls;
   cdk?: CdkRunner;
   resolveCredentials?: CdkCredentialResolver;
   bootstrap?: BootstrapProbe;
   resolveAccount?: AccountResolver;
   loadBootstrapTemplate?: BootstrapTemplateLoader;
+  provisionCredentials?: CredentialProvisioner;
+  removePaymentCredentials?: PaymentCredentialRemover;
   describeStack?: StackDescriber;
 };
 
@@ -89,6 +111,8 @@ export class CdkBackend implements ProjectBackend {
   private readonly bootstrap: BootstrapProbe;
   private readonly resolveAccount: AccountResolver;
   private readonly loadBootstrapTemplate: BootstrapTemplateLoader;
+  private readonly provisionCredentials: CredentialProvisioner;
+  private readonly removePaymentCredentials: PaymentCredentialRemover;
   private readonly describeStack: StackDescriber;
 
   constructor(config: CdkBackendConfig) {
@@ -108,6 +132,10 @@ export class CdkBackend implements ProjectBackend {
       ((region, credentials) => probeBootstrap(region, credentials, readBootstrapStack));
     this.resolveAccount = config.resolveAccount ?? resolveAwsAccount;
     this.loadBootstrapTemplate = config.loadBootstrapTemplate ?? loadBootstrapTemplate;
+    this.provisionCredentials =
+      config.provisionCredentials ?? createCredentialProvisioner(config.identity);
+    this.removePaymentCredentials =
+      config.removePaymentCredentials ?? createPaymentCredentialRemover(config.identity);
     this.describeStack =
       config.describeStack ??
       ((region, credentials, stackName) =>
@@ -116,9 +144,10 @@ export class CdkBackend implements ProjectBackend {
         ));
   }
 
-  public async *build(project: Project): AsyncGenerator<ProjectEvent, void> {
+  // Local prerequisites for synth. Checked before any AWS mutation so a missing
+  // toolchain or dependencies fails without having provisioned credentials.
+  private async ensureCdkDependencies(project: Project): Promise<void> {
     const cdkDir = this.cdkDirectory(project);
-
     if (!existsSync(join(cdkDir, "node_modules"))) {
       throw new ProjectStateError(
         `CDK dependencies are missing for project '${project.name}'. ` +
@@ -126,15 +155,36 @@ export class CdkBackend implements ProjectBackend {
       );
     }
     await this.checkTool("npm", "Install Node.js: https://nodejs.org/");
+  }
 
-    yield { message: "Synthesizing CloudFormation templates" };
-    await this.runner(
-      ["npm", "run", "cdk", "--", "synth", "--quiet", "--output", this.assemblyDirectory(project)],
-      {
-        cwd: cdkDir,
-        onOutput: (chunk) => this.logger.debug(chunk),
-      },
-    );
+  public async *build(project: Project): AsyncGenerator<ProjectEvent, void> {
+    await this.ensureCdkDependencies(project);
+
+    yield { type: "step", message: "Synthesizing CloudFormation templates" };
+    yield* withOutputEvents((emit) => {
+      // Chunks still go to the debug log whole; the splitter reassembles them
+      // into lines for the live progress tail.
+      const lines = createLineSplitter(emit);
+      return this.runner(
+        [
+          "npm",
+          "run",
+          "cdk",
+          "--",
+          "synth",
+          "--quiet",
+          "--output",
+          this.assemblyDirectory(project),
+        ],
+        {
+          cwd: this.cdkDirectory(project),
+          onOutput: (chunk) => {
+            this.logger.debug(chunk);
+            lines.push(chunk);
+          },
+        },
+      ).finally(() => lines.flush());
+    });
   }
 
   public async *deploy(
@@ -142,13 +192,31 @@ export class CdkBackend implements ProjectBackend {
     input: DeployBackendInput,
   ): AsyncGenerator<ProjectEvent, DeployResult> {
     const { target } = input;
-    yield { message: `Verifying AWS account ${target.account}` };
+    yield { type: "step", message: `Verifying AWS account ${target.account}` };
     const credentials = await this.credentialsForTarget(target);
 
-    // Validate any existing deployed state before mutating AWS. A malformed file
-    // must fail here — not after bootstrap/deploy — so we never leave AWS changed
-    // with the new stack ARN unrecorded because the post-deploy write can't parse it.
-    await readDeployedState(this.json, project.rootPath);
+    // Fail on local setup errors (missing toolchain/deps) and malformed state
+    // before any AWS mutation, so a local problem never leaves credentials
+    // provisioned or the stack ARN unrecorded.
+    await this.ensureCdkDependencies(project);
+    // Kept from before provisioning rewrites the credentials map: it is the only
+    // record of what this target provisioned, and a teardown reached by emptying the
+    // spec has no other way to know which providers it owns.
+    const recorded =
+      (await readDeployedState(this.json, project.rootPath)).targets[target.name]?.resources
+        ?.credentials ?? {};
+
+    // Credential providers aren't stack resources; the synthesized app reads their
+    // ARNs from deployed-state.json, so they must exist and be recorded before synth.
+    const provisioned = yield* this.provisionCredentials(project, {
+      credentials,
+      region: target.region,
+    });
+    // Recorded every deploy (even when empty) so dropping the last credential
+    // from the spec clears the stale entry instead of leaving it advertised.
+    await updateTargetState(this.json, project.rootPath, target.name, {
+      resources: { credentials: provisioned },
+    });
 
     yield* this.build(project);
     const assemblyDirectory = this.assemblyDirectory(project);
@@ -159,7 +227,7 @@ export class CdkBackend implements ProjectBackend {
     // with nothing in it as an instruction to delete the stack, and reports that
     // as an ordinary successful deploy.
     if ((await countDeployableResources(this.json, assemblyDirectory, artifact)) === 0) {
-      return yield* this.teardown({ project, artifact, input, options });
+      return yield* this.teardown({ project, artifact, input, options, recorded });
     }
 
     const bootstrap = await this.bootstrap(target.region, credentials);
@@ -174,10 +242,10 @@ export class CdkBackend implements ProjectBackend {
 
     if (bootstrap.kind !== "current") {
       const environment = `aws://${target.account}/${target.region}`;
-      yield { message: `Bootstrapping ${environment}` };
+      yield { type: "step", message: `Bootstrapping ${environment}` };
       const template = await this.loadBootstrapTemplate();
       try {
-        await this.cdk(
+        yield* this.runCdk(
           {
             kind: "bootstrap",
             environments: [environment],
@@ -190,8 +258,8 @@ export class CdkBackend implements ProjectBackend {
       }
     }
 
-    yield { message: `Deploying ${artifact.id}` };
-    const { outputs, stackArn } = await this.cdk(
+    yield { type: "step", message: `Deploying ${artifact.id}` };
+    const { outputs, stackArn } = yield* this.runCdk(
       { kind: "deploy", stackArtifactId: artifact.id },
       options,
     );
@@ -226,11 +294,14 @@ export class CdkBackend implements ProjectBackend {
     artifact,
     input,
     options,
+    recorded,
   }: {
     project: Project;
     artifact: StackArtifact;
     input: DeployBackendInput;
     options: CdkRunOptions;
+    /** The credentials deployed-state.json held for this target before the deploy. */
+    recorded: DeployedCredentials;
   }): AsyncGenerator<ProjectEvent, DeployResult> {
     const { target } = input;
     if (!(await this.describeStack(target.region, options.credentials, artifact.stackName))) {
@@ -256,16 +327,53 @@ export class CdkBackend implements ProjectBackend {
       );
     }
 
-    yield { message: `Removing stack ${artifact.stackName}` };
-    await this.cdk({ kind: "destroy", stackArtifactId: artifact.id }, options);
+    yield { type: "step", message: `Removing stack ${artifact.stackName}` };
+    yield* this.runCdk({ kind: "destroy", stackArtifactId: artifact.id }, options);
+    // After the stack, since a resource in it may still be using the provider.
+    yield* this.removePaymentCredentials(project, {
+      credentials: options.credentials,
+      region: target.region,
+      recorded,
+    });
     await removeTargetState(this.json, project.rootPath, target.name);
     return { outputs: {}, tornDown: true };
+  }
+
+  /**
+   * Runs one Toolkit operation with its progress streamed as `output` events.
+   * The trailing lines are also kept so a failure can carry them: the Toolkit's
+   * errors are often terse ("Access Denied"), and the resource events it
+   * reported just before failing are what make the error debuggable from the
+   * terminal alone.
+   */
+  private async *runCdk(
+    operation: CdkOperation,
+    options: CdkRunOptions,
+  ): AsyncGenerator<ProjectEvent, CdkRunResult> {
+    const recent: string[] = [];
+    try {
+      return yield* withOutputEvents((emit) =>
+        this.cdk(operation, {
+          ...options,
+          onOutput: (line) => {
+            recent.push(line);
+            if (recent.length > MAX_ERROR_OUTPUT_LINES) recent.shift();
+            emit(line);
+          },
+        }),
+      );
+    } catch (error) {
+      if (error instanceof Error && recent.length > 0) {
+        error.message += `\n\nRecent output:\n${recent.join("\n")}`;
+      }
+      throw error;
+    }
   }
 
   public async resolveDeployedResources(
     project: Project,
     input: ResolveDeployedResourcesBackendInput,
-  ): Promise<DeployedProjectResource[]> {
+  ): Promise<ResolvedDeployedResource[]> {
     const { target } = input;
     const deployedState = await readDeployedState(this.json, project.rootPath);
     const stackArn = deployedState.targets[target.name]?.stackArn;
@@ -291,7 +399,7 @@ export class CdkBackend implements ProjectBackend {
     ];
     return resources.flatMap((resource) => {
       const id = findDeployedResourceId(stack, resource);
-      return id ? [{ ...resource, id }] : [];
+      return id ? [{ ...resource, id, target }] : [];
     });
   }
 
