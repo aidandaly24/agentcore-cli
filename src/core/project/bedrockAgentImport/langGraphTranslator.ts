@@ -83,6 +83,18 @@ def invoke_${name}(query: str) -> str:
       });
     }
 
+    // langchain_aws derives the provider from model_id and raises if it is an ARN, which a Bedrock
+    // Agent may legally use (provisioned throughput, custom model, inference profile).
+    if (snapshot.foundationModel.startsWith("arn")) {
+      notes.push({
+        category: "LangGraph model provider",
+        message:
+          `The source model is the ARN '${snapshot.foundationModel}'. langchain_aws cannot infer a ` +
+          'provider from an ARN, so add provider="<anthropic|amazon|meta|...>" to the ChatBedrock ' +
+          "call in main.py before invoking the agent.",
+      });
+    }
+
     const modelDefinition = translator.generateModelDefinition(snapshot);
     const memoryCode =
       this.request.memory === "none" ? "" : generateLangGraphMemoryCode(this.request);

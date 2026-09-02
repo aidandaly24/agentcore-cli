@@ -17,7 +17,9 @@ export function generateImportPyproject(input: {
 
   if (input.framework === "strands") {
     dependencies.push("strands-agents ~= 1.15");
-    if (input.hasCodeInterpreter) dependencies.push("strands-agents-tools ~= 0.1.0");
+    // 0.1.x caps strands-agents below 1.0 and ships no code_interpreter module, so it cannot be
+    // resolved alongside strands-agents 1.x.
+    if (input.hasCodeInterpreter) dependencies.push("strands-agents-tools ~= 0.2.16");
   } else {
     dependencies.push(
       "langchain ~= 1.0",

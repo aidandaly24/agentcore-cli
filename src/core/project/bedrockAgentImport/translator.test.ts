@@ -96,6 +96,16 @@ describe("StrandsBedrockAgentTranslator", () => {
     expect(plan.files["IMPORT_NOTES.md"]).toContain("Strands guardrail");
   });
 
+  test("pins a code-interpreter dependency that can coexist with strands-agents 1.x", () => {
+    const pyproject = new StrandsBedrockAgentTranslator(snapshot(), request).translate().files[
+      "pyproject.toml"
+    ]!;
+
+    // 0.1.x caps strands-agents below 1.0, so the project would not resolve at all.
+    expect(pyproject).toContain("strands-agents-tools ~= 0.2.16");
+    expect(pyproject).not.toContain("strands-agents-tools ~= 0.1");
+  });
+
   test("keeps generated state to the repository's per-session agent cache", () => {
     const main = new StrandsBedrockAgentTranslator(snapshot(), request).translate().files[
       "main.py"
@@ -280,5 +290,17 @@ describe("LangGraphBedrockAgentTranslator", () => {
     expect(plan.files["pyproject.toml"]).toContain("langgraph ~= 1.0");
     expect(plan.files["pyproject.toml"]).not.toContain("strands-agents ~=");
     expect(plan.files["pyproject.toml"]).not.toMatch(/[a-z-]+ >=/);
+  });
+
+  test("flags an ARN foundation model, which langchain_aws cannot infer a provider from", () => {
+    const plan = new LangGraphBedrockAgentTranslator(
+      snapshot({
+        foundationModel: "arn:aws:bedrock:us-east-1:1:application-inference-profile/xyz",
+      }),
+      { ...request, framework: "langgraph", memory: "none" },
+    ).translate();
+
+    expect(plan.files["IMPORT_NOTES.md"]).toContain("LangGraph model provider");
+    expect(plan.files["IMPORT_NOTES.md"]).toContain('add provider="');
   });
 });
