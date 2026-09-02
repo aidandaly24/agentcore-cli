@@ -290,6 +290,16 @@ export const ProjectRuntimeSchema = z
         path: ["networkConfig", "securityGroups"],
       });
     }
+    // Mirrors the CDK, which feeds networkConfig.vpcId to the CodeBuild project's
+    // VpcConfig. Only `build: "Container"` reaches that path, so CodeZip is exempt.
+    if (data.networkMode === "VPC" && data.build === "Container" && !data.networkConfig?.vpcId) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "networkConfig.vpcId is required for Container builds in VPC mode (CodeBuild cannot infer the VPC from subnets)",
+        path: ["networkConfig", "vpcId"],
+      });
+    }
     if (
       data.authorizerType === "CUSTOM_JWT" &&
       !data.authorizerConfiguration?.customJwtAuthorizer

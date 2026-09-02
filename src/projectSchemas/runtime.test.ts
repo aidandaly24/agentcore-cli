@@ -144,9 +144,28 @@ describe("runtime custom validation", () => {
     );
     const vpc = {
       networkMode: "VPC" as const,
-      networkConfig: { ...networkConfig, securityGroups },
+      networkConfig: { ...networkConfig, securityGroups, vpcId: "vpc-0123456789abcdef0" },
     };
-    expect(ProjectRuntimeSchema.safeParse({ ...containerAgent, ...vpc }).success).toBe(false);
+    const capped = ProjectRuntimeSchema.safeParse({ ...containerAgent, ...vpc });
+    expect(capped.success).toBe(false);
+    expect(capped.error?.issues[0]?.path).toEqual(["networkConfig", "securityGroups"]);
     expect(ProjectRuntimeSchema.safeParse({ ...codeZipAgent, ...vpc }).success).toBe(true);
+  });
+  it("requires a VPC ID for container builds in VPC mode only", () => {
+    const vpc = { networkMode: "VPC" as const, networkConfig };
+    const missing = ProjectRuntimeSchema.safeParse({ ...containerAgent, ...vpc });
+    expect(missing.success).toBe(false);
+    expect(missing.error?.issues[0]?.path).toEqual(["networkConfig", "vpcId"]);
+    expect(
+      ProjectRuntimeSchema.safeParse({
+        ...containerAgent,
+        networkMode: "VPC",
+        networkConfig: { ...networkConfig, vpcId: "vpc-0123456789abcdef0" },
+      }).success,
+    ).toBe(true);
+
+    // CodeZip never reaches CodeBuild, so it needs no VPC ID.
+    expect(ProjectRuntimeSchema.safeParse({ ...codeZipAgent, ...vpc }).success).toBe(true);
+    expect(ProjectRuntimeSchema.safeParse(containerAgent).success).toBe(true);
   });
 });
