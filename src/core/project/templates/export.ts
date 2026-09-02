@@ -169,8 +169,6 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     isExportHarness: true,
     entrypoint: "main",
     enableOtel: true,
-    hasConfigBundle: false,
-    hasPayment: false,
     isVpc: spec.networkMode === "VPC",
     protocol: "HTTP",
     // Model
@@ -190,21 +188,15 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     actorId: memory.actorId,
     // Gateways are never exported as code (see resolveTools); the template still
     // needs the keys so its conditionals resolve.
-    hasGateway: false,
-    gatewayProviders: [],
-    gatewayAuthTypes: [],
     // Tools. Empty collections become undefined: the template's custom `or`/
     // `some` helpers use JS truthiness, where [] is truthy, unlike `{{#if}}`.
     inlineFunctionTools: undefinedIfEmpty(tools.inlineFunctionTools),
     remoteMcpTools: undefinedIfEmpty(tools.remoteMcpTools),
     hasShell: tools.hasShell,
     hasFileOperations: tools.hasFileOperations,
-    hasBrowser: false,
-    hasCodeInterpreter: false,
     // Skills
     hasSkillsFetcher: skills.hasSkillsFetcher,
     hasFetchedSkills: skills.hasFetchedSkills,
-    pathSkills: skills.pathSkills,
     s3Skills: undefinedIfEmpty(skills.s3Skills),
     gitSkills: undefinedIfEmpty(skills.gitSkills),
     // Execution limits (numbers are schema-validated >= 1, so plain #if works)

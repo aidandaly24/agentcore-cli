@@ -26,9 +26,6 @@ import subprocess
 {{#if hasFileOperations}}
 import os
 {{/if}}
-{{#if hasConfigBundle}}
-from strands.hooks import HookProvider, HookRegistry, BeforeInvocationEvent, BeforeToolCallEvent
-{{/if}}
 {{#if truncationStrategy}}
 {{#if (eq truncationStrategy "sliding_window")}}
 from strands.agent.conversation_manager import SlidingWindowConversationManager
@@ -39,24 +36,12 @@ from strands.agent.conversation_manager.summarizing_conversation_manager import 
 {{else}}
 from strands.agent.conversation_manager.null_conversation_manager import NullConversationManager
 {{/if}}
-{{#if hasConfigBundle}}
-from bedrock_agentcore.runtime.context import BedrockAgentCoreContext
-{{/if}}
-{{#if hasBrowser}}
-from strands_tools.browser import AgentCoreBrowser
-{{/if}}
-{{#if hasCodeInterpreter}}
-from strands_tools.code_interpreter import AgentCoreCodeInterpreter
-{{/if}}
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 from model.load import load_model
-{{#if hasGateway}}
-from mcp_client.client import get_all_gateway_mcp_clients
-{{/if}}
 {{#if remoteMcpTools}}
 from mcp_client.client import get_all_remote_mcp_clients
 {{/if}}
-{{#unless (or hasGateway remoteMcpTools)}}
+{{#unless remoteMcpTools}}
 {{#unless isExportHarness}}
 from mcp_client.client import get_streamable_http_mcp_client
 {{/unless}}
@@ -65,23 +50,17 @@ from mcp_client.client import get_streamable_http_mcp_client
 from memory.session import get_memory_session_manager
 {{/if}}
 {{#unless hasFileOperations}}
-{{#if (or needsOs browserIdentifierEnvVar codeInterpreterIdentifierEnvVar (some gitSkills "credentialArn"))}}
+{{#if (or needsOs (some gitSkills "credentialArn"))}}
 import os
 {{/if}}
 {{/unless}}
-{{#if hasPayment}}
-from capabilities.payments.payments import create_payments_plugin, PAYMENT_SYSTEM_PROMPT
-{{/if}}
 
 app = BedrockAgentCoreApp()
 log = app.logger
 
-{{#if (or hasGateway remoteMcpTools)}}
+{{#if remoteMcpTools}}
 # Define MCP clients for all configured MCP servers (gateways and/or remote MCP)
 mcp_clients = []
-{{#if hasGateway}}
-mcp_clients += get_all_gateway_mcp_clients()
-{{/if}}
 {{#if remoteMcpTools}}
 mcp_clients += get_all_remote_mcp_clients()
 {{/if}}
@@ -106,9 +85,6 @@ You have access to the following mounted filesystems. Use file_read, file_write,
 """
 {{/if}}
 
-{{#if hasConfigBundle}}
-DEFAULT_TOOL_DESC = "Return the sum of two numbers"
-{{/if}}
 
 # Define a collection of tools used by the model
 tools = []
@@ -138,33 +114,13 @@ _INLINE_FUNCTION_NAMES = set()
 
 {{#unless isExportHarness}}
 # Define a simple function tool
-{{#if hasConfigBundle}}
-@tool(description=DEFAULT_TOOL_DESC)
-{{else}}
 @tool
-{{/if}}
 def add_numbers(a: int, b: int) -> int:
     """Return the sum of two numbers"""
     return a+b
 tools.append(add_numbers)
 
 {{/unless}}
-{{/if}}
-{{#if hasBrowser}}
-{{#if browserIdentifierEnvVar}}
-_browser_id = os.getenv("{{browserIdentifierEnvVar}}")
-tools.append(AgentCoreBrowser(**({"identifier": _browser_id} if _browser_id else {})).browser)
-{{else}}
-tools.append(AgentCoreBrowser().browser)
-{{/if}}
-{{/if}}
-{{#if hasCodeInterpreter}}
-{{#if codeInterpreterIdentifierEnvVar}}
-_code_interpreter_id = os.getenv("{{codeInterpreterIdentifierEnvVar}}")
-tools.append(AgentCoreCodeInterpreter(**({"identifier": _code_interpreter_id} if _code_interpreter_id else {})).code_interpreter)
-{{else}}
-tools.append(AgentCoreCodeInterpreter().code_interpreter)
-{{/if}}
 {{/if}}
 {{#if hasShell}}
 @tool
@@ -323,7 +279,7 @@ def list_files(path: str) -> str:
 tools.extend([file_read, file_write, list_files])
 {{/unless}}{{/if}}
 
-{{#if (or hasGateway remoteMcpTools)}}
+{{#if remoteMcpTools}}
 # Add MCP clients to tools
 for mcp_client in mcp_clients:
     if mcp_client:
@@ -337,39 +293,6 @@ for mcp_client in mcp_clients:
 {{/unless}}
 {{/if}}
 
-{{#if hasConfigBundle}}
-
-class ConfigBundleHook(HookProvider):
-    """Injects config bundle values (system prompt, tool descriptions) before each invocation.
-
-    BedrockAgentCoreContext.get_config_bundle() fetches the component configuration
-    for the current runtime ARN from the config bundle service. The SDK caches the
-    result and refreshes on bundle version changes.
-    """
-
-    def register_hooks(self, registry: HookRegistry, **kwargs: Any) -> None:
-        registry.add_callback(BeforeInvocationEvent, self._inject_system_prompt)
-        registry.add_callback(BeforeToolCallEvent, self._override_tool_desc)
-
-    def _inject_system_prompt(self, event: BeforeInvocationEvent) -> None:
-        config = BedrockAgentCoreContext.get_config_bundle()
-        prompt = config.get("systemPrompt", DEFAULT_SYSTEM_PROMPT)
-
-        if prompt != event.agent.system_prompt:
-            event.agent.system_prompt = prompt
-
-    def _override_tool_desc(self, event: BeforeToolCallEvent) -> None:
-        config = BedrockAgentCoreContext.get_config_bundle()
-        tool_descs = config.get("toolDescriptions", {})
-
-        tool_name = event.tool_use["name"]
-        override = tool_descs.get(tool_name)
-        if override and event.selected_tool:
-            spec = event.selected_tool.tool_spec
-            if spec and "description" in spec:
-                spec["description"] = override
-
-{{/if}}
 
 def _make_conversation_manager():
 {{#if truncationStrategy}}
@@ -391,7 +314,6 @@ def _make_conversation_manager():
 {{/if}}
 
 {{#if hasMemory}}
-{{#unless hasPayment}}
 def agent_factory():
     cache = {}
     def get_or_create_agent(session_id, user_id{{#if hasSkillsFetcher}}, skill_plugins=None{{/if}}):
@@ -412,17 +334,12 @@ def agent_factory():
                 plugins=skill_plugins or None,
                 {{/if}}
                 hooks=[
-                    {{#if hasConfigBundle}}
-                    ConfigBundleHook(),
-                    {{/if}}
                 ],
             )
         return cache[key]
     return get_or_create_agent
 get_or_create_agent = agent_factory()
-{{/unless}}
 {{else}}
-{{#unless hasPayment}}
 # Reuses one Agent per session_id so each session keeps its own in-process
 # conversation history (best-effort; resets on cold start). The cache is bounded
 # to 128 sessions with LRU eviction (least-recently-used is dropped and its
@@ -445,15 +362,11 @@ def agent_factory():
             plugins=skill_plugins or None,
             {{/if}}
             hooks=[
-                {{#if hasConfigBundle}}
-                ConfigBundleHook(),
-                {{/if}}
             ],
         )
         return cache[session_id]
     return get_or_create_agent
 get_or_create_agent = agent_factory()
-{{/unless}}
 {{/if}}
 
 
@@ -533,15 +446,8 @@ def _is_inline_function_call(event: dict) -> bool:
 async def invoke(payload, context):
     log.info("Invoking Agent.....")
 
-{{#if hasPayment}}
-    user_id = payload.get("user_id") or getattr(context, "user_id", "default-user")
-    instrument_id = payload.get("payment_instrument_id")
-    session_id = payload.get("payment_session_id")
-    payments_plugin = create_payments_plugin(user_id, instrument_id, session_id)
-    plugins = [payments_plugin] if payments_plugin else []
-{{/if}}
 {{#if hasSkillsFetcher}}
-    skill_paths = [{{#each pathSkills}}{{safeJson this}}{{#unless @last}}, {{/unless}}{{/each}}]
+    skill_paths = []
     {{#if s3Skills}}
     s3_skill_sources = [{{#each s3Skills}}{{safeJson this}}{{#unless @last}}, {{/unless}}{{/each}}]
     skill_paths.extend(await asyncio.to_thread(resolve_s3_skills, s3_skill_sources, None))
@@ -563,22 +469,6 @@ async def invoke(payload, context):
 {{/if}}
 
 {{#if hasMemory}}
-{{#if hasPayment}}
-    mem_session_id = getattr(context, 'session_id', 'default-session')
-    {{#if actorId}}
-    mem_user_id = "{{actorId}}"
-    {{else}}
-    mem_user_id = getattr(context, 'user_id', 'default-user')
-    {{/if}}
-    agent = Agent(
-        model=load_model(),
-        session_manager=get_memory_session_manager(mem_session_id, mem_user_id),
-        system_prompt=DEFAULT_SYSTEM_PROMPT + PAYMENT_SYSTEM_PROMPT,
-        tools=tools,
-        plugins=plugins{{#if hasSkillsFetcher}} + _skill_plugins{{/if}},{{#if hasConfigBundle}}
-        hooks=[ConfigBundleHook()],{{/if}}
-    )
-{{else}}
     session_id = getattr(context, 'session_id', 'default-session')
     {{#if actorId}}
     user_id = "{{actorId}}"
@@ -586,20 +476,9 @@ async def invoke(payload, context):
     user_id = getattr(context, 'user_id', 'default-user')
     {{/if}}
     agent = get_or_create_agent(session_id, user_id{{#if hasSkillsFetcher}}, _skill_plugins{{/if}})
-{{/if}}
-{{else}}
-{{#if hasPayment}}
-    agent = Agent(
-        model=load_model(),
-        system_prompt=DEFAULT_SYSTEM_PROMPT + PAYMENT_SYSTEM_PROMPT,
-        tools=tools,
-        plugins=plugins{{#if hasSkillsFetcher}} + _skill_plugins{{/if}},{{#if hasConfigBundle}}
-        hooks=[ConfigBundleHook()],{{/if}}
-    )
 {{else}}
     session_id = getattr(context, 'session_id', 'default-session')
     agent = get_or_create_agent(session_id{{#if hasSkillsFetcher}}, _skill_plugins{{/if}})
-{{/if}}
 {{/if}}
 
     prompt = _extract_prompt(payload)

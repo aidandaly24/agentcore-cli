@@ -332,9 +332,11 @@ describe("mapHarnessToExportPlan tools", () => {
       }),
     });
 
-    expect(result.context.hasBrowser).toBe(false);
-    expect(result.context.hasCodeInterpreter).toBe(false);
-    expect(result.context.hasGateway).toBe(false);
+    // The render context carries nothing for these tools at all, so the template has no
+    // branch to render them from — the notes below are the whole output.
+    expect(result.context.hasBrowser).toBeUndefined();
+    expect(result.context.hasCodeInterpreter).toBeUndefined();
+    expect(result.context.hasGateway).toBeUndefined();
     expect(result.context.remoteMcpTools).toBeUndefined();
     expect(categories(result)).toEqual([
       GATEWAY_TOOL_NOTE_CATEGORY,
