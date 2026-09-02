@@ -184,10 +184,11 @@ import type { ReadWriteJson } from "../io";
 import { createSilentLogger } from "./logging";
 import { FsProjectManager, type ProjectBackend } from "../core/project";
 import type {
-  BedrockAgentMetadata,
-  DescribeBedrockAgent,
-  DescribeBedrockAgentInput,
-} from "../core/project/bedrockAgent";
+  BedrockAgentImportPlan,
+  BedrockAgentImportRequest,
+  CoreBedrockAgentImporter,
+} from "../core/project/bedrockAgentImport";
+import { BEDROCK_AGENT_IMPORT_REGIONS } from "../core/project/bedrockAgentImport";
 import type { ManagedBy } from "../projectSchemas/project";
 import { InputValidationError } from "../errors";
 
@@ -2395,20 +2396,25 @@ export class TestCoreClient implements Core {
   // recorded instead of spawned so tests stay fast and hermetic.
   readonly projectCommands: { command: string[]; cwd: string }[] = [];
 
-  // Seed with `agentId/agentAliasId` keys to make Bedrock Agents resolvable
-  // through describeBedrockAgent; unseeded ids reject like the service would.
-  readonly bedrockAgentDescriptions: Record<string, BedrockAgentMetadata> = {};
-  readonly describedBedrockAgents: DescribeBedrockAgentInput[] = [];
-  readonly describeBedrockAgent: DescribeBedrockAgent = async (input) => {
-    this.describedBedrockAgents.push(input);
-    const metadata = this.bedrockAgentDescriptions[`${input.agentId}/${input.agentAliasId}`];
-    if (!metadata) {
+  // Seed with `agentId/agentAliasId` keys to make Bedrock Agent imports
+  // resolvable; unseeded ids reject like the service would.
+  readonly bedrockAgentImportPlans: Record<string, BedrockAgentImportPlan> = {};
+  readonly importedBedrockAgents: BedrockAgentImportRequest[] = [];
+  readonly bedrockAgentImporter: CoreBedrockAgentImporter = {
+    import: async (input) => {
+      if (!(BEDROCK_AGENT_IMPORT_REGIONS as readonly string[]).includes(input.region)) {
+        throw new InputValidationError(
+          `'${input.region}' is not a supported Bedrock Agent region for import`,
+        );
+      }
+      this.importedBedrockAgents.push(input);
+      const plan = this.bedrockAgentImportPlans[`${input.agentId}/${input.agentAliasId}`];
+      if (plan) return plan;
       throw new InputValidationError(
         `no Bedrock Agent with id '${input.agentId}' exists in ${input.region}; ` +
           `check --agent-id and --region`,
       );
-    }
-    return metadata;
+    },
   };
 
   constructor(options?: TestCoreClientOptions) {

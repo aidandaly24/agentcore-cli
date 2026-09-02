@@ -25,10 +25,7 @@ import {
 import { InputValidationError } from "../../../errors";
 import { parseJsonFlag } from "../../utils";
 import { DEFAULT_HARNESS_MODEL } from "../add/harness";
-import {
-  describeBedrockAgent,
-  type DescribeBedrockAgent,
-} from "../../../core/project/bedrockAgent";
+import type { CoreBedrockAgentImporter } from "../../../core/project/bedrockAgentImport";
 import { importScaffoldRuntimeInput, resolveImportBedrockAgentInput } from "../importBedrockAgent";
 import type { ImportBedrockAgentInput } from "../add/runtime/types";
 import { RegionKey } from "../../keys";
@@ -36,8 +33,7 @@ import { RegionKey } from "../../keys";
 type CreateProjectHandlerConfig = {
   projectManager: ProjectManager;
   io: AppIO;
-  /** Describes a Bedrock Agent for --type import; injectable for tests. */
-  describeBedrockAgent?: DescribeBedrockAgent;
+  bedrockAgentImporter: CoreBedrockAgentImporter;
 };
 
 // Flags that select the runtime-scaffolding path. Any of these (or --template)
@@ -110,8 +106,8 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
       ),
       flag(
         "framework",
-        "agent framework for the scaffolded runtime code",
-        z.enum(["strands", "none"]).optional(),
+        "agent framework: strands or none for create; strands or langgraph for import",
+        z.enum(["strands", "langgraph", "none"]).optional(),
       ),
       flag(
         "protocol",
@@ -137,7 +133,7 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
       flag("runtime-name", "name of the scaffolded runtime", z.string().max(42).optional()),
       flag(
         "type",
-        "create scaffolds new agent code (the default); import wraps an existing Bedrock Agent",
+        "create scaffolds new agent code (the default); import translates a Bedrock Agent version",
         z.enum(["create", "import"]).optional(),
       ),
       flag(
@@ -147,7 +143,8 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
       ),
       flag(
         "agent-alias-id",
-        "Bedrock Agent Alias ID to import (requires --type import)",
+        "Bedrock Agent Alias ID selecting the version to import; must point at a prepared " +
+          "version, not DRAFT (requires --type import)",
         z.string().optional(),
       ),
       flag("model-id", "model ID for the created harness", z.string().optional()),
@@ -231,39 +228,52 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
 
       const isImport = flags["type"] === "import";
       const scaffoldingChoiceFlags = (
-        [
-          "build",
-          "language",
-          "framework",
-          "protocol",
-          "model-provider",
-          "api-key",
-          "memory",
-        ] as const
+        // --framework and --memory are import inputs, not scaffolding choices, so they are
+        // validated below instead of rejected here.
+        ["build", "language", "model-provider", "api-key"] as const
       ).filter((f) => flags[f] !== undefined);
       if (isImport && (isTemplate || scaffoldingChoiceFlags.length > 0)) {
         const offending = isTemplate ? "template" : scaffoldingChoiceFlags[0];
         throw new InputValidationError(
-          `--type import wraps an existing Bedrock Agent; --${offending} is a scaffolding ` +
-            `flag and cannot be combined with it`,
+          `--type import translates a Bedrock Agent into Python CodeZip runtime code; ` +
+            `--${offending} cannot be combined with it`,
         );
       }
       if (!isImport && (flags["agent-id"] !== undefined || flags["agent-alias-id"] !== undefined)) {
         throw new InputValidationError("--agent-id and --agent-alias-id require --type import");
       }
+      if (isImport && flags["framework"] === "none") {
+        throw new InputValidationError("--type import supports --framework strands or langgraph");
+      }
+      if (!isImport && flags["framework"] === "langgraph") {
+        throw new InputValidationError("--framework langgraph requires --type import");
+      }
+      if (isImport && flags["protocol"] !== undefined && flags["protocol"] !== "HTTP") {
+        throw new InputValidationError("an imported Bedrock Agent only supports HTTP");
+      }
 
       const isRuntimePath = presentRuntimeFlags.length > 0;
 
       let importBedrockAgent: ImportBedrockAgentInput | undefined;
+      const runtimeName = flags["runtime-name"] ?? name;
+      const importMemory = flags["memory"] ?? "none";
       if (isImport) {
-        const { imported, warnings } = await resolveImportBedrockAgentInput({
-          describeBedrockAgent: config.describeBedrockAgent ?? describeBedrockAgent,
+        importBedrockAgent = await resolveImportBedrockAgentInput({
+          importer: config.bedrockAgentImporter,
+          runtimeName,
           region: ctx.require(RegionKey),
           agentId: flags["agent-id"],
           agentAliasId: flags["agent-alias-id"],
+          framework: flags["framework"] === "langgraph" ? "langgraph" : "strands",
+          memory: importMemory,
         });
-        importBedrockAgent = imported;
-        for (const warning of warnings) config.io.stderr.write(`${warning}\n`);
+        if (importBedrockAgent.notes.length > 0) {
+          config.io.stderr.write(
+            `Import generated ${importBedrockAgent.notes.length} manual follow-up ` +
+              `${importBedrockAgent.notes.length === 1 ? "item" : "items"} in ` +
+              `app/${runtimeName}/IMPORT_NOTES.md.\n`,
+          );
+        }
       }
 
       const createInput: CreateProjectInput = isRuntimePath
@@ -272,7 +282,7 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
             skipInstall: flags["skip-install"],
             skipGit: flags["skip-git"],
             scaffoldRuntimeInput: isImport
-              ? importScaffoldRuntimeInput(flags["runtime-name"] ?? name)
+              ? importScaffoldRuntimeInput(runtimeName, MEMORY_SHORTCUTS[importMemory](runtimeName))
               : await resolveScaffoldRuntimeInput(config, { ...flags, name }),
             importBedrockAgent,
           }
@@ -303,7 +313,7 @@ type RuntimePathFlagValues = {
   template?: (typeof RUNTIME_TEMPLATE_SHORTCUT_NAMES)[number];
   build?: "CodeZip" | "Container";
   language?: "Python" | "TypeScript";
-  framework?: "strands" | "none";
+  framework?: "strands" | "langgraph" | "none";
   protocol?: "HTTP" | "MCP" | "A2A";
   "model-provider"?: ModelProviderFlag;
   "api-key"?: string;
@@ -348,7 +358,7 @@ async function resolveScaffoldRuntimeInput(
         runtimeName,
         build: flags["build"],
         language: flags["language"],
-        framework: flags["framework"],
+        framework: flags["framework"] === "langgraph" ? undefined : flags["framework"],
         protocol: flags["protocol"],
         modelProvider,
         apiKey,

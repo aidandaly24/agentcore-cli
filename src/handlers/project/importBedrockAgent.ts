@@ -1,79 +1,57 @@
 import { InputValidationError } from "../../errors";
-import {
-  BEDROCK_AGENT_IMPORT_REGIONS,
-  type DescribeBedrockAgent,
-} from "../../core/project/bedrockAgent";
-import type { ImportBedrockAgentInput } from "./add/runtime/types";
+import type {
+  BedrockAgentImportFramework,
+  BedrockAgentImportMemory,
+  CoreBedrockAgentImporter,
+} from "../../core/project/bedrockAgentImport";
+import type { Memory } from "../../projectSchemas/memory";
 import type { ScaffoldRuntimeInput } from "./types";
 
 /**
- * The fixed scaffold shape of a Bedrock Agent proxy runtime: plain Python,
- * CodeZip. The proxy template supplies the code; these values only shape the
- * runtime spec entry.
+ * Imported Bedrock Agents become Python CodeZip runtimes. The translation plan
+ * supplies the code while this input supplies the normal project memory entry.
  */
-export function importScaffoldRuntimeInput(runtimeName: string): ScaffoldRuntimeInput {
+export function importScaffoldRuntimeInput(
+  runtimeName: string,
+  memory?: Memory,
+): ScaffoldRuntimeInput {
   return {
     runtimeName,
     build: "CodeZip",
     language: "Python",
     framework: "none",
     modelProvider: "Bedrock",
+    memory,
     runtimeVersion: "PYTHON_3_14",
   };
 }
 
 export type ResolveImportInput = {
-  describeBedrockAgent: DescribeBedrockAgent;
-  /** The CLI's effective region (--region flag, env, shared config). */
+  importer: CoreBedrockAgentImporter;
+  runtimeName: string;
   region: string;
   agentId?: string;
   agentAliasId?: string;
+  framework: BedrockAgentImportFramework;
+  memory: BedrockAgentImportMemory;
 };
 
 /**
- * Validates the import addressing, describes the agent and alias through the
- * service, and returns the proxy scaffold's input plus any advisory warnings.
+ * Validates import addressing and resolves an alias-pinned translation plan.
  */
 export async function resolveImportBedrockAgentInput(
   input: ResolveImportInput,
-): Promise<{ imported: ImportBedrockAgentInput; warnings: string[] }> {
+): Promise<Awaited<ReturnType<CoreBedrockAgentImporter["import"]>>> {
   if (!input.agentId || !input.agentAliasId) {
     throw new InputValidationError("--type import requires both --agent-id and --agent-alias-id");
   }
 
-  const region = BEDROCK_AGENT_IMPORT_REGIONS.find((candidate) => candidate === input.region);
-  if (!region) {
-    throw new InputValidationError(
-      `'${input.region}' is not a supported Bedrock Agent region for import. ` +
-        `Supported regions: ${BEDROCK_AGENT_IMPORT_REGIONS.join(", ")}. ` +
-        `Pass --region <region> to select the agent's region.`,
-    );
-  }
-
-  const metadata = await input.describeBedrockAgent({
-    region,
+  return input.importer.import({
+    runtimeName: input.runtimeName,
+    region: input.region,
     agentId: input.agentId,
     agentAliasId: input.agentAliasId,
+    framework: input.framework,
+    memory: input.memory,
   });
-
-  const warnings: string[] = [];
-  if (metadata.agentAliasStatus !== "PREPARED") {
-    warnings.push(
-      `Warning: Bedrock Agent alias '${metadata.agentAliasName}' is in status ` +
-        `${metadata.agentAliasStatus} (not PREPARED); invocations may fail until the alias is prepared.`,
-    );
-  }
-
-  return {
-    imported: {
-      agentId: input.agentId,
-      agentAliasId: input.agentAliasId,
-      region,
-      agentName: metadata.agentName,
-      agentAliasArn: metadata.agentAliasArn,
-      ...(metadata.foundationModel && { foundationModel: metadata.foundationModel }),
-      ...(metadata.description && { description: metadata.description }),
-    },
-    warnings,
-  };
 }

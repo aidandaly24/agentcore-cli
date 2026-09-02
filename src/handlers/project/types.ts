@@ -85,7 +85,7 @@ export type CreateProjectInput = CreateProjectInputBase &
     | {
         /** The resolved template parameters. The handler maps --template to these before calling the manager. */
         scaffoldRuntimeInput: ScaffoldRuntimeInput;
-        /** Present when the runtime proxies an imported Bedrock Agent. */
+        /** Present when runtime files were translated from a Bedrock Agent version. */
         importBedrockAgent?: ImportBedrockAgentInput;
         scaffoldHarnessInput?: undefined;
       }

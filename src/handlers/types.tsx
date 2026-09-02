@@ -7,7 +7,7 @@ import type { CoreObservabilityClient, CoreRuntimeClient } from "./runtime/types
 import type { Context } from "../router";
 import type { CoreFetch } from "../core/types";
 import type { ProjectManager } from "./project/types.ts";
-import type { DescribeBedrockAgent } from "../core/project/bedrockAgent";
+import type { CoreBedrockAgentImporter } from "../core/project/bedrockAgentImport";
 
 export interface Core {
   harness: CoreHarnessClient;
@@ -18,8 +18,8 @@ export interface Core {
   eval: CoreEvalClient;
   observability: CoreObservabilityClient;
   projectManager: ProjectManager;
-  /** Describes a Bedrock Agent + alias for `--type import`. */
-  describeBedrockAgent: DescribeBedrockAgent;
+  /** Imports an alias-pinned Bedrock Agent definition into owned runtime code. */
+  bedrockAgentImporter: CoreBedrockAgentImporter;
   /** Shared outbound HTTP for handlers that call non-AWS APIs directly (e.g. feedback → Aperture). */
   fetch: CoreFetch;
 }

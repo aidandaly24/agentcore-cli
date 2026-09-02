@@ -10,6 +10,7 @@ import {
   testIO,
 } from "../../../../testing";
 import { InputValidationError } from "../../../../errors";
+import type { BedrockAgentImportPlan } from "../../../../core/project/bedrockAgentImport";
 
 const originalCwd = process.cwd();
 const tempDirectories: string[] = [];
@@ -46,6 +47,34 @@ async function inProject(name = "TestProject"): Promise<string> {
   const projectRoot = join(directory, name);
   process.chdir(projectRoot);
   return projectRoot;
+}
+
+function translatedImportPlan(
+  overrides: Partial<BedrockAgentImportPlan> = {},
+): BedrockAgentImportPlan {
+  return {
+    framework: "strands",
+    sourceAgentId: "A1B2C3D4E5",
+    sourceAgentAliasId: "TSTALIASID",
+    sourceAgentVersion: "7",
+    files: {
+      "main.py": "from strands import Agent\n# translated agent",
+      "pyproject.toml": '[project]\nname = "support-proxy"\n',
+      "IMPORT_NOTES.md":
+        "# Bedrock Agent Import Notes\n\n" +
+        "- **knowledge-base IAM:** Grant the Runtime execution role bedrock:Retrieve on: " +
+        "arn:aws:bedrock:us-east-1:111122223333:knowledge-base/KB123.\n",
+    },
+    notes: [
+      {
+        category: "knowledge-base IAM",
+        message:
+          "Grant the Runtime execution role bedrock:Retrieve on: " +
+          "arn:aws:bedrock:us-east-1:111122223333:knowledge-base/KB123.",
+      },
+    ],
+    ...overrides,
+  };
 }
 
 describe("project add runtime", () => {
@@ -757,15 +786,6 @@ describe("project add runtime", () => {
 });
 
 describe("project add runtime --type import", () => {
-  const metadata = {
-    agentName: "SupportAgent",
-    agentStatus: "PREPARED",
-    agentAliasArn: "arn:aws:bedrock:us-east-1:111122223333:agent-alias/A1B2C3D4E5/TSTALIASID",
-    agentAliasName: "live",
-    agentAliasStatus: "PREPARED",
-    foundationModel: "us.amazon.nova-lite-v1:0",
-  };
-
   const importArgs = [
     "add",
     "runtime",
@@ -781,15 +801,22 @@ describe("project add runtime --type import", () => {
     "us-east-1",
   ];
 
-  test("scaffolds a proxy runtime wrapping the described Bedrock Agent", async () => {
+  test("scaffolds owned runtime code translated from the selected agent version", async () => {
     const projectRoot = await inProject();
     const core = new TestCoreClient();
-    core.bedrockAgentDescriptions["A1B2C3D4E5/TSTALIASID"] = metadata;
+    core.bedrockAgentImportPlans["A1B2C3D4E5/TSTALIASID"] = translatedImportPlan();
 
     await run(importArgs, { core });
 
-    expect(core.describedBedrockAgents).toEqual([
-      { region: "us-east-1", agentId: "A1B2C3D4E5", agentAliasId: "TSTALIASID" },
+    expect(core.importedBedrockAgents).toEqual([
+      {
+        runtimeName: "support_proxy",
+        region: "us-east-1",
+        agentId: "A1B2C3D4E5",
+        agentAliasId: "TSTALIASID",
+        framework: "strands",
+        memory: "none",
+      },
     ]);
 
     const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
@@ -800,72 +827,70 @@ describe("project add runtime --type import", () => {
       codeLocation: "app/support_proxy",
       runtimeVersion: "PYTHON_3_14",
       protocol: "HTTP",
-      additionalPolicies: ["bedrock-agent-policy.json"],
     });
+    expect(spec.runtimes[0].additionalPolicies).toBeUndefined();
 
     const appDir = join(projectRoot, "app", "support_proxy");
     const main = await Bun.file(join(appDir, "main.py")).text();
-    expect(main).toContain('"A1B2C3D4E5"');
-    expect(main).toContain('"TSTALIASID"');
-    expect(main).toContain('"us-east-1"');
-    expect(main).toContain("invoke_agent");
-    expect(main).toContain("asyncio.to_thread");
-    expect(main).toContain("hashlib.sha256");
-    expect(main).toContain("isinstance(payload, dict)");
+    expect(main).toContain("translated agent");
+    expect(main).not.toContain("client.invoke_agent");
 
-    const policy = await Bun.file(join(appDir, "bedrock-agent-policy.json")).json();
-    expect(policy.Statement[0]).toMatchObject({
-      Action: "bedrock:InvokeAgent",
-      Resource: metadata.agentAliasArn,
-    });
+    const notes = await Bun.file(join(appDir, "IMPORT_NOTES.md")).text();
+    expect(notes).toContain("bedrock:Retrieve");
 
     const pyproject = await Bun.file(join(appDir, "pyproject.toml")).text();
-    expect(pyproject).toContain('name = "support_proxy"');
-    expect(pyproject).toContain("boto3");
+    expect(pyproject).toContain('name = "support-proxy"');
   });
 
-  test("warns when the alias is not PREPARED", async () => {
-    await inProject();
+  test("supports LangGraph translation and target memory", async () => {
+    const projectRoot = await inProject();
     const core = new TestCoreClient();
-    core.bedrockAgentDescriptions["A1B2C3D4E5/TSTALIASID"] = {
-      ...metadata,
-      agentAliasStatus: "FAILED",
-    };
+    core.bedrockAgentImportPlans["A1B2C3D4E5/TSTALIASID"] = translatedImportPlan({
+      framework: "langgraph",
+    });
 
-    const { io } = await run(importArgs, { core });
-    expect(io.stderr()).toContain("alias 'live' is in status FAILED");
+    await run([...importArgs, "--framework", "langgraph", "--memory", "longAndShortTerm"], {
+      core,
+    });
+
+    expect(core.importedBedrockAgents[0]).toMatchObject({
+      framework: "langgraph",
+      memory: "longAndShortTerm",
+    });
+    const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
+    expect(spec.memories[0]).toMatchObject({
+      name: "support_proxyMemory",
+      strategies: expect.any(Array),
+    });
   });
 
-  test("rejects a non-HTTP protocol before describing the agent", async () => {
+  test("rejects a non-HTTP protocol before importing the agent", async () => {
     await inProject();
     const core = new TestCoreClient();
 
     await expect(run([...importArgs, "--protocol", "MCP"], { core })).rejects.toThrow(
       /only supports HTTP/,
     );
-    expect(core.describedBedrockAgents).toEqual([]);
+    expect(core.importedBedrockAgents).toEqual([]);
   });
 
-  test("makes caller-owned role permissions explicit", async () => {
+  test("documents required permissions instead of generating policies for a caller-owned role", async () => {
     const projectRoot = await inProject();
     const core = new TestCoreClient();
-    core.bedrockAgentDescriptions["A1B2C3D4E5/TSTALIASID"] = metadata;
+    core.bedrockAgentImportPlans["A1B2C3D4E5/TSTALIASID"] = translatedImportPlan();
     const roleArn = "arn:aws:iam::111122223333:role/ExistingRuntimeRole";
 
     const { io } = await run([...importArgs, "--role-arn", roleArn], { core });
 
-    expect(io.stderr()).toContain(
-      `execution role '${roleArn}' must already allow bedrock:InvokeAgent on ${metadata.agentAliasArn}`,
-    );
+    expect(io.stderr()).toContain("IMPORT_NOTES.md");
     const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     expect(spec.runtimes[0]).toMatchObject({ executionRoleArn: roleArn });
     expect(spec.runtimes[0].additionalPolicies).toBeUndefined();
 
     const appDir = join(projectRoot, "app", "support_proxy");
-    expect(await Bun.file(join(appDir, "bedrock-agent-policy.json")).exists()).toBe(true);
-    expect(await Bun.file(join(appDir, "README.md")).text()).toContain(
-      "attach `bedrock-agent-policy.json` to that role before deploying",
-    );
+    const notes = await Bun.file(join(appDir, "IMPORT_NOTES.md")).text();
+    expect(notes).toContain("bedrock:Retrieve");
+    expect(await Bun.file(join(appDir, "bedrock-knowledge-base-policy.json")).exists()).toBe(false);
   });
 
   test("rejects a nonexistent agent with the describe error", async () => {
@@ -878,7 +903,7 @@ describe("project add runtime --type import", () => {
     const core = new TestCoreClient();
     const args = [...importArgs.slice(0, -2), "--region", "eu-north-1"];
     await expect(run(args, { core })).rejects.toThrow(/not a supported Bedrock Agent region/);
-    expect(core.describedBedrockAgents).toEqual([]);
+    expect(core.importedBedrockAgents).toEqual([]);
   });
 
   test("requires --agent-id and --agent-alias-id with --type import", async () => {
@@ -895,13 +920,16 @@ describe("project add runtime --type import", () => {
     );
   });
 
-  test("rejects scaffolding flags combined with --type import", async () => {
+  test("accepts translation flags and rejects incompatible scaffolding flags", async () => {
     await inProject();
-    await expect(run([...importArgs, "--framework", "strands"])).rejects.toThrow(
-      /--framework is a scaffolding flag/,
-    );
+    const core = new TestCoreClient();
+    core.bedrockAgentImportPlans["A1B2C3D4E5/TSTALIASID"] = translatedImportPlan();
+    await expect(run([...importArgs, "--framework", "strands"], { core })).resolves.toBeDefined();
     await expect(run([...importArgs, "--template", "hello-world-python"])).rejects.toThrow(
-      /--template is a scaffolding flag/,
+      /--template cannot be combined/,
+    );
+    await expect(run([...importArgs, "--build", "Container"])).rejects.toThrow(
+      /--build cannot be combined/,
     );
   });
 });

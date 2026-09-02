@@ -11,6 +11,7 @@ import {
   testIO,
 } from "../../testing";
 import { InputValidationError } from "../../errors";
+import type { BedrockAgentImportPlan } from "../../core/project/bedrockAgentImport";
 
 async function run(args: string[], opts?: { core?: TestCoreClient; stdin?: string }) {
   const io = testIO({ stdin: opts?.stdin });
@@ -37,6 +38,21 @@ test("project dev requires an AgentCore project", async () => {
 
 const originalCwd = process.cwd();
 const tempDirectories: string[] = [];
+
+function translatedImportPlan(): BedrockAgentImportPlan {
+  return {
+    framework: "strands",
+    sourceAgentId: "A1B2C3D4E5",
+    sourceAgentAliasId: "TSTALIASID",
+    sourceAgentVersion: "7",
+    files: {
+      "main.py": "from strands import Agent\n# translated",
+      "pyproject.toml": '[project]\nname = "my-import"\n',
+      "IMPORT_NOTES.md": "# Bedrock Agent Import Notes\n",
+    },
+    notes: [],
+  };
+}
 
 async function inTempDirectory(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "agentcore-project-"));
@@ -259,16 +275,10 @@ describe("project create", () => {
     ]);
   });
 
-  test("--type import scaffolds a Bedrock Agent proxy project", async () => {
+  test("--type import scaffolds a translated Bedrock Agent project", async () => {
     const directory = await inTempDirectory();
     const core = new TestCoreClient();
-    core.bedrockAgentDescriptions["A1B2C3D4E5/TSTALIASID"] = {
-      agentName: "SupportAgent",
-      agentStatus: "PREPARED",
-      agentAliasArn: "arn:aws:bedrock:us-east-1:111122223333:agent-alias/A1B2C3D4E5/TSTALIASID",
-      agentAliasName: "live",
-      agentAliasStatus: "PREPARED",
-    };
+    core.bedrockAgentImportPlans["A1B2C3D4E5/TSTALIASID"] = translatedImportPlan();
 
     await run(
       [
@@ -294,20 +304,19 @@ describe("project create", () => {
       name: "MyImport",
       build: "CodeZip",
       runtimeVersion: "PYTHON_3_14",
-      additionalPolicies: ["bedrock-agent-policy.json"],
     });
 
     const main = await Bun.file(join(projectRoot, "app", "MyImport", "main.py")).text();
-    expect(main).toContain('"A1B2C3D4E5"');
-    const policy = await Bun.file(
-      join(projectRoot, "app", "MyImport", "bedrock-agent-policy.json"),
-    ).json();
-    expect(policy.Statement[0].Resource).toBe(
-      "arn:aws:bedrock:us-east-1:111122223333:agent-alias/A1B2C3D4E5/TSTALIASID",
-    );
+    expect(main).toContain("# translated");
+    expect(main).not.toContain("client.invoke_agent");
+    expect(core.importedBedrockAgents[0]).toMatchObject({
+      runtimeName: "MyImport",
+      framework: "strands",
+      memory: "none",
+    });
   });
 
-  test("--type import conflicts with harness-only and scaffolding flags", async () => {
+  test("--type import conflicts with harness-only and incompatible scaffolding flags", async () => {
     await inTempDirectory();
     await expect(
       run(["create", "--name", "MyImport", "--type", "import", "--model-id", "x"]),
@@ -323,10 +332,10 @@ describe("project create", () => {
         "A",
         "--agent-alias-id",
         "B",
-        "--framework",
-        "strands",
+        "--build",
+        "Container",
       ]),
-    ).rejects.toThrow(/--framework is a scaffolding flag/);
+    ).rejects.toThrow(/--build cannot be combined/);
     await expect(run(["create", "--name", "MyImport", "--agent-id", "A"])).rejects.toThrow(
       /--agent-id and --agent-alias-id require --type import/,
     );

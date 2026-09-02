@@ -1,78 +1,98 @@
 import { describe, expect, test } from "bun:test";
 import type {
-  BedrockAgentMetadata,
-  DescribeBedrockAgent,
-  DescribeBedrockAgentInput,
-} from "../../core/project/bedrockAgent";
-import { resolveImportBedrockAgentInput } from "./importBedrockAgent";
+  BedrockAgentImportPlan,
+  BedrockAgentImportRequest,
+  CoreBedrockAgentImporter,
+} from "../../core/project/bedrockAgentImport";
+import { InputValidationError } from "../../errors";
+import { MEMORY_SHORTCUTS } from "./shortcuts";
+import { importScaffoldRuntimeInput, resolveImportBedrockAgentInput } from "./importBedrockAgent";
 
-const metadata: BedrockAgentMetadata = {
-  agentName: "SupportAgent",
-  agentStatus: "PREPARED",
-  agentAliasArn: "arn:aws:bedrock:us-east-1:111122223333:agent-alias/A1B2C3D4E5/TSTALIASID",
-  agentAliasName: "live",
-  agentAliasStatus: "PREPARED",
+const plan: BedrockAgentImportPlan = {
+  framework: "strands",
+  sourceAgentId: "A1B2C3D4E5",
+  sourceAgentAliasId: "TSTALIASID",
+  sourceAgentVersion: "7",
+  files: {
+    "main.py": "app = object()",
+    "pyproject.toml": "[project]",
+    "IMPORT_NOTES.md": "# Notes\n",
+  },
+  notes: [],
 };
 
-function describer(result: BedrockAgentMetadata = metadata): {
-  describeBedrockAgent: DescribeBedrockAgent;
-  calls: DescribeBedrockAgentInput[];
+function importer(): {
+  importer: CoreBedrockAgentImporter;
+  calls: BedrockAgentImportRequest[];
 } {
-  const calls: DescribeBedrockAgentInput[] = [];
+  const calls: BedrockAgentImportRequest[] = [];
   return {
     calls,
-    describeBedrockAgent: async (input) => {
-      calls.push(input);
-      return result;
+    importer: {
+      import: async (input) => {
+        calls.push(input);
+        return plan;
+      },
     },
   };
 }
 
 describe("resolveImportBedrockAgentInput", () => {
-  test.each(["ap-southeast-2", "eu-central-2", "eu-west-2", "eu-west-3"])(
-    "accepts predecessor-supported region %s",
-    async (region) => {
-      const subject = describer();
-
-      const result = await resolveImportBedrockAgentInput({
-        describeBedrockAgent: subject.describeBedrockAgent,
-        region,
-        agentId: "A1B2C3D4E5",
-        agentAliasId: "TSTALIASID",
-      });
-
-      expect(result.imported.region).toBe(region);
-      expect(subject.calls).toEqual([
-        { region, agentId: "A1B2C3D4E5", agentAliasId: "TSTALIASID" },
-      ]);
-    },
-  );
-
-  test("warns when the selected alias is not prepared", async () => {
-    const subject = describer({ ...metadata, agentAliasStatus: "FAILED" });
+  test("forwards the alias-pinned translation request", async () => {
+    const subject = importer();
 
     const result = await resolveImportBedrockAgentInput({
-      describeBedrockAgent: subject.describeBedrockAgent,
+      importer: subject.importer,
+      runtimeName: "support",
       region: "us-east-1",
       agentId: "A1B2C3D4E5",
       agentAliasId: "TSTALIASID",
+      framework: "strands",
+      memory: "longAndShortTerm",
     });
 
-    expect(result.warnings).toEqual([
-      "Warning: Bedrock Agent alias 'live' is in status FAILED (not PREPARED); invocations may fail until the alias is prepared.",
+    expect(result).toBe(plan);
+    expect(subject.calls).toEqual([
+      {
+        runtimeName: "support",
+        region: "us-east-1",
+        agentId: "A1B2C3D4E5",
+        agentAliasId: "TSTALIASID",
+        framework: "strands",
+        memory: "longAndShortTerm",
+      },
     ]);
   });
 
-  test("does not warn about the mutable agent draft when the alias is prepared", async () => {
-    const subject = describer({ ...metadata, agentStatus: "NOT_PREPARED" });
+  test("requires both source identifiers before calling the importer", async () => {
+    const subject = importer();
 
-    const result = await resolveImportBedrockAgentInput({
-      describeBedrockAgent: subject.describeBedrockAgent,
-      region: "us-east-1",
-      agentId: "A1B2C3D4E5",
-      agentAliasId: "TSTALIASID",
+    await expect(
+      resolveImportBedrockAgentInput({
+        importer: subject.importer,
+        runtimeName: "support",
+        region: "us-east-1",
+        agentId: "A1B2C3D4E5",
+        framework: "strands",
+        memory: "none",
+      }),
+    ).rejects.toBeInstanceOf(InputValidationError);
+    expect(subject.calls).toEqual([]);
+  });
+});
+
+describe("importScaffoldRuntimeInput", () => {
+  test("uses the fixed Python CodeZip runtime shape and selected memory", () => {
+    const memory = MEMORY_SHORTCUTS.longAndShortTerm("support");
+
+    expect(importScaffoldRuntimeInput("support", memory)).toEqual({
+      runtimeName: "support",
+      build: "CodeZip",
+      language: "Python",
+      framework: "none",
+      modelProvider: "Bedrock",
+      memory,
+      runtimeVersion: "PYTHON_3_14",
     });
-
-    expect(result.warnings).toEqual([]);
   });
 });

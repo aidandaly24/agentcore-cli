@@ -16,7 +16,6 @@ import {
 } from "../../shortcuts";
 import { ScaffoldRuntimeInputSchema, type ScaffoldRuntimeInput } from "../../types";
 import { RuntimeResourceConfigSchema, type ImportBedrockAgentInput } from "./types";
-import { describeBedrockAgent } from "../../../../core/project/bedrockAgent";
 import {
   importScaffoldRuntimeInput,
   resolveImportBedrockAgentInput,
@@ -32,7 +31,7 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
       flag("description", "an optional description of the runtime", z.string().optional()),
       flag(
         "type",
-        "create scaffolds new agent code (the default); import wraps an existing Bedrock Agent",
+        "create scaffolds new agent code (the default); import translates a Bedrock Agent version",
         z.enum(["create", "import"]).optional(),
       ),
       flag(
@@ -42,7 +41,8 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
       ),
       flag(
         "agent-alias-id",
-        "Bedrock Agent Alias ID to import (requires --type import)",
+        "Bedrock Agent Alias ID selecting the version to import; must point at a prepared " +
+          "version, not DRAFT (requires --type import)",
         z.string().optional(),
       ),
       flag(
@@ -58,8 +58,8 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
       ),
       flag(
         "framework",
-        "agent framework for the scaffolded runtime code",
-        z.enum(["strands", "none"]).optional(),
+        "agent framework: strands or none for create; strands or langgraph for import",
+        z.enum(["strands", "langgraph", "none"]).optional(),
       ),
       flag(
         "model-provider",
@@ -149,18 +149,27 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
       }
 
       const isImport = flags["type"] === "import";
-      if (isImport && (isTemplate || presentScaffoldingFlags.length > 0)) {
-        const offending = isTemplate ? "template" : presentScaffoldingFlags[0];
+      const importIncompatibleFlags = (
+        ["build", "language", "model-provider", "api-key"] as const
+      ).filter((flagName) => flags[flagName] !== undefined);
+      if (isImport && (isTemplate || importIncompatibleFlags.length > 0)) {
+        const offending = isTemplate ? "template" : importIncompatibleFlags[0];
         throw new InputValidationError(
-          `--type import wraps an existing Bedrock Agent; --${offending} is a scaffolding ` +
-            `flag and cannot be combined with it`,
+          `--type import translates a Bedrock Agent into Python CodeZip runtime code; ` +
+            `--${offending} cannot be combined with it`,
         );
       }
       if (!isImport && (flags["agent-id"] !== undefined || flags["agent-alias-id"] !== undefined)) {
         throw new InputValidationError("--agent-id and --agent-alias-id require --type import");
       }
+      if (isImport && flags.framework === "none") {
+        throw new InputValidationError("--type import supports --framework strands or langgraph");
+      }
+      if (!isImport && flags.framework === "langgraph") {
+        throw new InputValidationError("--framework langgraph requires --type import");
+      }
       if (isImport && flags.protocol !== undefined && flags.protocol !== "HTTP") {
-        throw new InputValidationError("an imported Bedrock Agent proxy only supports HTTP");
+        throw new InputValidationError("an imported Bedrock Agent only supports HTTP");
       }
 
       const isCustom = presentScaffoldingFlags.length > 0;
@@ -169,29 +178,31 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
       const apiKey = await source.resolveSecret("api-key", flags["api-key"]);
 
       const runtimeName = flags.name;
+      const importMemory = flags.memory ?? "none";
 
       let importBedrockAgent: ImportBedrockAgentInput | undefined;
       if (isImport) {
-        const { imported, warnings } = await resolveImportBedrockAgentInput({
-          describeBedrockAgent: config.describeBedrockAgent ?? describeBedrockAgent,
+        importBedrockAgent = await resolveImportBedrockAgentInput({
+          importer: config.bedrockAgentImporter,
+          runtimeName,
           region: ctx.require(RegionKey),
           agentId: flags["agent-id"],
           agentAliasId: flags["agent-alias-id"],
+          framework: flags.framework === "langgraph" ? "langgraph" : "strands",
+          memory: importMemory,
         });
-        importBedrockAgent = imported;
-        for (const warning of warnings) config.io.stderr.write(`${warning}\n`);
-        if (flags["role-arn"]) {
+        if (importBedrockAgent.notes.length > 0) {
           config.io.stderr.write(
-            `Warning: execution role '${flags["role-arn"]}' must already allow ` +
-              `bedrock:InvokeAgent on ${imported.agentAliasArn}; deployment does not attach ` +
-              `generated policies to caller-owned roles.\n`,
+            `Import generated ${importBedrockAgent.notes.length} manual follow-up ` +
+              `${importBedrockAgent.notes.length === 1 ? "item" : "items"} in ` +
+              `app/${runtimeName}/IMPORT_NOTES.md.\n`,
           );
         }
       }
 
       const defaultMemory = flags.framework === "strands" ? "longAndShortTerm" : "none";
       const scaffoldRuntimeInput: ScaffoldRuntimeInput = isImport
-        ? importScaffoldRuntimeInput(runtimeName)
+        ? importScaffoldRuntimeInput(runtimeName, MEMORY_SHORTCUTS[importMemory](runtimeName))
         : isTemplate
           ? resolveRuntimeTemplateShortcut(flags.template!, {
               runtimeName: flags.name,
@@ -205,7 +216,7 @@ export const createAddRuntimeHandler = (config: AddProjectResourceConfig) =>
                 runtimeName,
                 build: flags.build,
                 language: flags.language,
-                framework: flags.framework,
+                framework: flags.framework === "langgraph" ? undefined : flags.framework,
                 protocol: flags.protocol,
                 modelProvider: flags["model-provider"],
                 apiKey,

@@ -26,7 +26,7 @@ type ProjectHandlerConfig = {
 
 export function createProjectHandler({ core, io }: ProjectHandlerConfig): Router {
   const projectManager: ProjectManager = core.projectManager;
-  const config = { projectManager, io, describeBedrockAgent: core.describeBedrockAgent };
+  const config = { projectManager, io, bedrockAgentImporter: core.bedrockAgentImporter };
   const project = new Router("project", "manage an AgentCore project");
 
   // Without a default, a bare `agentcore project` falls back to Commander's help
@@ -41,7 +41,7 @@ export function createProjectHandler({ core, io }: ProjectHandlerConfig): Router
   const createProject = createCreateProjectHandler({
     projectManager,
     io,
-    describeBedrockAgent: core.describeBedrockAgent,
+    bedrockAgentImporter: core.bedrockAgentImporter,
   });
   const createProjectWithWizard = withTuiOnEmptyFlagsAndArgs(core, io)(createProject);
   const isInteractive = () => io.stdin.isTTY === true && io.stdout.isTTY === true;

@@ -24,7 +24,7 @@ import type {
 import type { Logger } from "../logging";
 import type { ProjectManager } from "../handlers/project/types";
 import { FsProjectManager } from "./project";
-import { describeBedrockAgent, type DescribeBedrockAgent } from "./project/bedrockAgent";
+import { BedrockAgentImporter, type CoreBedrockAgentImporter } from "./project/bedrockAgentImport";
 
 export type {
   AwsClients,
@@ -47,7 +47,7 @@ type CoreClientConfig = {
   fetch?: CoreFetch;
   newSessionId?: () => string;
   now?: () => number;
-  describeBedrockAgent?: DescribeBedrockAgent;
+  bedrockAgentImporter?: CoreBedrockAgentImporter;
 };
 
 // CoreClient is the single entry point to the Bedrock AgentCore APIs. It owns the
@@ -76,7 +76,7 @@ export class CoreClient implements AwsClients {
   readonly observability: ObservabilityClient;
 
   readonly projectManager: ProjectManager;
-  readonly describeBedrockAgent: DescribeBedrockAgent;
+  readonly bedrockAgentImporter: CoreBedrockAgentImporter;
   readonly fetch: CoreFetch;
 
   constructor(config: CoreClientConfig) {
@@ -114,7 +114,7 @@ export class CoreClient implements AwsClients {
       createCloudFormationClient: config.createCloudFormationClient,
       identity: this.identity,
     });
-    this.describeBedrockAgent = config.describeBedrockAgent ?? describeBedrockAgent;
+    this.bedrockAgentImporter = config.bedrockAgentImporter ?? new BedrockAgentImporter();
   }
 
   // control returns the control-plane client for `config`, creating and caching it
