@@ -66,10 +66,12 @@ function defaultHandler(command: unknown): unknown {
   if (command instanceof GetAgentAliasCommand) {
     return {
       agentAlias: {
-        agentId: AGENT_ID,
-        agentAliasId: ALIAS_ID,
-        agentAliasName: "live",
-        routingConfiguration: [{ agentVersion: AGENT_VERSION }],
+        agentId: command.input.agentId,
+        agentAliasId: command.input.agentAliasId,
+        agentAliasName: command.input.agentId === AGENT_ID ? "live" : "collaborator-live",
+        routingConfiguration: [
+          { agentVersion: command.input.agentId === AGENT_ID ? AGENT_VERSION : "3" },
+        ],
       },
     };
   }
@@ -384,8 +386,10 @@ describe("BedrockAgentSnapshotLoader", () => {
         return {
           agentCollaboratorSummaries: [
             {
-              agentId: collaboratorId,
-              agentVersion: collaboratorVersion,
+              // The service reports the supervisor here, not the collaborator.
+              agentId: AGENT_ID,
+              agentVersion: AGENT_VERSION,
+              collaboratorId: "ASSOC12345",
               agentDescriptor: {
                 aliasArn:
                   `arn:aws:bedrock:us-east-1:111122223333:agent-alias/` +
@@ -457,16 +461,76 @@ describe("BedrockAgentSnapshotLoader", () => {
     ]);
   });
 
+  // Verbatim ListAgentCollaborators shape from the live service for a supervisor with two
+  // collaborators: agentId/agentVersion are the SUPERVISOR's, collaboratorId is an association id,
+  // and only agentDescriptor.aliasArn identifies the collaborator. Reading agentId resolved every
+  // collaborator to its own parent, so all of them were dropped as false cycles.
+  test("identifies collaborators by alias ARN, not by the supervisor's own agent id", async () => {
+    const subject = loaderWith((command) => {
+      if (command instanceof ListAgentCollaboratorsCommand && command.input.agentId === AGENT_ID) {
+        return {
+          agentCollaboratorSummaries: [
+            {
+              agentId: AGENT_ID,
+              agentVersion: AGENT_VERSION,
+              collaboratorId: "E7X0GZ0QPW",
+              agentDescriptor: {
+                aliasArn:
+                  "arn:aws:bedrock:us-east-1:111122223333:agent-alias/FU3HDK7KCP/BNCV3MSIMC",
+              },
+              collaborationInstruction: "Delegate weather questions here.",
+              relayConversationHistory: "DISABLED",
+              collaboratorName: "weather",
+            },
+            {
+              agentId: AGENT_ID,
+              agentVersion: AGENT_VERSION,
+              collaboratorId: "K83BQALAAY",
+              agentDescriptor: {
+                aliasArn:
+                  "arn:aws:bedrock:us-east-1:111122223333:agent-alias/OCJQA7719R/KNWAW2VWZL",
+              },
+              collaborationInstruction: "Delegate billing and invoice questions here.",
+              relayConversationHistory: "TO_COLLABORATOR",
+              collaboratorName: "billing",
+            },
+          ],
+        };
+      }
+      return defaultHandler(command);
+    });
+
+    const result = await subject.loader.load({
+      region: "us-east-1",
+      agentId: AGENT_ID,
+      agentAliasId: ALIAS_ID,
+    });
+
+    expect(result.notes).toEqual([]);
+    expect(result.collaborators.map((collaborator) => collaborator.name)).toEqual([
+      "weather",
+      "billing",
+    ]);
+    expect(result.collaborators.map((collaborator) => collaborator.agent.sourceAgentId)).toEqual([
+      "FU3HDK7KCP",
+      "OCJQA7719R",
+    ]);
+  });
+
   test("does not treat a collaborator reused by sibling entries as a cycle", async () => {
     const collaboratorId = "B1B2B3B4B5";
-    const collaboratorVersion = "3";
     const subject = loaderWith((command) => {
       if (command instanceof ListAgentCollaboratorsCommand && command.input.agentId === AGENT_ID) {
         return {
           agentCollaboratorSummaries: ["billing-primary", "billing-backup"].map(
             (collaboratorName) => ({
-              agentId: collaboratorId,
-              agentVersion: collaboratorVersion,
+              agentId: AGENT_ID,
+              agentVersion: AGENT_VERSION,
+              agentDescriptor: {
+                aliasArn:
+                  `arn:aws:bedrock:us-east-1:111122223333:agent-alias/` +
+                  `${collaboratorId}/COLLABALIAS`,
+              },
               collaboratorName,
               collaborationInstruction: "Handle billing questions.",
             }),

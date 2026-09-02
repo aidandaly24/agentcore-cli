@@ -36,53 +36,17 @@ export class BedrockAgentSnapshotLoader {
     agentAliasId: string;
   }): Promise<BedrockAgentSnapshot> {
     const client = this.createClient(input.region);
-    let alias;
-    try {
-      ({ agentAlias: alias } = await client.send(
-        new GetAgentAliasCommand({
-          agentId: input.agentId,
-          agentAliasId: input.agentAliasId,
-        }),
-      ));
-    } catch (error) {
-      if (isNamedError(error, "ResourceNotFoundException")) {
-        throw new InputValidationError(
+    const sourceVersion = await this.resolveAliasVersion(
+      client,
+      input.agentId,
+      input.agentAliasId,
+      {
+        region: input.region,
+        notFound:
           `Bedrock Agent '${input.agentId}' has no alias with id '${input.agentAliasId}' in ` +
-            `${input.region}; check --agent-id, --agent-alias-id, and --region`,
-          { cause: error },
-        );
-      }
-      throw error;
-    }
-
-    if (
-      !alias ||
-      alias.agentId !== input.agentId ||
-      alias.agentAliasId !== input.agentAliasId ||
-      !alias.agentAliasName
-    ) {
-      throw new MalformedServiceResponseError(
-        `the Bedrock Agent service returned an incomplete alias description for agent ` +
-          `'${input.agentId}' / alias '${input.agentAliasId}'`,
-      );
-    }
-
-    const routing = alias.routingConfiguration ?? [];
-    const sourceVersion = routing.length === 1 ? routing[0]?.agentVersion : undefined;
-    if (!sourceVersion) {
-      throw new InputValidationError(
-        `Bedrock Agent alias '${alias.agentAliasName}' does not route to exactly one agent version`,
-      );
-    }
-    // The built-in test alias (TSTALIASID) routes to DRAFT, which is mutable and has no
-    // GetAgentVersion representation. Import needs an immutable snapshot.
-    if (sourceVersion === "DRAFT") {
-      throw new InputValidationError(
-        `Bedrock Agent alias '${alias.agentAliasName}' routes to the mutable DRAFT version; ` +
-          "import requires a prepared version. Create a version and an alias that points at it, " +
-          "then pass that alias with --agent-alias-id",
-      );
-    }
+          `${input.region}; check --agent-id, --agent-alias-id, and --region`,
+      },
+    );
 
     const snapshot = await this.loadVersion(
       client,
@@ -99,6 +63,58 @@ export class BedrockAgentSnapshotLoader {
       );
     }
     return snapshot;
+  }
+
+  /**
+   * An alias names a routing target, not a snapshot. Resolve it to the single immutable version it
+   * routes to, rejecting DRAFT, which is mutable and has no GetAgentVersion representation. Used
+   * for the requested agent and for every collaborator, which the service also identifies by alias.
+   */
+  private async resolveAliasVersion(
+    client: BedrockAgentClient,
+    agentId: string,
+    agentAliasId: string,
+    messages: { region: string; notFound: string },
+  ): Promise<string> {
+    let alias;
+    try {
+      ({ agentAlias: alias } = await client.send(
+        new GetAgentAliasCommand({ agentId, agentAliasId }),
+      ));
+    } catch (error) {
+      if (isNamedError(error, "ResourceNotFoundException")) {
+        throw new InputValidationError(messages.notFound, { cause: error });
+      }
+      throw error;
+    }
+
+    if (
+      !alias ||
+      alias.agentId !== agentId ||
+      alias.agentAliasId !== agentAliasId ||
+      !alias.agentAliasName
+    ) {
+      throw new MalformedServiceResponseError(
+        `the Bedrock Agent service returned an incomplete alias description for agent ` +
+          `'${agentId}' / alias '${agentAliasId}'`,
+      );
+    }
+
+    const routing = alias.routingConfiguration ?? [];
+    const version = routing.length === 1 ? routing[0]?.agentVersion : undefined;
+    if (!version) {
+      throw new InputValidationError(
+        `Bedrock Agent alias '${alias.agentAliasName}' does not route to exactly one agent version`,
+      );
+    }
+    if (version === "DRAFT") {
+      throw new InputValidationError(
+        `Bedrock Agent alias '${alias.agentAliasName}' routes to the mutable DRAFT version; ` +
+          "import requires a prepared version. Create a version and an alias that points at it, " +
+          "then pass that alias with --agent-alias-id",
+      );
+    }
+    return version;
   }
 
   private async loadVersion(
@@ -291,21 +307,38 @@ export class BedrockAgentSnapshotLoader {
 
     const collaborators: ImportedCollaborator[] = [];
     for (const summary of summaries) {
-      const aliasArn = summary.agentDescriptor?.aliasArn;
-      const arnMatch = aliasArn ? ALIAS_ARN_PATTERN.exec(aliasArn) : undefined;
-      const collaboratorAgentId = summary.agentId ?? arnMatch?.[1];
-      const collaboratorVersion = summary.agentVersion;
+      // `agentId` and `agentVersion` on a collaborator summary describe the SUPERVISOR that owns
+      // the collaboration, not the collaborator. Only agentDescriptor.aliasArn identifies the
+      // collaborator, so reading agentId here would resolve every collaborator to its own parent.
+      const arnMatch = summary.agentDescriptor?.aliasArn
+        ? ALIAS_ARN_PATTERN.exec(summary.agentDescriptor.aliasArn)
+        : undefined;
+      const collaboratorAgentId = arnMatch?.[1];
+      const collaboratorAliasId = arnMatch?.[2];
       if (
         !summary.collaboratorName ||
         !summary.collaborationInstruction ||
         !collaboratorAgentId ||
-        !collaboratorVersion
+        !collaboratorAliasId
       ) {
         throw new MalformedServiceResponseError(
           `the Bedrock Agent service returned an incomplete collaborator for agent ` +
             `'${agentId}' version '${agentVersion}'`,
         );
       }
+
+      const collaboratorVersion = await this.resolveAliasVersion(
+        client,
+        collaboratorAgentId,
+        collaboratorAliasId,
+        {
+          region,
+          notFound:
+            `Collaborator '${summary.collaboratorName}' of Bedrock Agent '${agentId}' points at ` +
+            `alias '${collaboratorAliasId}' of agent '${collaboratorAgentId}', which does not ` +
+            `exist in ${region}`,
+        },
+      );
 
       const collaborator = await this.loadVersion(
         client,
