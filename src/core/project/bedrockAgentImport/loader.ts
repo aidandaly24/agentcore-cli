@@ -90,8 +90,6 @@ export class BedrockAgentSnapshotLoader {
         region: input.region,
         agentId: input.agentId,
         agentVersion: sourceVersion,
-        agentAliasId: input.agentAliasId,
-        agentAliasName: alias.agentAliasName,
       },
       new Set<string>(),
     );
@@ -109,8 +107,6 @@ export class BedrockAgentSnapshotLoader {
       region: string;
       agentId: string;
       agentVersion: string;
-      agentAliasId?: string;
-      agentAliasName?: string;
     },
     visited: Set<string>,
   ): Promise<BedrockAgentSnapshot | undefined> {
@@ -141,7 +137,6 @@ export class BedrockAgentSnapshotLoader {
       agentVersion.agentId !== input.agentId ||
       agentVersion.version !== input.agentVersion ||
       !agentVersion.agentName ||
-      !agentVersion.agentArn ||
       !agentVersion.foundationModel
     ) {
       throw new MalformedServiceResponseError(
@@ -167,9 +162,6 @@ export class BedrockAgentSnapshotLoader {
     return {
       region: input.region,
       sourceAgentId: input.agentId,
-      sourceAgentAliasId: input.agentAliasId,
-      sourceAgentAliasName: input.agentAliasName,
-      sourceAgentArn: agentVersion.agentArn,
       sourceAgentVersion: input.agentVersion,
       agentName: agentVersion.agentName,
       description: agentVersion.description,
@@ -186,7 +178,6 @@ export class BedrockAgentSnapshotLoader {
             }
           : undefined,
       sourceMemoryEnabled: (agentVersion.memoryConfiguration?.enabledMemoryTypes?.length ?? 0) > 0,
-      agentCollaboration: agentVersion.agentCollaboration,
       actionGroups,
       knowledgeBases,
       collaborators,
@@ -303,7 +294,6 @@ export class BedrockAgentSnapshotLoader {
       const aliasArn = summary.agentDescriptor?.aliasArn;
       const arnMatch = aliasArn ? ALIAS_ARN_PATTERN.exec(aliasArn) : undefined;
       const collaboratorAgentId = summary.agentId ?? arnMatch?.[1];
-      const collaboratorAliasId = arnMatch?.[2];
       const collaboratorVersion = summary.agentVersion;
       if (
         !summary.collaboratorName ||
@@ -323,7 +313,6 @@ export class BedrockAgentSnapshotLoader {
           region,
           agentId: collaboratorAgentId,
           agentVersion: collaboratorVersion,
-          agentAliasId: collaboratorAliasId,
         },
         new Set(visited),
       );
@@ -432,7 +421,6 @@ function normalizeActionGroup(
                   },
                 ]),
               ),
-              requiresConfirmation: fn.requireConfirmation === "ENABLED",
             },
           ]
         : [],

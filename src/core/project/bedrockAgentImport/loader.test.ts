@@ -113,8 +113,6 @@ describe("BedrockAgentSnapshotLoader", () => {
 
     expect(result).toMatchObject({
       sourceAgentId: AGENT_ID,
-      sourceAgentAliasId: ALIAS_ID,
-      sourceAgentAliasName: "live",
       sourceAgentVersion: AGENT_VERSION,
       agentName: "SupportAgent",
       foundationModel: "us.amazon.nova-lite-v1:0",
@@ -361,7 +359,6 @@ describe("BedrockAgentSnapshotLoader", () => {
             parameters: {
               city: { type: "string", description: undefined, required: true },
             },
-            requiresConfirmation: false,
           },
         ],
         hasApiSchema: false,
@@ -416,7 +413,6 @@ describe("BedrockAgentSnapshotLoader", () => {
       relayConversationHistory: "TO_COLLABORATOR",
       agent: {
         sourceAgentId: collaboratorId,
-        sourceAgentAliasId: "COLLABALIAS",
         sourceAgentVersion: collaboratorVersion,
         agentName: "BillingAgent",
       },

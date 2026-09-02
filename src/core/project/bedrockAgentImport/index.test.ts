@@ -9,12 +9,7 @@ import {
 } from "@aws-sdk/client-bedrock-agent";
 import { InputValidationError } from "../../../errors";
 import { BedrockAgentImporter } from ".";
-import type {
-  BedrockAgentImportPlan,
-  BedrockAgentImportRequest,
-  BedrockAgentSnapshot,
-  BedrockAgentTranslator,
-} from "./types";
+import type { BedrockAgentImportRequest } from "./types";
 
 class FakeClient {
   async send(command: unknown): Promise<unknown> {
@@ -59,45 +54,44 @@ class FakeClient {
 }
 
 describe("BedrockAgentImporter", () => {
-  test("loads the selected snapshot and delegates to the requested translator", async () => {
-    const calls: {
-      snapshot: BedrockAgentSnapshot;
-      request: BedrockAgentImportRequest;
-    }[] = [];
-    const plan: BedrockAgentImportPlan = {
+  const request: BedrockAgentImportRequest = {
+    runtimeName: "support",
+    region: "us-east-1",
+    agentId: "A1B2C3D4E5",
+    agentAliasId: "TSTALIASID",
+    framework: "strands",
+    memory: "none",
+  };
+
+  test("translates the alias-selected version with the Strands translator", async () => {
+    const importer = new BedrockAgentImporter({
+      createClient: () => new FakeClient() as unknown as BedrockAgentClient,
+    });
+
+    const plan = await importer.import(request);
+
+    expect(plan).toMatchObject({
       framework: "strands",
       sourceAgentId: "A1B2C3D4E5",
       sourceAgentAliasId: "TSTALIASID",
       sourceAgentVersion: "7",
-      files: { "main.py": "# translated" },
-      notes: [],
-    };
-    const translator: BedrockAgentTranslator = {
-      translate: (snapshot, request) => {
-        calls.push({ snapshot, request });
-        return plan;
-      },
-    };
+    });
+    expect(plan.files["main.py"]).toContain("from strands import Agent");
+    expect(plan.files["main.py"]).toContain('SYSTEM_PROMPT = """Be helpful."""');
+    expect(plan.files["pyproject.toml"]).toContain("strands-agents");
+    expect(plan.files["IMPORT_NOTES.md"]).toContain("Source version: `7`");
+  });
+
+  test("translates with the LangGraph translator when requested", async () => {
     const importer = new BedrockAgentImporter({
       createClient: () => new FakeClient() as unknown as BedrockAgentClient,
-      translators: { strands: translator },
     });
-    const request: BedrockAgentImportRequest = {
-      runtimeName: "support",
-      region: "us-east-1",
-      agentId: "A1B2C3D4E5",
-      agentAliasId: "TSTALIASID",
-      framework: "strands",
-      memory: "none",
-    };
 
-    await expect(importer.import(request)).resolves.toBe(plan);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.request).toBe(request);
-    expect(calls[0]!.snapshot).toMatchObject({
-      sourceAgentVersion: "7",
-      instruction: "Be helpful.",
-    });
+    const plan = await importer.import({ ...request, framework: "langgraph" });
+
+    expect(plan.framework).toBe("langgraph");
+    expect(plan.files["main.py"]).toContain("from langgraph.prebuilt import create_react_agent");
+    expect(plan.files["main.py"]).not.toContain("from strands import");
   });
 
   test("rejects unsupported regions before creating a service client", async () => {

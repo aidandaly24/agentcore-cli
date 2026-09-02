@@ -6,22 +6,18 @@ import {
   BEDROCK_AGENT_IMPORT_REGIONS,
   type BedrockAgentImportPlan,
   type BedrockAgentImportRequest,
-  type BedrockAgentTranslator,
   type CoreBedrockAgentImporter,
 } from "./types";
 
 type BedrockAgentImporterConfig = {
   createClient?: CreateBedrockAgentClient;
-  translators?: Partial<Record<BedrockAgentImportRequest["framework"], BedrockAgentTranslator>>;
 };
 
 export class BedrockAgentImporter implements CoreBedrockAgentImporter {
   private readonly loader: BedrockAgentSnapshotLoader;
-  private readonly translators?: BedrockAgentImporterConfig["translators"];
 
   constructor(config: BedrockAgentImporterConfig = {}) {
     this.loader = new BedrockAgentSnapshotLoader(config.createClient);
-    this.translators = config.translators;
   }
 
   async import(request: BedrockAgentImportRequest): Promise<BedrockAgentImportPlan> {
@@ -39,12 +35,9 @@ export class BedrockAgentImporter implements CoreBedrockAgentImporter {
       agentId: request.agentId,
       agentAliasId: request.agentAliasId,
     });
-    const translator =
-      this.translators?.[request.framework] ??
-      (request.framework === "strands"
-        ? new StrandsBedrockAgentTranslator(snapshot, request)
-        : new LangGraphBedrockAgentTranslator(snapshot, request));
-    return translator.translate(snapshot, request);
+    return request.framework === "strands"
+      ? new StrandsBedrockAgentTranslator(snapshot, request).translate()
+      : new LangGraphBedrockAgentTranslator(snapshot, request).translate();
   }
 }
 

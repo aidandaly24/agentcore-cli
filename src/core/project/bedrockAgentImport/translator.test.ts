@@ -16,9 +16,6 @@ function snapshot(overrides: Partial<BedrockAgentSnapshot> = {}): BedrockAgentSn
   return {
     region: "us-east-1",
     sourceAgentId: "A1B2C3D4E5",
-    sourceAgentAliasId: "TSTALIASID",
-    sourceAgentAliasName: "live",
-    sourceAgentArn: "arn:aws:bedrock:us-east-1:111122223333:agent/A1B2C3D4E5",
     sourceAgentVersion: "7",
     agentName: "SupportAgent",
     description: "Handles customer support.",
@@ -28,7 +25,6 @@ function snapshot(overrides: Partial<BedrockAgentSnapshot> = {}): BedrockAgentSn
     hasPromptOverrides: true,
     guardrail: { identifier: "GR123", version: "1" },
     sourceMemoryEnabled: true,
-    agentCollaboration: "SUPERVISOR",
     actionGroups: [
       {
         name: "weather",
@@ -40,7 +36,6 @@ function snapshot(overrides: Partial<BedrockAgentSnapshot> = {}): BedrockAgentSn
               city: { type: "string", required: true },
               days: { type: "integer", required: false },
             },
-            requiresConfirmation: false,
           },
         ],
         hasApiSchema: false,
@@ -135,7 +130,6 @@ describe("StrandsBedrockAgentTranslator", () => {
           relayConversationHistory: "TO_COLLABORATOR",
           agent: snapshot({
             sourceAgentId: "B1B2B3B4B5",
-            sourceAgentAliasId: "BILLALIAS",
             sourceAgentVersion: "2",
             agentName: "BillingAgent",
             collaborators: [],
@@ -282,7 +276,9 @@ describe("LangGraphBedrockAgentTranslator", () => {
     );
     expect(plan.files["main.py"]).toContain("await asyncio.to_thread");
     expect(plan.files["IMPORT_NOTES.md"]).toContain("LangGraph code interpreter");
-    expect(plan.files["pyproject.toml"]).toContain("langgraph >= 1.0.2");
-    expect(plan.files["pyproject.toml"]).not.toContain("strands-agents >=");
+    // Compatible-release pinning, matching the repository's scaffolded templates.
+    expect(plan.files["pyproject.toml"]).toContain("langgraph ~= 1.0");
+    expect(plan.files["pyproject.toml"]).not.toContain("strands-agents ~=");
+    expect(plan.files["pyproject.toml"]).not.toMatch(/[a-z-]+ >=/);
   });
 });

@@ -76,6 +76,9 @@ export abstract class BaseBedrockAgentTranslator {
         framework: this.request.framework,
         hasMemory: this.request.memory !== "none",
         hasCodeInterpreter: this.hasCodeInterpreter(),
+        hasKnowledgeBases: snapshotTree(this.snapshot).some(
+          (snapshot) => snapshot.knowledgeBases.length > 0,
+        ),
       }),
     };
 
@@ -83,7 +86,8 @@ export abstract class BaseBedrockAgentTranslator {
     return {
       framework: this.request.framework,
       sourceAgentId: this.snapshot.sourceAgentId,
-      sourceAgentAliasId: this.snapshot.sourceAgentAliasId!,
+      // From the request, which always carries it, rather than a non-null assertion on the snapshot.
+      sourceAgentAliasId: this.request.agentAliasId,
       sourceAgentVersion: this.snapshot.sourceAgentVersion,
       description: this.snapshot.description,
       files,

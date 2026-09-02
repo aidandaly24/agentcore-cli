@@ -52,7 +52,6 @@ export type ImportedFunction = {
   name: string;
   description?: string;
   parameters: Record<string, ImportedFunctionParameter>;
-  requiresConfirmation: boolean;
 };
 
 export type ImportedActionGroup = {
@@ -87,9 +86,6 @@ export type ImportedCollaborator = {
 export type BedrockAgentSnapshot = {
   region: string;
   sourceAgentId: string;
-  sourceAgentAliasId?: string;
-  sourceAgentAliasName?: string;
-  sourceAgentArn: string;
   sourceAgentVersion: string;
   agentName: string;
   description?: string;
@@ -99,7 +95,6 @@ export type BedrockAgentSnapshot = {
   hasPromptOverrides: boolean;
   guardrail?: ImportedGuardrail;
   sourceMemoryEnabled: boolean;
-  agentCollaboration?: string;
   actionGroups: ImportedActionGroup[];
   knowledgeBases: ImportedKnowledgeBase[];
   collaborators: ImportedCollaborator[];
@@ -125,11 +120,4 @@ export type BedrockAgentImportPlan = z.infer<typeof BedrockAgentImportPlanSchema
 
 export interface CoreBedrockAgentImporter {
   import(request: BedrockAgentImportRequest): Promise<BedrockAgentImportPlan>;
-}
-
-export interface BedrockAgentTranslator {
-  translate(
-    snapshot: BedrockAgentSnapshot,
-    request: BedrockAgentImportRequest,
-  ): BedrockAgentImportPlan;
 }
