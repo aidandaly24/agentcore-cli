@@ -731,16 +731,11 @@ export class FsProjectManager implements ProjectManager {
     yield { type: "step", message: `Rendering agent code at 'app/${targetAgentName}'` };
     const tree = await FsTreeNode.fromAssetSource(
       { assetSource: this.assetSource },
-      { assetDir: "templates/strands-http-python" },
+      { assetDir: "templates/export-harness-python" },
       {
         rootDirName: targetAgentName,
         transformContent: (raw) => this.templateRenderer.render(raw, plan.context),
-        filter: (name, isDir) => {
-          if (isDir && name === "memory") return plan.hasMemory;
-          // Export always emits a CodeZip runtime, so the template's container files are never used.
-          if (name === "Dockerfile" || name === ".dockerignore") return false;
-          return true;
-        },
+        filter: (name, isDir) => (isDir && name === "memory" ? plan.hasMemory : true),
       },
     );
 

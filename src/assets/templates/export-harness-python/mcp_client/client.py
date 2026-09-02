@@ -69,21 +69,24 @@ from bedrock_agentcore.identity.auth import requires_api_key
 {{#if headerCredentials}}
 {{#each headerCredentials}}
 @requires_api_key(provider_name="{{credentialName}}")
-def _get_{{snakeCase ../name}}_{{snakeCase headerKey}}_key(api_key: str) -> str:
+def _get_{{pythonName}}_key(api_key: str) -> str:
     """Fetch {{headerKey}} credential for {{../name}} from AgentCore Identity."""
     return api_key
 
 {{/each}}
 {{/if}}
-def get_{{snakeCase name}}_mcp_client() -> MCPClient | None:
+def get_{{pythonName}}_mcp_client() -> MCPClient | None:
     """Returns an MCP Client for the {{name}} remote MCP server."""
     url = {{safeJson url}}
     {{#if headerCredentials}}
-    if os.getenv("LOCAL_DEV") == "1":
-        headers = { {{#each headerCredentials}}{{safeJson headerKey}}: os.environ.get("{{envVarName}}", ""){{#unless @last}}, {{/unless}}{{/each}} }
-    else:
-        headers = { {{#each headerCredentials}}{{safeJson headerKey}}: _get_{{snakeCase ../name}}_{{snakeCase headerKey}}_key(){{#unless @last}}, {{/unless}}{{/each}} }
-    return MCPClient(lambda: streamablehttp_client(url, headers=headers))
+    def transport():
+        if os.getenv("LOCAL_DEV") == "1":
+            headers = { {{#each headerCredentials}}{{safeJson headerKey}}: os.environ.get("{{envVarName}}", ""){{#unless @last}}, {{/unless}}{{/each}} }
+        else:
+            headers = { {{#each headerCredentials}}{{safeJson headerKey}}: _get_{{pythonName}}_key(){{#unless @last}}, {{/unless}}{{/each}} }
+        return streamablehttp_client(url, headers=headers)
+
+    return MCPClient(transport)
     {{else}}
     return MCPClient(lambda: streamablehttp_client(url))
     {{/if}}
@@ -91,7 +94,7 @@ def get_{{snakeCase name}}_mcp_client() -> MCPClient | None:
 {{/each}}
 def get_all_remote_mcp_clients() -> list[MCPClient]:
     """Returns all configured remote MCP clients."""
-    clients = [{{#each remoteMcpTools}}get_{{snakeCase name}}_mcp_client(){{#unless @last}}, {{/unless}}{{/each}}]
+    clients = [{{#each remoteMcpTools}}get_{{pythonName}}_mcp_client(){{#unless @last}}, {{/unless}}{{/each}}]
     return [c for c in clients if c is not None]
 {{/if}}
 {{#unless (or hasGateway remoteMcpTools)}}
