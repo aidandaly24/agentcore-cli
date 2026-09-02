@@ -76,7 +76,7 @@ const HARNESS_DEFAULT_MODEL_IDS: Record<HarnessModelProvider, string> = {
   bedrock: DEFAULT_HARNESS_MODEL.modelId,
   open_ai: "gpt-5",
   gemini: "gemini-2.5-flash",
-  lite_llm: "anthropic/claude-sonnet-4-5",
+  lite_llm: `bedrock/${DEFAULT_HARNESS_MODEL.modelId}`,
 };
 
 export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =>

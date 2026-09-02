@@ -185,7 +185,7 @@ describe("project create", () => {
     ).json();
     expect(harness.model).toEqual({
       provider: "lite_llm",
-      modelId: "anthropic/claude-sonnet-4-5",
+      modelId: "bedrock/global.anthropic.claude-sonnet-4-6",
       apiBase: "https://litellm.example.com/v1",
       additionalParams: { max_retries: 2 },
     });
