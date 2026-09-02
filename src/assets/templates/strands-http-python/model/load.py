@@ -67,10 +67,15 @@ def load_model() -> BedrockModel:
     """Get Bedrock model client using IAM credentials."""
     return BedrockModel(
         model_id="{{#if modelId}}{{modelId}}{{else}}global.anthropic.claude-sonnet-4-5-20250929-v1:0{{/if}}",
-        {{#if modelMaxTokens}}max_tokens={{modelMaxTokens}},
-        {{/if}}{{#if modelTemperature}}temperature={{modelTemperature}},
-        {{/if}}{{#if modelTopP}}top_p={{modelTopP}},
-        {{/if}}
+{{#if modelMaxTokens}}
+        max_tokens={{modelMaxTokens}},
+{{/if}}
+{{#if modelTemperature}}
+        temperature={{modelTemperature}},
+{{/if}}
+{{#if modelTopP}}
+        top_p={{modelTopP}},
+{{/if}}
     )
 {{/if}}
 {{/if}}
