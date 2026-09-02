@@ -76,9 +76,6 @@ export abstract class BaseBedrockAgentTranslator {
         framework: this.request.framework,
         hasMemory: this.request.memory !== "none",
         hasCodeInterpreter: this.hasCodeInterpreter(),
-        hasKnowledgeBases: snapshotTree(this.snapshot).some(
-          (snapshot) => snapshot.knowledgeBases.length > 0,
-        ),
       }),
     };
 
