@@ -227,11 +227,12 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
       }
 
       const isImport = flags["type"] === "import";
-      const scaffoldingChoiceFlags = (
+      const scaffoldingChoiceFlags =
         // --framework and --memory are import inputs, not scaffolding choices, so they are
         // validated below instead of rejected here.
-        ["build", "language", "model-provider", "api-key"] as const
-      ).filter((f) => flags[f] !== undefined);
+        (["build", "language", "model-provider", "api-key"] as const).filter(
+          (f) => flags[f] !== undefined,
+        );
       if (isImport && (isTemplate || scaffoldingChoiceFlags.length > 0)) {
         const offending = isTemplate ? "template" : scaffoldingChoiceFlags[0];
         throw new InputValidationError(
