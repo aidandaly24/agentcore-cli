@@ -158,12 +158,60 @@ describe("StrandsBedrockAgentTranslator", () => {
     expect(plan.files["main.py"]).toContain(
       "from strands_collaborator_billing import invoke_agent as invoke_billing_agent",
     );
-    expect(plan.files["main.py"]).toContain(
-      "invoke_billing_agent(query, COLLABORATOR_SESSION, COLLABORATOR_SESSION)",
-    );
     expect(plan.files["main.py"]).not.toContain("contextvars");
     expect(plan.files["IMPORT_NOTES.md"]).toContain("collaborator session scope");
-    expect(plan.files["IMPORT_NOTES.md"]).toContain("relayed conversation history");
+  });
+
+  // relayConversationHistory=TO_COLLABORATOR means the source agent forwarded its conversation to
+  // the collaborator, so the generated tool must too.
+  test("relays the caller's conversation to a TO_COLLABORATOR collaborator", () => {
+    const plan = new StrandsBedrockAgentTranslator(
+      snapshot({
+        collaborators: [
+          {
+            name: "billing",
+            instruction: "Handle billing.",
+            relayConversationHistory: "TO_COLLABORATOR",
+            agent: snapshot({ agentName: "BillingAgent", collaborators: [] }),
+          },
+        ],
+      }),
+      { ...request, memory: "none" },
+    ).translate();
+
+    expect(plan.files["main.py"]).toContain("from strands.types.tools import ToolContext");
+    expect(plan.files["main.py"]).toContain("@tool(context=True)");
+    expect(plan.files["main.py"]).toContain("list(tool_context.agent.messages[:-1])");
+    // Only the collaborator module accepts relayed history; the root is called by the entrypoint.
+    expect(plan.files["strands_collaborator_billing.py"]).toContain("relayed_messages");
+    expect(plan.files["strands_collaborator_billing.py"]).toContain(
+      "agent.messages = list(relayed_messages)",
+    );
+    expect(plan.files["main.py"]).not.toContain("relayed_messages: list");
+    expect(plan.files["IMPORT_NOTES.md"]).not.toContain("relayed conversation history");
+  });
+
+  test("does not relay to a collaborator the source agent did not relay to", () => {
+    const plan = new StrandsBedrockAgentTranslator(
+      snapshot({
+        collaborators: [
+          {
+            name: "weather",
+            instruction: "Weather.",
+            relayConversationHistory: "DISABLED",
+            agent: snapshot({ agentName: "WeatherAgent", collaborators: [] }),
+          },
+        ],
+      }),
+      { ...request, memory: "none" },
+    ).translate();
+
+    // Collaborator modules always accept the optional parameter; only a relaying parent passes it.
+    expect(plan.files["main.py"]).toContain(
+      "invoke_weather_agent(query, COLLABORATOR_SESSION, COLLABORATOR_SESSION)",
+    );
+    expect(plan.files["main.py"]).not.toContain("ToolContext");
+    expect(plan.files["main.py"]).not.toContain("@tool(context=True)");
   });
 
   test("gives only the root module the Runtime entrypoint", () => {
@@ -292,15 +340,41 @@ describe("LangGraphBedrockAgentTranslator", () => {
     expect(plan.files["pyproject.toml"]).not.toMatch(/[a-z-]+ >=/);
   });
 
-  test("flags an ARN foundation model, which langchain_aws cannot infer a provider from", () => {
+  // langchain_aws raises on ANY `arn:` model id rather than looking inside it, so ChatBedrock
+  // needs the provider supplied whenever the source agent used an ARN.
+  test("supplies the provider named by a foundation-model ARN", () => {
     const plan = new LangGraphBedrockAgentTranslator(
       snapshot({
-        foundationModel: "arn:aws:bedrock:us-east-1:1:application-inference-profile/xyz",
+        foundationModel:
+          "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0",
       }),
       { ...request, framework: "langgraph", memory: "none" },
     ).translate();
 
+    expect(plan.files["main.py"]).toContain('provider="anthropic"');
+    expect(plan.files["IMPORT_NOTES.md"]).not.toContain("LangGraph model provider");
+  });
+
+  test("asks for the provider when the ARN does not name one", () => {
+    const plan = new LangGraphBedrockAgentTranslator(
+      snapshot({
+        foundationModel: "arn:aws:bedrock:us-east-1:1:application-inference-profile/9f8d7s6a",
+      }),
+      { ...request, framework: "langgraph", memory: "none" },
+    ).translate();
+
+    expect(plan.files["main.py"]).toContain('# provider="anthropic",');
     expect(plan.files["IMPORT_NOTES.md"]).toContain("LangGraph model provider");
-    expect(plan.files["IMPORT_NOTES.md"]).toContain('add provider="');
+  });
+
+  test("leaves a plain model id alone, since langchain_aws infers it", () => {
+    const plan = new LangGraphBedrockAgentTranslator(snapshot(), {
+      ...request,
+      framework: "langgraph",
+      memory: "none",
+    }).translate();
+
+    expect(plan.files["main.py"]).not.toContain("provider=");
+    expect(plan.files["IMPORT_NOTES.md"]).not.toContain("LangGraph model provider");
   });
 });

@@ -213,6 +213,19 @@ def ${pythonIdentifier(fn.name)}(${parameters}) -> str:
 }
 
 /**
+ * langchain_aws refuses to infer a provider from any `arn:` model id, so `ChatBedrock` needs one
+ * supplied. A foundation-model ARN carries it in the resource name
+ * (`.../foundation-model/anthropic.claude-...`); provisioned-model and inference-profile ARNs do
+ * not, and only a service lookup could resolve those.
+ */
+export function providerFromModelArn(foundationModel: string): string | undefined {
+  if (!foundationModel.startsWith("arn:")) return undefined;
+  const resource = foundationModel.split("/").pop() ?? "";
+  const provider = resource.split(".")[0];
+  return provider && provider !== resource ? provider.toLowerCase() : undefined;
+}
+
+/**
  * A knowledge base can live in a different region than the agent, so prefer the region encoded in
  * its ARN and fall back to the agent's region only when the ARN was unavailable.
  */

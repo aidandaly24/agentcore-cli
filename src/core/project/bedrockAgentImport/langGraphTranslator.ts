@@ -3,6 +3,7 @@ import {
   escapePythonString,
   escapePythonTripleQuoted,
   knowledgeBaseRegion,
+  providerFromModelArn,
   pythonIdentifier,
 } from "./baseTranslator";
 import type {
@@ -35,6 +36,7 @@ export class LangGraphBedrockAgentTranslator extends BaseBedrockAgentTranslator 
     const collaboratorImports: string[] = [];
     const collaboratorTools: string[] = [];
     const collaboratorToolNames: string[] = [];
+    const relayingCollaborators: string[] = [];
 
     for (const collaborator of snapshot.collaborators) {
       const name = pythonIdentifier(collaborator.name);
@@ -44,20 +46,33 @@ export class LangGraphBedrockAgentTranslator extends BaseBedrockAgentTranslator 
       Object.assign(files, child.files);
       notes.push(...child.notes);
       collaboratorImports.push(`from ${moduleName} import invoke_agent as invoke_${name}_agent`);
-      collaboratorTools.push(`@tool
+      // TO_COLLABORATOR means the source agent forwarded its conversation, so the collaborator gets
+      // the caller's history. InjectedState is hidden from the model's tool schema; the final
+      // message is the query itself and so is dropped.
+      const relays = collaborator.relayConversationHistory === "TO_COLLABORATOR";
+      collaboratorTools.push(
+        relays
+          ? `@tool
+def invoke_${name}(query: str, state: Annotated[dict, InjectedState]) -> str:
+    """${escapePythonTripleQuoted(collaborator.instruction)}"""
+    return invoke_${name}_agent(
+        query,
+        COLLABORATOR_SESSION,
+        COLLABORATOR_SESSION,
+        list(state.get("messages", [])[:-1]),
+    )`
+          : `@tool
 def invoke_${name}(query: str) -> str:
     """${escapePythonTripleQuoted(collaborator.instruction)}"""
-    return invoke_${name}_agent(query, COLLABORATOR_SESSION, COLLABORATOR_SESSION)`);
+    return invoke_${name}_agent(query, COLLABORATOR_SESSION, COLLABORATOR_SESSION)`,
+      );
+      if (relays) relayingCollaborators.push(name);
       collaboratorToolNames.push(`invoke_${name}`);
       notes.push({
         category: "collaborator session scope",
         message:
           `Collaborator '${collaborator.name}' runs under a shared session rather than the ` +
-          "caller's session, so its own history is not isolated per end user." +
-          (collaborator.relayConversationHistory === "TO_COLLABORATOR"
-            ? " The source agent also requested relayed conversation history, which the generated " +
-              "tool does not copy; it delegates only the current query."
-            : ""),
+          "caller's session, so its own history is not isolated per end user.",
       });
     }
 
@@ -83,15 +98,18 @@ def invoke_${name}(query: str) -> str:
       });
     }
 
-    // langchain_aws derives the provider from model_id and raises if it is an ARN, which a Bedrock
-    // Agent may legally use (provisioned throughput, custom model, inference profile).
-    if (snapshot.foundationModel.startsWith("arn")) {
+    // A foundation-model ARN carries its provider, so generateModelDefinition emits it. Other ARNs
+    // (provisioned-model, inference-profile) do not, and langchain_aws refuses to guess.
+    if (
+      snapshot.foundationModel.startsWith("arn:") &&
+      providerFromModelArn(snapshot.foundationModel) === undefined
+    ) {
       notes.push({
         category: "LangGraph model provider",
         message:
-          `The source model is the ARN '${snapshot.foundationModel}'. langchain_aws cannot infer a ` +
-          'provider from an ARN, so add provider="<anthropic|amazon|meta|...>" to the ChatBedrock ' +
-          "call in main.py before invoking the agent.",
+          `The source model is the ARN '${snapshot.foundationModel}', which does not name its ` +
+          "provider. Uncomment and set the provider argument on the ChatBedrock call in main.py " +
+          '(for example provider="anthropic") before invoking the agent.',
       });
     }
 
@@ -113,6 +131,9 @@ def invoke_${name}(query: str) -> str:
         ? "from langchain_aws import AmazonKnowledgeBasesRetriever, ChatBedrock"
         : "from langchain_aws import ChatBedrock",
       ...(toolNames.length > 0 ? ["from langchain_core.tools import tool"] : []),
+      ...(relayingCollaborators.length > 0
+        ? ["from typing import Annotated", "from langgraph.prebuilt import InjectedState"]
+        : []),
       "from langgraph.checkpoint.memory import InMemorySaver",
       "from langgraph.prebuilt import create_react_agent",
       ...collaboratorImports,
@@ -161,11 +182,11 @@ ${this.request.memory === "none" ? "" : "    system_prompt += retrieve_memory_co
     return _agents[key]
 
 
-def invoke_agent(question: str, session_id: str, user_id: str) -> str:
+def invoke_agent(question: str, session_id: str, user_id: str${isRoot ? "" : ", relayed_messages: list | None = None"}) -> str:
     agent = get_or_create_agent(session_id, user_id)
     response = asyncio.run(
         agent.ainvoke(
-            {"messages": [{"role": "user", "content": question}]},
+            {"messages": [${isRoot ? "" : "*(relayed_messages or []), "}{"role": "user", "content": question}]},
             {"configurable": {"thread_id": session_id}},
         )
     )
@@ -229,6 +250,12 @@ def retrieve_${pythonIdentifier(knowledgeBase.name)}(query: str) -> str:
   }
 
   private generateModelDefinition(snapshot: BedrockAgentSnapshot): string {
+    const provider = providerFromModelArn(snapshot.foundationModel);
+    const providerArg = provider
+      ? `\n    provider="${escapePythonString(provider)}",`
+      : snapshot.foundationModel.startsWith("arn:")
+        ? `\n    # TODO: langchain_aws cannot infer a provider from this ARN. See IMPORT_NOTES.md.\n    # provider="anthropic",`
+        : "";
     const inference = snapshot.inferenceConfiguration;
     const modelKwargs = {
       ...(inference?.temperature !== undefined && { temperature: inference.temperature }),
@@ -245,7 +272,7 @@ def retrieve_${pythonIdentifier(knowledgeBase.name)}(query: str) -> str:
       : "";
     return `llm = ChatBedrock(
     model_id="${escapePythonString(snapshot.foundationModel)}",
-    region_name="${escapePythonString(snapshot.region)}",
+    region_name="${escapePythonString(snapshot.region)}",${providerArg}
     model_kwargs=${JSON.stringify(modelKwargs)}${guardrails}
 )`;
   }

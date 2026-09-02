@@ -31,6 +31,7 @@ export class StrandsBedrockAgentTranslator extends BaseBedrockAgentTranslator {
     const collaboratorImports: string[] = [];
     const collaboratorTools: string[] = [];
     const collaboratorToolNames: string[] = [];
+    const relayingCollaborators: string[] = [];
 
     for (const collaborator of snapshot.collaborators) {
       const name = pythonIdentifier(collaborator.name);
@@ -40,20 +41,33 @@ export class StrandsBedrockAgentTranslator extends BaseBedrockAgentTranslator {
       Object.assign(files, child.files);
       notes.push(...child.notes);
       collaboratorImports.push(`from ${moduleName} import invoke_agent as invoke_${name}_agent`);
-      collaboratorTools.push(`@tool
+      // TO_COLLABORATOR means the source agent forwarded its conversation, so the collaborator gets
+      // the caller's history. ToolContext hands the tool the invoking agent, whose last message is
+      // the query itself and so is dropped.
+      const relays = collaborator.relayConversationHistory === "TO_COLLABORATOR";
+      collaboratorTools.push(
+        relays
+          ? `@tool(context=True)
+def invoke_${name}(query: str, tool_context: ToolContext) -> str:
+    """${escapePythonTripleQuoted(collaborator.instruction)}"""
+    return invoke_${name}_agent(
+        query,
+        COLLABORATOR_SESSION,
+        COLLABORATOR_SESSION,
+        list(tool_context.agent.messages[:-1]),
+    )`
+          : `@tool
 def invoke_${name}(query: str) -> str:
     """${escapePythonTripleQuoted(collaborator.instruction)}"""
-    return invoke_${name}_agent(query, COLLABORATOR_SESSION, COLLABORATOR_SESSION)`);
+    return invoke_${name}_agent(query, COLLABORATOR_SESSION, COLLABORATOR_SESSION)`,
+      );
+      if (relays) relayingCollaborators.push(name);
       collaboratorToolNames.push(`invoke_${name}`);
       notes.push({
         category: "collaborator session scope",
         message:
           `Collaborator '${collaborator.name}' runs under a shared session rather than the ` +
-          "caller's session, so its own history is not isolated per end user." +
-          (collaborator.relayConversationHistory === "TO_COLLABORATOR"
-            ? " The source agent also requested relayed conversation history, which the generated " +
-              "tool does not copy; it delegates only the current query."
-            : ""),
+          "caller's session, so its own history is not isolated per end user.",
       });
     }
 
@@ -94,6 +108,7 @@ def invoke_${name}(query: str) -> str:
       ...(snapshot.knowledgeBases.length > 0 ? ["import boto3"] : []),
       ...(isRoot ? ["from bedrock_agentcore.runtime import BedrockAgentCoreApp"] : []),
       toolNames.length > 0 ? "from strands import Agent, tool" : "from strands import Agent",
+      ...(relayingCollaborators.length > 0 ? ["from strands.types.tools import ToolContext"] : []),
       "from strands.models import BedrockModel",
       ...(codeInterpreter
         ? ["from strands_tools.code_interpreter import AgentCoreCodeInterpreter"]
@@ -143,9 +158,9 @@ ${memoryModule ? "        session_manager=get_memory_session_manager(session_id,
     return _agents[key]
 
 
-def invoke_agent(question: str, session_id: str, user_id: str) -> str:
+def invoke_agent(question: str, session_id: str, user_id: str${isRoot ? "" : ", relayed_messages: list | None = None"}) -> str:
     agent = get_or_create_agent(session_id, user_id)
-    return str(agent(question))
+${isRoot ? "" : "    if relayed_messages:\n        agent.messages = list(relayed_messages)\n"}    return str(agent(question))
 ${
   isRoot
     ? `
