@@ -1,5 +1,7 @@
 import z from "zod";
-import { InputValidationError } from "../../../errors";
+import { InputValidationError, RuntimeInvokeResponseError } from "../../../errors";
+import { invokeLocalRuntime } from "../../../core/dev/localInvoke";
+import { DEV_PORTS } from "../../../core/dev/port";
 import type { AppIO } from "../../../io";
 import { ExitCode, withUserCancellation } from "../../../runnable";
 import { createHandler, flag, ProjectKey } from "../../../router";
@@ -27,7 +29,13 @@ export const createProjectInvokeRuntimeHandler = (
     description: "invoke a Runtime from the current project",
     flags: [
       flag("name", "the logical project Runtime name", z.string().optional()),
-      flag("target", "project deployment target", z.string().default("default")),
+      flag("local", "invoke a local development server", z.boolean()),
+      flag(
+        "port",
+        "local development server port (default: 8080)",
+        z.coerce.number().int().min(1).max(65535).optional(),
+      ),
+      flag("target", "project deployment target", z.string().optional()),
       flag("payload", "the inline payload to send", z.string().optional(), { sensitive: true }),
       flag("qualifier", "the Runtime endpoint qualifier", z.string().optional()),
       flag("content-type", "the payload content type", z.string().optional()),
@@ -56,9 +64,70 @@ export const createProjectInvokeRuntimeHandler = (
     ],
     handle: async (ctx, flags) => {
       const project = ctx.require(ProjectKey);
+      const jsonOutput = ctx.require(JsonKey);
+
+      if (!flags.local && flags.port !== undefined) {
+        throw new InputValidationError("--port requires --local");
+      }
+      if (flags.local) {
+        if (jsonOutput && flags["output-file"] !== undefined) {
+          throw new InputValidationError("--json cannot be used with --output-file");
+        }
+        const unsupportedFlag = Object.entries({
+          name: flags.name,
+          target: flags.target,
+          qualifier: flags.qualifier,
+          "content-type": flags["content-type"],
+          accept: flags.accept,
+          "session-id": flags["session-id"],
+          "user-id": flags["user-id"],
+          header: flags.header,
+          "bearer-token": flags["bearer-token"],
+          "mcp-session-id": flags["mcp-session-id"],
+          "mcp-protocol-version": flags["mcp-protocol-version"],
+          "mcp-method": flags["mcp-method"],
+          "mcp-name": flags["mcp-name"],
+          "trace-id": flags["trace-id"],
+          "trace-parent": flags["trace-parent"],
+          "trace-state": flags["trace-state"],
+          baggage: flags.baggage,
+        }).find(([, value]) => value !== undefined)?.[0];
+        if (unsupportedFlag !== undefined) {
+          throw new InputValidationError(`--${unsupportedFlag} cannot be used with --local`);
+        }
+        if (flags.payload === undefined) {
+          throw new InputValidationError("required option '--payload <payload>' not specified", {
+            exitCode: ExitCode.USAGE,
+          });
+        }
+
+        await withUserCancellation(async (signal) => {
+          const sources = await resolveRuntimeInvokeSources(
+            { payload: flags.payload! },
+            io.stdin,
+            signal,
+          );
+          const response = await invokeLocalRuntime(
+            { port: flags.port ?? DEV_PORTS.HTTP, payload: sources.payload },
+            signal,
+          );
+          await writeRuntimeInvokeResponse(response, {
+            stdout: io.stdout,
+            stderr: io.stderr,
+            outputFile: flags["output-file"],
+            json: jsonOutput,
+            signal,
+          });
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw new RuntimeInvokeResponseError(`HTTP ${response.statusCode}`);
+          }
+        });
+        return;
+      }
+
       const name = selectProjectResource(project, "runtime", flags.name);
       const deployed = await core.projectManager.resolveDeployedResource(project, {
-        target: flags.target,
+        target: flags.target ?? "default",
         resourceType: "runtime",
         name,
       });
@@ -69,6 +138,7 @@ export const createProjectInvokeRuntimeHandler = (
           ([flagName, value]) =>
             ![
               "name",
+              "local",
               "target",
               "qualifier",
               "payload",
@@ -105,7 +175,7 @@ export const createProjectInvokeRuntimeHandler = (
         return;
       }
 
-      if (invokeCtx.require(JsonKey) && flags["output-file"] !== undefined) {
+      if (jsonOutput && flags["output-file"] !== undefined) {
         throw new InputValidationError("--json cannot be used with --output-file");
       }
       await withUserCancellation(async (signal) => {
@@ -143,7 +213,7 @@ export const createProjectInvokeRuntimeHandler = (
           stdout: io.stdout,
           stderr: io.stderr,
           outputFile: flags["output-file"],
-          json: invokeCtx.require(JsonKey),
+          json: jsonOutput,
           signal,
         });
       });

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -8,7 +8,9 @@ import type {
   GetHarnessResponse,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type { ProjectBackend, ResolveDeployedResourcesBackendInput } from "../../../core/project";
+import { startHttpServer, type HttpServerHandle } from "../../../io";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
+import { ExitCode, runWithExitCode } from "../../../runnable";
 import { ProjectKey, ValueContext, type Context } from "../../../router";
 import {
   createSilentLogger,
@@ -27,6 +29,7 @@ import { createProjectInvokeRuntimeHandler } from "./runtime";
 
 const originalCwd = process.cwd();
 const temporaryDirectories: string[] = [];
+const servers: HttpServerHandle[] = [];
 
 const TARGET = {
   name: "default",
@@ -52,10 +55,13 @@ function body(...chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
   })();
 }
 
-async function inProject(resources: {
-  runtimes?: unknown[];
-  harnesses?: unknown[];
-}): Promise<void> {
+async function inProject(
+  resources: {
+    runtimes?: unknown[];
+    harnesses?: unknown[];
+  },
+  options: { writeTargets?: boolean } = {},
+): Promise<void> {
   const root = await mkdtemp(join(tmpdir(), "agentcore-project-invoke-reduced-"));
   temporaryDirectories.push(root);
   await mkdir(join(root, "agentcore"), { recursive: true });
@@ -66,7 +72,9 @@ async function inProject(resources: {
     harnesses: resources.harnesses ?? [],
   });
   await writeFile(join(root, "agentcore", "agentcore.json"), JSON.stringify(spec));
-  await writeFile(join(root, "agentcore", "aws-targets.json"), JSON.stringify([TARGET]));
+  if (options.writeTargets !== false) {
+    await writeFile(join(root, "agentcore", "aws-targets.json"), JSON.stringify([TARGET]));
+  }
   process.chdir(root);
 }
 
@@ -122,8 +130,12 @@ function configureCore(core: TestCoreClient): void {
     );
 }
 
-async function run(args: string[], resources: { runtimes?: unknown[]; harnesses?: unknown[] }) {
-  await inProject(resources);
+async function run(
+  args: string[],
+  resources: { runtimes?: unknown[]; harnesses?: unknown[] },
+  options: { writeTargets?: boolean } = {},
+) {
+  await inProject(resources, options);
   const resolved = backend();
   const core = new TestCoreClient({ backends: { CDK: resolved.value } });
   configureCore(core);
@@ -146,6 +158,7 @@ function context(project: Project): Context {
 
 afterEach(async () => {
   process.chdir(originalCwd);
+  await Promise.all(servers.splice(0).map((server) => server.close()));
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -154,6 +167,70 @@ afterEach(async () => {
 });
 
 describe("project invoke", () => {
+  test("invokes a local Runtime directly without resolving project resources", async () => {
+    let request:
+      { method: string; url: string; contentType: string | undefined; body: string } | undefined;
+    const server = await startHttpServer((received) => {
+      request = {
+        method: received.method,
+        url: received.url,
+        contentType: received.headers["content-type"],
+        body: received.body.toString(),
+      };
+      return {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+        body: "local response",
+      };
+    });
+    servers.push(server);
+    const payload = '{"prompt":"hi"}';
+
+    const { core, io, resolved } = await run(
+      ["runtime", "--local", "--port", String(server.port), "--payload", payload],
+      {},
+      { writeTargets: false },
+    );
+
+    expect(request).toEqual({
+      method: "POST",
+      url: "/invocations",
+      contentType: "application/json",
+      body: payload,
+    });
+    expect(io.stdout()).toBe("local response");
+    expect(resolved.calls).toEqual([]);
+    expect(core.runtime.calls).toEqual([]);
+  });
+
+  test("prints how to start project dev when the local Runtime is not running", async () => {
+    const server = await startHttpServer(() => ({ status: 200 }));
+    const port = server.port;
+    await server.close();
+    const errors: string[] = [];
+    const errorLog = spyOn(console, "error").mockImplementation((message) => {
+      errors.push(String(message));
+    });
+
+    try {
+      const code = await runWithExitCode(async () => {
+        await run(
+          ["runtime", "--local", "--port", String(port), "--payload", "{}"],
+          {},
+          { writeTargets: false },
+        );
+      });
+
+      expect(code).toBe(ExitCode.FAILURE);
+      expect(errors.join("\n")).toContain(`Local dev server is not running on port ${port}`);
+      expect(errors.join("\n")).toContain(
+        `agentcore project dev --mode headless --agent <name> --port ${port}`,
+      );
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+
   test("invokes the sole Runtime with its existing payload contract in the target region", async () => {
     const payload = '{"custom":"wire shape"}';
     const { core, io, resolved } = await run(
@@ -199,7 +276,7 @@ describe("project invoke", () => {
     ).rejects.toThrow(/multiple Runtimes.*--name.*checkout, inventory/s);
   });
 
-  test("opens the existing Runtime TUI with the resolved project Runtime", async () => {
+  test("opens the existing Runtime TUI for a bare Runtime invoke", async () => {
     await inProject({ runtimes: [RUNTIME] });
     const resolved = backend();
     const core = new TestCoreClient({ backends: { CDK: resolved.value } });
@@ -212,13 +289,15 @@ describe("project invoke", () => {
     await handler.handle(
       context(project!),
       {
-        name: "checkout",
-        target: "default",
+        name: undefined,
+        local: false,
+        port: undefined,
+        target: undefined,
         payload: undefined,
         qualifier: undefined,
         "content-type": undefined,
         accept: undefined,
-        "session-id": "project-session",
+        "session-id": undefined,
         "user-id": undefined,
         header: undefined,
         "bearer-token": undefined,
@@ -239,7 +318,6 @@ describe("project invoke", () => {
     expect(launches[0]!.context.require(RegionKey)).toBe(TARGET.region);
     expect(launches[0]!.context.require(RuntimeInvokeLaunchContextKey)).toMatchObject({
       runtimeId: RUNTIME_ID,
-      runtimeSessionId: "project-session",
     });
   });
 
