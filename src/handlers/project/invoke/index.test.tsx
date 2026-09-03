@@ -55,6 +55,10 @@ function body(...chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
   })();
 }
 
+function header(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value.join(", ") : value;
+}
+
 async function inProject(
   resources: {
     runtimes?: unknown[];
@@ -135,6 +139,16 @@ async function run(
   resources: { runtimes?: unknown[]; harnesses?: unknown[] },
   options: { writeTargets?: boolean } = {},
 ) {
+  const subject = await routedCommand(args, resources, options);
+  await subject.route();
+  return subject;
+}
+
+async function routedCommand(
+  args: string[],
+  resources: { runtimes?: unknown[]; harnesses?: unknown[] },
+  options: { writeTargets?: boolean } = {},
+) {
   await inProject(resources, options);
   const resolved = backend();
   const core = new TestCoreClient({ backends: { CDK: resolved.value } });
@@ -145,8 +159,8 @@ async function run(
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
   });
-  await root.route(["node", "agentcore", "project", "invoke", ...args]);
-  return { core, io, resolved };
+  const route = () => root.route(["node", "agentcore", "project", "invoke", ...args]);
+  return { core, io, resolved, route };
 }
 
 function context(project: Project): Context {
@@ -169,12 +183,24 @@ afterEach(async () => {
 describe("project invoke", () => {
   test("invokes a local Runtime directly without resolving project resources", async () => {
     let request:
-      { method: string; url: string; contentType: string | undefined; body: string } | undefined;
+      | {
+          method: string;
+          url: string;
+          contentType: string | undefined;
+          accept: string | undefined;
+          sessionId: string | undefined;
+          userId: string | undefined;
+          body: string;
+        }
+      | undefined;
     const server = await startHttpServer((received) => {
       request = {
         method: received.method,
         url: received.url,
-        contentType: received.headers["content-type"],
+        contentType: header(received.headers["content-type"]),
+        accept: header(received.headers.accept),
+        sessionId: header(received.headers["x-amzn-bedrock-agentcore-runtime-session-id"]),
+        userId: header(received.headers["x-amzn-bedrock-agentcore-runtime-user-id"]),
         body: received.body.toString(),
       };
       return {
@@ -196,11 +222,91 @@ describe("project invoke", () => {
       method: "POST",
       url: "/invocations",
       contentType: "application/json",
+      accept: "text/event-stream",
+      sessionId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      ),
+      userId: "default",
       body: payload,
     });
     expect(io.stdout()).toBe("local response");
+    expect(io.stderr()).toContain(`runtime-session-id=${request?.sessionId}`);
     expect(resolved.calls).toEqual([]);
     expect(core.runtime.calls).toEqual([]);
+  });
+
+  test("forwards local HTTP Runtime request options", async () => {
+    type CapturedHeaders = {
+      contentType?: string;
+      accept?: string;
+      sessionId?: string;
+      userId?: string;
+      tenant?: string;
+      traceId?: string;
+      traceParent?: string;
+      traceState?: string;
+      baggage?: string;
+    };
+    let headers: CapturedHeaders | undefined;
+    const expectedHeaders: CapturedHeaders = {
+      contentType: "application/custom+json",
+      accept: "application/json",
+      sessionId: "local-session",
+      userId: "local-user",
+      tenant: "retail",
+      traceId: "Root=1-local",
+      traceParent: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      traceState: "tenant=retail",
+      baggage: "tenant=retail",
+    };
+    const server = await startHttpServer((received) => {
+      headers = {
+        contentType: header(received.headers["content-type"]),
+        accept: header(received.headers.accept),
+        sessionId: header(received.headers["x-amzn-bedrock-agentcore-runtime-session-id"]),
+        userId: header(received.headers["x-amzn-bedrock-agentcore-runtime-user-id"]),
+        tenant: header(received.headers["x-tenant"]),
+        traceId: header(received.headers["x-amzn-trace-id"]),
+        traceParent: header(received.headers.traceparent),
+        traceState: header(received.headers.tracestate),
+        baggage: header(received.headers.baggage),
+      };
+      return { status: 204 };
+    });
+    servers.push(server);
+
+    await run(
+      [
+        "runtime",
+        "--local",
+        "--port",
+        String(server.port),
+        "--payload",
+        "{}",
+        "--content-type",
+        "application/custom+json",
+        "--accept",
+        "application/json",
+        "--session-id",
+        "local-session",
+        "--user-id",
+        "local-user",
+        "--header",
+        "X-Tenant: retail",
+        "--trace-id",
+        "Root=1-local",
+        "--trace-parent",
+        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "--trace-state",
+        "tenant=retail",
+        "--baggage",
+        "tenant=retail",
+      ],
+      {},
+      { writeTargets: false },
+    );
+
+    expect(headers).toEqual(expectedHeaders);
   });
 
   test("prints how to start project dev when the local Runtime is not running", async () => {
@@ -222,13 +328,53 @@ describe("project invoke", () => {
       });
 
       expect(code).toBe(ExitCode.FAILURE);
-      expect(errors.join("\n")).toContain(`Local dev server is not running on port ${port}`);
+      expect(errors.join("\n")).toContain(`Could not reach local dev server on port ${port}`);
       expect(errors.join("\n")).toContain(
         `agentcore project dev --mode headless --agent <name> --port ${port}`,
       );
     } finally {
       errorLog.mockRestore();
     }
+  });
+
+  test("writes a local Runtime error response before exiting unsuccessfully", async () => {
+    const server = await startHttpServer(() => ({
+      status: 500,
+      headers: { "Content-Type": "text/plain" },
+      body: "local failure",
+    }));
+    servers.push(server);
+    const subject = await routedCommand(
+      ["runtime", "--local", "--port", String(server.port), "--payload", "{}"],
+      {},
+      { writeTargets: false },
+    );
+
+    const code = await runWithExitCode(subject.route);
+
+    expect(code).toBe(ExitCode.FAILURE);
+    expect(subject.io.stdout()).toBe("local failure");
+    expect(subject.io.stderr()).toContain("status=500");
+  });
+
+  test.each([
+    {
+      name: "requires --local with --port",
+      args: ["runtime", "--port", "8081", "--payload", "{}"],
+      message: "--port requires --local",
+    },
+    {
+      name: "rejects deployed-only flags locally",
+      args: ["runtime", "--local", "--payload", "{}", "--target", "prod"],
+      message: "--target cannot be used with --local",
+    },
+    {
+      name: "requires a local payload",
+      args: ["runtime", "--local"],
+      message: "required option '--payload <payload>' not specified",
+    },
+  ])("$name", async ({ args, message }) => {
+    await expect(run([...args], {}, { writeTargets: false })).rejects.toThrow(message);
   });
 
   test("invokes the sole Runtime with its existing payload contract in the target region", async () => {
@@ -276,7 +422,7 @@ describe("project invoke", () => {
     ).rejects.toThrow(/multiple Runtimes.*--name.*checkout, inventory/s);
   });
 
-  test("opens the existing Runtime TUI for a bare Runtime invoke", async () => {
+  test("opens the existing Runtime TUI for bare and TUI-compatible Runtime invokes", async () => {
     await inProject({ runtimes: [RUNTIME] });
     const resolved = backend();
     const core = new TestCoreClient({ backends: { CDK: resolved.value } });
@@ -286,38 +432,52 @@ describe("project invoke", () => {
       launches.push({ path, context: ctx });
     });
 
-    await handler.handle(
-      context(project!),
-      {
-        name: undefined,
-        local: false,
-        port: undefined,
-        target: undefined,
-        payload: undefined,
-        qualifier: undefined,
-        "content-type": undefined,
-        accept: undefined,
-        "session-id": undefined,
-        "user-id": undefined,
-        header: undefined,
-        "bearer-token": undefined,
-        "mcp-session-id": undefined,
-        "mcp-protocol-version": undefined,
-        "mcp-method": undefined,
-        "mcp-name": undefined,
-        "trace-id": undefined,
-        "trace-parent": undefined,
-        "trace-state": undefined,
-        baggage: undefined,
-        "output-file": undefined,
-      },
-      {},
-    );
+    const bareFlags = {
+      name: undefined,
+      local: false,
+      port: undefined,
+      target: undefined,
+      payload: undefined,
+      qualifier: undefined,
+      "content-type": undefined,
+      accept: undefined,
+      "session-id": undefined,
+      "user-id": undefined,
+      header: undefined,
+      "bearer-token": undefined,
+      "mcp-session-id": undefined,
+      "mcp-protocol-version": undefined,
+      "mcp-method": undefined,
+      "mcp-name": undefined,
+      "trace-id": undefined,
+      "trace-parent": undefined,
+      "trace-state": undefined,
+      baggage: undefined,
+      "output-file": undefined,
+    };
+
+    await handler.handle(context(project!), bareFlags, {});
 
     expect(launches[0]!.path).toBe(`/agentcore/runtime/invoke/${RUNTIME_ID}`);
     expect(launches[0]!.context.require(RegionKey)).toBe(TARGET.region);
     expect(launches[0]!.context.require(RuntimeInvokeLaunchContextKey)).toMatchObject({
       runtimeId: RUNTIME_ID,
+    });
+
+    await handler.handle(
+      context(project!),
+      {
+        ...bareFlags,
+        name: "checkout",
+        target: "default",
+        "session-id": "project-session",
+      },
+      {},
+    );
+
+    expect(launches[1]!.context.require(RuntimeInvokeLaunchContextKey)).toMatchObject({
+      runtimeId: RUNTIME_ID,
+      runtimeSessionId: "project-session",
     });
   });
 

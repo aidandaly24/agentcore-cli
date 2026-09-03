@@ -29,13 +29,13 @@ export const createProjectInvokeRuntimeHandler = (
     description: "invoke a Runtime from the current project",
     flags: [
       flag("name", "the logical project Runtime name", z.string().optional()),
-      flag("local", "invoke a local development server", z.boolean()),
+      flag("local", "invoke a local HTTP Runtime development server", z.boolean()),
       flag(
         "port",
-        "local development server port (default: 8080)",
+        "local HTTP Runtime development server port (default: 8080)",
         z.coerce.number().int().min(1).max(65535).optional(),
       ),
-      flag("target", "project deployment target", z.string().optional()),
+      flag("target", "project deployment target (default: default)", z.string().optional()),
       flag("payload", "the inline payload to send", z.string().optional(), { sensitive: true }),
       flag("qualifier", "the Runtime endpoint qualifier", z.string().optional()),
       flag("content-type", "the payload content type", z.string().optional()),
@@ -77,20 +77,11 @@ export const createProjectInvokeRuntimeHandler = (
           name: flags.name,
           target: flags.target,
           qualifier: flags.qualifier,
-          "content-type": flags["content-type"],
-          accept: flags.accept,
-          "session-id": flags["session-id"],
-          "user-id": flags["user-id"],
-          header: flags.header,
           "bearer-token": flags["bearer-token"],
           "mcp-session-id": flags["mcp-session-id"],
           "mcp-protocol-version": flags["mcp-protocol-version"],
           "mcp-method": flags["mcp-method"],
           "mcp-name": flags["mcp-name"],
-          "trace-id": flags["trace-id"],
-          "trace-parent": flags["trace-parent"],
-          "trace-state": flags["trace-state"],
-          baggage: flags.baggage,
         }).find(([, value]) => value !== undefined)?.[0];
         if (unsupportedFlag !== undefined) {
           throw new InputValidationError(`--${unsupportedFlag} cannot be used with --local`);
@@ -102,15 +93,29 @@ export const createProjectInvokeRuntimeHandler = (
         }
 
         await withUserCancellation(async (signal) => {
+          const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
           const sources = await resolveRuntimeInvokeSources(
             { payload: flags.payload! },
             io.stdin,
             signal,
           );
           const response = await invokeLocalRuntime(
-            { port: flags.port ?? DEV_PORTS.HTTP, payload: sources.payload },
+            {
+              port: flags.port ?? DEV_PORTS.HTTP,
+              payload: sources.payload,
+              contentType: flags["content-type"],
+              accept: flags.accept,
+              runtimeSessionId: flags["session-id"],
+              runtimeUserId: flags["user-id"],
+              applicationHeaders,
+              traceId: flags["trace-id"],
+              traceParent: flags["trace-parent"],
+              traceState: flags["trace-state"],
+              baggage: flags.baggage,
+            },
             signal,
           );
+          // Local agent error bodies are useful diagnostics, so write them before returning nonzero.
           await writeRuntimeInvokeResponse(response, {
             stdout: io.stdout,
             stderr: io.stderr,
