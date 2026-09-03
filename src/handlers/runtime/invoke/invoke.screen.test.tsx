@@ -808,7 +808,7 @@ describe("Runtime invoke JSON console", () => {
     await screen.write("{}");
     await screen.press("return");
     await waitFor(() => invokeRequests(core).length === 1);
-    expect(invokeRequests(core)[0]!.runtimeUserId).toBeUndefined();
+    expect(invokeRequests(core)[0]!.runtimeUserId).toBe("default");
     expect(invokeRequests(core)[0]!.applicationHeaders).toBeUndefined();
     expect(invokeRequests(core)[0]!.bearerToken).toBeUndefined();
   });

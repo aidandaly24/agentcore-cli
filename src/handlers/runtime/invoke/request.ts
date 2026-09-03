@@ -15,6 +15,7 @@ export type RuntimeInvokeInput = Omit<
 > &
   Partial<Pick<RuntimeInvokeRequest, "qualifier" | "contentType">>;
 
+const DEFAULT_RUNTIME_USER_ID = "default";
 const CUSTOM_HEADER_PREFIX = "x-amzn-bedrock-agentcore-runtime-custom-";
 const RESERVED_HEADERS = new Set([
   "authorization",
@@ -170,6 +171,7 @@ export function normalizeRuntimeInvokeRequest(
     payload,
     contentType: contentType || "application/json",
     ...modeled,
+    runtimeUserId: modeled.runtimeUserId ?? DEFAULT_RUNTIME_USER_ID,
     accept: modeled.accept ?? (mcp ? "application/json, text/event-stream" : undefined),
     ...(applicationHeaders.length > 0 && { applicationHeaders }),
   };

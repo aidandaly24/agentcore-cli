@@ -212,6 +212,15 @@ describe("normalizeRuntimeInvokeRequest", () => {
     expect(request.accept).toBe("application/json, text/event-stream");
   });
 
+  test("defaults the Runtime user ID when omitted", () => {
+    const request = normalizeRuntimeInvokeRequest(detail(), {
+      runtimeId: RUNTIME_ID,
+      payload: new Uint8Array(),
+    });
+
+    expect(request.runtimeUserId).toBe("default");
+  });
+
   test("maps every request field and ordered allowed headers once", () => {
     const request = normalizeRuntimeInvokeRequest(
       detail({
