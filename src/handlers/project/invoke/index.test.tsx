@@ -162,6 +162,7 @@ describe("project invoke", () => {
       .args[0] as RuntimeInvokeRequest;
     expect(new TextDecoder().decode(request.payload)).toBe(payload);
     expect(request.contentType).toBe("application/custom+json");
+    expect(request.runtimeUserId).toBe("default");
     expect(core.runtime.calls.at(-1)!.args[1]).toEqual({ region: TARGET.region });
     expect(io.stdout()).toBe("runtime response");
     expect(resolved.calls).toEqual([{ target: TARGET }]);
