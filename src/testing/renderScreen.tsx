@@ -1,5 +1,6 @@
 import { render, cleanup } from "ink-testing-library";
 import { QueryClient } from "@tanstack/react-query";
+import type { Command } from "commander";
 import { ValueContext, compile, CommandKey, PlatformKey, type Context } from "../router";
 import { RegionKey, JsonKey, DebugKey, EndpointKey } from "../handlers/keys";
 import { JsonRendererKey } from "../tui";
@@ -22,6 +23,20 @@ import { TestGlobalConfigAccessor } from "./globalConfig";
 // synchronous frames, so useInput handlers and TextInput focus behave as in a
 // real terminal.
 
+// compiledRootCommand compiles the real handler tree into the Commander command
+// the app pins as CommandKey. Tests also walk it to enumerate every command, so
+// a command added later is covered without a new test.
+export function compiledRootCommand(core: TestCoreClient = new TestCoreClient()): Command {
+  return compile(
+    createRootHandler(core, {
+      io: testIO().io,
+      logger: createSilentLogger(),
+      globalConfigAccessor: new TestGlobalConfigAccessor(),
+    }),
+    ValueContext.EmptyContext(),
+  );
+}
+
 // baseContext builds the Context a screen needs, mirroring what the app pins
 // before mounting the TUI: the compiled root Commander command (CommandKey —
 // RouterScreen walks it to resolve each menu's subcommands), the global flags
@@ -32,17 +47,8 @@ function baseContext(
   endpointUrl?: string,
   platform: NodeJS.Platform = process.platform,
 ): Context {
-  const rootCommand = compile(
-    createRootHandler(core, {
-      io: testIO().io,
-      logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-    }),
-    ValueContext.EmptyContext(),
-  );
-
   return ValueContext.EmptyContext()
-    .withValue(CommandKey, rootCommand)
+    .withValue(CommandKey, compiledRootCommand(core))
     .withValue(RegionKey, "us-east-1")
     .withValue(PlatformKey, platform)
     .withValue(EndpointKey, endpointUrl)

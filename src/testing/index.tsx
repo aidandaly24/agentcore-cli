@@ -21,6 +21,7 @@ export {
 } from "./TestCoreClient";
 export { StreamController } from "./StreamController";
 export {
+  compiledRootCommand,
   renderScreen,
   cleanupScreens,
   keys,
