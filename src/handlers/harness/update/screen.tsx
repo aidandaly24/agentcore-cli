@@ -31,6 +31,7 @@ export function HarnessUpdateScreen(props: ScreenProps) {
 }
 
 function UpdateWizard({ ctx, core, harnessId }: ScreenProps & { harnessId: string }) {
+  const navigate = useNavigate();
   const opts = coreOptsFromCtx(ctx);
   const finishFlow = useFinishFlow("/agentcore/harness");
 
@@ -68,6 +69,7 @@ function UpdateWizard({ ctx, core, harnessId }: ScreenProps & { harnessId: strin
       breadcrumb={["agentcore", "harness", "update", harnessId]}
       initial={fromHarness(detail.data.harness!)}
       onDone={(id) => finishFlow(`/agentcore/harness/get/${id}`)}
+      onExit={() => navigate("/agentcore/harness/update")}
     />
   );
 }

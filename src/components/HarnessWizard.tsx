@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Box, Text, useInput, useWindowSize } from "ink";
-import { useNavigate } from "react-router";
 import type {
   Harness,
   HarnessMemoryConfiguration,
@@ -246,6 +245,10 @@ export interface HarnessWizardProps extends ScreenProps {
   initial?: HarnessFormValues;
   // onDone is called after a successful submit is acknowledged.
   onDone: (harnessId: string) => void;
+  // onExit is called when escape leaves the first step. It navigates to an
+  // explicit screen rather than popping history: `agentcore harness create`
+  // opens the wizard as the first history entry, so a pop would go nowhere.
+  onExit: () => void;
 }
 
 const NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]{0,47}$/;
@@ -263,8 +266,8 @@ export function HarnessWizard({
   harnessId,
   initial,
   onDone,
+  onExit,
 }: HarnessWizardProps) {
-  const navigate = useNavigate();
   const opts = coreOptsFromCtx(ctx);
 
   const steps: Step[] = useMemo(() => {
@@ -290,7 +293,7 @@ export function HarnessWizard({
 
   const next = () => setStepIndex((i) => Math.min(steps.length - 1, i + 1));
   const back = () => {
-    if (stepIndex === 0) navigate(-1);
+    if (stepIndex === 0) onExit();
     else setStepIndex((i) => i - 1);
   };
 
