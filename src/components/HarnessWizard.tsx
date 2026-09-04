@@ -245,9 +245,9 @@ export interface HarnessWizardProps extends ScreenProps {
   initial?: HarnessFormValues;
   // onDone is called after a successful submit is acknowledged.
   onDone: (harnessId: string) => void;
-  // onExit is called when escape leaves the first step. It navigates to an
-  // explicit screen rather than popping history: `agentcore harness create`
-  // opens the wizard as the first history entry, so a pop would go nowhere.
+  // onExit runs when escape leaves the first step. A history pop goes nowhere
+  // when the wizard is the first entry (`agentcore harness create` deep-links
+  // here), so such callers must navigate to an explicit screen.
   onExit: () => void;
 }
 

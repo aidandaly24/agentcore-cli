@@ -86,6 +86,7 @@ export function EndpointWizard({
   const stepKey = steps[stepIndex]!.key;
   const next = () => setStepIndex((i) => Math.min(steps.length - 1, i + 1));
   const back = () => {
+    // Safe only while every route in passes a picker first; see HarnessWizard.onExit.
     if (stepIndex === 0) navigate(-1);
     else setStepIndex((i) => i - 1);
   };

@@ -69,7 +69,7 @@ function UpdateWizard({ ctx, core, harnessId }: ScreenProps & { harnessId: strin
       breadcrumb={["agentcore", "harness", "update", harnessId]}
       initial={fromHarness(detail.data.harness!)}
       onDone={(id) => finishFlow(`/agentcore/harness/get/${id}`)}
-      onExit={() => navigate("/agentcore/harness/update")}
+      onExit={() => navigate(-1)}
     />
   );
 }
