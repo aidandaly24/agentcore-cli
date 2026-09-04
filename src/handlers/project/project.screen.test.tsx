@@ -4,6 +4,7 @@ import {
   waitForFlatText,
   waitForText,
   cleanupScreens,
+  compiledRootCommand,
   createSilentLogger,
   menuEntries,
   TestCoreClient,
@@ -11,7 +12,6 @@ import {
   testIO,
 } from "../../testing";
 import { InvalidEnvironmentError } from "../../errors";
-import { compile, ValueContext } from "../../router";
 import { ExitCode } from "../../runnable";
 import { createRootHandler } from "../index";
 
@@ -20,14 +20,7 @@ afterEach(cleanupScreens);
 // projectSubcommands reads the project group's children off the compiled
 // Commander tree, so tests driven by it cover any subcommand added later.
 function projectSubcommands(): string[] {
-  const root = compile(
-    createRootHandler(new TestCoreClient(), {
-      io: testIO().io,
-      logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-    }),
-    ValueContext.EmptyContext(),
-  );
+  const root = compiledRootCommand();
   const project = root.commands.find((command) => command.name() === "project")!;
   return project.commands.map((command) => command.name());
 }
@@ -71,14 +64,7 @@ describe("project menu", () => {
 // projectCommand resolves a compiled project subcommand by path, for reading
 // the help the CLI-only screen must match.
 function projectCommand(...path: string[]) {
-  const root = compile(
-    createRootHandler(new TestCoreClient(), {
-      io: testIO().io,
-      logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-    }),
-    ValueContext.EmptyContext(),
-  );
+  const root = compiledRootCommand();
   let command = root.commands.find((c) => c.name() === "project")!;
   for (const name of path) command = command.commands.find((c) => c.name() === name)!;
   return command;

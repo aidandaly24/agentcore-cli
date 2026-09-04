@@ -1,35 +1,23 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import type { Command } from "commander";
 import {
+  cleanupScreens,
+  compiledRootCommand,
+  menuEntries,
   renderScreen,
   waitForText,
-  cleanupScreens,
-  createSilentLogger,
-  menuEntries,
-  TestCoreClient,
-  TestGlobalConfigAccessor,
-  testIO,
 } from "../testing";
-import { compile, isTuiCommandSupported, ValueContext } from "../router";
-import { createRootHandler } from "../handlers";
+import { isTuiCommandSupported } from "../router";
 
 afterEach(cleanupScreens);
-
-function compiledRoot(): Command {
-  return compile(
-    createRootHandler(new TestCoreClient(), {
-      io: testIO().io,
-      logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-    }),
-    ValueContext.EmptyContext(),
-  );
-}
 
 // cliOnlyCommands walks the compiled Commander tree for every command without
 // a screen, so a command added later is covered without a new test. `help` is
 // Commander's own, not one of ours.
-function cliOnlyCommands(command = compiledRoot(), path: string[] = []): [string[], Command][] {
+function cliOnlyCommands(
+  command = compiledRootCommand(),
+  path: string[] = [],
+): [string[], Command][] {
   const here = [...path, command.name()];
   const own: [string[], Command][] = isTuiCommandSupported(command) ? [] : [[here, command]];
   return [

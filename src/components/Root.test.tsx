@@ -51,6 +51,8 @@ describe("every command with a screen", () => {
   // The route table decides what each path shows and where its escape goes. A
   // path that redirects to a screen whose escape targets that same path loops
   // in place, so from wherever a command opens, escape must reach a menu above.
+  // Any ancestor menu is accepted, so this catches a no-op or a loop but not
+  // an escape that jumps further up than it should.
   test.each(SCREENS.map(([path, command]) => [path.join(" "), path, command] as const))(
     "%s opens, and esc returns to a menu above it",
     async (_label, path, command) => {
