@@ -3,6 +3,7 @@ import type { AgentEnvSpec } from '../../../schema';
 import { getGatewayEnvVars } from './gateway-env.js';
 import { getMemoryEnvVars } from './memory-env.js';
 import { getPaymentEnvVars } from './payment-env.js';
+import { getRegionEnvVars } from './region-env.js';
 
 export interface DevEnv {
   /** Merged env vars: deployed-state (gateway + memory + payment) first, then .env overrides */
@@ -21,12 +22,13 @@ export interface DevEnv {
 export async function loadDevEnv(workingDir: string, runtime?: AgentEnvSpec): Promise<DevEnv> {
   const configRoot = findConfigRoot(workingDir);
   const dotEnvVars = configRoot ? await readEnvFile(configRoot) : {};
+  const regionEnvVars = await getRegionEnvVars();
   const gatewayEnvVars = await getGatewayEnvVars();
   const memoryEnvVars = await getMemoryEnvVars();
   const paymentEnvVars = await getPaymentEnvVars(runtime);
 
   return {
-    envVars: { ...gatewayEnvVars, ...memoryEnvVars, ...paymentEnvVars, ...dotEnvVars },
+    envVars: { ...regionEnvVars, ...gatewayEnvVars, ...memoryEnvVars, ...paymentEnvVars, ...dotEnvVars },
     deployedMemoryCount: Object.keys(memoryEnvVars).length,
   };
 }
