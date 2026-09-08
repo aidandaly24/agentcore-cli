@@ -32,8 +32,17 @@ afterEach(async () => {
   );
 });
 
-async function run(args: string[], opts?: { core?: TestCoreClient }) {
-  const io = testIO();
+// Ink writes cursor/erase sequences around each frame; the TTY assertions
+// below care about frame text, not terminal control. Built without a
+// control-char literal so lint stays quiet.
+const ANSI_SEQUENCE = new RegExp(`${String.fromCharCode(0x1b)}\\[[0-9;?]*[A-Za-z]`, "g");
+
+function stripAnsi(text: string): string {
+  return text.replace(ANSI_SEQUENCE, "");
+}
+
+async function run(args: string[], opts?: { core?: TestCoreClient; isTTY?: boolean }) {
+  const io = testIO({ isTTY: opts?.isTTY });
   const core = opts?.core ?? new TestCoreClient();
   const root = createRootHandler(core, {
     io: io.io,
@@ -64,6 +73,33 @@ describe("project add memory", () => {
       resource: { type: "memory", name: "customer_memory" },
     });
     expect(io.stderr()).not.toContain("added memory");
+  });
+
+  // The same progress driver create, build, and deploy use: a TTY gets the live
+  // step list with every step marked done, and the success line follows it.
+  test("renders a live step list on a TTY", async () => {
+    await inProject();
+    const { io } = await run(["add", "memory", "--name", "customer_memory"], { isTTY: true });
+
+    const frames = stripAnsi(io.stderr());
+    expect(frames).toContain("✓ Reading project spec file");
+    expect(frames).toContain("✓ Updating project spec file");
+    expect(frames).toContain("added memory 'customer_memory' to 'TestProject'");
+    expect(io.stdout()).toBe("");
+  });
+
+  test("--json on a TTY keeps the plain step lines so no ANSI reaches stderr", async () => {
+    await inProject();
+    const { io } = await run(["add", "memory", "--name", "customer_memory", "--json"], {
+      isTTY: true,
+    });
+
+    expect(io.stderr()).not.toContain(String.fromCharCode(0x1b));
+    expect(io.stderr()).toContain("Reading project spec file");
+    expect(JSON.parse(io.stdout())).toMatchObject({
+      operation: "add",
+      resource: { type: "memory", name: "customer_memory" },
+    });
   });
 
   /** Verify the flag -> agentcore.json memories[] entry for each flag. */

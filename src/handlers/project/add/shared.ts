@@ -1,5 +1,6 @@
 import type { Context } from "../../../router";
 import { runWithProgress } from "../../../tui/progress";
+import { JsonKey } from "../../keys";
 import { renderResult } from "../../utils";
 import {
   projectMutationResource,
@@ -23,11 +24,12 @@ export async function addProjectResource(
   humanSuccessMessage: string,
   options: AddProjectResourceResultOptions = {},
 ): Promise<Project> {
+  // Same driver as create, build, and deploy: a live step list in a TTY, and
+  // plain line-per-step output when stderr is not a TTY or --json wants no ANSI
+  // on it.
   const updatedProject = await runWithProgress(config.projectManager.addResource(project, input), {
     io: config.io,
-    // Project add commands historically print plain progress lines even on a
-    // TTY. Keep that behavior while still collecting the generator result.
-    interactive: false,
+    interactive: ctx.require(JsonKey) ? false : undefined,
   });
 
   renderResult<ProjectMutationResult>(
