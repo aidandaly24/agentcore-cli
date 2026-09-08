@@ -75,4 +75,25 @@ describe("TaskList", () => {
     expect(tailLine).toContain("…");
     instance.unmount();
   });
+
+  // A title with no break opportunity (a Windows temp path) is wider than the
+  // row; Ink's default shrink used to give the glyph column to the title.
+  test("keeps the glyph and spinner when an unbreakable title exceeds the width", () => {
+    const title = "Reading 'C:\\Users\\Admin\\AppData\\Local\\Temp\\agentcore-x\\agentcore.json'";
+    const instance = render(<></>);
+    Object.defineProperty(instance.stdout, "columns", { configurable: true, value: 40 });
+    instance.rerender(
+      <TaskList
+        tasks={[
+          { title, state: "done", tail: [] },
+          { title, state: "running", tail: [] },
+        ]}
+      />,
+    );
+
+    const lines = (instance.lastFrame() ?? "").split("\n");
+    expect(lines[0]).toMatch(/^✓ Reading/);
+    expect(lines.some((line) => /^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] Reading/.test(line))).toBe(true);
+    instance.unmount();
+  });
 });

@@ -49,9 +49,12 @@ export const TaskList: React.FC<TaskListProps> = ({
             <Spinner label={task.title} theme={theme} />
           ) : (
             <Box>
-              <Text color={task.state === "done" ? theme.colors.success : theme.colors.error}>
-                {task.state === "done" ? glyphs.done : glyphs.failed}
-              </Text>
+              {/* Keep the glyph column when the title is wider than the row. */}
+              <Box flexShrink={0}>
+                <Text color={task.state === "done" ? theme.colors.success : theme.colors.error}>
+                  {task.state === "done" ? glyphs.done : glyphs.failed}
+                </Text>
+              </Box>
               <Text color={theme.colors.text}> {task.title}</Text>
             </Box>
           )}

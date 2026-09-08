@@ -32,7 +32,10 @@ export const Spinner: React.FC<SpinnerProps> = ({
 
   return (
     <Box>
-      <Text color={theme.colors.primary}>{frames[frame]}</Text>
+      {/* Keep the frame column when the label is wider than the row. */}
+      <Box flexShrink={0}>
+        <Text color={theme.colors.primary}>{frames[frame]}</Text>
+      </Box>
       {label ? <Text color={theme.colors.text}> {label}</Text> : null}
     </Box>
   );
