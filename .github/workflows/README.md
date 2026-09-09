@@ -48,9 +48,10 @@ Dispatch `release-prepare` with a bump and a channel, review the release PR it o
 
 Publishing listens for pushes to `refactor` (switch to `main` when the refactor lands), not PR
 events. It looks up the pushed commit's associated PRs and proceeds only when that exact commit
-is the merge of a `release/v*` PR from this repository into the target branch. Ordinary merges,
-fork PRs, and pushes without a matching release PR skip verification and publishing. Every job
-uses the pushed SHA, so later commits cannot change what is released.
+is the merge of a `release/v*` PR opened by `agentcore-devx-automation[bot]` (account ID
+`282717993`) from this repository into the target branch. Manually opened release PRs,
+ordinary merges, fork PRs, and pushes without a matching release PR skip verification and
+publishing. Every job uses the pushed SHA, so later commits cannot change what is released.
 
 The prepare job uses `aws-release-4-core`. The check-release and publish jobs stay on
 `ubuntu-latest` until `release-publish.yml` is allowlisted for the dedicated runner group.
