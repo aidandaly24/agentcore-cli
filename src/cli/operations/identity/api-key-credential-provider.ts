@@ -35,6 +35,26 @@ export async function apiKeyProviderExists(
 }
 
 /**
+ * Get an existing API key credential provider's ARN by name.
+ * Used to link a provider that was created outside the project (console, another
+ * project, IaC) when no local secret is available to create/update it.
+ */
+export async function getApiKeyProvider(
+  client: BedrockAgentCoreControlClient,
+  providerName: string
+): Promise<Result<{ credentialProviderArn: string }>> {
+  try {
+    const response = await client.send(new GetApiKeyCredentialProviderCommand({ name: providerName }));
+    if (!response.credentialProviderArn) {
+      return err(toError('No credentialProviderArn in response'));
+    }
+    return ok({ credentialProviderArn: response.credentialProviderArn });
+  } catch (error) {
+    return err(toError(error));
+  }
+}
+
+/**
  * Create an API key credential provider.
  * Returns success even if provider already exists (idempotent).
  */
