@@ -16,9 +16,8 @@
     "node": ">=20.12.0"
   },
   "files": [
-    "dist/index.js",
-    "dist/main.js",
-    "dist/assets"
+    "dist",
+    "!dist/bin"
   ],
   "scripts": {
     "build": "bun scripts/build.ts bundle",

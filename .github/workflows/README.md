@@ -59,9 +59,10 @@ The allowlist is scoped to workflow paths and branches; renaming a workflow or c
 branch requires a runner-group administrator to update it. Keep PR-triggered workflows
 and the verification matrix off this release-only pool.
 
-The npm package includes only `dist/index.js`, `dist/main.js`, and `dist/assets`, plus standard
-package metadata. Native binaries in `dist/bin` are separate GitHub release assets, never npm
-package contents, even when packing a workspace that has already compiled them.
+The npm package includes `dist` except `dist/bin`, plus standard package metadata. This keeps
+additional bundle chunks and runtime assets included as the build evolves. Native binaries in
+`dist/bin` are separate GitHub release assets, never npm package contents, even when packing a
+workspace that has already compiled them.
 
 If publish fails after the merge, rerun the failed `release-publish` jobs. Both the npm publish
 and the GitHub release steps skip work that already succeeded. Do not re-dispatch
