@@ -2,19 +2,46 @@
 # release-prepare.yml merges. The version is whatever the merged package.json says.
 name: release-publish
 on:
-  pull_request:
-    types: [closed]
+  push:
     # TODO: switch to main once the refactor lands there.
     branches: [refactor]
 
 jobs:
+  check-release:
+    if: "!github.event.deleted"
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      is_release: ${{ steps.check.outputs.is_release }}
+    steps:
+      # Push runs the trusted base-branch workflow, but does not carry the merged PR's metadata.
+      - name: Check for a merged release PR
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          IS_RELEASE=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            | jq -r --arg repository "$GITHUB_REPOSITORY" --arg ref "$GITHUB_REF_NAME" --arg sha "$GITHUB_SHA" '
+                any(.[][];
+                  .merged_at != null and
+                  .merge_commit_sha == $sha and
+                  .head.repo.full_name == $repository and
+                  .base.repo.full_name == $repository and
+                  .base.ref == $ref and
+                  (.head.ref | startswith("release/v"))
+                )')
+          echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+
   verify:
-    if: github.event.pull_request.merged && startsWith(github.head_ref, 'release/v')
+    needs: check-release
+    if: needs.check-release.outputs.is_release == 'true'
     uses: ./.github/workflows/verify.yml
     permissions:
       contents: read
     with:
-      ref: ${{ github.event.pull_request.merge_commit_sha }}
+      ref: ${{ github.sha }}
 
   publish:
     needs: verify
@@ -24,7 +51,7 @@ jobs:
       contents: write
       id-token: write
     env:
-      REF: ${{ github.event.pull_request.merge_commit_sha }}
+      REF: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v7
         with:

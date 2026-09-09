@@ -46,6 +46,22 @@ compose freely.
 Dispatch `release-prepare` with a bump and a channel, review the release PR it opens, merge it.
 `release-publish` then publishes the merged package.json version.
 
+Publishing listens for pushes to `refactor` (switch to `main` when the refactor lands), not PR
+events. It looks up the pushed commit's associated PRs and proceeds only when that exact commit
+is the merge of a `release/v*` PR from this repository into the target branch. Ordinary merges,
+fork PRs, and pushes without a matching release PR skip verification and publishing. Every job
+uses the pushed SHA, so later commits cannot change what is released.
+
+The prepare job uses `aws-release-4-core`. The check-release and publish jobs stay on
+`ubuntu-latest` until `release-publish.yml` is allowlisted for the dedicated runner group.
+The allowlist is scoped to workflow paths and branches; renaming a workflow or changing its
+branch requires a runner-group administrator to update it. Keep PR-triggered workflows
+and the verification matrix off this release-only pool.
+
+The npm package includes only `dist/index.js`, `dist/main.js`, and `dist/assets`, plus standard
+package metadata. Native binaries in `dist/bin` are separate GitHub release assets, never npm
+package contents, even when packing a workspace that has already compiled them.
+
 If publish fails after the merge, rerun the failed `release-publish` jobs. Both the npm publish
 and the GitHub release steps skip work that already succeeded. Do not re-dispatch
 `release-prepare`, package.json already holds the new version and it would bump again.
