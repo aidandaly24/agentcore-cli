@@ -3,13 +3,13 @@
 name: release-publish
 on:
   push:
-    # TODO: switch to main once the refactor lands there.
+    # TODO: switch to main once the refactor lands and this workflow is allowlisted there.
     branches: [refactor]
 
 jobs:
   check-release:
     if: "!github.event.deleted"
-    runs-on: ubuntu-latest
+    runs-on: aws-release-4-core
     permissions:
       pull-requests: read
     outputs:
@@ -47,7 +47,7 @@ jobs:
   publish:
     needs: verify
     # npm provenance is only issued from GitHub-hosted runners.
-    runs-on: ubuntu-latest
+    runs-on: aws-release-4-core
     permissions:
       contents: write
       id-token: write

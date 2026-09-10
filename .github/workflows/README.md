@@ -46,18 +46,18 @@ compose freely.
 Dispatch `release-prepare` with a bump and a channel, review the release PR it opens, merge it.
 `release-publish` then publishes the merged package.json version.
 
-Publishing listens for pushes to `refactor` (switch to `main` when the refactor lands), not PR
-events. It looks up the pushed commit's associated PRs and proceeds only when that exact commit
+Publishing listens for pushes to `refactor`, not PR events. It looks up the pushed commit's
+associated PRs and proceeds only when that exact commit
 is the merge of a `release/v*` PR opened by `agentcore-devx-automation[bot]` (account ID
 `282717993`) from this repository into the target branch. Manually opened release PRs,
 ordinary merges, fork PRs, and pushes without a matching release PR skip verification and
 publishing. Every job uses the pushed SHA, so later commits cannot change what is released.
 
-The prepare job uses `aws-release-4-core`. The check-release and publish jobs stay on
-`ubuntu-latest` until `release-publish.yml` is allowlisted for the dedicated runner group.
-The allowlist is scoped to workflow paths and branches; renaming a workflow or changing its
-branch requires a runner-group administrator to update it. Keep PR-triggered workflows
-and the verification matrix off this release-only pool.
+The prepare, check-release, and publish jobs use `aws-release-4-core`. The `release-publish.yml`
+allowlist currently covers `refactor` only. After the workflow lands on `main`, have a
+runner-group administrator add its `main` entry before switching the publish branch filter.
+The allowlist is scoped to workflow paths and branches; renaming a workflow also requires an
+update. Keep PR-triggered workflows and the verification matrix off this release-only pool.
 
 The npm package includes `dist` except `dist/bin`, plus standard package metadata. This keeps
 additional bundle chunks and runtime assets included as the build evolves. Native binaries in
