@@ -43,6 +43,10 @@ type Route =
       name: 'invoke';
       sessionId?: string;
       userId?: string;
+      /** Resolved named runtime endpoint (version alias) to target. Undefined targets DEFAULT. */
+      endpoint?: string;
+      /** Where the resolved endpoint came from, for telemetry. */
+      endpointSource?: 'flag' | 'env' | 'default';
       headers?: Record<string, string>;
       bearerToken?: string;
       isResume?: boolean;
@@ -248,6 +252,8 @@ function AppContent({
         initialSessionId={route.sessionId}
         isResume={route.isResume}
         initialUserId={route.userId}
+        initialEndpoint={route.endpoint}
+        initialEndpointSource={route.endpointSource}
         initialHeaders={route.headers}
         initialBearerToken={route.bearerToken}
         onExec={result => {

@@ -14,6 +14,10 @@ interface InvokeScreenProps {
   initialPrompt?: string;
   initialSessionId?: string;
   initialUserId?: string;
+  /** Resolved named runtime endpoint (version alias) to target on every invocation. Undefined targets DEFAULT. */
+  initialEndpoint?: string;
+  /** Where the resolved endpoint came from, for telemetry. */
+  initialEndpointSource?: 'flag' | 'env' | 'default';
   /** Custom headers to forward to the agent runtime on every invocation */
   initialHeaders?: Record<string, string>;
   initialBearerToken?: string;
@@ -155,6 +159,8 @@ export function InvokeScreen({
   initialPrompt,
   initialSessionId,
   initialUserId,
+  initialEndpoint,
+  initialEndpointSource,
   initialHeaders,
   initialBearerToken,
   onExec,
@@ -189,6 +195,8 @@ export function InvokeScreen({
   } = useInvokeFlow({
     initialSessionId,
     initialUserId,
+    initialEndpoint,
+    initialEndpointSource,
     headers: initialHeaders,
     initialBearerToken,
     isResume,

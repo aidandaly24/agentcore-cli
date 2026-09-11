@@ -13,6 +13,7 @@ import {
   DepSyncOutcome,
   DeployModeSchema,
   DevAction,
+  EndpointSource,
   EvaluatorLevel,
   EvaluatorModelProvider,
   EvaluatorType,
@@ -172,6 +173,7 @@ const InvokeAttrs = safeSchema({
   has_session_id: z.boolean(),
   auth_type: AuthType,
   agent_protocol: AgentProtocol.optional(),
+  endpoint_source: EndpointSource,
 });
 
 const ExecAttrs = safeSchema({

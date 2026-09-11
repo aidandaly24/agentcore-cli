@@ -16,7 +16,14 @@ export {
   type AgentRuntimeStatusResult,
   type GetAgentRuntimeStatusOptions,
 } from './agentcore-control';
-export { streamLogs, searchLogs, type LogEvent, type StreamLogsOptions, type SearchLogsOptions } from './cloudwatch';
+export {
+  streamLogs,
+  searchLogs,
+  resolveEndpointName,
+  type LogEvent,
+  type StreamLogsOptions,
+  type SearchLogsOptions,
+} from './cloudwatch';
 export { enableTransactionSearch } from './transaction-search';
 export {
   startPolicyGeneration,

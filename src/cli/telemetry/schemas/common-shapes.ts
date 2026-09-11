@@ -32,6 +32,8 @@ export const UiMode = z.enum(['browser', 'terminal']);
 export const AgentSource = z.enum(['create', 'byo', 'import']);
 export const AttachMode = z.enum(['log_only', 'enforce']);
 export const AuthType = z.enum(['sigv4', 'bearer_token']);
+/** Where the invoke --endpoint qualifier came from: the --endpoint flag, the AGENTCORE_RUNTIME_ENDPOINT env var, or the implicit DEFAULT endpoint. */
+export const EndpointSource = z.enum(['flag', 'env', 'default']);
 export const AuthorizerType = z.enum(['aws_iam', 'custom_jwt', 'none']);
 export const BuildType = z.enum(['codezip', 'container']);
 export const CredentialType = z.enum(['api-key', 'oauth']);

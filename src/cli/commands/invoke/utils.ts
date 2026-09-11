@@ -1,4 +1,10 @@
-import { AgentEnvironment, AgentProtocol, AuthType, standardize } from '../../telemetry/schemas/common-shapes.js';
+import {
+  AgentEnvironment,
+  AgentProtocol,
+  AuthType,
+  EndpointSource,
+  standardize,
+} from '../../telemetry/schemas/common-shapes.js';
 
 function isHarnessInvoke(options: {
   harnessName?: string;
@@ -11,6 +17,17 @@ function isHarnessInvoke(options: {
   return false;
 }
 
+/**
+ * Classify where the resolved invoke endpoint qualifier came from for telemetry:
+ * the explicit --endpoint flag, the AGENTCORE_RUNTIME_ENDPOINT env var, or the
+ * implicit DEFAULT endpoint when neither is set.
+ */
+export function computeEndpointSource(flagEndpoint?: string): 'flag' | 'env' | 'default' {
+  if (flagEndpoint) return 'flag';
+  if (process.env.AGENTCORE_RUNTIME_ENDPOINT) return 'env';
+  return 'default';
+}
+
 export function computeInvokeAttrs(options: {
   harnessName?: string;
   harnessArn?: string;
@@ -20,6 +37,7 @@ export function computeInvokeAttrs(options: {
   hasSessionId: boolean;
   bearerToken?: string;
   agentProtocol?: string;
+  endpointSource?: 'flag' | 'env' | 'default';
 }) {
   const isHarness = isHarnessInvoke(options);
   return {
@@ -28,5 +46,6 @@ export function computeInvokeAttrs(options: {
     has_session_id: options.hasSessionId,
     auth_type: standardize(AuthType, options.bearerToken ? 'bearer_token' : 'sigv4'),
     agent_protocol: isHarness ? undefined : standardize(AgentProtocol, options.agentProtocol ?? 'http'),
+    endpoint_source: standardize(EndpointSource, options.endpointSource ?? 'default'),
   };
 }
