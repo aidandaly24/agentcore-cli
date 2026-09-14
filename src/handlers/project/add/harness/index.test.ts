@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { parse } from "yaml";
 import { createRootHandler } from "../../../index";
 import {
   createSilentLogger,
@@ -415,8 +416,8 @@ describe("project add harness", () => {
     cleanups.push(cleanup);
     await run(["add", "harness", ...flags]);
 
-    const harnessJson = await Bun.file(join(projectRoot, "app", "x", "harness.json")).json();
-    expect(harnessJson).toMatchObject(expected);
+    const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
+    expect(harnessYaml).toMatchObject(expected);
 
     const agentcoreJson = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     expect(agentcoreJson.harnesses).toContainEqual({
@@ -433,8 +434,12 @@ describe("project add harness", () => {
     const prompt = await Bun.file(join(projectRoot, "app", "x", "system-prompt.md")).text();
     expect(prompt).toBe("You are a pirate.");
 
-    const harnessJson = await Bun.file(join(projectRoot, "app", "x", "harness.json")).json();
-    expect(harnessJson).not.toHaveProperty("systemPrompt");
+    const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
+    expect(harnessYaml.systemPrompt).toBe("file://./system-prompt.md");
+    expect(harnessYaml.memory).toEqual({ mode: "managed" });
+    expect(harnessYaml.tools).toBeUndefined();
+    expect(harnessYaml.skills).toBeUndefined();
+    expect(existsSync(join(projectRoot, "app", "x", "harness.json"))).toBe(false);
   });
 
   test("--dockerfile copies the file into the harness directory and stores the relative path", async () => {
@@ -449,8 +454,8 @@ describe("project add harness", () => {
     const copiedContent = await Bun.file(join(projectRoot, "app", "x", "Dockerfile")).text();
     expect(copiedContent).toBe("FROM python:3.12-slim\nCOPY . /app\n");
 
-    const harnessJson = await Bun.file(join(projectRoot, "app", "x", "harness.json")).json();
-    expect(harnessJson.dockerfile).toBe("Dockerfile");
+    const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
+    expect(harnessYaml.dockerfile).toBe("Dockerfile");
   });
 
   test("--dockerfile with VPC mode succeeds when vpcId is in network-config", async () => {
@@ -473,8 +478,8 @@ describe("project add harness", () => {
       '{"subnets":["subnet-0123456789abcdef0"],"securityGroups":["sg-0123456789abcdef0"],"vpcId":"vpc-0123456789abcdef0"}',
     ]);
 
-    const harnessJson = await Bun.file(join(projectRoot, "app", "x", "harness.json")).json();
-    expect(harnessJson).toMatchObject({
+    const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
+    expect(harnessYaml).toMatchObject({
       dockerfile: "Dockerfile",
       networkMode: "VPC",
       networkConfig: {

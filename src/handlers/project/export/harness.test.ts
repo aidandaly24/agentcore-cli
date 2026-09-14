@@ -59,6 +59,8 @@ async function inProjectWithHarness(
     JSON.stringify({ provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0", maxTokens: 256 }),
     "--system-prompt",
     "You are a terse assistant.",
+    "--memory",
+    '{"mode":"disabled"}',
   ]);
   return projectRoot;
 }

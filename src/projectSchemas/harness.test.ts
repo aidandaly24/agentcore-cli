@@ -42,7 +42,7 @@ describe("harness custom validation", () => {
     ).toBe(false);
   });
   // The pinned @aws/agentcore-cdk rejects additionalParams on every provider but lite_llm, and
-  // re-parses harness.json at synth — so accepting it here would defer the failure to
+  // re-parses harness.yaml at synth — so accepting it here would defer the failure to
   // `project build` instead of surfacing it at authoring time.
   it("accepts additional parameters only for the lite_llm provider", () => {
     expect(
