@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
-import { AgentCoreCLIError, DeserializationError } from "../../../errors";
+import { AgentCoreCLIError, DeserializationError, InputValidationError } from "../../../errors";
 import { createRootHandler } from "../../index";
 import {
   createSilentLogger,
@@ -69,6 +69,35 @@ async function inProjectWithHarness(
 }
 
 describe("project export harness handler", () => {
+  test.each(["maxIteration", "model.maxToken"])(
+    "rejects %s with the source file and field, without export side effects",
+    async (field) => {
+      const subject = testExportCommand();
+      const projectRoot = await inProjectWithHarness(subject);
+      const path = join(projectRoot, "app", "exportme", "harness.yaml");
+      const config = parse(await Bun.file(path).text());
+      if (field === "maxIteration") config.maxIteration = 3;
+      else config.model.maxToken = 512;
+      const yaml = "# Customer comment\n" + stringify(config);
+      await writeFile(path, yaml);
+      const specPath = join(projectRoot, "agentcore", "agentcore.json");
+      const before = await Bun.file(specPath).text();
+      const error = await subject
+        .run(["--name", "exportme", "--json"])
+        .catch(AgentCoreCLIError.fromError);
+      expect(error).toBeInstanceOf(InputValidationError);
+      expect(error).toMatchObject({ source: "user", exitCode: 1, cause: expect.any(Error) });
+      expect((error as Error).message).toContain(path);
+      for (const key of field.split(".")) expect((error as Error).message).toContain(key);
+      expect(existsSync(join(projectRoot, "app", "exportmeAgent"))).toBe(false);
+      expect(await Bun.file(specPath).text()).toBe(before);
+      expect(await Bun.file(path).text()).toBe(yaml);
+      expect(subject.core.projectCommands).not.toContainEqual(
+        expect.objectContaining({ command: ["uv", "sync"] }),
+      );
+    },
+  );
+
   test.each([
     "malformed YAML",
     "missing main",

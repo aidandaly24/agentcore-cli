@@ -51,6 +51,7 @@ export const HarnessModelSchema = z
     apiBase: z.string().min(1).max(MAX_LITE_LLM_API_BASE_LENGTH).optional(),
     additionalParams: z.record(z.string(), z.unknown()).optional(),
   })
+  .strict()
   .superRefine((model, ctx) => {
     if (model.topK !== undefined && model.provider !== "gemini") {
       ctx.addIssue({
@@ -501,6 +502,7 @@ export const HarnessSpecSchema = z
     connections: z.array(ConnectionSchema).optional(),
     tags: TagsSchema.optional(),
   })
+  .strict()
   .superRefine((data, ctx) => {
     if (data.containerUri !== undefined && data.dockerfile !== undefined) {
       ctx.addIssue({

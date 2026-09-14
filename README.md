@@ -212,6 +212,11 @@ harness directory. A literal `--system-prompt` is written to `system-prompt.md`.
 Skills are unchanged: skill paths refer to the **runtime/container filesystem**,
 not local files to package. Other fields do not support local includes.
 Malformed YAML, duplicate keys, and existing schema violations fail the read.
+Unknown fields at the harness root and directly inside `model` are rejected,
+not silently removed or corrected. Nested configurations keep their existing
+validation contracts; this is not a recursive unknown-field check. Free-form
+maps such as headers, tags, environment variables, `additionalParams`, and
+`inputSchema` still accept arbitrary keys.
 Build, deploy, and export do not rewrite harness YAML or remove its comments.
 `agentcore.json`, deployment targets, JSON CLI flags/output, and service payloads
 are unchanged.
@@ -234,7 +239,8 @@ CDK app already copied into your project**:
 3. Generate a separate reference project with the updated CLI:
    `agentcore project create --name HarnessYamlReference --template empty --skip-install --skip-git`.
    Compare its `agentcore/cdk/` with your project's copy. Port the YAML reader
-   (`io/harnessConfig.ts`) and the harness-loading changes in `bin/cdk.ts`; add
+   (`io/harnessConfig.ts`), schema composition (`lib/harness-schema.ts`), and
+   harness-loading changes in `bin/cdk.ts`; add
    the direct `yaml` dependency from `package.json` and the `io/**/*` include
    from `tsconfig.json`. Preserve your custom CDK code, especially
    `lib/cdk-stack.ts`. The reference app also includes a harness synthesis test.

@@ -33,6 +33,30 @@ async function run(args: string[], opts?: { core?: TestCoreClient }) {
 describe("project add harness", () => {
   const defaultModel = { provider: "bedrock", modelId: "global.anthropic.claude-sonnet-4-6" };
 
+  test("rejects a model typo as user input without scaffolding or registering a harness", async () => {
+    const { projectRoot, cleanup } = await initProject();
+    cleanups.push(cleanup);
+    const specPath = join(projectRoot, "agentcore", "agentcore.json");
+    const before = await Bun.file(specPath).text();
+    const error = await run([
+      "add",
+      "harness",
+      "--name",
+      "typo",
+      "--model",
+      JSON.stringify({ ...defaultModel, maxToken: 512 }),
+      "--system-prompt",
+      "file://./selected.md",
+      "--json",
+    ]).catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(InputValidationError);
+    expect(error).toMatchObject({ source: "user", exitCode: 1 });
+    expect((error as Error).message).toContain("model");
+    expect((error as Error).message).toContain("maxToken");
+    expect(existsSync(join(projectRoot, "app", "typo"))).toBe(false);
+    expect(await Bun.file(specPath).text()).toBe(before);
+  });
+
   test.each<[string, string[], Record<string, unknown>]>([
     ["minimal — name only", ["--name", "x"], { model: defaultModel }],
     [

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { AgentCoreStack, type HarnessConfig } from '../lib/cdk-stack';
-import { ConfigIO, HarnessSpecSchema, type AwsDeploymentTarget } from '@aws/agentcore-cdk';
+import { ConfigIO, type AwsDeploymentTarget } from '@aws/agentcore-cdk';
 import { App, type Environment } from 'aws-cdk-lib';
 import * as path from 'path';
 import * as fs from 'fs';
 import { HarnessConfigReader } from '../io/harnessConfig';
+import { HarnessSpecSchema } from '../lib/harness-schema';
 
 function toEnvironment(target: AwsDeploymentTarget): Environment {
   return {
