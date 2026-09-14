@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { stringify } from "yaml";
 import { HarnessConfigReader } from "./harnessConfig";
 import { HarnessConfigReader as CdkHarnessConfigReader } from "../assets/cdk/io/harnessConfig";
@@ -36,6 +38,55 @@ for (const [label, Reader] of [
   ["generated CDK", CdkHarnessConfigReader],
 ] as const) {
   describe(`${label} harness YAML reader`, () => {
+    test.skipIf(process.platform === "win32").each(["system", "summary", "fallback"] as const)(
+      "rejects a FIFO %s prompt in a bounded subprocess",
+      async (field) => {
+        const { directory, path } = await fixture(
+          field === "system"
+            ? { systemPrompt: "file://./pipe" }
+            : field === "summary"
+              ? {
+                  truncation: {
+                    strategy: "summarization",
+                    config: { summarization: { summarizationSystemPrompt: "file://./pipe" } },
+                  },
+                }
+              : {},
+        );
+        const fifo = join(directory, field === "fallback" ? "system-prompt.md" : "pipe");
+        const setup = spawnSync("mkfifo", [fifo], { timeout: 2000, encoding: "utf8" });
+        expect(setup.error).toBeUndefined();
+        expect(setup.status).toBe(0);
+        const readerPath = fileURLToPath(
+          new URL(
+            label === "CLI" ? "./harnessConfig.ts" : "../assets/cdk/io/harnessConfig.ts",
+            import.meta.url,
+          ),
+        );
+        const result = spawnSync(
+          process.execPath,
+          [
+            "--eval",
+            `
+          import { HarnessConfigReader } from ${JSON.stringify(readerPath)};
+          try {
+            await new HarnessConfigReader().read(${JSON.stringify(path)});
+            process.exitCode = 2;
+          } catch (error) {
+            console.error(error.message);
+            process.exitCode = 1;
+          }
+        `,
+          ],
+          { timeout: 2000, killSignal: "SIGKILL", encoding: "utf8" },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain("not a regular prompt file");
+        expect(result.stderr).toContain(fifo);
+      },
+    );
+
     test.each(["system", "summary"] as const)(
       "resolves only the %s prompt field from a YAML-relative path",
       async (field) => {

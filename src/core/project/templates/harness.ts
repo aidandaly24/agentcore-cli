@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { ZodError, z } from "zod";
 import { HarnessSpecSchema } from "../../../projectSchemas/harness";
+import { HarnessAuthoringSchema } from "../../../projectSchemas/harness-authoring";
 import { FsTreeNode } from "./fsTree";
 import { InputValidationError, ResourceNotFoundError } from "../../../errors/errors";
 import type { TemplateResolver } from "./types";
@@ -14,12 +15,12 @@ export function getHarnessTemplateResolver(): TemplateResolver<z.input<typeof Ha
     async resolve(spec) {
       validateHarnessTemplateSource(spec);
 
-      const { systemPrompt, ...rest } = spec;
       const parsed = parseHarnessSpec({
-        ...rest,
+        ...spec,
         memory: spec.memory === undefined ? { mode: "managed" } : spec.memory,
         dockerfile: spec.dockerfile ? "Dockerfile" : undefined,
       });
+      const systemPrompt = parsed.systemPrompt;
       const promptReference = systemPrompt?.startsWith("file://")
         ? systemPrompt
         : "file://./system-prompt.md";
@@ -54,7 +55,7 @@ export function validateHarnessTemplateSource(spec: z.input<typeof HarnessSpecSc
 
 function parseHarnessSpec(spec: z.input<typeof HarnessSpecSchema>) {
   try {
-    return HarnessSpecSchema.parse(spec);
+    return HarnessAuthoringSchema.parse(spec);
   } catch (err) {
     if (err instanceof ZodError) throw new InputValidationError(z.prettifyError(err));
     throw err;

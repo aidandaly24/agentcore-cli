@@ -204,6 +204,11 @@ must be readable, nonempty UTF-8 text of at most **1 MiB each**; whitespace-only
 files are rejected. Inline text and file contents preserve their whitespace.
 File contents are not interpreted as further references.
 
+`project add harness --system-prompt file://./selected.md` preserves that
+reference in the generated YAML. Scaffolding validates reference syntax without
+reading or copying the selected file; build and export resolve it from the new
+harness directory. A literal `--system-prompt` is written to `system-prompt.md`.
+
 Skills are unchanged: skill paths refer to the **runtime/container filesystem**,
 not local files to package. Other fields do not support local includes.
 Malformed YAML, duplicate keys, and existing schema violations fail the read.

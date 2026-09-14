@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { parse, stringify } from "yaml";
+import { AgentCoreCLIError, DeserializationError } from "../../../errors";
 import { createRootHandler } from "../../index";
 import {
   createSilentLogger,
@@ -66,6 +69,55 @@ async function inProjectWithHarness(
 }
 
 describe("project export harness handler", () => {
+  test.each([
+    "malformed YAML",
+    "missing main",
+    "missing summary",
+    "empty main",
+    "directory",
+    "invalid UTF-8",
+  ] as const)(
+    "classifies %s as customer configuration through the CLI boundary",
+    async (failure) => {
+      const subject = testExportCommand();
+      const projectRoot = await inProjectWithHarness(subject);
+      const directory = join(projectRoot, "app", "exportme");
+      const path = join(directory, "harness.yaml");
+      const config = parse(await Bun.file(path).text());
+      let field = "systemPrompt";
+      if (failure === "missing summary") {
+        field = "truncation.config.summarization.summarizationSystemPrompt";
+        config.truncation = {
+          strategy: "summarization",
+          config: { summarization: { summarizationSystemPrompt: "file://./missing.md" } },
+        };
+      } else {
+        config.systemPrompt = "file://./selected.md";
+      }
+      if (failure === "empty main") await writeFile(join(directory, "selected.md"), " \n");
+      if (failure === "invalid UTF-8")
+        await writeFile(join(directory, "selected.md"), Buffer.from([0xff]));
+      if (failure === "directory") await mkdir(join(directory, "selected.md"));
+      await writeFile(path, failure === "malformed YAML" ? "name: [" : stringify(config));
+      const specPath = join(projectRoot, "agentcore", "agentcore.json");
+      const before = await Bun.file(specPath).text();
+      const error = await subject
+        .run(["--name", "exportme", "--json"])
+        .catch(AgentCoreCLIError.fromError);
+      expect(error).toBeInstanceOf(DeserializationError);
+      expect(error).toMatchObject({
+        source: "user",
+        exitCode: 1,
+        name: "DeserializationError",
+        cause: expect.any(Error),
+      });
+      expect((error as Error).message).toContain(path);
+      if (failure !== "malformed YAML") expect((error as Error).message).toContain(field);
+      expect(existsSync(join(projectRoot, "app", "exportmeAgent"))).toBe(false);
+      expect(await Bun.file(specPath).text()).toBe(before);
+    },
+  );
+
   test("requires exactly one of --name and --arn", async () => {
     const subject = testExportCommand();
     await inProjectWithHarness(subject);

@@ -147,3 +147,10 @@ test("preserves a supplied explicit prompt reference", async () => {
 test("defaults only absent memory and does not mask an invalid supplied setting", async () => {
   await expect(scaffold({ memory: null })).rejects.toThrow();
 });
+
+test.each(["file://", "", " \n", "./legacy.md"])(
+  "shared project scaffolding rejects invalid authoring prompt %j",
+  async (systemPrompt) => {
+    await expect(scaffold({ systemPrompt })).rejects.toThrow();
+  },
+);

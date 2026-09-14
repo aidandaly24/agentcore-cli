@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
+import { HarnessConfigReader } from "../../../../io/harnessConfig";
+import { HarnessSpecSchema } from "../../../../projectSchemas/harness";
 import { createRootHandler } from "../../../index";
 import {
   createSilentLogger,
@@ -440,6 +442,37 @@ describe("project add harness", () => {
     expect(harnessYaml.tools).toBeUndefined();
     expect(harnessYaml.skills).toBeUndefined();
     expect(existsSync(join(projectRoot, "app", "x", "harness.json"))).toBe(false);
+  });
+
+  test.each(["selected.md", "selected.txt", "selected", "chosen #100%.md"])(
+    "preserves the %s authoring reference relative to the resulting YAML directory",
+    async (filename) => {
+      const { projectRoot, cleanup } = await initProject();
+      cleanups.push(cleanup);
+      const reference = `file://./${filename}`;
+      await Bun.write(join(projectRoot, filename), "Caller CWD decoy.");
+      await run(["add", "harness", "--name", "Reference", "--system-prompt", reference]);
+      const directory = join(projectRoot, "app", "Reference");
+      const path = join(directory, "harness.yaml");
+      expect(parse(await Bun.file(path).text()).systemPrompt).toBe(reference);
+      expect(await Bun.file(join(directory, "system-prompt.md")).text()).toBe(
+        "You are a helpful assistant",
+      );
+      await expect(new HarnessConfigReader().read(path)).rejects.toThrow(filename);
+      await Bun.write(join(directory, filename), "  YAML-relative contents.\r\n");
+      expect(HarnessSpecSchema.parse(await new HarnessConfigReader().read(path)).systemPrompt).toBe(
+        "  YAML-relative contents.\r\n",
+      );
+    },
+  );
+
+  test("rejects an empty project authoring reference before writing files", async () => {
+    const { projectRoot, cleanup } = await initProject();
+    cleanups.push(cleanup);
+    await expect(
+      run(["add", "harness", "--name", "EmptyReference", "--system-prompt", "file://"]),
+    ).rejects.toThrow(/systemPrompt.*file:\/\/ requires a path/s);
+    expect(existsSync(join(projectRoot, "app", "EmptyReference"))).toBe(false);
   });
 
   test("--dockerfile copies the file into the harness directory and stores the relative path", async () => {
