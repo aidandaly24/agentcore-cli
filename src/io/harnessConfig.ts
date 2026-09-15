@@ -75,7 +75,9 @@ export class HarnessConfigReader {
         if (length > MAX_PROMPT_FILE_SIZE) {
           throw new Error(`${field}: prompt file '${filePath}' exceeds the 1 MiB limit`);
         }
-        const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(0, length));
+        const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+          bytes.subarray(0, length),
+        );
         if (!text.trim())
           throw new Error(`${field}: prompt file '${filePath}' is empty or whitespace-only`);
         return text;

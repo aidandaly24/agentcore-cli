@@ -129,6 +129,36 @@ for (const [label, Reader] of [
       },
     );
 
+    test.each(["system", "summary", "fallback"] as const)(
+      "preserves the UTF-8 BOM and CRLF in the %s prompt",
+      async (field) => {
+        const { directory, path } = await fixture(
+          field === "system"
+            ? { systemPrompt: "file://./prompt.md" }
+            : field === "summary"
+              ? {
+                  truncation: {
+                    strategy: "summarization",
+                    config: { summarization: { summarizationSystemPrompt: "file://./prompt.md" } },
+                  },
+                }
+              : {},
+        );
+        await writeFile(
+          join(directory, field === "fallback" ? "system-prompt.md" : "prompt.md"),
+          "\uFEFFHi\r\n",
+        );
+        const data = HarnessSpecSchema.parse(await new Reader().read(path));
+        expect(
+          field === "summary"
+            ? data.truncation?.config &&
+                "summarization" in data.truncation.config &&
+                data.truncation.config.summarization.summarizationSystemPrompt
+            : data.systemPrompt,
+        ).toBe("\uFEFFHi\r\n");
+      },
+    );
+
     test("preserves inline prompts, including whitespace and YAML-special characters", async () => {
       const literal = '  "hello": #yes\n[one, two] * & %\n';
       const { directory, path } = await fixture({
@@ -202,6 +232,7 @@ for (const [label, Reader] of [
       "missing",
       "empty",
       "whitespace",
+      "BOM-only",
       "directory",
       "oversized",
       "invalid UTF-8",
@@ -218,7 +249,9 @@ for (const [label, Reader] of [
               ? Buffer.from([0xff])
               : condition === "whitespace"
                 ? " \r\n\t"
-                : "",
+                : condition === "BOM-only"
+                  ? "\uFEFF"
+                  : "",
         );
       for (const config of [
         { systemPrompt: "file://./prompt.md" },
