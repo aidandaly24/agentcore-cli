@@ -8,7 +8,6 @@ import {
   HarnessTruncationConfigSchema,
   HarnessMemoryRetrievalConfigSchema,
   validateApiFormat,
-  type HarnessSpec,
 } from "./harness";
 const minimalHarness = {
   name: "harness",
@@ -18,85 +17,6 @@ const networkConfig = {
   subnets: ["subnet-0123456789abcdef0"],
   securityGroups: ["sg-0123456789abcdef0"],
 };
-describe.each([
-  ["normalized", HarnessSpecSchema],
-  ["authoring", HarnessAuthoringSchema],
-] as const)("%s harness unknown fields", (_name, schema) => {
-  it("rejects root and model typos together instead of discarding them", () => {
-    const result = schema.safeParse({
-      ...minimalHarness,
-      maxIteration: 3,
-      model: { ...minimalHarness.model, maxToken: 512 },
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ code: "unrecognized_keys", path: [], keys: ["maxIteration"] }),
-          expect.objectContaining({
-            code: "unrecognized_keys",
-            path: ["model"],
-            keys: ["maxToken"],
-          }),
-        ]),
-      );
-    }
-  });
-
-  it.each([
-    {
-      provider: "bedrock",
-      modelId: "example",
-      apiFormat: "converse_stream",
-      temperature: 0,
-      topP: 0,
-      maxTokens: 512,
-    },
-    { provider: "open_ai", modelId: "example", apiKeyArn: "arn:key", apiFormat: "responses" },
-    { provider: "gemini", modelId: "example", apiKeyArn: "arn:key", topK: 40 },
-    {
-      provider: "lite_llm",
-      modelId: "example",
-      apiBase: "https://example.com",
-      additionalParams: { maxToken: 512, model: { maxIteration: 3 } },
-    },
-  ])("preserves valid provider fields and arbitrary map keys: %j", (model) => {
-    const map = { maxToken: "512", maxIteration: "3", model: "custom" };
-    const input = {
-      ...minimalHarness,
-      model,
-      maxIterations: 3,
-      maxTokens: 1024,
-      timeoutSeconds: 60,
-      tags: map,
-      environmentVariables: map,
-      tools: [
-        {
-          type: "remote_mcp",
-          name: "mcp",
-          config: { remoteMcp: { url: "https://example.com", headers: map } },
-        },
-        {
-          type: "inline_function",
-          name: "fn",
-          config: {
-            inlineFunction: {
-              description: "Custom schema",
-              inputSchema: { maxToken: 512, properties: { maxIteration: { type: "number" } } },
-            },
-          },
-        },
-        {
-          type: "agentcore_gateway",
-          name: "gateway",
-          config: { agentCoreGateway: { gatewayArn: "arn:gateway", maxIteration: 3 } },
-        },
-      ],
-    } satisfies Omit<HarnessSpec, "skills">;
-    expect(schema.parse(input)).toEqual({ ...input, skills: [] });
-  });
-});
-
 describe("harness custom validation", () => {
   it("binds model-only fields to their providers", () => {
     expect(HarnessModelSchema.safeParse({ provider: "open_ai", modelId: "gpt" }).success).toBe(

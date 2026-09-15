@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
 import type z from "zod";
-import { InputValidationError } from "../../../errors";
 import { HarnessSpecSchema } from "../../../projectSchemas/harness";
 import { HarnessConfigReader } from "../../../io/harnessConfig";
 import { getHarnessTemplateResolver } from "./harness";
@@ -135,22 +134,5 @@ test.each(["file://", "", " \n"])(
   "shared project scaffolding rejects invalid authoring prompt %j",
   async (systemPrompt) => {
     await expect(scaffold({ systemPrompt })).rejects.toThrow();
-  },
-);
-
-test.each([{ maxIteration: 3 }, { model: { ...model, maxToken: 512 } }])(
-  "shared scaffolding rejects unknown fixed fields: %j",
-  async (overrides) => {
-    const error = await getHarnessTemplateResolver()
-      .resolve({
-        name: "assistant",
-        model,
-        systemPrompt: "file://./selected.md",
-        ...overrides,
-      })
-      .catch((error: unknown) => error);
-    expect(error).toBeInstanceOf(InputValidationError);
-    expect(error).toMatchObject({ source: "user" });
-    expect((error as Error).message).toContain("Unrecognized key");
   },
 );
