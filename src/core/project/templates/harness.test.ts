@@ -40,7 +40,7 @@ test("actual scaffold includes semantic comments and inactive examples, without 
     memory: { mode: "managed" },
   });
   expect(yaml).not.toMatch(/^(tools|skills):/m);
-  expect(yaml).toContain("# Prompt file paths are relative to this YAML file.");
+  expect(yaml).toContain("# Inline prompt text or a file:// path relative to this YAML file.");
   expect(yaml).toContain(
     "# Output tokens per model call, rather than across the whole invocation.",
   );

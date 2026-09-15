@@ -72,7 +72,7 @@ export class HarnessYamlRenderer {
     const sections = [
       "# Optional settings are shown with example values.\n",
       stringify({ name: spec.name }),
-      this.comment("Prompt file paths are relative to this YAML file.") +
+      this.comment("Inline prompt text or a file:// path relative to this YAML file.") +
         stringify({ systemPrompt: spec.systemPrompt }),
       this.comment("Model") +
         stringify({ model: spec.model }) +
