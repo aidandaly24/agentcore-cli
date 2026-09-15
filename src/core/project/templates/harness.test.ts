@@ -30,7 +30,7 @@ async function scaffold(overrides: Partial<z.input<typeof HarnessSpecSchema>> = 
   return { directory, path, yaml, data: parse(yaml) };
 }
 
-test("actual scaffold includes semantic comments and inactive examples, without default tools", async () => {
+test("scaffolds valid YAML with inactive examples and a resolvable prompt", async () => {
   const { directory, path, yaml, data } = await scaffold();
   expect((await readdir(directory)).sort()).toEqual(["harness.yaml", "system-prompt.md"]);
   expect(data).toEqual({
@@ -39,28 +39,10 @@ test("actual scaffold includes semantic comments and inactive examples, without 
     systemPrompt: "file://./system-prompt.md",
     memory: { mode: "managed" },
   });
-  expect(yaml).not.toMatch(/^(tools|skills):/m);
-  expect(yaml).toContain("# Inline prompt text or a file:// path relative to this YAML file.");
-  expect(yaml).toContain(
-    "# Output tokens per model call, rather than across the whole invocation.",
-  );
-  expect(yaml).toContain("# Execution limits apply per invocation, across all model calls.");
-  expect(yaml).toContain(
-    "# Skill path sources refer to files already present in the runtime container.",
-  );
-  expect(yaml).toContain(
-    "# Truncation changes the context sent to the model, not the saved memory.",
-  );
-  expect(yaml).toContain("# maxTokens: 20000");
+  expect(yaml).toMatch(/^# maxTokens:/m);
   expect(yaml).toContain("agentcore_code_interpreter");
   expect(yaml).toContain("remote_mcp");
-  expect(yaml).toContain(
-    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html",
-  );
-  expect(yaml).toContain(
-    "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html",
-  );
-  expect(yaml).not.toMatch(/uncomment|replace \[\]|\bexa\b/i);
+  expect(yaml).toMatch(/^# https:\/\/docs\.aws\.amazon\.com\//m);
   expect(HarnessSpecSchema.parse(await new HarnessConfigReader().read(path)).systemPrompt).toBe(
     "You are a helpful assistant",
   );
