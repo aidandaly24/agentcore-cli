@@ -69,6 +69,26 @@ async function inProjectWithHarness(
 }
 
 describe("project export harness handler", () => {
+  test.each([
+    "README.md\n",
+    "./instructions.md",
+    "https://example.com/prompt.md\n",
+    "file://./not-a-recursive-include.md",
+  ])("exports prompt file contents %j as exact literal text", async (prompt) => {
+    const subject = testExportCommand();
+    const projectRoot = await inProjectWithHarness(subject);
+    const directory = join(projectRoot, "app", "exportme");
+    const path = join(directory, "harness.yaml");
+    const yaml = await Bun.file(path).text();
+    await writeFile(join(directory, "system-prompt.md"), prompt);
+    await subject.run(["--name", "exportme"]);
+    expect(await Bun.file(join(projectRoot, "app", "exportmeAgent", "main.py")).text()).toContain(
+      `DEFAULT_SYSTEM_PROMPT = """${prompt}"""`,
+    );
+    expect(await Bun.file(path).text()).toBe(yaml);
+    expect(await Bun.file(join(directory, "system-prompt.md")).text()).toBe(prompt);
+  });
+
   test.each(["maxIteration", "model.maxToken"])(
     "rejects %s with the source file and field, without export side effects",
     async (field) => {

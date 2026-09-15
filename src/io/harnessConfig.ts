@@ -15,21 +15,7 @@ export class HarnessConfigReader {
   async read(filePath: string): Promise<unknown> {
     const configPath = resolve(filePath);
     try {
-      let raw: string;
-      try {
-        raw = await readFile(configPath, "utf8");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          const obsoletePath = join(dirname(configPath), "harness.json");
-          if (await stat(obsoletePath).catch(() => undefined)) {
-            throw new Error(
-              `Obsolete harness.json at '${obsoletePath}'. Migrate it to harness.yaml and update ` +
-                "the copied agentcore/cdk app; see the README harness migration guide.",
-            );
-          }
-        }
-        throw error;
-      }
+      const raw = await readFile(configPath, "utf8");
       const document = parseDocument(raw);
       if (document.errors.length) throw document.errors[0];
       const data: unknown = document.toJS();

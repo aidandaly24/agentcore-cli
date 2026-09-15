@@ -7,7 +7,6 @@ import {
   HarnessToolSchema,
   HarnessTruncationConfigSchema,
   HarnessMemoryRetrievalConfigSchema,
-  looksLikeLegacyPromptPath,
   validateApiFormat,
   type HarnessSpec,
 } from "./harness";
@@ -236,15 +235,18 @@ describe("harness custom validation", () => {
       }).success,
     ).toBe(false);
   });
-  it("rejects legacy path-shaped and blank system prompts", () => {
-    expect(looksLikeLegacyPromptPath("./prompt.md")).toBe(true);
-    expect(looksLikeLegacyPromptPath("Use prompt.md when needed")).toBe(false);
-    expect(
-      HarnessSpecSchema.safeParse({ ...minimalHarness, systemPrompt: "./prompt.md" }).success,
-    ).toBe(false);
-    expect(HarnessSpecSchema.safeParse({ ...minimalHarness, systemPrompt: "   " }).success).toBe(
-      false,
-    );
+  it.each(["README.md\n", "./instructions.md", "../prompt.txt", "https://example.com/prompt.md"])(
+    "preserves %j as literal prompt text in normalized and authoring schemas",
+    (systemPrompt) => {
+      for (const schema of [HarnessSpecSchema, HarnessAuthoringSchema]) {
+        expect(schema.parse({ ...minimalHarness, systemPrompt }).systemPrompt).toBe(systemPrompt);
+      }
+    },
+  );
+  it.each(["", " \r\n\t"])("rejects blank system prompts: %j", (systemPrompt) => {
+    for (const schema of [HarnessSpecSchema, HarnessAuthoringSchema]) {
+      expect(schema.safeParse({ ...minimalHarness, systemPrompt }).success).toBe(false);
+    }
   });
   it("rejects duplicate tools and excessive environment variables", () => {
     expect(

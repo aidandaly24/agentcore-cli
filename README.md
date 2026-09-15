@@ -161,7 +161,8 @@ since the exported agent has no container filesystem to read them from.
 
 `project create` (without `--template`) and `project add harness` share the same
 scaffolding flow. Each harness has `app/<name>/harness.yaml` and
-`app/<name>/system-prompt.md`. The YAML contains the supplied settings and
+`app/<name>/system-prompt.md`. YAML is the harness configuration format.
+The YAML contains the supplied settings and
 commented optional examples. Tools are opt-in. Newly scaffolded harnesses
 explicitly use `memory: { mode: managed }` unless another memory configuration
 was supplied. Reading an existing file with no `memory` setting still means
@@ -203,6 +204,8 @@ omitted. A bad explicit reference never falls back silently. Referenced files
 must be readable, nonempty UTF-8 text of at most **1 MiB each**; whitespace-only
 files are rejected. Inline text and file contents preserve their whitespace.
 File contents are not interpreted as further references.
+Plain strings such as `README.md`, `./instructions.md`, and HTTPS URLs are
+literal prompt text, not file references.
 
 `project add harness --system-prompt file://./selected.md` preserves that
 reference in the generated YAML. Scaffolding validates reference syntax without
@@ -220,41 +223,6 @@ maps such as headers, tags, environment variables, `additionalParams`, and
 Build, deploy, and export do not rewrite harness YAML or remove its comments.
 `agentcore.json`, deployment targets, JSON CLI flags/output, and service payloads
 are unchanged.
-
-### Migrate Harness JSON
-
-On the `refactor` branch, `harness.yaml` replaces `harness.json`; the new reader
-does not fall back to the old filename. Migrate both the harness file **and the
-CDK app already copied into your project**:
-
-1. Commit or back up your project. Rename each `app/<name>/harness.json` to
-   `harness.yaml` and convert its object to YAML without changing its values.
-   JSON syntax is valid YAML, so the renamed file can retain its JSON syntax
-   while you reformat it. Keep string values quoted where needed, and preserve
-   omitted, disabled, or existing memory settings.
-2. Keep an inline `systemPrompt`, or set `systemPrompt: file://./system-prompt.md`
-   to select the conventional prompt explicitly. If both previously existed,
-   choose the intended prompt: explicit text now wins consistently for local
-   export and CDK. Bare paths such as `./prompt.md` are not references.
-3. Generate a separate reference project with the updated CLI:
-   `agentcore project create --name HarnessYamlReference --template empty --skip-install --skip-git`.
-   Compare its `agentcore/cdk/` with your project's copy. Port the YAML reader
-   (`io/harnessConfig.ts`), schema composition (`lib/harness-schema.ts`), and
-   harness-loading changes in `bin/cdk.ts`; add
-   the direct `yaml` dependency from `package.json` and the `io/**/*` include
-   from `tsconfig.json`. Preserve your custom CDK code, especially
-   `lib/cdk-stack.ts`. The reference app also includes a harness synthesis test.
-4. Reinstall dependencies in your project's `agentcore/cdk/`, compile it, and
-   run `agentcore project build` from the project root before deploying.
-   This does not require a newer `@aws/agentcore-cdk` release.
-
-Upgrading the CLI does **not** overwrite a project's copied CDK app.
-`project add harness` in an older project produces YAML but likewise does not
-upgrade that app; complete step 3 before building or deploying the new harness.
-An old app may still report a missing `harness.json` after the rename. That
-means its reader needs migrating, not that the YAML should be renamed back.
-The updated reader reports an obsolete-JSON error when only `harness.json`
-exists. Neither path silently renames files or enables memory in existing ones.
 
 Global flags (declared at the root, available on every command):
 

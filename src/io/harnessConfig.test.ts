@@ -272,15 +272,16 @@ for (const [label, Reader] of [
       expect(data.other).toEqual({ summarizationSystemPrompt: "file://./prompt.md" });
     });
 
-    test("diagnoses obsolete JSON without reading or renaming it", async () => {
+    test.each([false, true])("reports missing YAML with nearby JSON=%s", async (nearbyJson) => {
       const { directory, path } = await fixture({});
       await rm(path);
       const json = join(directory, "harness.json");
-      await writeFile(json, "{}");
-      await expect(new Reader().read(path)).rejects.toThrow(
-        /Obsolete harness.json.*Migrate.*copied agentcore\/cdk/s,
-      );
-      expect(await readFile(json, "utf8")).toBe("{}");
+      if (nearbyJson) await writeFile(json, "not valid JSON");
+      const error = await new Reader().read(path).catch((error: Error) => error);
+      expect(error).toMatchObject({ cause: expect.objectContaining({ code: "ENOENT", path }) });
+      expect((error as Error).message).toContain("harness.yaml");
+      expect((error as Error).message).not.toContain("harness.json");
+      if (nearbyJson) expect(await readFile(json, "utf8")).toBe("not valid JSON");
     });
 
     test("does not fall back after an explicit reference fails", async () => {

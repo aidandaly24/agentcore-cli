@@ -149,7 +149,7 @@ test("defaults only absent memory and does not mask an invalid supplied setting"
   await expect(scaffold({ memory: null })).rejects.toThrow();
 });
 
-test.each(["file://", "", " \n", "./legacy.md"])(
+test.each(["file://", "", " \n"])(
   "shared project scaffolding rejects invalid authoring prompt %j",
   async (systemPrompt) => {
     await expect(scaffold({ systemPrompt })).rejects.toThrow();

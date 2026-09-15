@@ -46,6 +46,8 @@ test.each([
   { authorizerType: 'CUSTOM_JWT' },
   { containerUri: '123456789012.dkr.ecr.us-east-1.amazonaws.com/repo:tag', dockerfile: 'Dockerfile' },
   { tools: [{ type: 'agentcore_browser', name: 'same' }, { type: 'agentcore_browser', name: 'same' }] },
+  { systemPrompt: '' },
+  { systemPrompt: ' \r\n\t' },
 ])('retains published refinements for %j', (overrides) => {
   expect(HarnessSpecSchema.safeParse({
     name: 'assistant',
@@ -54,7 +56,16 @@ test.each([
   }).success).toBe(false);
 });
 
-test.each(['literal', 'file', 'fallback', 'maxIteration', 'model.maxToken'])('generated app validates %s configuration without rewriting it', (source) => {
+test.each([
+  ...['literal', 'file', 'fallback', 'maxIteration', 'model.maxToken'].map(source => ({
+    source, prompt: '  Selected prompt: # 100%\n',
+  })),
+  ...['README.md\n', './instructions.md', 'https://example.com/prompt.md\n', 'file://./not-a-recursive-include.md'].map(prompt => ({
+    source: 'file', prompt,
+  })),
+  { source: 'literal', prompt: './instructions.md' },
+  { source: 'fallback', prompt: 'README.md\n' },
+])('generated app validates $source prompt $prompt without rewriting it', ({ source, prompt }) => {
   const root = mkdtempSync(join(tmpdir(), 'harness-yaml-synth-'));
   roots.push(root);
   const configRoot = join(root, 'agentcore');
@@ -69,7 +80,6 @@ test.each(['literal', 'file', 'fallback', 'maxIteration', 'model.maxToken'])('ge
     harnesses: [{ name: 'assistant', path: 'app/assistant' }],
   }));
   writeFileSync(join(configRoot, 'aws-targets.json'), '[]');
-  const prompt = '  Selected prompt: # 100%\n';
   const summary = 'Keep decisions and open questions.\n';
   writeFileSync(join(harnessDir, 'chosen #100%.md'), prompt);
   writeFileSync(join(harnessDir, 'system-prompt.md'), source === 'fallback' ? prompt : 'Conventional prompt loses.');
@@ -113,6 +123,8 @@ test.each(['literal', 'file', 'fallback', 'maxIteration', 'model.maxToken'])('ge
   expect(harness.Properties.SystemPrompt).toEqual([{ Text: prompt }]);
   expect(harness.Properties.Memory).toEqual({ Disabled: {} });
   expect(JSON.stringify(harness.Properties)).toContain(JSON.stringify(summary).slice(1, -1));
-  expect(JSON.stringify(harness.Properties)).not.toContain('file://');
+  expect(JSON.stringify(harness.Properties)).not.toContain('file://./chosen #100%.md');
+  expect(JSON.stringify(harness.Properties)).not.toContain('file://./summary.md');
+  expect(readFileSync(join(harnessDir, 'chosen #100%.md'), 'utf8')).toBe(prompt);
   expect(readFileSync(join(harnessDir, 'harness.yaml'), 'utf8')).toBe(yaml);
 });
