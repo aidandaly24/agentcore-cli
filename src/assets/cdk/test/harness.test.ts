@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { stringify } from 'yaml';
-import { HarnessSpecSchema } from '../lib/harness-schema';
+import { HarnessSpecSchema } from '@aws/agentcore-cdk';
 
 const entrypoint = resolve(__dirname, '..', 'dist/bin/cdk.js');
 const roots: string[] = [];
@@ -15,7 +15,7 @@ afterEach(() => {
 test.each([
   { systemPrompt: '' },
   { systemPrompt: ' \r\n\t' },
-])('retains published refinements for %j', (overrides) => {
+])('rejects blank system prompts: %j', (overrides) => {
   expect(HarnessSpecSchema.safeParse({
     name: 'assistant',
     model: { provider: 'bedrock', modelId: 'example' },

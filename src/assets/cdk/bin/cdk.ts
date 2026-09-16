@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 import { AgentCoreStack, type HarnessConfig } from '../lib/cdk-stack';
-import { ConfigIO, type AwsDeploymentTarget } from '@aws/agentcore-cdk';
+import { ConfigIO, HarnessSpecSchema, type AwsDeploymentTarget } from '@aws/agentcore-cdk';
 import { App, type Environment } from 'aws-cdk-lib';
 import * as path from 'path';
 import * as fs from 'fs';
 import { HarnessConfigReader } from '../io/harnessConfig';
-import { HarnessSpecSchema } from '../lib/harness-schema';
 
 function toEnvironment(target: AwsDeploymentTarget): Environment {
   return {
@@ -74,8 +73,9 @@ async function resolveHarnessConfigs(spec: SpecWithLatestFields, projectRoot: st
   for (const entry of spec.harnesses ?? []) {
     const harnessDir = path.resolve(projectRoot, entry.path);
     const harnessPath = path.resolve(harnessDir, 'harness.yaml');
+    const data = await new HarnessConfigReader().read(harnessPath);
     try {
-      const harnessSpec = HarnessSpecSchema.parse(await new HarnessConfigReader().read(harnessPath));
+      const harnessSpec = HarnessSpecSchema.parse(data);
       harnessConfigs.push({
         name: entry.name,
         executionRoleArn: harnessSpec.executionRoleArn,
@@ -98,7 +98,8 @@ async function resolveHarnessConfigs(spec: SpecWithLatestFields, projectRoot: st
       });
     } catch (err) {
       throw new Error(
-        `Could not read harness.yaml for "${entry.name}" at ${harnessPath}: ${err instanceof Error ? err.message : err}`
+        `Invalid harness configuration for "${entry.name}" at ${harnessPath}: ${err instanceof Error ? err.message : err}`,
+        { cause: err }
       );
     }
   }

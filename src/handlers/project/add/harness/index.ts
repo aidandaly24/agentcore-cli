@@ -4,7 +4,7 @@ import type { AddProjectResourceConfig } from "../types";
 import { addProjectResource } from "../shared";
 import { parseJsonFlag, parseTags } from "../../../utils";
 import { InputValidationError } from "../../../../errors";
-import { HarnessAuthoringSchema } from "../../../../projectSchemas/harness-authoring";
+import { HarnessAuthoringSchema } from "../../../../projectSchemas/harness";
 
 /** The model a harness runs on when none is configured; `project create`'s
  * harness path shares it so the two entry points cannot drift. */

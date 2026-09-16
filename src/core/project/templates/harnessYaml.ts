@@ -23,21 +23,6 @@ const TOOL_EXAMPLES = [
 
 const OPTIONAL_SECTIONS = [
   {
-    comment:
-      "Tool patterns: @<server-name>/<tool-name> or @builtin.\nThis controls agent tool selection, not IAM permissions.",
-    values: { allowedTools: ["@builtin", "@research/search"] },
-  },
-  {
-    comment: "Skill path sources refer to files already present in the runtime container.",
-    values: {
-      skills: [
-        { s3Uri: "s3://your-skills-bucket/skills/research/" },
-        { gitUrl: "https://github.com/your-org/agent-skills.git", path: "skills/research" },
-        { path: "/opt/skills/research" },
-      ],
-    },
-  },
-  {
     comment: "Execution limits apply per invocation, across all model calls.",
     values: { maxIterations: 15, maxTokens: 20000, timeoutSeconds: 300 },
   },
@@ -88,20 +73,49 @@ export class HarnessYamlRenderer {
         (spec.tools.length
           ? stringify({ tools: spec.tools })
           : this.comment(stringify({ tools: TOOL_EXAMPLES }).trimEnd())),
+      this.comment(
+        "Tool patterns: @<server-name>/<tool-name> or @builtin.\nThis controls agent tool selection, not IAM permissions.",
+      ) +
+        (spec.allowedTools === undefined
+          ? this.comment(stringify({ allowedTools: ["@builtin", "@research/search"] }).trimEnd())
+          : stringify({ allowedTools: spec.allowedTools })),
+      this.comment("Skill path sources refer to files already present in the runtime container.") +
+        (spec.skills.length
+          ? stringify({ skills: spec.skills })
+          : this.comment(
+              stringify({
+                skills: [
+                  { s3Uri: "s3://your-skills-bucket/skills/research/" },
+                  {
+                    gitUrl: "https://github.com/your-org/agent-skills.git",
+                    path: "skills/research",
+                  },
+                  { path: "/opt/skills/research" },
+                ],
+              }).trimEnd(),
+            )),
+      this.memory(spec.memory),
     ];
-    const rendered = new Set(["name", "systemPrompt", "model", "tools", "memory"]);
+    const rendered = new Set([
+      "name",
+      "systemPrompt",
+      "model",
+      "tools",
+      "allowedTools",
+      "skills",
+      "memory",
+    ]);
     for (const section of OPTIONAL_SECTIONS) {
       let body = this.comment(section.comment);
       for (const [key, example] of Object.entries(section.values)) {
         rendered.add(key);
         const value = spec[key as keyof HarnessSpec];
         body +=
-          value === undefined || (key === "skills" && Array.isArray(value) && value.length === 0)
+          value === undefined
             ? this.comment(stringify({ [key]: example }).trimEnd())
             : stringify({ [key]: value });
       }
       sections.push(body);
-      if ("skills" in section.values) sections.push(this.memory(spec.memory));
     }
     for (const [key, value] of Object.entries(spec)) {
       if (!rendered.has(key) && value !== undefined) sections.push(stringify({ [key]: value }));

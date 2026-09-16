@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 import { ZodError, z } from "zod";
-import { HarnessSpecSchema } from "../../../projectSchemas/harness";
-import { HarnessAuthoringSchema } from "../../../projectSchemas/harness-authoring";
+import { HarnessAuthoringSchema, HarnessSpecSchema } from "../../../projectSchemas/harness";
 import { FsTreeNode } from "./fsTree";
 import { InputValidationError, ResourceNotFoundError } from "../../../errors/errors";
 import type { TemplateResolver } from "./types";

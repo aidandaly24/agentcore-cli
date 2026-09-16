@@ -263,8 +263,18 @@ for (const [label, Reader] of [
         },
       ]) {
         await writeFile(path, stringify({ name: "assistant", model, ...config }));
-        await expect(new Reader().read(path)).rejects.toThrow();
-        await expect(new Reader().read(path)).rejects.toThrow(path);
+        const error = await new Reader().read(path).catch((error: unknown) => error);
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).cause).toBeInstanceOf(Error);
+        const field =
+          "systemPrompt" in config
+            ? "systemPrompt"
+            : "truncation.config.summarization.summarizationSystemPrompt";
+        const message = (error as Error).message;
+        expect(message.split(path)).toHaveLength(2);
+        expect(message.split(field)).toHaveLength(2);
+        expect(message).toContain(promptPath);
+        if (condition !== "missing") expect(message.split(promptPath)).toHaveLength(2);
       }
     });
 

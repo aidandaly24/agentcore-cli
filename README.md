@@ -215,9 +215,9 @@ harness directory. A literal `--system-prompt` is written to `system-prompt.md`.
 Skills are unchanged: skill paths refer to the **runtime/container filesystem**,
 not local files to package. Other fields do not support local includes.
 Malformed YAML, duplicate keys, and existing schema violations fail the read.
-Unknown fields at the harness root and directly inside `model` are rejected,
-not silently removed or corrected. Nested configurations keep their existing
-validation contracts; this is not a recursive unknown-field check. Free-form
+Unknown fields at the harness root and directly inside `model` are stripped
+from the parsed configuration. Nested configurations keep their existing
+validation contracts. Free-form
 maps such as headers, tags, environment variables, `additionalParams`, and
 `inputSchema` still accept arbitrary keys.
 Build, deploy, and export do not rewrite harness YAML or remove its comments.

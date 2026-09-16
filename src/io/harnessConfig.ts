@@ -58,13 +58,12 @@ export class HarnessConfigReader {
   private async readPrompt(filePath: string, field: string): Promise<string> {
     try {
       const info = await stat(filePath);
-      if (!info.isFile()) throw new Error(`${field}: '${filePath}' is not a regular prompt file`);
+      if (!info.isFile()) throw new Error("not a regular prompt file");
       // A path can change after stat; nonblocking POSIX opens avoid waiting on a replacement FIFO.
       const flags = constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NONBLOCK);
       const file = await open(filePath, flags);
       try {
-        if (!(await file.stat()).isFile())
-          throw new Error(`${field}: '${filePath}' is not a regular prompt file`);
+        if (!(await file.stat()).isFile()) throw new Error("not a regular prompt file");
         const bytes = Buffer.alloc(MAX_PROMPT_FILE_SIZE + 1);
         let length = 0;
         while (length < bytes.length) {
@@ -73,13 +72,12 @@ export class HarnessConfigReader {
           length += bytesRead;
         }
         if (length > MAX_PROMPT_FILE_SIZE) {
-          throw new Error(`${field}: prompt file '${filePath}' exceeds the 1 MiB limit`);
+          throw new Error("exceeds the 1 MiB limit");
         }
         const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
           bytes.subarray(0, length),
         );
-        if (!text.trim())
-          throw new Error(`${field}: prompt file '${filePath}' is empty or whitespace-only`);
+        if (!text.trim()) throw new Error("empty or whitespace-only");
         return text;
       } finally {
         await file.close();

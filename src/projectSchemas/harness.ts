@@ -51,7 +51,6 @@ export const HarnessModelSchema = z
     apiBase: z.string().min(1).max(MAX_LITE_LLM_API_BASE_LENGTH).optional(),
     additionalParams: z.record(z.string(), z.unknown()).optional(),
   })
-  .strict()
   .superRefine((model, ctx) => {
     if (model.topK !== undefined && model.provider !== "gemini") {
       ctx.addIssue({
@@ -493,7 +492,6 @@ export const HarnessSpecSchema = z
     connections: z.array(ConnectionSchema).optional(),
     tags: TagsSchema.optional(),
   })
-  .strict()
   .superRefine((data, ctx) => {
     if (data.containerUri !== undefined && data.dockerfile !== undefined) {
       ctx.addIssue({
@@ -577,6 +575,13 @@ export const HarnessSpecSchema = z
     }
   });
 export type HarnessSpec = z.infer<typeof HarnessSpecSchema>;
+
+/** Scaffold references name future YAML-relative files; validate syntax without reading them. */
+export const HarnessAuthoringSchema = HarnessSpecSchema.refine(
+  ({ systemPrompt }) => systemPrompt !== "file://",
+  { path: ["systemPrompt"], message: "systemPrompt: file:// requires a path" },
+);
+
 export const HarnessRegistryEntrySchema = z.object({
   name: HarnessNameSchema,
   path: z.string().min(1, "Path to harness config directory is required"),

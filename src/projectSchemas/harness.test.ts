@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { HarnessAuthoringSchema } from "./harness-authoring";
 import {
+  HarnessAuthoringSchema,
   HarnessMemoryRefSchema,
   HarnessModelSchema,
   HarnessSpecSchema,
