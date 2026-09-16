@@ -466,13 +466,28 @@ describe("project add harness", () => {
     },
   );
 
-  test("rejects an empty project authoring reference before writing files", async () => {
+  test.each<[string, string[]]>([
+    ["systemPrompt", ["--system-prompt", "file://"]],
+    [
+      "summarizationSystemPrompt",
+      [
+        "--truncation",
+        JSON.stringify({
+          strategy: "summarization",
+          config: { summarization: { summarizationSystemPrompt: "file://" } },
+        }),
+      ],
+    ],
+  ])("rejects empty %s references before writing files", async (field, flags) => {
     const { projectRoot, cleanup } = await initProject();
     cleanups.push(cleanup);
-    await expect(
-      run(["add", "harness", "--name", "EmptyReference", "--system-prompt", "file://"]),
-    ).rejects.toThrow(/systemPrompt.*file:\/\/ requires a path/s);
+    const projectSpec = Bun.file(join(projectRoot, "agentcore", "agentcore.json"));
+    const originalSpec = await projectSpec.text();
+    await expect(run(["add", "harness", "--name", "EmptyReference", ...flags])).rejects.toThrow(
+      `${field}: file:// requires a path`,
+    );
     expect(existsSync(join(projectRoot, "app", "EmptyReference"))).toBe(false);
+    expect(await projectSpec.text()).toBe(originalSpec);
   });
 
   test("--dockerfile copies the file into the harness directory and stores the relative path", async () => {

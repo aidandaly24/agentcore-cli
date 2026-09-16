@@ -580,6 +580,15 @@ export type HarnessSpec = z.infer<typeof HarnessSpecSchema>;
 export const HarnessAuthoringSchema = HarnessSpecSchema.refine(
   ({ systemPrompt }) => systemPrompt !== "file://",
   { path: ["systemPrompt"], message: "systemPrompt: file:// requires a path" },
+).refine(
+  ({ truncation }) =>
+    !truncation?.config ||
+    !("summarization" in truncation.config) ||
+    truncation.config.summarization.summarizationSystemPrompt !== "file://",
+  {
+    path: ["truncation", "config", "summarization", "summarizationSystemPrompt"],
+    message: "summarizationSystemPrompt: file:// requires a path",
+  },
 );
 
 export const HarnessRegistryEntrySchema = z.object({
