@@ -1,5 +1,6 @@
 import type z from "zod";
 import type { Context, ContextKey } from "./context";
+import type { Middleware } from "./middleware";
 
 // Flag is generic over its literal name `N` and its inferred value type `T`, so a
 // tuple of flags can be mapped to a typed object at the authoring boundary (see
@@ -110,6 +111,7 @@ type CreateHandlerInput<
   arguments?: A;
   handle?: HandleFn<F, A>;
   children?: Handler[];
+  middlewares?: Middleware[];
 };
 
 const noOpHandler = async (_ctx: Context, _flags: any, _args: any): Promise<void> => {};
@@ -121,6 +123,7 @@ class BaseHandler implements Handler {
   _arguments: Argument[];
   _handle: HandleFn<any, any>;
   _children: Handler[];
+  _middlewares: Middleware[];
 
   constructor(
     input: CreateHandlerInput<readonly Flag<string, any>[], readonly Argument<string, any>[]>,
@@ -131,6 +134,7 @@ class BaseHandler implements Handler {
     this._arguments = (input.arguments ?? []) as Argument[];
     this._handle = (input.handle ?? noOpHandler) as HandleFn<any, any>;
     this._children = input.children ?? [];
+    this._middlewares = input.middlewares ?? [];
   }
 
   name(): string {
@@ -159,6 +163,10 @@ class BaseHandler implements Handler {
 
   children(): Handler[] {
     return this._children;
+  }
+
+  middlewares(): Middleware[] {
+    return this._middlewares;
   }
 }
 

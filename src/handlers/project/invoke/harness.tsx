@@ -3,11 +3,11 @@ import { InputValidationError } from "../../../errors";
 import type { AppIO } from "../../../io";
 import { createHandler, flag, ProjectKey } from "../../../router";
 import { JsonRendererKey, renderTuiAt } from "../../../tui";
-import { JsonKey, RegionKey } from "../../keys";
+import { AwsCredentialProviderKey, JsonKey, RegionKey } from "../../keys";
 import { invokeHarnessTurn } from "../../harness/invoke/operation";
 import type { Core } from "../../types";
 import { coreOptsFromCtx } from "../../utils";
-import { selectProjectResource } from "./selection";
+import { selectProjectResource } from "../selection";
 
 export const createProjectInvokeHarnessHandler = (
   core: Core,
@@ -34,13 +34,15 @@ export const createProjectInvokeHarnessHandler = (
     ],
     handle: async (ctx, flags) => {
       const project = ctx.require(ProjectKey);
-      const name = selectProjectResource(project, "harness", flags.name);
+      const name = selectProjectResource(project, "harness", flags.name, "invoke");
       const deployed = await core.projectManager.resolveDeployedResource(project, {
         target: flags.target,
         resourceType: "harness",
         name,
       });
-      const invokeCtx = ctx.withValue(RegionKey, deployed.target.region);
+      const invokeCtx = ctx
+        .withValue(RegionKey, deployed.target.region)
+        .withValue(AwsCredentialProviderKey, deployed.credentialProvider);
 
       if (!flags.prompt) {
         if (invokeCtx.require(JsonKey)) {

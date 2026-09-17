@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline/promises";
-import { argument, createHandler, flag, ProjectKey } from "../../../router";
+import { argument, createHandler, flag, ProjectKey, type Middleware } from "../../../router";
 import { InputValidationError, UserCancellationError } from "../../../errors";
 import z from "zod";
 import type { AppIO } from "../../../io";
@@ -12,12 +12,14 @@ import { projectMutationResource, projectReference, type ProjectMutationResult }
 type RemoveProjectResourceConfig = {
   projectManager: ProjectManager;
   io: AppIO;
+  middlewares?: Middleware[];
 };
 
 export const createRemoveProjectHandler = (config: RemoveProjectResourceConfig) =>
   createHandler({
     name: "remove",
     description: "remove a resource from the project",
+    middlewares: config.middlewares,
     flags: [
       flag("name", "name of the resource to remove", z.string().min(1).optional()),
       flag("gateway", "name of the parent Gateway for a Target", z.string().min(1).optional()),
@@ -25,6 +27,11 @@ export const createRemoveProjectHandler = (config: RemoveProjectResourceConfig) 
       flag(
         "manager",
         "name of the parent payment manager for a connector",
+        z.string().min(1).optional(),
+      ),
+      flag(
+        "runtime",
+        "name of the parent runtime for a runtime-endpoint",
         z.string().min(1).optional(),
       ),
       flag(
@@ -54,6 +61,7 @@ export const createRemoveProjectHandler = (config: RemoveProjectResourceConfig) 
             "policy",
             "payment-manager",
             "payment-connector",
+            "runtime-endpoint",
             "all",
           ])
           .optional(),
@@ -73,6 +81,9 @@ export const createRemoveProjectHandler = (config: RemoveProjectResourceConfig) 
       }
       if (flags.manager && resource !== "payment-connector") {
         throw new InputValidationError(`--manager is valid only when removing a payment-connector`);
+      }
+      if (flags.runtime && resource !== "runtime-endpoint") {
+        throw new InputValidationError(`--runtime is valid only when removing a runtime-endpoint`);
       }
 
       const project = ctx.require(ProjectKey);
@@ -123,6 +134,15 @@ export const createRemoveProjectHandler = (config: RemoveProjectResourceConfig) 
         input = {
           resourceType: "payment-connector",
           managerName: flags.manager,
+          name,
+        };
+      } else if (resource === "runtime-endpoint") {
+        if (!flags.runtime) {
+          throw new InputValidationError(`--runtime is required option`);
+        }
+        input = {
+          resourceType: "runtime-endpoint",
+          runtimeName: flags.runtime,
           name,
         };
       } else {

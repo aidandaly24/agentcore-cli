@@ -61,6 +61,7 @@ import { EvaluatorSchema } from "../../projectSchemas/evaluator";
 import { OnlineEvalConfigSchema } from "../../projectSchemas/online-eval-config";
 import { PaymentConnectorSchema, PaymentManagerSchema } from "../../projectSchemas/payment";
 import { PolicyEngineSchema, PolicySchema } from "../../projectSchemas/policy";
+import { RuntimeEndpointSchema } from "../../projectSchemas/runtime";
 import { enclosingProjectRoot, projectSpecPath } from "./fsUtils";
 import {
   AgentCoreCLIError,
@@ -320,6 +321,20 @@ export class FsProjectManager implements ProjectManager {
           `a payment connector with name '${input.resourceConfig.name}' already exists in manager '${input.managerName}'`,
         );
       }
+    } else if (input.resourceType === "runtime-endpoint") {
+      const runtime = projectSpec.runtimes.find(
+        (candidate) => candidate.name === input.runtimeName,
+      );
+      if (!runtime) {
+        throw new ResourceNotFoundError(
+          `no runtime named '${input.runtimeName}' exists in this project`,
+        );
+      }
+      if (runtime.endpoints?.[input.resourceConfig.name]) {
+        throw new InputValidationError(
+          `a runtime-endpoint named '${input.resourceConfig.name}' already exists on runtime '${input.runtimeName}'`,
+        );
+      }
     } else if (existingResources.find((resource) => resource.name === input.resourceConfig.name)) {
       throw new InputValidationError(
         `a ${input.resourceType} with name '${input.resourceConfig.name}' already exists`,
@@ -480,6 +495,19 @@ export class FsProjectManager implements ProjectManager {
         manager.connectors.push(parseResource(PaymentConnectorSchema, input.resourceConfig));
         break;
       }
+      case "runtime-endpoint": {
+        const runtime = projectSpec.runtimes.find(
+          (candidate) => candidate.name === input.runtimeName,
+        )!;
+        runtime.endpoints ??= {};
+        runtime.endpoints[input.resourceConfig.name] = parseResource(RuntimeEndpointSchema, {
+          version: input.resourceConfig.version,
+          ...(input.resourceConfig.description
+            ? { description: input.resourceConfig.description }
+            : {}),
+        });
+        break;
+      }
       default: {
         const unhandled: never = input;
         throw new NotImplementedError(`unsupported project resource: ${String(unhandled)}`);
@@ -598,6 +626,26 @@ export class FsProjectManager implements ProjectManager {
       removed = connectors.length !== manager.connectors.length;
       payments[managerIndex] = { ...manager, connectors };
       newSpec = { ...existingProjectSpec, payments };
+    } else if (input.resourceType === "runtime-endpoint") {
+      const runtimes = [...existingProjectSpec.runtimes];
+      const runtimeIndex = runtimes.findIndex((runtime) => runtime.name === input.runtimeName);
+      if (runtimeIndex < 0) {
+        throw new ResourceNotFoundError(
+          `no runtime named '${input.runtimeName}' exists in this project`,
+        );
+      }
+      const runtime = runtimes[runtimeIndex]!;
+      if (runtime.endpoints?.[input.name]) {
+        const { [input.name]: _removed, ...rest } = runtime.endpoints;
+        // Drop the endpoints key entirely when the last endpoint goes, mirroring
+        // how removeResource prunes an emptied payment manager's connectors.
+        runtimes[runtimeIndex] = {
+          ...runtime,
+          endpoints: Object.keys(rest).length > 0 ? rest : undefined,
+        };
+        removed = true;
+      }
+      newSpec = { ...existingProjectSpec, runtimes };
     } else {
       const projectSpecKey = toProjectSpecKey(input.resourceType);
       const existingResources = existingProjectSpec[projectSpecKey] ?? [];
@@ -668,7 +716,7 @@ export class FsProjectManager implements ProjectManager {
       configBundles: [],
       abTests: [],
       harnesses: [],
-      mcpRuntimeTools: undefined,
+      toolRuntimes: undefined,
       unassignedTargets: undefined,
       datasets: undefined,
       httpGateways: undefined,
@@ -999,8 +1047,9 @@ export class FsProjectManager implements ProjectManager {
       ({ resourceType, name }) => resourceType === input.resourceType && name === input.name,
     );
     // The declared target wins over the copy on the item: the manager resolved it
-    // from aws-targets.json, and both invoke handlers pin the AWS region off this
-    // value, so trusting a backend's echo would let it redirect the call.
+    // from aws-targets.json, and both invoke handlers pin the AWS region from this
+    // value while reusing the backend's verified credential provider. Trusting a
+    // backend's target echo would let it redirect the call.
     if (resource) return { ...resource, target: resolved.target };
 
     const label = input.resourceType === "runtime" ? "Runtime" : "Harness";
@@ -1244,6 +1293,8 @@ function toProjectSpecKey(resourceType: ProjectResource) {
     case "payment-manager":
     case "payment-connector":
       return "payments";
+    case "runtime-endpoint":
+      return "runtimes";
   }
 }
 

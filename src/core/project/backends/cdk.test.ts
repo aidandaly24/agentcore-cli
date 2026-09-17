@@ -306,6 +306,23 @@ describe("CdkBackend.build", () => {
     expect(subject.commands).toEqual([{ command: synthCommand(input), cwd: cdkDirectory(input) }]);
   });
 
+  test("warns but continues when the installed CDK is legacy", async () => {
+    const input = await project();
+    const packageDirectory = join(cdkDirectory(input), "node_modules", "@aws", "agentcore-cdk");
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(join(packageDirectory, "package.json"), JSON.stringify({ version: "0.0.0-0" }));
+    const subject = harness();
+
+    expect(await collect(subject.backend.build(input))).toEqual([
+      {
+        type: "warning",
+        message: expect.stringContaining("Update the CDK dependency, then rebuild or redeploy."),
+      },
+      { type: "step", message: "Synthesizing CloudFormation templates" },
+    ]);
+    expect(subject.commands).toEqual([{ command: synthCommand(input), cwd: cdkDirectory(input) }]);
+  });
+
   test("streams synth output as line-buffered output events", async () => {
     const input = await project();
     // The chunk boundary splits a line, so a chunk-per-event bridge would leak
@@ -861,12 +878,14 @@ describe("CdkBackend.resolveDeployedResources", () => {
         name: "checkout_agent",
         id: "checkout_agent-AbCdEf1234",
         target: TARGET,
+        credentialProvider: subject.credentials,
       },
       {
         resourceType: "harness",
         name: "support_agent",
         id: "support_agent-AbCdEf1234",
         target: TARGET,
+        credentialProvider: subject.credentials,
       },
     ]);
     expect(subject.stackReads).toHaveLength(1);
@@ -903,6 +922,7 @@ describe("CdkBackend.resolveDeployedResources", () => {
         name: "support",
         id: "support-AbCdEf1234",
         target: TARGET,
+        credentialProvider: subject.credentials,
       },
     ]);
     expect(subject.stackReads[0]?.stackName).toBe("AgentCore-example-default");

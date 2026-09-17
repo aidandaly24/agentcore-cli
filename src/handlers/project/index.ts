@@ -18,6 +18,8 @@ import type { ProjectManager } from "./types";
 import { createAddProjectResourceHandler } from "./add";
 import { createExportProjectResourceHandler } from "./export";
 import { createProjectInvokeHandler } from "./invoke";
+import { createProjectLogHandler } from "./log";
+import { createProjectTracesHandler } from "./traces";
 
 type ProjectHandlerConfig = {
   core: Core;
@@ -38,6 +40,7 @@ export function createProjectHandler({ core, io }: ProjectHandlerConfig): Router
     "deploy",
     "status",
     "add",
+    "remove",
   );
 
   // Without a default, a bare `agentcore project` falls back to Commander's help
@@ -46,15 +49,26 @@ export function createProjectHandler({ core, io }: ProjectHandlerConfig): Router
 
   // A bare `agentcore project create` in an interactive session opens the TUI
   // create wizard; any user-supplied flag, --json, or a non-TTY invocation keeps
-  // the headless handler (see withTuiWhenInteractive).
-  const tuiWhenInteractive = withTuiWhenInteractive(core, io);
-  project.handler(tuiWhenInteractive(createCreateProjectHandler({ projectManager, io })));
+  // the headless handler. The TUI is exposed as middleware so the router runs it
+  // before flag validation, letting the wizard supply a required flag.
+  project.handler(
+    createCreateProjectHandler({
+      projectManager,
+      io,
+      middlewares: [withTuiWhenInteractive(core, io)],
+    }),
+  );
   project.handler(createAddProjectResourceHandler(config, core));
   project.handler(createExportProjectResourceHandler({ projectManager, core, io }));
   project.handler(
-    withProject({ projectManager: config.projectManager })(
-      createRemoveProjectHandler({ projectManager: config.projectManager, io: config.io }),
-    ),
+    createRemoveProjectHandler({
+      projectManager: config.projectManager,
+      io: config.io,
+      middlewares: [
+        withProject({ projectManager: config.projectManager }),
+        withTuiWhenInteractive(core, io),
+      ],
+    }),
   );
   project.handler(
     withProject({ projectManager: config.projectManager })(
@@ -82,15 +96,19 @@ export function createProjectHandler({ core, io }: ProjectHandlerConfig): Router
     ),
   );
   project.handler(createProjectInvokeHandler(core, io));
+  project.handler(createProjectLogHandler(core, io));
+  project.handler(createProjectTracesHandler(core, io));
   // A bare `agentcore project status` in an interactive session opens the TUI
   // linked-resources screen; any user-supplied flag, --json, or a non-TTY
-  // invocation keeps the headless JSON report. withProject stays outermost so
-  // the not-found guidance outside a project is the CLI's own, and the resolved
-  // project seeds the screen via ProjectKey.
+  // invocation keeps the headless JSON report. withProject runs before the TUI
+  // so the not-found guidance is the CLI's own and the resolved project seeds
+  // the screen via ProjectKey.
+  const withStatusProject = withProject({ projectManager: config.projectManager });
   project.handler(
-    withProject({ projectManager: config.projectManager })(
-      tuiWhenInteractive(createStatusProjectHandler({ projectManager: config.projectManager })),
-    ),
+    createStatusProjectHandler({
+      projectManager: config.projectManager,
+      middlewares: [withStatusProject, withTuiWhenInteractive(core, io)],
+    }),
   );
   // withProject wraps only the commands that require an existing project, so
   // `create` (which refuses to nest inside one) stays unaffected.

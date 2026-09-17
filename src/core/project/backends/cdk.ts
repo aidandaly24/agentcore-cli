@@ -10,6 +10,7 @@ import type {
   ResolvedDeployedResource,
   ResolvedProjectResource,
 } from "../../../handlers/project/types";
+import { cdkCompatibilityWarning } from "./cdk/compatibility";
 import {
   createLineSplitter,
   FsReadWriteJson,
@@ -81,7 +82,7 @@ type StackDescriber = typeof describeStack;
  */
 const MAX_ERROR_OUTPUT_LINES = 20;
 
-// Payment logical ids drop underscores the same way the template's toCdkId does.
+// Payment output keys drop underscores the same way AgentCorePayments' toCdkId does.
 function cdkId(name: string): string {
   return name.replace(/_/g, "");
 }
@@ -181,6 +182,11 @@ export class CdkBackend implements ProjectBackend {
 
   public async *build(project: Project): AsyncGenerator<ProjectEvent, void> {
     await this.ensureCdkDependencies(project);
+
+    const compatibilityWarning = await cdkCompatibilityWarning(this.cdkDirectory(project));
+    if (compatibilityWarning) {
+      yield { type: "warning", message: compatibilityWarning };
+    }
 
     yield { type: "step", message: "Synthesizing CloudFormation templates" };
     yield* withOutputEvents((emit) => {
@@ -431,7 +437,7 @@ export class CdkBackend implements ProjectBackend {
     ];
     return resources.flatMap((resource) => {
       const id = findDeployedResourceId(stack, resource);
-      return id ? [{ ...resource, id, target }] : [];
+      return id ? [{ ...resource, id, target, credentialProvider: credentials }] : [];
     });
   }
 
@@ -499,15 +505,18 @@ export class CdkBackend implements ProjectBackend {
         case "config-bundle":
           return byExportName("ConfigBundle", name, "Arn");
         case "payment-manager":
-          // The CLI template writes the payment outputs. It does not set an
-          // exportName on them. Therefore match on the OutputKey. The template
-          // makes that key from the manager name.
-          // See src/assets/cdk/lib/cdk-stack.ts
+          // @aws/agentcore-cdk's AgentCorePayments construct writes the payment
+          // outputs at stack scope without an exportName, under keys built from
+          // the manager name with underscores removed (its toCdkId). Therefore
+          // match on the OutputKey.
           return byOutputKey(`Payment${cdkId(name)}ManagerArn`);
         case "payment-connector":
-          // The same template does not set an exportName. Therefore match on the
-          // OutputKey. The template writes only a connector id, and never an ARN.
+          // The same construct writes only a connector id, never an ARN, again
+          // without an exportName. Therefore match on the OutputKey.
           return byOutputKey(`Payment${cdkId(owner ?? "")}${cdkId(name)}ConnectorId`);
+        case "runtime-endpoint":
+          // ExportName: <StackName>-Endpoint-<runtimeName>-<endpointName>-Arn
+          return byExportName("Endpoint", owner ?? "", name, "Arn");
         case "credential":
           // The CLI creates credential providers imperatively. The stack does not
           // contain them. Therefore read the ARN from the deployed state file.
@@ -538,7 +547,13 @@ export class CdkBackend implements ProjectBackend {
     };
 
     return [
-      ...spec.runtimes.map(({ name }) => resolve("runtime", name)),
+      ...spec.runtimes.map((runtime) =>
+        resolve("runtime", runtime.name, {
+          children: Object.keys(runtime.endpoints ?? {}).map((endpointName) =>
+            resolve("runtime-endpoint", endpointName, { owner: runtime.name }),
+          ),
+        }),
+      ),
       ...spec.harnesses.map(({ name }) => resolve("harness", name)),
       ...spec.memories.map(({ name }) => resolve("memory", name)),
       ...spec.knowledgeBases.map(({ name }) => resolve("knowledge-base", name)),

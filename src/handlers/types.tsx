@@ -4,7 +4,9 @@ import type { CorePolicyClient } from "./gateway/policy/types.tsx";
 import type { CoreHarnessClient } from "./harness/types.tsx";
 import type { CoreIdentityClient } from "./identity/types.tsx";
 import type { CoreMemoryClient } from "./memory/types.tsx";
-import type { CoreObservabilityClient, CoreRuntimeClient } from "./runtime/types.tsx";
+import type { CoreObservabilityClient } from "../core/observability/types.ts";
+import type { CoreRuntimeClient } from "./runtime/types.tsx";
+import type { CorePaymentClient } from "./payment/types.tsx";
 import type { Context } from "../router";
 import type { CoreFetch } from "../core/types";
 import type { ProjectManager } from "./project/types.ts";
@@ -19,6 +21,7 @@ export interface Core {
   eval: CoreEvalClient;
   observability: CoreObservabilityClient;
   policy: CorePolicyClient;
+  payment: CorePaymentClient;
   projectManager: ProjectManager;
   /** Imports an alias-pinned Bedrock Agent definition into owned runtime code. */
   bedrockAgentImporter: CoreBedrockAgentImporter;

@@ -1,7 +1,6 @@
 import { test, expect } from "bun:test";
 import {
   executionPolicy,
-  isManagedOnlineEvalRole,
   onlineEvalExecutionRoleName,
   scopePolicyName,
 } from "./onlineEvalExecutionRole";
@@ -62,31 +61,6 @@ test("keeps role names within 64 characters and distinct", () => {
   expect(onlineEvalExecutionRoleName("short")).toBe("AgentCoreOnlineEval-short");
 });
 
-// A role created by an earlier build carries a hash suffix this build cannot
-// recompute, so a truncated name is recognised on its prefix.
-test.each([
-  ["short", "arn:aws:iam::123456789012:role/AgentCoreOnlineEval-short", true],
-  ["short", "arn:aws:iam::123456789012:role/AgentCoreOnlineEval-other", false],
-  ["short", "arn:aws:iam::123456789012:role/custom-role", false],
-  [
-    "x".repeat(50),
-    `arn:aws:iam::123456789012:role/${onlineEvalExecutionRoleName("x".repeat(50))}`,
-    true,
-  ],
-  [
-    "x".repeat(50),
-    `arn:aws:iam::123456789012:role/AgentCoreOnlineEval-${"x".repeat(35)}-20487c61`,
-    true,
-  ],
-  [
-    "x".repeat(50),
-    `arn:aws:iam::123456789012:role/AgentCoreOnlineEval-${"y".repeat(35)}-20487c61`,
-    false,
-  ],
-])("recognises the managed role for %s from %s: %s", (configName, roleArn, expected) => {
-  expect(isManagedOnlineEvalRole(roleArn, configName)).toBe(expected);
-});
-
 // Each scope must map to its own policy name. Granting a new scope writes a new
 // policy rather than overwriting the current one, which is what lets an update
 // keep the old scope intact until the config change has landed.
@@ -109,4 +83,69 @@ test("gives identical policies the same name", () => {
   expect(scopePolicyName(doc)).not.toBe(
     scopePolicyName(executionPolicy(REGION, ACCOUNT, ["/a*", "/b*"], [])),
   );
+});
+
+function writeStatement(policy: string) {
+  return statements(policy).find((s) => s.Sid === "WriteEvaluationResults");
+}
+
+const SERVICE_RESULTS = `arn:aws:logs:${REGION}:${ACCOUNT}:log-group:/aws/bedrock-agentcore/evaluations/*`;
+
+test("a config with no output destination keeps the service namespace as a bare string", () => {
+  const write = writeStatement(executionPolicy(REGION, ACCOUNT, LOG_GROUPS, []));
+
+  expect(write?.Resource).toBe(SERVICE_RESULTS);
+  expect(Array.isArray(write?.Resource)).toBe(false);
+});
+
+test("a customer-named dedicated group is granted alongside the service namespace", () => {
+  const write = writeStatement(
+    executionPolicy(REGION, ACCOUNT, LOG_GROUPS, [], {
+      cloudWatchConfig: {
+        logGroupName: "/company/agent-evaluations",
+        resultDestination: "DEDICATED_LOG_GROUP",
+      },
+    }),
+  );
+
+  expect(write?.Resource).toEqual([
+    SERVICE_RESULTS,
+    `arn:aws:logs:${REGION}:${ACCOUNT}:log-group:/company/agent-evaluations*`,
+  ]);
+  expect(write?.Action).toContain("logs:CreateLogGroup");
+});
+
+test("SOURCE_LOG_GROUP grants writes to the groups the traces are read from", () => {
+  const write = writeStatement(
+    executionPolicy(REGION, ACCOUNT, LOG_GROUPS, [], {
+      cloudWatchConfig: { resultDestination: "SOURCE_LOG_GROUP" },
+    }),
+  );
+
+  expect(write?.Resource).toEqual([
+    SERVICE_RESULTS,
+    `arn:aws:logs:${REGION}:${ACCOUNT}:log-group:/aws/bedrock-agentcore/runtimes/orders-agent-abc123*`,
+  ]);
+});
+
+test("a destination already inside the service namespace adds nothing", () => {
+  const write = writeStatement(
+    executionPolicy(REGION, ACCOUNT, LOG_GROUPS, [], {
+      cloudWatchConfig: {
+        logGroupName: "/aws/bedrock-agentcore/evaluations/online-evaluations/results/default",
+        resultDestination: "DEDICATED_LOG_GROUP",
+      },
+    }),
+  );
+
+  expect(write?.Resource).toBe(SERVICE_RESULTS);
+});
+
+test("changing the destination changes the policy name, so a re-scope is a new grant", () => {
+  const before = executionPolicy(REGION, ACCOUNT, LOG_GROUPS, []);
+  const after = executionPolicy(REGION, ACCOUNT, LOG_GROUPS, [], {
+    cloudWatchConfig: { logGroupName: "/company/agent-evaluations" },
+  });
+
+  expect(scopePolicyName(after)).not.toBe(scopePolicyName(before));
 });

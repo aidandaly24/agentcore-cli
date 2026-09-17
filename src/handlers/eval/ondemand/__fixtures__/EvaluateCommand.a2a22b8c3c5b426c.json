@@ -1,0 +1,23 @@
+{
+  "evaluationResults": [
+    {
+      "evaluatorArn": "arn:aws:bedrock-agentcore:::evaluator/Builtin.Helpfulness",
+      "evaluatorId": "Builtin.Helpfulness",
+      "evaluatorName": "Builtin.Helpfulness",
+      "context": {
+        "spanContext": {
+          "sessionId": "12f1f7a2-987b-4448-8f40-dd3da6558611",
+          "traceId": "6aa82ccc63d06bd964d302913ef6da1a"
+        }
+      },
+      "explanation": "The user asked for a summary of what an agent runtime does. The assistant provided a comprehensive, well-structured response that:\n\n1. Opens with a clear, concise definition framing the agent runtime as the 'nervous system' connecting LLM to tools\n2. Organizes the information into 7 distinct functional categories with clear headers\n3. Covers all major aspects found in the search results: execution management, session/context management, infrastructure abstraction, tool orchestration, reliability/recovery, multi-agent coordination, and observability\n4. Uses concrete examples and specific details (e.g., '8 hours session persistence', '40 message sliding window', microVM isolation)\n5. Ends with a memorable bottom-line summary that reinforces the key concept\n\nThe response directly addresses the user's goal of understanding what an agent runtime does. It synthesizes information from multiple sources (AWS Bedrock, Google Cloud, Kore.ai, Medium article) into a coherent, readable summary. The formatting with headers and bullet points makes it easy to scan and understand. The response goes beyond a basic answer by providing depth and context while remaining accessible.\n\nThis is an excellent summary that comprehensively covers the topic, is well-organized, draws from multiple authoritative sources, and provides both breadth and appropriate depth. It fully satisfies the user's request and could serve as a reference document.",
+      "value": 1,
+      "label": "Above And Beyond",
+      "tokenUsage": {
+        "inputTokens": 10934,
+        "outputTokens": 325,
+        "totalTokens": 11259
+      }
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import type { Core } from "../../../types";
 import type { SessionMetadataShape } from "@aws-sdk/client-bedrock-agentcore";
 import { coreOptsFromCtx, parseJsonFlag } from "../../../utils";
 import { SessionSource } from "../../sessionSource";
+import { BatchOutputConfig } from "../outputConfig";
 
 const CONFIGURATION = "Configuration:";
 const EVALUATION = "Evaluation:";
@@ -75,6 +76,7 @@ export const createEvaluateBatchEvaluationHandler = (core: Core, io: AppIO) =>
         z.string().optional(),
         { group: EVALUATION, help: groundTruthHelp },
       ),
+      ...BatchOutputConfig.flags,
     ],
     handle: async (ctx, flags) => {
       if (!flags["name"]) {
@@ -86,13 +88,18 @@ export const createEvaluateBatchEvaluationHandler = (core: Core, io: AppIO) =>
         );
       }
 
-      const source = await SessionSource.resolve(flags, io);
-
+      // One resolver shared across every stdin-capable flag, so a second `-`
+      // (e.g. --ground-truth - --output-config -) is rejected rather than
+      // silently reading an empty string after the first drains stdin.
       const resolver = new SourceResolver({ stdin: io.stdin });
+      const source = await SessionSource.resolve(flags, resolver);
+
       const groundTruth = parseJsonFlag<SessionMetadataShape[]>(
         "ground-truth",
         await resolver.resolveText("ground-truth", flags["ground-truth"]),
       );
+
+      const outputConfig = await BatchOutputConfig.resolve(flags["output-config"], resolver);
 
       const response = await core.eval.startBatchEvaluation(
         {
@@ -102,6 +109,7 @@ export const createEvaluateBatchEvaluationHandler = (core: Core, io: AppIO) =>
           source,
           groundTruth,
           kmsKeyArn: flags["kms-key-arn"],
+          outputConfig,
         },
         coreOptsFromCtx(ctx),
       );

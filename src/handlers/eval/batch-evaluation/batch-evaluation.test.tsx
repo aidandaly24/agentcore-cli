@@ -34,10 +34,14 @@ const RESULTS: BatchEvaluationResultEntry[] = [
   { evaluatorId: "Builtin.Helpfulness", level: "Session", sessionId: "s1", score: 5 },
 ];
 
-async function run(args: string[], configure?: (core: TestCoreClient) => void) {
+async function run(
+  args: string[],
+  configure?: (core: TestCoreClient) => void,
+  ioOptions?: { stdin?: string },
+) {
   const core = new TestCoreClient();
   configure?.(core);
-  const io = testIO();
+  const io = testIO(ioOptions);
   const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
@@ -260,5 +264,114 @@ describe("eval batch-evaluation simulate", () => {
     expect(invoke).toBeDefined();
     expect((invoke!.args[0] as { waitIngestionMs?: number }).waitIngestionMs).toBe(0);
     expect(JSON.parse(stdout).failures).toEqual([{ exampleId: "bad", error: "HTTP 500" }]);
+  });
+});
+
+describe("eval batch-evaluation evaluate --output-config", () => {
+  const BASE = [
+    "eval",
+    "batch-evaluation",
+    "evaluate",
+    "--agent",
+    "r-1",
+    "--evaluators",
+    "Builtin.Helpfulness",
+    "--name",
+    "eval-1",
+  ];
+  test("rejects malformed JSON before any SDK call", async () => {
+    const core = new TestCoreClient();
+    const io = testIO();
+    const root = createRootHandler(core, {
+      io: io.io,
+      logger: createSilentLogger(),
+      globalConfigAccessor: new TestGlobalConfigAccessor(),
+    });
+    await expect(
+      root.route([
+        "node",
+        "agentcore",
+        ...BASE,
+        "--output-config",
+        "{not json",
+        "--region",
+        "us-west-2",
+      ]),
+    ).rejects.toThrow(/Invalid JSON for option '--output-config'/);
+    expect(core.eval.calls).toEqual([]);
+  });
+
+  test("rejects a second option reading from stdin, before any SDK call", async () => {
+    // --ground-truth and --output-config share one resolver, so the second `-`
+    // is a conflict rather than an empty read after the first drains stdin.
+    const core = new TestCoreClient();
+    const io = testIO({ stdin: "{}" });
+    const root = createRootHandler(core, {
+      io: io.io,
+      logger: createSilentLogger(),
+      globalConfigAccessor: new TestGlobalConfigAccessor(),
+    });
+    await expect(
+      root.route([
+        "node",
+        "agentcore",
+        ...BASE,
+        "--ground-truth",
+        "-",
+        "--output-config",
+        "-",
+        "--region",
+        "us-west-2",
+      ]),
+    ).rejects.toThrow(/only one option may read from stdin.*'--output-config'.*'--ground-truth'/);
+    expect(core.eval.calls).toEqual([]);
+  });
+});
+
+describe("eval batch-evaluation simulate --endpoint and --output-config", () => {
+  const BASE = [
+    "eval",
+    "batch-evaluation",
+    "simulate",
+    "--runtime-id",
+    "r-1",
+    "--payload-template",
+    '{"prompt":"{input}"}',
+    "--dataset",
+    "/tmp/ds.jsonl",
+    "--evaluators",
+    "Builtin.Helpfulness",
+    "--name",
+    "sim-1",
+  ];
+  const invoked = (c: TestCoreClient) =>
+    c.eval.setInvokeDatasetResponse({
+      sessions: [{ exampleId: "e1", sessionId: "s1" }],
+      invoked: 1,
+      failed: 0,
+      failures: [],
+    });
+
+  test("malformed --output-config aborts before any Runtime is invoked", async () => {
+    const core = new TestCoreClient();
+    invoked(core);
+    const io = testIO();
+    const root = createRootHandler(core, {
+      io: io.io,
+      logger: createSilentLogger(),
+      globalConfigAccessor: new TestGlobalConfigAccessor(),
+    });
+    await expect(
+      root.route([
+        "node",
+        "agentcore",
+        ...BASE,
+        "--output-config",
+        "{not json",
+        "--region",
+        "us-west-2",
+      ]),
+    ).rejects.toThrow(/Invalid JSON for option '--output-config'/);
+    expect(core.eval.calls.map((c) => c.method)).not.toContain("invokeDataset");
   });
 });

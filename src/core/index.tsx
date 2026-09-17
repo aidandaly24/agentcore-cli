@@ -7,12 +7,11 @@ import { GatewayClient } from "./gateway";
 import { HarnessClient } from "./harness";
 import { IdentityClient } from "./identity";
 import { MemoryClient } from "./memory";
+import { PaymentClient } from "./payment";
 import { PolicyClient } from "./policy";
-import { ObservabilityClient } from "./observability";
-import { CloudWatchClient } from "./observability/index";
+import { CloudWatchClient, ObservabilityClient } from "./observability/index";
 import { RuntimeClient } from "./runtime";
 import type { OpenRuntimeShell } from "./runtime";
-import { FsReadWriteJson } from "../io";
 import type {
   AwsClients,
   AwsCredentials,
@@ -79,6 +78,7 @@ export class CoreClient implements AwsClients {
   readonly eval: EvalClient;
   readonly observability: ObservabilityClient;
   readonly policy: PolicyClient;
+  readonly payment: PaymentClient;
 
   readonly projectManager: ProjectManager;
   readonly bedrockAgentImporter: CoreBedrockAgentImporter;
@@ -101,6 +101,7 @@ export class CoreClient implements AwsClients {
     );
     this.gateway = new GatewayClient(this, fetch, this.logger.child({ module: "gateway" }));
     this.policy = new PolicyClient(this, this.logger.child({ module: "policy" }));
+    this.payment = new PaymentClient(this);
     // EvalClient shares the injected fetch: dataset content is served from a
     // presigned S3 URL, outside the SDK seam the other operations use. The logger
     // is used for batch-evaluation result-log diagnostics.
@@ -113,14 +114,7 @@ export class CoreClient implements AwsClients {
       cloudWatch,
     );
 
-    // Observability resolves a project's deployed runtime from its stack
-    // outputs, so it reads aws-targets.json through the same JSON layer the
-    // project manager uses.
-    this.observability = new ObservabilityClient(cloudWatch, {
-      readJson: new FsReadWriteJson({
-        logger: this.logger.child({ module: "observability" }),
-      }),
-    });
+    this.observability = new ObservabilityClient(cloudWatch);
 
     this.projectManager = new FsProjectManager({
       logger: this.logger.child({ module: "projectManager" }),

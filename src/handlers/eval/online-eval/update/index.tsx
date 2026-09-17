@@ -2,13 +2,13 @@ import z from "zod";
 import type { DataSourceConfig, Filter } from "@aws-sdk/client-bedrock-agentcore-control";
 import { createHandler, flag } from "../../../../router";
 import { InputValidationError } from "../../../../errors";
-import { JsonKey } from "../../../keys";
 import { JsonRendererKey } from "../../../../tui";
 import { SourceResolver, type AppIO } from "../../../../io";
 import type { Core } from "../../../types";
 import { assertMutuallyExclusiveFlags, coreOptsFromCtx, parseJsonFlag } from "../../../utils";
 import { filtersHelp } from "../filtersHelp";
 import { onlineEvalDataSourceConfigHelp } from "../dataSourceConfigHelp";
+import { OnlineEvalOutputConfigFlag } from "../outputConfig";
 
 const SESSION_SOURCE = "Session source:";
 const SOURCE_FILTERS = "Source filters:";
@@ -23,6 +23,12 @@ export const createUpdateOnlineEvalHandler = (core: Core, io: AppIO) =>
       flag("id", "the ID of the online evaluation config to update", z.string().optional(), {
         group: "Target:",
       }),
+      flag(
+        "description",
+        "replace the description of the config's monitoring purpose",
+        z.string().optional(),
+        { group: "Configuration:" },
+      ),
       flag("agent", "repoint at a different harness ID or Runtime ID", z.string().optional(), {
         group: SESSION_SOURCE,
       }),
@@ -66,16 +72,11 @@ export const createUpdateOnlineEvalHandler = (core: Core, io: AppIO) =>
         group: EVALUATION,
         help: filtersHelp,
       }),
+      ...OnlineEvalOutputConfigFlag.flags,
       flag(
         "role-arn",
         "replace the IAM role the online evaluation assumes",
         z.string().optional(),
-        { group: EXECUTION },
-      ),
-      flag(
-        "update-role",
-        "whether to re-scope an auto-provisioned execution role when the data source changes (default true)",
-        z.enum(["true", "false"]).optional(),
         { group: EXECUTION },
       ),
     ],
@@ -96,10 +97,16 @@ export const createUpdateOnlineEvalHandler = (core: Core, io: AppIO) =>
         );
       }
 
+      // One resolver shared across every stdin-capable flag (--filters,
+      // --data-source-config, --output-config) so a second `-` is rejected
+      // rather than reading empty after the first drains stdin.
       const source = new SourceResolver({ stdin: io.stdin });
-      const { response, roleScopeWarning } = await core.eval.updateOnlineEvaluationConfig(
+      const outputConfig = await OnlineEvalOutputConfigFlag.resolve(flags["output-config"], source);
+      const { response } = await core.eval.updateOnlineEvaluationConfig(
         flags["id"],
         {
+          description: flags["description"],
+          outputConfig,
           samplingRate: flags["sampling-rate"],
           sessionTimeoutMinutes: flags["session-timeout-minutes"],
           filters: parseJsonFlag<Filter[]>(
@@ -115,35 +122,9 @@ export const createUpdateOnlineEvalHandler = (core: Core, io: AppIO) =>
             await source.resolveText("data-source-config", flags["data-source-config"]),
           ),
           evaluationExecutionRoleArn: flags["role-arn"],
-          updateRole:
-            flags["update-role"] === undefined ? undefined : flags["update-role"] === "true",
         },
         coreOptsFromCtx(ctx),
       );
-      // Suppressed under --json, matching runtime/invoke's advisory summary: a
-      // scripted caller gets a machine-readable stdout and nothing else.
-      if (roleScopeWarning && !ctx.require(JsonKey)) {
-        const { reason, roleArn, logGroupNames } = roleScopeWarning;
-        if (reason === "stale-scope") {
-          // The update succeeded and the role grants the new data source; the
-          // policy for the superseded one just could not be detached.
-          io.stderr.write(
-            `warning: the execution role still grants access to the previous data source.\n` +
-              `  role: ${roleArn}\n` +
-              `  detach the inline policy covering: ${logGroupNames.join(", ")}\n`,
-          );
-        } else {
-          const detail =
-            reason === "custom-role"
-              ? "it is not managed by the CLI"
-              : "re-scoping was declined via --update-role false";
-          io.stderr.write(
-            `warning: the data source moved but the execution role was not re-scoped because ${detail}.\n` +
-              `  role: ${roleArn}\n` +
-              `  ensure it grants logs:StartQuery and logs:GetQueryResults on: ${logGroupNames.join(", ")}\n`,
-          );
-        }
-      }
       ctx.require(JsonRendererKey).renderJson(response);
     },
   });

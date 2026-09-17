@@ -6,7 +6,7 @@ import type { AppIO } from "../../../io";
 import { ExitCode, withUserCancellation } from "../../../runnable";
 import { createHandler, flag, ProjectKey } from "../../../router";
 import { renderTuiAt } from "../../../tui";
-import { JsonKey, RegionKey } from "../../keys";
+import { AwsCredentialProviderKey, JsonKey, RegionKey } from "../../keys";
 import { RuntimeInvokeLaunchContextKey } from "../../runtime/invoke/launchContext";
 import { invokeRuntimeTarget } from "../../runtime/invoke/operation";
 import {
@@ -17,7 +17,7 @@ import {
 import { writeRuntimeInvokeResponse } from "../../runtime/invoke/response";
 import type { Core } from "../../types";
 import { coreOptsFromCtx } from "../../utils";
-import { selectProjectResource } from "./selection";
+import { selectProjectResource } from "../selection";
 
 export const createProjectInvokeRuntimeHandler = (
   core: Core,
@@ -130,13 +130,15 @@ export const createProjectInvokeRuntimeHandler = (
         return;
       }
 
-      const name = selectProjectResource(project, "runtime", flags.name);
+      const name = selectProjectResource(project, "runtime", flags.name, "invoke");
       const deployed = await core.projectManager.resolveDeployedResource(project, {
         target: flags.target ?? "default",
         resourceType: "runtime",
         name,
       });
-      const invokeCtx = ctx.withValue(RegionKey, deployed.target.region);
+      const invokeCtx = ctx
+        .withValue(RegionKey, deployed.target.region)
+        .withValue(AwsCredentialProviderKey, deployed.credentialProvider);
 
       if (flags.payload === undefined) {
         const hasHeadlessOnlyFlag = Object.entries(flags).some(

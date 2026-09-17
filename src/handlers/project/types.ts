@@ -15,6 +15,7 @@ import type { AgentCoreGateway, AgentCoreGatewayTarget } from "../../projectSche
 import type { PolicyEngineSchema, PolicySchema } from "../../projectSchemas/policy";
 import type { AwsDeploymentTarget } from "../../projectSchemas/aws-targets";
 import type { ProgressEvent } from "../../tui/progress";
+import type { AwsCredentialProvider } from "../../core/types";
 
 type CreateProjectInputBase = {
   /** The name of the project; also the directory it is scaffolded into. */
@@ -213,6 +214,8 @@ export type ResolvedDeployedResource = {
   name: string;
   id: string;
   target: AwsDeploymentTarget;
+  /** Credential provider used to resolve and access this target. */
+  credentialProvider: AwsCredentialProvider;
 };
 
 export type ResolvedDeployedResources = {
@@ -244,7 +247,8 @@ export type DeployableResource =
   | "policy"
   | "config-bundle"
   | "payment-manager"
-  | "payment-connector";
+  | "payment-connector"
+  | "runtime-endpoint";
 
 /**
  * A declared resource paired with what the target holds for it. `local-only`
@@ -351,6 +355,13 @@ export type AddResourceInput =
       resourceType: "payment-connector";
       managerName: string;
       resourceConfig: z.input<typeof PaymentConnectorSchema>;
+    }
+  | {
+      // A runtime endpoint is a named version alias nested under a runtime, keyed
+      // by name in the runtime's `endpoints` record; `runtimeName` is the parent.
+      resourceType: "runtime-endpoint";
+      runtimeName: string;
+      resourceConfig: { name: string; version: number; description?: string };
     };
 
 export type ProjectResource = AddResourceInput["resourceType"];
@@ -413,6 +424,11 @@ export type RemoveResourceInput =
       resourceType: "payment-connector";
       managerName: string;
       name: string;
+    }
+  | {
+      resourceType: "runtime-endpoint";
+      runtimeName: string;
+      name: string;
     };
 
 /** The shared outcome of a spec-level removal. */
@@ -459,7 +475,7 @@ export interface ProjectManager {
   /** Locate an existing AgentCore project. Returns undefined if no project can be found. */
   resolve(input: ResolveProjectInput): Promise<Project | undefined>;
 
-  /** Resolve a logical project resource to its deployed physical ID and target. */
+  /** Resolve a logical project resource to its deployed physical ID, target, and credential provider. */
   resolveDeployedResource(
     project: Project,
     input: ResolveDeployedResourceInput,

@@ -115,14 +115,13 @@ import {
   runtimeLogGroup,
   sanitizeQueryValue,
   type InsightsRowLimit,
-} from "./observability";
-import { CloudWatchClient } from "./observability/index";
+  CloudWatchClient,
+} from "./observability/index";
 import type {
   BatchEvaluationDetail,
   CodeBasedUpdate,
   DatasetUpdateProgressEvent,
   DatasetUpdateResult,
-  RoleScopeWarning,
   CoreEvalClient,
   CreateConfigurationBundleInput,
   CreateConfigBasedABTestInput,
@@ -166,16 +165,8 @@ import type { AwsClients, CoreFetch, CoreOptions } from "./types";
 import type { Logger } from "../logging";
 import { FilteredPaginator } from "./filteredPaginator";
 import { toClientConfig } from "./utils";
-import {
-  accountIdFromRoleArn,
-  executionPolicy,
-  grantOnlineEvalScope,
-  isManagedOnlineEvalRole,
-  revokeOnlineEvalScope,
-  scopePolicyName,
-} from "./onlineEvalExecutionRole";
+import { grantOnlineEvalScope } from "./onlineEvalExecutionRole";
 import { accountIdFromArn, deleteAbTestRole, provisionAbTestRole } from "./abTestExecutionRole";
-import { resourceNameFromArn } from "./arn";
 import { harnessRuntimeFromResponse } from "./harness";
 
 const DEFAULT_INGESTION_WAIT_MS = 180_000;
@@ -679,6 +670,7 @@ export class EvalClient implements CoreEvalClient {
         dataSourceConfig,
         evaluationMetadata: input.groundTruth ? { sessionMetadata: input.groundTruth } : undefined,
         kmsKeyArn: input.kmsKeyArn,
+        outputConfig: input.outputConfig,
       }),
     );
   }
@@ -988,6 +980,9 @@ export class EvalClient implements CoreEvalClient {
           options.region,
           logGroupNamesOf(dataSourceConfig),
           await evaluatorKmsKeys(input.evaluatorIds ?? [], control),
+          // Read only to widen the write scope to the chosen destination; the
+          // request object below still gets the caller's object untouched.
+          { outputConfig: input.outputConfig },
         )
       ).roleArn;
 
@@ -997,8 +992,10 @@ export class EvalClient implements CoreEvalClient {
       rule: toRule(input.samplingRate, input.sessionTimeoutMinutes, input.filters),
       dataSourceConfig,
       evaluators: input.evaluatorIds?.map((evaluatorId) => ({ evaluatorId })),
+      outputConfig: input.outputConfig,
       evaluationExecutionRoleArn,
       enableOnCreate: input.enableOnCreate ?? true,
+      tags: input.tags,
     });
 
     // A role provisioned moments ago may not be assumable yet (IAM is eventually
@@ -1170,10 +1167,7 @@ export class EvalClient implements CoreEvalClient {
     id: string,
     update: UpdateOnlineEvalInput,
     options: CoreOptions,
-  ): Promise<{
-    response: UpdateOnlineEvaluationConfigResponse;
-    roleScopeWarning?: RoleScopeWarning;
-  }> {
+  ): Promise<{ response: UpdateOnlineEvaluationConfigResponse }> {
     const control = this.clients.control(toClientConfig(options));
     const current = await control.send(
       new GetOnlineEvaluationConfigCommand({
@@ -1225,120 +1219,21 @@ export class EvalClient implements CoreEvalClient {
       dataSourceConfig = await agentDataSource(runtimeId, endpoint, this.clients, options);
     }
 
-    // Moving the data source invalidates the execution role's scope: its policy
-    // grants query access to the previous log groups only. A role the caller named
-    // via --role-arn is theirs to manage and is never edited; a CLI-provisioned one
-    // (identified by its derived name) is re-scoped unless the caller declines.
-    // Either way, skipping the refresh is reported so the caller can be told.
-    let roleScopeWarning: RoleScopeWarning | undefined;
-    const movedTo =
-      dataSourceConfig !== undefined && dataSourceConfig !== current.dataSourceConfig
-        ? dataSourceConfig
-        : undefined;
-
-    const configName = current.onlineEvaluationConfigName;
-    const roleArn = update.evaluationExecutionRoleArn ?? current.evaluationExecutionRoleArn;
-    const managedRoleName =
-      configName !== undefined &&
-      update.evaluationExecutionRoleArn === undefined &&
-      roleArn !== undefined &&
-      isManagedOnlineEvalRole(roleArn, configName)
-        ? configName
-        : undefined;
-    const refreshManagedRole = movedTo !== undefined && managedRoleName !== undefined;
-
-    if (movedTo !== undefined && managedRoleName === undefined && roleArn) {
-      roleScopeWarning = {
-        reason: "custom-role",
-        roleArn,
-        logGroupNames: logGroupNamesOf(movedTo),
-      };
-    } else if (movedTo !== undefined && !refreshManagedRole && roleArn) {
-      // managed role, but the caller declined the refresh
-      roleScopeWarning = {
-        reason: "update-declined",
-        roleArn,
-        logGroupNames: logGroupNamesOf(movedTo),
-      };
-    }
-
-    if (refreshManagedRole && update.updateRole !== false) {
-      const iam = this.clients.iam({ region: options.region });
-      const newLogGroups = logGroupNamesOf(movedTo);
-      const oldLogGroups = current.dataSourceConfig
-        ? logGroupNamesOf(current.dataSourceConfig)
-        : [];
-      // The evaluator list may have changed alongside the data source, so
-      // re-resolve the keys rather than reusing the ones from create.
-      const kmsKeys = await evaluatorKmsKeys(
-        update.evaluatorIds ??
-          (current.evaluators ?? [])
-            .map((e) => ("evaluatorId" in e ? e.evaluatorId : undefined))
-            .filter((id): id is string => id !== undefined),
-        control,
-      );
-
-      // Grant the new scope as its own inline policy before the update, then
-      // revoke the superseded one only once the update has landed. IAM unions
-      // Allows across a role's inline policies, so both scopes are granted in
-      // between — and because each scope is a separate policy, a failed update
-      // leaves the one backing the current data source exactly as it was.
-      const { roleArn: managedRoleArn, policyName: newPolicyName } = await grantOnlineEvalScope(
-        iam,
-        managedRoleName,
-        options.region,
-        newLogGroups,
-        kmsKeys,
-        resourceNameFromArn(roleArn!),
-      );
-      const oldPolicyName = scopePolicyName(
-        executionPolicy(
-          options.region,
-          accountIdFromRoleArn(managedRoleArn),
-          oldLogGroups,
-          kmsKeys,
-        ),
-      );
-
-      const response = await control.send(
-        new UpdateOnlineEvaluationConfigCommand({
-          onlineEvaluationConfigId: id,
-          rule: toRule(samplingPercentage, sessionTimeoutMinutes, filters),
-          dataSourceConfig,
-          evaluators,
-        }),
-      );
-
-      if (newPolicyName !== oldPolicyName) {
-        const revoked = await revokeOnlineEvalScope(
-          iam,
-          resourceNameFromArn(managedRoleArn),
-          oldPolicyName,
-        ).catch(() => false);
-        // The config is already correct; the role just still grants a data
-        // source it no longer uses, either because the delete failed or because
-        // the policy was written under a legacy name this build cannot derive.
-        if (!revoked) {
-          roleScopeWarning = {
-            reason: "stale-scope",
-            roleArn: roleArn!,
-            logGroupNames: oldLogGroups,
-          };
-        }
-      }
-      return { response, roleScopeWarning };
-    }
-
+    // Like `harness update`, the execution role is never provisioned or
+    // re-scoped here: a role passed via --role-arn is forwarded as-is and the
+    // caller owns keeping its policy in step with any data-source move.
     const response = await control.send(
       new UpdateOnlineEvaluationConfigCommand({
         onlineEvaluationConfigId: id,
+        description: update.description,
         rule: toRule(samplingPercentage, sessionTimeoutMinutes, filters),
         dataSourceConfig,
         evaluators,
+        outputConfig: update.outputConfig,
         evaluationExecutionRoleArn: update.evaluationExecutionRoleArn,
       }),
     );
-    return { response, roleScopeWarning };
+    return { response };
   }
 
   async getOnlineEvaluationConfig(
