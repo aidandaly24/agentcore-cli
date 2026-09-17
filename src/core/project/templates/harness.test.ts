@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import type z from "zod";
 import { HarnessSpecSchema } from "../../../projectSchemas/harness";
-import { HarnessConfigReader } from "../../../io/harnessConfig";
 import { FsAssetSource } from "../source";
 import { getHarnessTemplateResolver } from "./harness";
 import { HandlebarsTemplateRenderer } from "./renderer";
@@ -36,16 +35,15 @@ async function scaffold(overrides: Partial<z.input<typeof HarnessSpecSchema>> = 
 }
 
 test("scaffolds valid YAML with inactive examples and a resolvable prompt", async () => {
-  const { directory, path, yaml, data } = await scaffold();
+  const { directory, yaml, data } = await scaffold();
   expect((await readdir(directory)).sort()).toEqual(["harness.yaml", "system-prompt.md"]);
   expect(data).toEqual({
     name: "assistant",
     model,
-    systemPrompt: "file://./system-prompt.md",
     memory: { mode: "managed" },
   });
   expect(yaml).toMatchSnapshot();
-  expect(HarnessSpecSchema.parse(await new HarnessConfigReader().read(path)).systemPrompt).toBe(
+  expect(await readFile(join(directory, "system-prompt.md"), "utf8")).toBe(
     "You are a helpful assistant",
   );
 });
@@ -121,29 +119,30 @@ test("serializes supplied nested strings, arrays, maps, and zero values without 
     maxIterations: 2,
     timeoutSeconds: 19,
   };
-  const { data, path } = await scaffold(overrides);
-  const expected = HarnessSpecSchema.parse({
+  const { data, directory } = await scaffold(overrides);
+  const { systemPrompt, ...expected } = HarnessSpecSchema.parse({
     name: "assistant",
     model,
     ...overrides,
     memory: { mode: "managed" },
   });
-  expect(data).toEqual({ ...expected, systemPrompt: "file://./system-prompt.md" });
-  expect(HarnessSpecSchema.parse(await new HarnessConfigReader().read(path))).toEqual(expected);
+  expect(data).toEqual(expected);
+  expect(await readFile(join(directory, "system-prompt.md"), "utf8")).toBe(systemPrompt!);
 });
 
-test("preserves a supplied explicit prompt reference", async () => {
-  const { data, directory } = await scaffold({ systemPrompt: "file://../shared.md" });
-  expect(data.systemPrompt).toBe("file://../shared.md");
-  expect(await readFile(join(directory, "system-prompt.md"), "utf8")).not.toContain("file://");
+test("writes supplied instructions to the conventional prompt file", async () => {
+  const systemPrompt = "\uFEFFBe concise.\r\n";
+  const { data, directory } = await scaffold({ systemPrompt });
+  expect(data.systemPrompt).toBeUndefined();
+  expect(await readFile(join(directory, "system-prompt.md"), "utf8")).toBe(systemPrompt);
 });
 
 test("defaults only absent memory and does not mask an invalid supplied setting", async () => {
   await expect(scaffold({ memory: null })).rejects.toThrow();
 });
 
-test.each(["file://", "", " \n"])(
-  "shared project scaffolding rejects invalid authoring prompt %j",
+test.each(["", " \n"])(
+  "shared project scaffolding rejects blank prompt %j",
   async (systemPrompt) => {
     await expect(scaffold({ systemPrompt })).rejects.toThrow();
   },

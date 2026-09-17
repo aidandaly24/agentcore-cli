@@ -173,19 +173,16 @@ name: assistant
 model:
   provider: bedrock
   modelId: global.anthropic.claude-sonnet-4-6
-systemPrompt: file://./system-prompt.md
+# Instructions come from system-prompt.md unless systemPrompt is set inline.
+# systemPrompt: You are a helpful assistant.
 memory:
   mode: managed
 ```
 
-Only `systemPrompt` and
-`truncation.config.summarization.summarizationSystemPrompt` resolve local
-`file://` references. The prefix is removed and the remaining filesystem path
-is resolved relative to **the YAML file's directory**, not the shell's working
-directory. `file://./prompt.md`, `file://../shared/prompt.md`, and absolute
-filesystem paths are supported. Paths use native filesystem spelling (including
-Windows drive paths), not URL host or percent-encoding rules; spaces, `#`, and
-`%` in a filename stay literal. YAML quoting preserves special characters.
+Both deployment and local export use inline `systemPrompt` text when it is
+provided. Otherwise, instructions come from `system-prompt.md` next to
+`harness.yaml`. Prompt contents are not trimmed, and blank prompts are rejected.
+Prompt settings do not resolve local file references.
 
 ```yaml
 systemPrompt: |
@@ -194,23 +191,13 @@ truncation:
   strategy: summarization
   config:
     summarization:
-      summarizationSystemPrompt: "file://../shared/summary #1.md"
+      summarizationSystemPrompt: Keep decisions and open questions.
 ```
 
-Both build/deploy and local export resolve these files to literal text before
-schema validation. Explicit prompt text or a reference takes precedence over
-`system-prompt.md`. That conventional file is used only when `systemPrompt` is
-omitted. A bad explicit reference never falls back silently. Referenced files
-must be readable, nonempty UTF-8 text of at most **1 MiB each**; whitespace-only
-files are rejected. Inline text and file contents preserve their whitespace.
-File contents are not interpreted as further references.
-Plain strings such as `README.md`, `./instructions.md`, and HTTPS URLs are
-literal prompt text, not file references.
-
-`project add harness --system-prompt file://./selected.md` preserves that
-reference in the generated YAML. Scaffolding validates reference syntax without
-reading or copying the selected file; build and export resolve it from the new
-harness directory. A literal `--system-prompt` is written to `system-prompt.md`.
+`project add harness --system-prompt "Your instructions"` writes the supplied
+text to `system-prompt.md`, leaving `systemPrompt` out of the generated YAML.
+Summary instructions in
+`truncation.config.summarization.summarizationSystemPrompt` are inline text.
 
 Skills are unchanged: skill paths refer to the **runtime/container filesystem**,
 not local files to package. Other fields do not support local includes.

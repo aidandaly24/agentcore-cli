@@ -2,8 +2,8 @@
 
 {{yaml.name}}
 
-# Inline prompt text or a file:// path relative to this YAML file.
-{{yaml.systemPrompt}}
+# Instructions come from system-prompt.md unless systemPrompt is set inline.
+# systemPrompt: You are a helpful assistant.
 
 # Model
 {{yaml.model}}

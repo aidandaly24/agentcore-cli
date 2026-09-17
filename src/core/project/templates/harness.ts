@@ -1,11 +1,7 @@
 import { existsSync } from "node:fs";
 import { stringify } from "yaml";
 import { ZodError, z } from "zod";
-import {
-  HarnessAuthoringSchema,
-  HarnessSpecSchema,
-  type HarnessSpec,
-} from "../../../projectSchemas/harness";
+import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
 import { FsTreeNode } from "./fsTree";
 import { InputValidationError, ResourceNotFoundError } from "../../../errors/errors";
 import type { TemplateRenderer, TemplateResolver } from "./types";
@@ -14,7 +10,6 @@ import type { AssetSource } from "../source";
 const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant";
 const TEMPLATE_FIELDS = new Set([
   "name",
-  "systemPrompt",
   "model",
   "tools",
   "allowedTools",
@@ -49,12 +44,8 @@ export function getHarnessTemplateResolver(
         memory: spec.memory === undefined ? { mode: "managed" } : spec.memory,
         dockerfile: spec.dockerfile ? "Dockerfile" : undefined,
       });
-      const systemPrompt = parsed.systemPrompt;
-      const promptReference = systemPrompt?.startsWith("file://")
-        ? systemPrompt
-        : "file://./system-prompt.md";
-
-      const context = buildTemplateContext({ ...parsed, systemPrompt: promptReference });
+      const { systemPrompt, ...settings } = parsed;
+      const context = buildTemplateContext(settings);
       const tree = await FsTreeNode.fromAssetSource(
         { assetSource: config.assetSource },
         { assetDir: "templates/harness" },
@@ -64,10 +55,9 @@ export function getHarnessTemplateResolver(
         },
       );
       tree.children.push(
-        FsTreeNode.createFile("system-prompt.md", async () =>
-          systemPrompt?.startsWith("file://")
-            ? DEFAULT_SYSTEM_PROMPT
-            : (systemPrompt ?? DEFAULT_SYSTEM_PROMPT),
+        FsTreeNode.createFile(
+          "system-prompt.md",
+          async () => systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
         ),
         ...(spec.dockerfile ? [FsTreeNode.fromTextFile("Dockerfile", spec.dockerfile)] : []),
       );
@@ -116,7 +106,7 @@ export function validateHarnessTemplateSource(spec: z.input<typeof HarnessSpecSc
 
 function parseHarnessSpec(spec: z.input<typeof HarnessSpecSchema>) {
   try {
-    return HarnessAuthoringSchema.parse(spec);
+    return HarnessSpecSchema.parse(spec);
   } catch (err) {
     if (err instanceof ZodError) throw new InputValidationError(z.prettifyError(err));
     throw err;

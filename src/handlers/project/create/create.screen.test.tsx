@@ -211,7 +211,7 @@ describe("project create wizard", () => {
       apiKeyArn,
     });
     expect(harness.memory).toEqual({ mode: "managed" });
-    expect(harness.systemPrompt).toBe("file://./system-prompt.md");
+    expect(harness.systemPrompt).toBeUndefined();
     r.unmount();
   }, 10000);
 

@@ -24,15 +24,9 @@ test.each([
 });
 
 test.each([
-  ...['literal', 'file', 'fallback'].map(source => ({
-    source, prompt: '  Selected prompt: # 100%\n',
-  })),
-  ...['README.md\n', './instructions.md', 'https://example.com/prompt.md\n', 'file://./not-a-recursive-include.md'].map(prompt => ({
-    source: 'file', prompt,
-  })),
-  { source: 'literal', prompt: './instructions.md' },
-  { source: 'fallback', prompt: 'README.md\n' },
-])('generated app validates $source prompt $prompt without rewriting it', ({ source, prompt }) => {
+  { source: 'inline', prompt: '  Inline instructions: # 100%\n' },
+  { source: 'file', prompt: '\uFEFFREADME.md\r\n' },
+])('generated app deploys the $source prompt without rewriting YAML', ({ source, prompt }) => {
   const root = mkdtempSync(join(tmpdir(), 'harness-yaml-synth-'));
   roots.push(root);
   const configRoot = join(root, 'agentcore');
@@ -48,20 +42,18 @@ test.each([
   }));
   writeFileSync(join(configRoot, 'aws-targets.json'), '[]');
   const summary = 'Keep decisions and open questions.\n';
-  writeFileSync(join(harnessDir, 'chosen #100%.md'), prompt);
-  writeFileSync(join(harnessDir, 'system-prompt.md'), source === 'fallback' ? prompt : 'Conventional prompt loses.');
-  writeFileSync(join(harnessDir, 'summary.md'), summary);
+  writeFileSync(join(harnessDir, 'system-prompt.md'), source === 'file' ? prompt : 'Conventional prompt loses.');
   const yaml = '# Customer comment stays intact.\n' + stringify({
     name: 'assistant',
     model: {
       provider: 'bedrock',
       modelId: 'global.anthropic.claude-sonnet-4-6',
     },
-    systemPrompt: source === 'fallback' ? undefined : source === 'literal' ? prompt : 'file://./chosen #100%.md',
+    systemPrompt: source === 'file' ? undefined : prompt,
     memory: { mode: 'disabled' },
     truncation: {
       strategy: 'summarization',
-      config: { summarization: { summaryRatio: 0.3, preserveRecentMessages: 0, summarizationSystemPrompt: 'file://./summary.md' } },
+      config: { summarization: { summaryRatio: 0.3, preserveRecentMessages: 0, summarizationSystemPrompt: summary } },
     },
   });
   writeFileSync(join(harnessDir, 'harness.yaml'), yaml);
@@ -79,8 +71,4 @@ test.each([
   expect(harness.Properties.SystemPrompt).toEqual([{ Text: prompt }]);
   expect(harness.Properties.Memory).toEqual({ Disabled: {} });
   expect(JSON.stringify(harness.Properties)).toContain(JSON.stringify(summary).slice(1, -1));
-  expect(JSON.stringify(harness.Properties)).not.toContain('file://./chosen #100%.md');
-  expect(JSON.stringify(harness.Properties)).not.toContain('file://./summary.md');
-  expect(readFileSync(join(harnessDir, 'chosen #100%.md'), 'utf8')).toBe(prompt);
-  expect(readFileSync(join(harnessDir, 'harness.yaml'), 'utf8')).toBe(yaml);
 });

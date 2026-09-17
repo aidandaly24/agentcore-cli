@@ -318,8 +318,8 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
 });
 
 describe("FsProjectManager.exportHarness side effects", () => {
-  test.each(["literal", "file", "fallback"] as const)(
-    "exports the %s prompt and resolved summary without rewriting YAML",
+  test.each(["inline", "file"] as const)(
+    "exports the %s prompt and inline summary without rewriting YAML",
     async (source) => {
       const { manager: subject } = manager();
       const project = await projectWithHarness(subject);
@@ -329,15 +329,13 @@ describe("FsProjectManager.exportHarness side effects", () => {
       const prompt = "  Explicit prompt.\nKeep its whitespace.\n";
       await Bun.write(
         join(dir, "system-prompt.md"),
-        source === "fallback" ? prompt : "Conventional prompt loses.",
+        source === "file" ? prompt : "Conventional prompt loses.",
       );
-      await Bun.write(join(dir, "chosen #1%.md"), prompt);
-      await Bun.write(join(dir, "summary.md"), "  Keep the decisions.\n");
-      if (source === "fallback") delete config.systemPrompt;
-      else config.systemPrompt = source === "literal" ? prompt : "file://./chosen #1%.md";
+      if (source === "file") delete config.systemPrompt;
+      else config.systemPrompt = prompt;
       config.truncation = {
         strategy: "summarization",
-        config: { summarization: { summarizationSystemPrompt: "file://./summary.md" } },
+        config: { summarization: { summarizationSystemPrompt: "  Keep the decisions.\n" } },
       };
       const yaml = "# Keep this customer comment.\n" + stringify(config);
       await Bun.write(configPath, yaml);
@@ -345,7 +343,6 @@ describe("FsProjectManager.exportHarness side effects", () => {
       const main = await Bun.file(join(result.agentPath, "main.py")).text();
       expect(main).toContain(prompt);
       expect(main).toContain("Keep the decisions.");
-      expect(main).not.toContain("file://");
       expect(main).not.toContain("Conventional prompt loses.");
       expect(await Bun.file(configPath).text()).toBe(yaml);
     },

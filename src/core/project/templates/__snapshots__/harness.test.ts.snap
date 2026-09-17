@@ -5,8 +5,8 @@ exports[`scaffolds valid YAML with inactive examples and a resolvable prompt 1`]
 
 name: assistant
 
-# Inline prompt text or a file:// path relative to this YAML file.
-systemPrompt: file://./system-prompt.md
+# Instructions come from system-prompt.md unless systemPrompt is set inline.
+# systemPrompt: You are a helpful assistant.
 
 # Model
 model:

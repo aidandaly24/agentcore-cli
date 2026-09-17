@@ -83,7 +83,7 @@ describe("project create", () => {
       modelId: "global.anthropic.claude-sonnet-4-6",
     });
     expect(harness.memory).toEqual({ mode: "managed" });
-    expect(harness.systemPrompt).toBe("file://./system-prompt.md");
+    expect(harness.systemPrompt).toBeUndefined();
     expect(harness.tools).toBeUndefined();
     expect(harness.skills).toBeUndefined();
     expect(existsSync(join(projectRoot, "app", "MyAgent", "harness.json"))).toBe(false);

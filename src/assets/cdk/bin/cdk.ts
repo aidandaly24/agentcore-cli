@@ -4,7 +4,7 @@ import { ConfigIO, HarnessSpecSchema, type AwsDeploymentTarget } from '@aws/agen
 import { App, type Environment } from 'aws-cdk-lib';
 import * as path from 'path';
 import * as fs from 'fs';
-import { HarnessConfigReader } from '../io/harnessConfig';
+import { parse } from 'yaml';
 
 function toEnvironment(target: AwsDeploymentTarget): Environment {
   return {
@@ -68,14 +68,13 @@ function resolveConnectorParametersByFile(
 // Synthesize a HarnessConfig for each harness entry in the spec. The full validated
 // spec drives the AWS::BedrockAgentCore::Harness CFN resource; the role-scoped
 // fields drive the IAM role + container build.
-async function resolveHarnessConfigs(spec: SpecWithLatestFields, projectRoot: string): Promise<HarnessConfig[]> {
+function resolveHarnessConfigs(spec: SpecWithLatestFields, projectRoot: string): HarnessConfig[] {
   const harnessConfigs: HarnessConfig[] = [];
   for (const entry of spec.harnesses ?? []) {
     const harnessDir = path.resolve(projectRoot, entry.path);
     const harnessPath = path.resolve(harnessDir, 'harness.yaml');
-    const data = await new HarnessConfigReader().read(harnessPath);
     try {
-      const harnessSpec = HarnessSpecSchema.parse(data);
+      const harnessSpec = HarnessSpecSchema.parse(parse(fs.readFileSync(harnessPath, 'utf-8')));
       harnessConfigs.push({
         name: entry.name,
         executionRoleArn: harnessSpec.executionRoleArn,
@@ -125,7 +124,7 @@ async function main() {
 
   const mcpSpec = resolveMcpSpec(specAny);
   const connectorParametersByFile = resolveConnectorParametersByFile(specAny, projectRoot);
-  const harnessConfigs = await resolveHarnessConfigs(specAny, projectRoot);
+  const harnessConfigs = resolveHarnessConfigs(specAny, projectRoot);
 
   // Read deployed state for credential ARNs (populated by pre-deploy identity setup).
   // Under agentcore/.cli/ to match the released CLI's location.

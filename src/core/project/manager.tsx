@@ -30,6 +30,8 @@ import {
   createLineSplitter,
   requireTool,
   runProcess,
+  readTextFile,
+  readYamlFile,
   type ProcessRunner,
   type ReadWriteJson,
 } from "../../io";
@@ -46,7 +48,6 @@ import {
   mapHarnessToExportPlan,
 } from "./templates/export";
 import { HarnessSpecSchema } from "../../projectSchemas/harness";
-import { HarnessConfigReader } from "../../io/harnessConfig";
 import { FsTreeNode } from "./templates/fsTree";
 import { getEvaluatorTemplateResolver } from "./templates/evaluator";
 import { ProjectSpecSchema, type ManagedBy } from "../../projectSchemas/project";
@@ -63,6 +64,7 @@ import { PolicyEngineSchema, PolicySchema } from "../../projectSchemas/policy";
 import { enclosingProjectRoot, projectSpecPath } from "./fsUtils";
 import {
   AgentCoreCLIError,
+  DeserializationError,
   InputValidationError,
   InvalidEnvironmentError,
   MalformedServiceResponseError,
@@ -744,7 +746,7 @@ export class FsProjectManager implements ProjectManager {
         message: `Reading harness configuration from '${join(entry.path, "harness.yaml")}'`,
       };
       const harnessPath = join(harnessDir, "harness.yaml");
-      const parsed = HarnessSpecSchema.safeParse(await new HarnessConfigReader().read(harnessPath));
+      const parsed = HarnessSpecSchema.safeParse(await readYamlFile(harnessPath));
       if (!parsed.success) {
         throw new InputValidationError(
           `Invalid harness.yaml at '${harnessPath}': ${z.prettifyError(parsed.error)}`,
@@ -753,6 +755,24 @@ export class FsProjectManager implements ProjectManager {
       }
       spec = parsed.data;
       systemPrompt = spec.systemPrompt ?? DEFAULT_EXPORT_SYSTEM_PROMPT;
+      if (spec.systemPrompt === undefined) {
+        const promptPath = join(harnessDir, "system-prompt.md");
+        try {
+          systemPrompt = await readTextFile(promptPath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw new DeserializationError(promptPath, {
+              cause: error,
+              details: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+        if (!systemPrompt.trim()) {
+          throw new InputValidationError(
+            `System prompt file '${promptPath}' is empty or whitespace-only.`,
+          );
+        }
+      }
     }
 
     // Refuse to overwrite anything: the target name must be free in the spec

@@ -435,6 +435,11 @@ export const AllowedToolSchema = z
   .min(1)
   .max(64)
   .regex(/^(\*|@?[^/]+(\/[^/]+)?)$/, 'Must be "*" or a tool name pattern (max 64 chars)');
+export function looksLikeLegacyPromptPath(value: string): boolean {
+  const v = value.trim();
+  if (!/^\S+$/.test(v)) return false;
+  return /^\.\.?\//.test(v) || /\.(md|txt)$/i.test(v);
+}
 export const HarnessSpecSchema = z
   .object({
     name: HarnessNameSchema,
@@ -443,6 +448,10 @@ export const HarnessSpecSchema = z
       .string()
       .refine((val) => val.trim().length > 0, {
         message: "systemPrompt must not be empty or whitespace-only",
+      })
+      .refine((val) => !looksLikeLegacyPromptPath(val), {
+        message:
+          "systemPrompt looks like a file path. It is now always literal text — put file-backed prompts in a `system-prompt.md` in the harness directory (auto-discovered), or inline the prompt text here.",
       })
       .optional(),
     tools: z
@@ -575,22 +584,6 @@ export const HarnessSpecSchema = z
     }
   });
 export type HarnessSpec = z.infer<typeof HarnessSpecSchema>;
-
-/** Scaffold references name future YAML-relative files; validate syntax without reading them. */
-export const HarnessAuthoringSchema = HarnessSpecSchema.refine(
-  ({ systemPrompt }) => systemPrompt !== "file://",
-  { path: ["systemPrompt"], message: "systemPrompt: file:// requires a path" },
-).refine(
-  ({ truncation }) =>
-    !truncation?.config ||
-    !("summarization" in truncation.config) ||
-    truncation.config.summarization.summarizationSystemPrompt !== "file://",
-  {
-    path: ["truncation", "config", "summarization", "summarizationSystemPrompt"],
-    message: "summarizationSystemPrompt: file:// requires a path",
-  },
-);
-
 export const HarnessRegistryEntrySchema = z.object({
   name: HarnessNameSchema,
   path: z.string().min(1, "Path to harness config directory is required"),

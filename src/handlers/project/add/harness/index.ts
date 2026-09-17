@@ -4,7 +4,7 @@ import type { AddProjectResourceConfig } from "../types";
 import { addProjectResource } from "../shared";
 import { parseJsonFlag, parseTags } from "../../../utils";
 import { InputValidationError } from "../../../../errors";
-import { HarnessAuthoringSchema } from "../../../../projectSchemas/harness";
+import { HarnessSpecSchema } from "../../../../projectSchemas/harness";
 
 /** The model a harness runs on when none is configured; `project create`'s
  * harness path shares it so the two entry points cannot drift. */
@@ -105,7 +105,7 @@ export const createAddHarnessHandler = (config: AddProjectResourceConfig) =>
         dockerfile: flags["dockerfile"],
       };
 
-      const result = HarnessAuthoringSchema.safeParse(harnessInput);
+      const result = HarnessSpecSchema.safeParse(harnessInput);
       if (!result.success)
         throw new InputValidationError(z.prettifyError(result.error), { cause: result.error });
 

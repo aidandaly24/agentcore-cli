@@ -5,10 +5,12 @@ This CDK project is managed by the AgentCore CLI. It deploys your agent infrastr
 ## Structure
 
 - `bin/cdk.ts` — Entry point. Reads project configuration from `agentcore/` and creates a stack per deployment target.
-- `io/harnessConfig.ts` — Reads each harness YAML file and resolves its local prompt references before validation with `HarnessSpecSchema` from `@aws/agentcore-cdk`.
 - `lib/cdk-stack.ts` — Defines `AgentCoreStack`, which wraps the `AgentCoreApplication` L3 construct.
 - `test/cdk.test.ts` — Unit tests for stack synthesis.
 - `test/harness.test.ts` — Tests owner-schema prompt validation and generated-app harness synthesis.
+
+Harness settings are read from `harness.yaml`. Inline `systemPrompt` text overrides
+the conventional `system-prompt.md` file in the harness directory.
 
 ## Useful commands
 
