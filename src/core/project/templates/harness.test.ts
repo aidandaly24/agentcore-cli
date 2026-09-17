@@ -6,10 +6,16 @@ import { parse } from "yaml";
 import type z from "zod";
 import { HarnessSpecSchema } from "../../../projectSchemas/harness";
 import { HarnessConfigReader } from "../../../io/harnessConfig";
+import { FsAssetSource } from "../source";
 import { getHarnessTemplateResolver } from "./harness";
+import { HandlebarsTemplateRenderer } from "./renderer";
 
 const roots: string[] = [];
 const model = { provider: "bedrock", modelId: "example" } as const;
+const config = {
+  assetSource: new FsAssetSource(),
+  templateRenderer: new HandlebarsTemplateRenderer(),
+};
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -17,7 +23,7 @@ afterEach(async () => {
 async function scaffold(overrides: Partial<z.input<typeof HarnessSpecSchema>> = {}) {
   const root = await mkdtemp(join(tmpdir(), "harness-yaml-template-"));
   roots.push(root);
-  const { tree } = await getHarnessTemplateResolver().resolve({
+  const { tree } = await getHarnessTemplateResolver(config).resolve({
     name: "assistant",
     model,
     ...overrides,
@@ -38,10 +44,7 @@ test("scaffolds valid YAML with inactive examples and a resolvable prompt", asyn
     systemPrompt: "file://./system-prompt.md",
     memory: { mode: "managed" },
   });
-  expect(yaml).toMatch(/^# maxTokens:/m);
-  expect(yaml).toContain("agentcore_code_interpreter");
-  expect(yaml).toContain("remote_mcp");
-  expect(yaml).toMatch(/^# https:\/\/docs\.aws\.amazon\.com\//m);
+  expect(yaml).toMatchSnapshot();
   expect(HarnessSpecSchema.parse(await new HarnessConfigReader().read(path)).systemPrompt).toBe(
     "You are a helpful assistant",
   );
@@ -75,6 +78,7 @@ test("serializes supplied nested strings, arrays, maps, and zero values without 
       maxTokens: 27,
       additionalParams: {
         quoted: 'a: "b" # comment\nnext',
+        template: "{{name}} {{#if tools}}not expanded{{/if}}",
         flags: [false, 0, "007", "null"],
         nested: { "a: b": "[x]" },
       },
@@ -94,8 +98,16 @@ test("serializes supplied nested strings, arrays, maps, and zero values without 
     ],
     allowedTools: ["@custom/search"],
     skills: [{ path: "/opt/runtime-only" }],
-    environmentVariables: { YES: "true", NUMBER: "007", NULL: "null", OTHER: "a: b\nc" },
+    environmentVariables: {
+      YES: "true",
+      NUMBER: "007",
+      NULL: "null",
+      OTHER: "a: b\nc",
+      EMPTY: "",
+      TRAILING: "line\n\n",
+    },
     tags: { team: "false" },
+    networkMode: "PUBLIC",
     truncation: {
       strategy: "summarization",
       config: {

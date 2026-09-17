@@ -333,7 +333,10 @@ export class FsProjectManager implements ProjectManager {
         const outputPath = join(project.rootPath, "app", input.resourceConfig.name);
         scaffoldedPaths.push(outputPath);
 
-        const resolver = getHarnessTemplateResolver();
+        const resolver = getHarnessTemplateResolver({
+          assetSource: this.assetSource,
+          templateRenderer: this.templateRenderer,
+        });
         const result = await resolver.resolve(input.resourceConfig);
         await result.tree.write(dirname(outputPath));
         if (result.spec.harnesses) projectSpec.harnesses.push(...result.spec.harnesses);
