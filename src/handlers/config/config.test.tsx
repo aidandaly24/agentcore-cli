@@ -56,6 +56,37 @@ describe("config", () => {
     expect(JSON.parse(output)).toBe(true);
   });
 
+  test("imperative mutations default to false for existing and missing config files", async () => {
+    expect(JSON.parse(await run(["imperative-mutation-commands"]))).toBe(false);
+    await rm(configPath);
+    expect(JSON.parse(await run(["imperative-mutation-commands"]))).toBe(false);
+  });
+
+  test("persists the mutation flag across config accessor instances", async () => {
+    for (const enabled of [true, false]) {
+      expect(JSON.parse(await run(["imperative-mutation-commands", String(enabled)]))).toBe(
+        enabled,
+      );
+      expect(JSON.parse(await run(["imperative-mutation-commands"]))).toBe(enabled);
+    }
+  });
+
+  test("rejects an invalid mutation flag without changing the saved value", async () => {
+    await run(["imperative-mutation-commands", "true"]);
+    await expect(run(["imperative-mutation-commands", "banana"])).rejects.toThrow(
+      InputValidationError,
+    );
+    expect(JSON.parse(await run(["imperative-mutation-commands"]))).toBe(true);
+  });
+
+  test("rejects a non-boolean mutation flag read from disk", async () => {
+    await writeFile(
+      configPath,
+      JSON.stringify({ ...validConfigOverrides, "imperative-mutation-commands": "true" }),
+    );
+    await expect(run([])).rejects.toThrow("Failed to deserialize");
+  });
+
   test("prints a nested object when a branch key is passed", async () => {
     const output = await run(["telemetry"]);
     expect(JSON.parse(output)).toMatchObject(validConfigOverrides.telemetry);

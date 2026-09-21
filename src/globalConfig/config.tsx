@@ -4,6 +4,7 @@ import type { DeepPartial, GlobalConfig } from "./types";
  * Default values for the global config. Includes a unique installationId for each process.
  */
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
+  "imperative-mutation-commands": false,
   telemetry: {
     enabled: true,
     audit: false,
@@ -20,6 +21,8 @@ export function applyOverrides(
   overrides: DeepPartial<GlobalConfig>,
 ): GlobalConfig {
   return {
+    "imperative-mutation-commands":
+      overrides["imperative-mutation-commands"] ?? defaults["imperative-mutation-commands"],
     telemetry: {
       enabled: overrides.telemetry?.enabled ?? defaults.telemetry.enabled,
       audit: overrides.telemetry?.audit ?? defaults.telemetry.audit,
