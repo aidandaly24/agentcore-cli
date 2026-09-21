@@ -1,5 +1,5 @@
-import React, { useState, type Ref } from "react";
-import { Box, Text, useInput, type DOMElement } from "ink";
+import React, { useState } from "react";
+import { Box, Text, useInput } from "ink";
 import { darkTheme, glyphs } from "../_core.js";
 import type { InkUITheme } from "../_core.js";
 
@@ -37,8 +37,6 @@ export interface TreeViewProps<T = unknown> {
    * to it. Without it the press is a no-op, as before.
    */
   onUpFromFirst?: () => void;
-  /** Lets a containing viewport keep the focused row visible. */
-  focusedRowRef?: Ref<DOMElement>;
   theme?: InkUITheme;
 }
 
@@ -80,7 +78,6 @@ export function TreeView<T = unknown>({
   focusMarker = false,
   focus = true,
   onUpFromFirst,
-  focusedRowRef,
   theme = darkTheme,
 }: TreeViewProps<T>): React.ReactElement {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
@@ -172,7 +169,7 @@ export function TreeView<T = unknown>({
           : "";
 
         return (
-          <Box key={node.id} flexDirection="row" ref={isFocused ? focusedRowRef : undefined}>
+          <Box key={node.id} flexDirection="row">
             {focusMarker && (
               <Text color={theme.colors.focus}>{isFocused ? `${glyphs.pointer} ` : "  "}</Text>
             )}
