@@ -196,6 +196,40 @@ test("renders supplied deployment settings once in their sections", async () => 
   expect(data).toEqual({ name: "assistant", model, ...defaultSettings, ...overrides });
 });
 
+test("preserves explicit empty settings and disabled truncation", async () => {
+  const { data, yaml } = await scaffold({
+    allowedTools: [],
+    truncation: { strategy: "none" },
+    model: { ...model, temperature: 0, topP: 0, maxTokens: 123, apiFormat: "responses" },
+  });
+  expect(data.allowedTools).toEqual([]);
+  expect(data.truncation).toEqual({ strategy: "none" });
+  expect(yaml).not.toContain("#     messagesCount: 40");
+  expect(yaml).not.toContain("# temperature:");
+  expect(yaml).not.toContain("# topP:");
+  expect(yaml).not.toContain("# maxTokens: 4096");
+  expect(yaml).not.toContain("# apiFormat:");
+});
+
+test.each([
+  ["bedrock", "converse_stream"],
+  ["open_ai", "responses"],
+  ["gemini", undefined],
+  ["lite_llm", undefined],
+] as const)("shows a compatible API format example for %s", async (provider, apiFormat) => {
+  const { yaml } = await scaffold({
+    model: { provider, modelId: "example", apiKeyArn: "arn:example" },
+  });
+  if (apiFormat) expect(yaml).toContain(`# apiFormat: ${apiFormat}`);
+  else expect(yaml).not.toContain("# apiFormat:");
+});
+
+test("keeps the sliding-window size optional", async () => {
+  const { data, yaml } = await scaffold({ truncation: { strategy: "sliding_window" } });
+  expect(data.truncation).toEqual({ strategy: "sliding_window" });
+  expect(yaml).toContain("  #     messagesCount: 40");
+});
+
 test("writes supplied instructions to the conventional prompt file", async () => {
   const systemPrompt = "\uFEFFBe concise.\r\n";
   const { data, directory } = await scaffold({ systemPrompt });
