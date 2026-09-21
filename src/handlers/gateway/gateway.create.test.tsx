@@ -63,6 +63,7 @@ async function run(args: string[]): Promise<string> {
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
+    imperativeMutationCommands: true,
   });
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
   return io.stdout();

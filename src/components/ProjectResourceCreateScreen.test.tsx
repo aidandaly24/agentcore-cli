@@ -23,6 +23,12 @@ const RESOURCES = [
     parentDescription: "inspect AgentCore Memories",
     addCommand: "agentcore project add memory",
   },
+  {
+    resource: "gateway",
+    label: "Gateway",
+    parentDescription: "manage AgentCore Gateways",
+    addCommand: "agentcore project add gateway --name MyGateway",
+  },
 ] as const satisfies {
   resource: ProjectCreateResource;
   label: string;
@@ -30,7 +36,7 @@ const RESOURCES = [
   addCommand: string;
 }[];
 
-describe("project-only resource creation guidance", () => {
+describe("project resource creation guidance", () => {
   test.each(RESOURCES)(
     "$resource lists create in its TUI menu and opens project instructions",
     async ({ resource, label, parentDescription, addCommand }) => {
@@ -62,4 +68,26 @@ describe("project-only resource creation guidance", () => {
       expect(command?.commands.some((candidate) => candidate.name() === "create")).toBe(false);
     }
   });
+
+  test.each(RESOURCES.filter(({ resource }) => resource !== "gateway"))(
+    "$resource keeps project guidance when Gateway mutations are enabled",
+    async ({ resource, label, addCommand }) => {
+      const r = renderScreen(`/agentcore/${resource}`, { imperativeMutationCommands: true });
+      await waitForText(r.lastFrame, "type to choose a command");
+      const entries = menuEntries(r.lastFrame()!);
+      expect(entries.screens[0]).toBe("create");
+      expect(entries.cliOnly).not.toContain("create");
+
+      await r.press("return");
+      await waitForText(r.lastFrame, `Create an AgentCore ${label}`);
+      expect(r.lastFrame()).toContain(addCommand);
+      expect(r.lastFrame()).not.toContain("this command runs from the command line");
+
+      const command = compiledRootCommand(undefined, true).commands.find(
+        (candidate) => candidate.name() === resource,
+      );
+      expect(command?.commands.some((candidate) => candidate.name() === "create")).toBe(false);
+      r.unmount();
+    },
+  );
 });

@@ -22,7 +22,7 @@ import {
 import type { AppIO } from "../io";
 import type { Core } from "./types.tsx";
 import type { Logger } from "../logging";
-import type { GlobalConfigAccessor } from "../globalConfig";
+import { DEFAULT_GLOBAL_CONFIG, type GlobalConfigAccessor } from "../globalConfig";
 import { PACKAGE_VERSION } from "../constants";
 
 export interface RootHandlerConfig {
@@ -77,7 +77,13 @@ export function createRootHandler(core: Core, config: RootHandlerConfig): Router
   root.handler(createIdentityHandler(core, io));
   root.handler(createRuntimeHandler(core, io));
   root.handler(createMemoryHandler(core, io));
-  root.handler(createGatewayHandler(core, io));
+  root.handler(
+    createGatewayHandler(
+      core,
+      io,
+      config.imperativeMutationCommands ?? DEFAULT_GLOBAL_CONFIG["imperative-mutation-commands"],
+    ),
+  );
   root.handler(createPaymentHandler(core, io));
   root.handler(createEvalHandler(core, io));
   root.handler(createFeedbackHandler(core, io));

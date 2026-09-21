@@ -40,6 +40,7 @@ async function runWithTestCore(args: string[]): Promise<TestCoreClient> {
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
+    imperativeMutationCommands: true,
   });
   await root.route(["node", "agentcore", ...args, "--region", "us-west-2"]);
   return core;
@@ -51,6 +52,7 @@ describe("Gateway update command hierarchy", () => {
       io: testIO().io,
       logger: createSilentLogger(),
       globalConfigAccessor: new TestGlobalConfigAccessor(),
+      imperativeMutationCommands: true,
     });
     const gateway = root.children().find((child) => child.name() === "gateway")!;
 
@@ -283,6 +285,7 @@ async function runFixture(args: string[]): Promise<string> {
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
+    imperativeMutationCommands: true,
   });
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
   return io.stdout();

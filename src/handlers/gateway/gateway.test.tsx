@@ -35,6 +35,7 @@ async function run<C extends Core>(
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
+    imperativeMutationCommands: true,
   });
 
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
@@ -47,6 +48,7 @@ function supportsTui(path: readonly string[]): boolean {
       io: testIO().io,
       logger: createSilentLogger(),
       globalConfigAccessor: new TestGlobalConfigAccessor(),
+      imperativeMutationCommands: true,
     }),
     ValueContext.EmptyContext(),
   );
@@ -65,6 +67,7 @@ describe("gateway command hierarchy", () => {
       io: testIO().io,
       logger: createSilentLogger(),
       globalConfigAccessor: new TestGlobalConfigAccessor(),
+      imperativeMutationCommands: true,
     });
     const gateway = root.children().find((child) => child.name() === "gateway");
     const target = gateway?.children().find((child) => child.name() === "target");

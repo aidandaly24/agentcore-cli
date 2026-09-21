@@ -15,7 +15,7 @@ afterEach(cleanupScreens);
 // a screen, so a command added later is covered without a new test. `help` is
 // Commander's own, not one of ours.
 function cliOnlyCommands(
-  command = compiledRootCommand(),
+  command = compiledRootCommand(undefined, true),
   path: string[] = [],
 ): [string[], Command][] {
   const here = [...path, command.name()];
@@ -99,7 +99,7 @@ describe("every command-line-only command opens on screen", () => {
   test.each(CLI_ONLY.map(([path, command]) => [path.join(" "), path, command] as const))(
     "%s opens its menu or help, and esc returns to the parent",
     async (_label, path, command) => {
-      const r = renderScreen("/" + path.join("/"));
+      const r = renderScreen("/" + path.join("/"), { imperativeMutationCommands: true });
       // Wide and tall enough that no option term wraps and nothing is below the
       // fold; scrolling and wrapping have their own tests.
       await r.resize(220, 200);
@@ -144,7 +144,7 @@ describe("paths without a screen of their own", () => {
   });
 
   test("a group drills down to a leaf's help and back", async () => {
-    const r = renderScreen("/agentcore/gateway");
+    const r = renderScreen("/agentcore/gateway", { imperativeMutationCommands: true });
 
     await waitForText(r.lastFrame, "command line only");
     await r.write("create");
@@ -189,7 +189,7 @@ describe("option help groups", () => {
   });
 
   test("a command whose flags carry no group keeps a single options section", async () => {
-    const r = renderScreen("/agentcore/gateway/create");
+    const r = renderScreen("/agentcore/gateway/create", { imperativeMutationCommands: true });
 
     await waitForText(r.lastFrame, "this command runs from the command line");
     const frame = r.lastFrame()!;

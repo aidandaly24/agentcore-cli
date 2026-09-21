@@ -51,6 +51,7 @@ async function run(
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
+    imperativeMutationCommands: true,
   });
 
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
@@ -221,6 +222,7 @@ async function runFixture(args: string[]): Promise<string> {
     io: io.io,
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
+    imperativeMutationCommands: true,
   });
   await root.route(["node", "agentcore", ...args, "--region", "us-east-1"]);
   return io.stdout();
