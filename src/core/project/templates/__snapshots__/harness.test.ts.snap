@@ -2,7 +2,6 @@
 
 exports[`scaffolds valid YAML with inactive examples and a resolvable prompt 1`] = `
 "# Harness configuration: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness.html
-# Commented settings are examples, not defaults.
 
 name: assistant
 
@@ -54,12 +53,6 @@ allowedTools: ["*"]
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html
 skills: []
 
-# Limits for one invocation, across all model calls.
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
-# maxIterations: 15
-# maxTokens: 20000
-# timeoutSeconds: 300
-
 # Controls how conversation history is kept within the model's context window.
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTruncationConfiguration.html
 truncation:
@@ -68,12 +61,18 @@ truncation:
   #   slidingWindow:
   #     messagesCount: 40
 
+# Limits for one invocation, across all model calls.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
+# maxIterations: 15
+# maxTokens: 20000
+# timeoutSeconds: 300
+
 # Values must be strings. Put quotes around numbers and booleans.
 # Environment values are stored in plaintext.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html
 environmentVariables: {}
 
-# Use a local Dockerfile OR an ECR image. Omit both to use the service-provided environment.
+# Use a local Dockerfile or an ECR image. Omit both to use the service-provided environment.
 # Dockerfile paths are relative to this file's directory.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html#harness-custom-container
 # dockerfile: Dockerfile

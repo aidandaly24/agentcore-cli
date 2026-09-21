@@ -1,5 +1,4 @@
 # Harness configuration: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness.html
-# Commented settings are examples, not defaults.
 
 {{yaml.name}}
 
@@ -80,24 +79,6 @@ allowedTools: ["*"]
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html
 {{yaml.skills}}
 
-# Limits for one invocation, across all model calls.
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
-{{#if yaml.maxIterations}}
-{{yaml.maxIterations}}
-{{else}}
-# maxIterations: 15
-{{/if}}
-{{#if yaml.maxTokens}}
-{{yaml.maxTokens}}
-{{else}}
-# maxTokens: 20000
-{{/if}}
-{{#if yaml.timeoutSeconds}}
-{{yaml.timeoutSeconds}}
-{{else}}
-# timeoutSeconds: 300
-{{/if}}
-
 # Controls how conversation history is kept within the model's context window.
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTruncationConfiguration.html
 {{#if yaml.truncation}}
@@ -117,6 +98,24 @@ truncation:
   #     messagesCount: 40
 {{/if}}
 
+# Limits for one invocation, across all model calls.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
+{{#if yaml.maxIterations}}
+{{yaml.maxIterations}}
+{{else}}
+# maxIterations: 15
+{{/if}}
+{{#if yaml.maxTokens}}
+{{yaml.maxTokens}}
+{{else}}
+# maxTokens: 20000
+{{/if}}
+{{#if yaml.timeoutSeconds}}
+{{yaml.timeoutSeconds}}
+{{else}}
+# timeoutSeconds: 300
+{{/if}}
+
 # Values must be strings. Put quotes around numbers and booleans.
 # Environment values are stored in plaintext.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html
@@ -126,7 +125,7 @@ truncation:
 environmentVariables: {}
 {{/if}}
 
-# Use a local Dockerfile OR an ECR image. Omit both to use the service-provided environment.
+# Use a local Dockerfile or an ECR image. Omit both to use the service-provided environment.
 # Dockerfile paths are relative to this file's directory.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html#harness-custom-container
 {{#if yaml.dockerfile}}
