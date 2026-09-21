@@ -3,10 +3,10 @@ import type { ScreenProps } from "../handlers/types";
 import { CommandInfoScreen } from "./CliOnlyScreen";
 import { darkTheme } from "./ui/_core.js";
 
-export type ProjectOnlyResource = "runtime" | "memory";
+export type ProjectCreateResource = "runtime" | "memory" | "gateway";
 
 const RESOURCES: Record<
-  ProjectOnlyResource,
+  ProjectCreateResource,
   { label: string; pluralLabel: string; description: string; addCommand: string }
 > = {
   runtime: {
@@ -21,9 +21,15 @@ const RESOURCES: Record<
     description: "create an AgentCore Memory in a project",
     addCommand: "agentcore project add memory",
   },
+  gateway: {
+    label: "Gateway",
+    pluralLabel: "Gateways",
+    description: "create an AgentCore Gateway in a project",
+    addCommand: "agentcore project add gateway --name MyGateway",
+  },
 };
 
-export function projectCreateTuiCommand(resource: ProjectOnlyResource) {
+export function projectCreateTuiCommand(resource: ProjectCreateResource) {
   return {
     name: "create",
     description: RESOURCES[resource].description,
@@ -31,12 +37,11 @@ export function projectCreateTuiCommand(resource: ProjectOnlyResource) {
 }
 
 interface ProjectResourceCreateScreenProps extends ScreenProps {
-  resource: ProjectOnlyResource;
+  resource: ProjectCreateResource;
 }
 
-// Runtime and Memory do not have imperative create commands. This screen keeps
-// their TUI menus discoverable while directing creation through the project
-// workflow that owns and deploys those resources.
+// This is informational only. Gateway routes here only when its imperative
+// create command is disabled; Runtime and Memory always use project creation.
 export function ProjectResourceCreateScreen({ resource }: ProjectResourceCreateScreenProps) {
   const config = RESOURCES[resource];
 

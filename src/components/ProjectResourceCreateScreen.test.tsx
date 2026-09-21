@@ -6,7 +6,7 @@ import {
   renderScreen,
   waitForText,
 } from "../testing";
-import type { ProjectOnlyResource } from "./ProjectResourceCreateScreen";
+import type { ProjectCreateResource } from "./ProjectResourceCreateScreen";
 
 afterEach(cleanupScreens);
 
@@ -24,7 +24,7 @@ const RESOURCES = [
     addCommand: "agentcore project add memory",
   },
 ] as const satisfies {
-  resource: ProjectOnlyResource;
+  resource: ProjectCreateResource;
   label: string;
   parentDescription: string;
   addCommand: string;
