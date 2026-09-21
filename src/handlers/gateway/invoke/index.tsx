@@ -4,6 +4,7 @@ import { SourceResolver, type AppIO } from "../../../io";
 import { withUserCancellation } from "../../../runnable";
 import { createHandler, flag, PathKey } from "../../../router";
 import { renderTuiAt } from "../../../tui";
+import { runWithProgress } from "../../../tui/progress";
 import { JsonKey } from "../../keys";
 import type { Core } from "../../types";
 import { coreOptsFromCtx } from "../../utils";
@@ -100,7 +101,7 @@ export const createInvokeGatewayHandler = (
       const gatewayId = flags.id;
       const payload = flags.payload;
 
-      await withUserCancellation(async (signal) => {
+      const invoke = async (signal: AbortSignal, beforeOutput: () => Promise<void>) => {
         const applicationHeaders = parseGatewayInvokeHeaders(flags.header);
         const sources = await resolveGatewayInvokeSources(
           { payload, bearerToken: flags["bearer-token"] },
@@ -129,10 +130,18 @@ export const createInvokeGatewayHandler = (
           outputFile: flags["output-file"],
           json: jsonOutput,
           signal,
+          beforeOutput,
         });
         if (response.statusCode < 200 || response.statusCode >= 300) {
           throw new GatewayInvokeResponseError(`HTTP ${response.statusCode}`);
         }
-      });
+      };
+      await withUserCancellation((signal) =>
+        runWithProgress((stop) => invoke(signal, stop), {
+          io,
+          label: "Invoking gateway...",
+          interactive: !jsonOutput,
+        }),
+      );
     },
   });

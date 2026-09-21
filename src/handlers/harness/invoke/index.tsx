@@ -5,6 +5,7 @@ import type { Core } from "../../types.tsx";
 import { coreOptsFromCtx } from "../../utils.tsx";
 import { JsonKey } from "../../keys.tsx";
 import { JsonRendererKey, renderTuiAt } from "../../../tui";
+import { runWithProgress } from "../../../tui/progress";
 import { InputValidationError } from "../../../errors";
 import { invokeHarnessTurn } from "./operation.ts";
 
@@ -43,16 +44,23 @@ export const createInvokeHarnessHandler = (core: Core, io: AppIO) =>
       }
 
       const opts = coreOptsFromCtx(ctx);
-      const result = await invokeHarnessTurn(
-        core.harness,
-        {
-          harnessId: flags["id"],
-          prompt: flags["prompt"],
-          qualifier: flags["qualifier"] ?? "DEFAULT",
-          sessionId: flags["session-id"],
-        },
-        opts,
-      );
+      const prompt = flags["prompt"];
+      const invoke = () =>
+        invokeHarnessTurn(
+          core.harness,
+          {
+            harnessId: flags["id"],
+            prompt,
+            qualifier: flags["qualifier"] ?? "DEFAULT",
+            sessionId: flags["session-id"],
+          },
+          opts,
+        );
+      const result = await runWithProgress(invoke, {
+        io,
+        label: "Invoking harness...",
+        interactive: !ctx.require(JsonKey),
+      });
       ctx.require(JsonRendererKey).renderJson(result);
     },
   });

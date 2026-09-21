@@ -13,6 +13,9 @@ import {
   expectError,
   TestCoreClient,
   TestGlobalConfigAccessor,
+  StreamController,
+  testIO,
+  tick,
   waitFor,
 } from "../../../testing";
 import { PathKey, ValueContext } from "../../../router";
@@ -80,6 +83,41 @@ function configuredCore(gateway: Partial<GetGatewayResponse> = {}): TestCoreClie
 }
 
 describe("gateway invoke", () => {
+  test.each([false, true])(
+    "hands progress to streamed output and respects JSON mode (json=%s)",
+    async (json) => {
+      const core = configuredCore();
+      const stream = new StreamController<Uint8Array>();
+      core.gateway.setInvokeResponse({ statusCode: 200, contentType: "text/plain", body: stream });
+      const io = testIO({ isTTY: true });
+      const pending = runCommand(core, io.io, [
+        "gateway",
+        "invoke",
+        "--id",
+        GATEWAY_ID,
+        "--payload",
+        "{}",
+        ...(json ? ["--json"] : []),
+      ]);
+      try {
+        await waitFor(() => core.gateway.calls.some(({ method }) => method === "invokeGateway"));
+        if (json) expect(io.stderr()).toBe("");
+        else await waitFor(() => io.stderr().includes("Invoking gateway..."));
+        stream.emit(Buffer.from("first"));
+        if (json) expect(io.stdout()).toBe("");
+        else await waitFor(() => io.stdout() === "first");
+        const afterFirstChunk = io.stderr();
+        await tick(120);
+        expect(io.stderr()).toBe(afterFirstChunk);
+      } finally {
+        stream.emit(Buffer.from("second"));
+        stream.end();
+        await pending;
+      }
+      expect(json ? JSON.parse(io.stdout()).body : io.stdout()).toBe("firstsecond");
+    },
+  );
+
   test("resolves the Gateway, invokes it, and streams exact response bytes", async () => {
     const core = configuredCore();
     const output = captureIO();

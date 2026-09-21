@@ -7,6 +7,7 @@ import { coreOptsFromCtx } from "../../utils";
 import { JsonKey } from "../../keys";
 import { ExitCode, withUserCancellation } from "../../../runnable";
 import { renderTuiAt } from "../../../tui";
+import { runWithProgress } from "../../../tui/progress";
 import {
   parseRuntimeInvokeHeaders,
   resolveRuntimeInvokeSources,
@@ -101,7 +102,7 @@ export const createInvokeRuntimeHandler = (core: Core, io: AppIO) =>
       }
       const runtimeId = flags.id;
       const payload = flags.payload;
-      await withUserCancellation(async (signal) => {
+      const invoke = async (signal: AbortSignal, beforeOutput: () => Promise<void>) => {
         const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
         const sources = await resolveRuntimeInvokeSources(
           { payload, bearerToken: flags["bearer-token"] },
@@ -139,7 +140,15 @@ export const createInvokeRuntimeHandler = (core: Core, io: AppIO) =>
           outputFile: flags["output-file"],
           json: jsonOutput,
           signal,
+          beforeOutput,
         });
-      });
+      };
+      await withUserCancellation((signal) =>
+        runWithProgress((stop) => invoke(signal, stop), {
+          io,
+          label: "Invoking runtime...",
+          interactive: !jsonOutput,
+        }),
+      );
     },
   });

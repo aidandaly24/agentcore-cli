@@ -11,6 +11,9 @@ import {
   TestCoreClient,
   TestGlobalConfigAccessor,
   testIO,
+  StreamController,
+  tick,
+  waitFor,
 } from "../../../testing";
 import { InputValidationError } from "../../../errors";
 
@@ -42,12 +45,11 @@ const TURN_EVENTS: InvokeHarnessStreamOutput[] = [
 
 // run routes `args` beneath `agentcore` over a fresh handler tree and returns
 // the core (for call assertions) and captured stdout.
-async function run(args: string[], configure?: (core: TestCoreClient) => void) {
+async function run(args: string[], configure?: (core: TestCoreClient) => void, io = testIO()) {
   const core = new TestCoreClient();
   core.harness.setGetResponse(GET_RESPONSE);
   core.harness.setInvokeEvents(...TURN_EVENTS);
   configure?.(core);
-  const io = testIO();
   const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
@@ -58,6 +60,39 @@ async function run(args: string[], configure?: (core: TestCoreClient) => void) {
 }
 
 describe("harness invoke", () => {
+  test.each([false, true])(
+    "waits for the transcript and respects JSON mode (json=%s)",
+    async (json) => {
+      const io = testIO({ isTTY: true });
+      const stream = new StreamController<InvokeHarnessStreamOutput>();
+      const pending = run(
+        [
+          "harness",
+          "invoke",
+          "--id",
+          "MyHarness-abc123",
+          "--prompt",
+          "hi",
+          ...(json ? ["--json"] : []),
+        ],
+        (core) => core.harness.queueInvokeStream(stream),
+        io,
+      );
+      try {
+        if (json) await tick(120);
+        else await waitFor(() => io.stderr().includes("Invoking harness..."));
+        expect(io.stdout()).toBe("");
+        if (json) expect(io.stderr()).toBe("");
+      } finally {
+        for (const event of TURN_EVENTS) stream.emit(event);
+        stream.end();
+        await pending;
+      }
+      expect(JSON.parse(io.stdout()).stopReason).toBe("end_turn");
+      if (json) expect(io.stderr()).toBe("");
+    },
+  );
+
   test("folds the stream into a JSON transcript", async () => {
     const { stdout } = await run([
       "harness",

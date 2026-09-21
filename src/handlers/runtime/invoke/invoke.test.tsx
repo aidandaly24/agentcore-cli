@@ -10,6 +10,9 @@ import {
   expectError,
   TestCoreClient,
   TestGlobalConfigAccessor,
+  StreamController,
+  testIO,
+  tick,
   waitFor,
 } from "../../../testing";
 import { ExitCode, runWithExitCode } from "../../../runnable";
@@ -85,6 +88,43 @@ async function run(
 }
 
 describe("runtime invoke", () => {
+  test.each([false, true])(
+    "hands progress to streamed output and respects JSON mode (json=%s)",
+    async (json) => {
+      const core = new TestCoreClient();
+      const stream = new StreamController<Uint8Array>();
+      core.runtime
+        .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
+        .setInvokeResponse({ statusCode: 200, contentType: "text/plain", body: stream });
+      const io = testIO({ isTTY: true });
+      const pending = runCommand(core, io.io, [
+        "runtime",
+        "invoke",
+        "--id",
+        RUNTIME_ID,
+        "--payload",
+        "{}",
+        ...(json ? ["--json"] : []),
+      ]);
+      try {
+        await waitFor(() => core.runtime.calls.some(({ method }) => method === "invokeRuntime"));
+        if (json) expect(io.stderr()).toBe("");
+        else await waitFor(() => io.stderr().includes("Invoking runtime..."));
+        stream.emit(Buffer.from("first"));
+        if (json) expect(io.stdout()).toBe("");
+        else await waitFor(() => io.stdout() === "first");
+        const afterFirstChunk = io.stderr();
+        await tick(120);
+        expect(io.stderr()).toBe(afterFirstChunk);
+      } finally {
+        stream.emit(Buffer.from("second"));
+        stream.end();
+        await pending;
+      }
+      expect(json ? JSON.parse(io.stdout()).body : io.stdout()).toBe("firstsecond");
+    },
+  );
+
   test("resolves the Runtime, invokes its ID in the current account, and writes exact bytes", async () => {
     const { core, output } = await run([
       "runtime",
