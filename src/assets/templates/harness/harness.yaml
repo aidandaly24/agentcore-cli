@@ -1,93 +1,87 @@
-# Optional settings are shown with example values.
+# Harness configuration: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness.html
+# Commented settings are examples, not defaults.
 
 {{yaml.name}}
 
-# Instructions come from system-prompt.md unless systemPrompt is set inline.
-# systemPrompt: You are a helpful assistant.
-
-# Model
+# Supported providers: bedrock, open_ai, gemini, lite_llm.
+# Omitted tuning settings are left to the service and provider unless explicitly set by this file.
+# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessModelConfiguration.html
 {{yaml.model}}
+{{#unless model.temperature includeZero=true}}
+  # temperature: 0.2
+{{/unless}}
+{{#unless model.topP includeZero=true}}
+  # topP: 0.9
+{{/unless}}
 {{#if modelMaxTokensExample}}
-  # Output tokens per model call, rather than across the whole invocation.
   # maxTokens: 4096
 {{/if}}
+{{#if (or (eq model.provider "bedrock") (eq model.provider "open_ai"))}}
+{{#unless model.apiFormat}}
+{{#if (eq model.provider "bedrock")}}
+  # apiFormat: converse_stream
+{{else}}
+  # apiFormat: responses
+{{/if}}
+{{/unless}}
+{{/if}}
+{{#unless model.apiKeyArn}}
+  # apiKeyArn: YOUR_API_KEY_PROVIDER_ARN
+{{/unless}}
 
-# Tools
-# Code Interpreter and Browser use built-in resources when no ARN is specified.
-# awsIam uses the harness execution role, which must allow Gateway invocation.
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html
+# Edit system-prompt.md next to this file, or set inline instructions below to override it.
+# systemPrompt: |
+#   You are a helpful assistant.
+#   Ask for clarification when a request is ambiguous.
+
+{{#if (eq memory.mode "managed")}}
+# Managed memory is created for this harness.
+{{/if}}
+# Remove this block or set mode to disabled to turn memory off.
+# For existing memory, set mode to existing and add arn or name (for a memory in this project).
+# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessMemoryConfiguration.html
+{{yaml.memory}}
+{{#if (eq memory.mode "managed")}}
+{{#if memoryExamples.strategies}}
+  # strategies: [SEMANTIC, SUMMARIZATION, USER_PREFERENCE, EPISODIC]
+{{/if}}
+{{#if memoryExamples.eventExpiryDuration}}
+  # eventExpiryDuration: 30 # Days.
+{{/if}}
+{{/if}}
+
+# Add tools alongside the harness's built-in shell and file operations.
+# Choose a unique name for each entry. The harness uses this name for the tool.
+# For Remote MCP, Gateway, Browser, Code Interpreter, and other tool configurations, see:
+# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTool.html
 {{#if tools.length}}
 {{yaml.tools}}
 {{else}}
 # tools:
-#   - name: code_interpreter
-#     type: agentcore_code_interpreter
-#   - name: browser
-#     type: agentcore_browser
 #   - name: research
 #     type: remote_mcp
 #     config:
 #       remoteMcp:
 #         url: https://mcp.example.com/mcp
-#   - name: company_tools
-#     type: agentcore_gateway
-#     config:
-#       agentCoreGateway:
-#         gatewayArn: arn:aws:bedrock-agentcore:us-west-2:123456789012:gateway/example-1234567890
-#         outboundAuth:
-#           awsIam: {}
 {{/if}}
 
-# Tool patterns: @<server-name>/<tool-name> or @builtin.
-# This controls agent tool selection, not IAM permissions.
+# Limit which available tools the agent can use. "*" allows all available tools.
+# Restrict with patterns such as "@builtin" or "@research/search".
+# AWS permissions must still be configured separately.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-tools.html
 {{#if yaml.allowedTools}}
 {{yaml.allowedTools}}
 {{else}}
-# allowedTools:
-#   - "@builtin"
-#   - "@research/search"
+allowedTools: ["*"]
 {{/if}}
 
-# Skill path sources refer to files already present in the runtime container.
-{{#if skills.length}}
+# Load skills from S3 (s3Uri), Git (gitUrl), container files (path), or bundled AWS skills (awsSkills).
+# With gitUrl, path is a folder in that repository. A standalone path is inside the harness container.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html
 {{yaml.skills}}
-{{else}}
-# skills:
-#   - s3Uri: s3://your-skills-bucket/skills/research/
-#   - gitUrl: https://github.com/your-org/agent-skills.git
-#     path: skills/research
-#   - path: /opt/skills/research
-{{/if}}
 
-# Memory
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html
-# Alternatives: existing (name or ARN), disabled.
-{{yaml.memory}}
-{{#if (eq memory.mode "managed")}}
-{{#if (or memoryExamples.strategies memoryExamples.eventExpiryDuration)}}
-  # Managed-memory settings. Absent values use service defaults.
-  # Event retention is in days.
-{{#if memoryExamples.strategies}}
-  # strategies:
-  #   - SEMANTIC
-  #   - SUMMARIZATION
-{{/if}}
-{{#if memoryExamples.eventExpiryDuration}}
-  # eventExpiryDuration: 30
-{{/if}}
-{{/if}}
-{{/if}}
-{{#if (or memoryExamples.name memoryExamples.arn)}}
-  # Existing-memory reference: project resource name or external ARN.
-{{#if memoryExamples.name}}
-  # name: ConversationMemory
-{{/if}}
-{{#if memoryExamples.arn}}
-  # arn: arn:aws:bedrock-agentcore:us-west-2:123456789012:memory/example-1234567890
-{{/if}}
-{{/if}}
-
-# Execution limits apply per invocation, across all model calls.
+# Limits for one invocation, across all model calls.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
 {{#if yaml.maxIterations}}
 {{yaml.maxIterations}}
 {{else}}
@@ -104,19 +98,37 @@
 # timeoutSeconds: 300
 {{/if}}
 
-# Truncation changes the context sent to the model, not the saved memory.
+# Controls how conversation history is kept within the model's context window.
+# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTruncationConfiguration.html
 {{#if yaml.truncation}}
 {{yaml.truncation}}
+{{#if (eq truncation.strategy "sliding_window")}}
+{{#unless truncation.config}}
+  # config:
+  #   slidingWindow:
+  #     messagesCount: 40
+{{/unless}}
+{{/if}}
 {{else}}
-# truncation:
-#   strategy: sliding_window
-#   config:
-#     slidingWindow:
-#       messagesCount: 40
+truncation:
+  strategy: sliding_window
+  # config:
+  #   slidingWindow:
+  #     messagesCount: 40
 {{/if}}
 
-# dockerfile and containerUri are mutually exclusive. With neither set, the
-# service-provided environment is used. Dockerfile paths are relative to this directory.
+# Values must be strings. Put quotes around numbers and booleans.
+# Environment values are stored in plaintext.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html
+{{#if yaml.environmentVariables}}
+{{yaml.environmentVariables}}
+{{else}}
+environmentVariables: {}
+{{/if}}
+
+# Use a local Dockerfile OR an ECR image. Omit both to use the service-provided environment.
+# Dockerfile paths are relative to this file's directory.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html#harness-custom-container
 {{#if yaml.dockerfile}}
 {{yaml.dockerfile}}
 {{else}}
@@ -128,28 +140,94 @@
 # containerUri: 123456789012.dkr.ecr.us-west-2.amazonaws.com/my-harness:latest
 {{/if}}
 
-# Environment values are stored in plaintext.
-{{#if yaml.environmentVariables}}
-{{yaml.environmentVariables}}
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-security.html#harness-network-config
+{{#unless yaml.networkConfig}}
+# To use the VPC example below, change networkMode to VPC and replace the resource IDs.
+{{/unless}}
+# vpcId is required for Dockerfile builds in VPC mode.
+{{#if yaml.networkMode}}
+{{yaml.networkMode}}
 {{else}}
-# environmentVariables:
-#   LOG_LEVEL: info
+networkMode: PUBLIC
+{{/if}}
+{{#if yaml.networkConfig}}
+{{yaml.networkConfig}}
+{{else}}
+# networkConfig:
+#   vpcId: vpc-0123456789abcdef0
+#   subnets: [subnet-0123456789abcdef0]
+#   securityGroups: [sg-0123456789abcdef0]
 {{/if}}
 
-# Deployment creates a role when executionRoleArn is absent.
+# Caller authentication, separate from the credentials used to call models or tools.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-security.html
+{{#unless yaml.authorizerConfiguration}}
+# To use JWT, change authorizerType to CUSTOM_JWT and configure your identity provider below.
+{{/unless}}
+{{#if yaml.authorizerType}}
+{{yaml.authorizerType}}
+{{else}}
+authorizerType: AWS_IAM
+{{/if}}
+{{#if yaml.authorizerConfiguration}}
+{{yaml.authorizerConfiguration}}
+{{else}}
+# authorizerConfiguration:
+#   customJwtAuthorizer:
+#     discoveryUrl: https://id.example.com/.well-known/openid-configuration
+#     allowedAudience: [my-harness-app]
+{{/if}}
+
+# Deployment will create an execution role when omitted. Manage permissions yourself for a supplied role.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-security.html#harness-execution-role-policy
 {{#if yaml.executionRoleArn}}
 {{yaml.executionRoleArn}}
 {{else}}
 # executionRoleArn: arn:aws:iam::123456789012:role/MyHarnessRole
 {{/if}}
 
-# Tags
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
+{{#if yaml.lifecycleConfig}}
+{{yaml.lifecycleConfig}}
+{{else}}
+# lifecycleConfig:
+#   idleRuntimeSessionTimeout: 900
+#   maxLifetime: 28800
+{{/if}}
+
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html
+{{#if yaml.sessionStoragePath}}
+{{yaml.sessionStoragePath}}
+{{else}}
+# sessionStoragePath: /mnt/session
+{{/if}}
+
+# EFS and S3 Files mounts require VPC mode. Each entry contains an accessPointArn and mountPath.
+# Mount paths must be under /mnt and must be unique across all filesystem types.
+{{#if yaml.efsAccessPoints}}
+{{yaml.efsAccessPoints}}
+{{else}}
+efsAccessPoints: []
+{{/if}}
+{{#if yaml.s3AccessPoints}}
+{{yaml.s3AccessPoints}}
+{{else}}
+s3AccessPoints: []
+{{/if}}
+
+# Grant access to existing resources and expose their connection details as environment variables.
+# This does not add agent tools; declare those under tools.
+{{#if yaml.connections}}
+{{yaml.connections}}
+{{else}}
+connections: []
+{{/if}}
+
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html
 {{#if yaml.tags}}
 {{yaml.tags}}
 {{else}}
-# tags:
-#   team: support
-#   environment: development
+tags: {}
 {{/if}}
 {{#each additionalSettings}}
 

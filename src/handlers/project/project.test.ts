@@ -87,7 +87,7 @@ describe("project create", () => {
     expect(harness.memory).toEqual({ mode: "managed" });
     expect(harness.systemPrompt).toBeUndefined();
     expect(harness.tools).toBeUndefined();
-    expect(harness.skills).toBeUndefined();
+    expect(harness.skills).toEqual([]);
     expect(existsSync(join(projectRoot, "app", "MyAgent", "harness.json"))).toBe(false);
     expect(await Bun.file(join(projectRoot, "app", "MyAgent", "system-prompt.md")).exists()).toBe(
       true,

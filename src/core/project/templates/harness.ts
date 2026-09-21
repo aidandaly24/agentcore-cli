@@ -23,6 +23,15 @@ const TEMPLATE_FIELDS = new Set([
   "containerUri",
   "environmentVariables",
   "executionRoleArn",
+  "networkMode",
+  "networkConfig",
+  "authorizerType",
+  "authorizerConfiguration",
+  "lifecycleConfig",
+  "sessionStoragePath",
+  "efsAccessPoints",
+  "s3AccessPoints",
+  "connections",
   "tags",
 ]);
 

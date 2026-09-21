@@ -438,7 +438,7 @@ describe("project add harness", () => {
     expect(harnessYaml.systemPrompt).toBeUndefined();
     expect(harnessYaml.memory).toEqual({ mode: "managed" });
     expect(harnessYaml.tools).toBeUndefined();
-    expect(harnessYaml.skills).toBeUndefined();
+    expect(harnessYaml.skills).toEqual([]);
     expect(existsSync(join(projectRoot, "app", "x", "harness.json"))).toBe(false);
   });
 

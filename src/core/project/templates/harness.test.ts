@@ -10,7 +10,23 @@ import { getHarnessTemplateResolver } from "./harness";
 import { HandlebarsTemplateRenderer } from "./renderer";
 
 const roots: string[] = [];
-const model = { provider: "bedrock", modelId: "example" } as const;
+const model = {
+  provider: "bedrock",
+  modelId: "global.anthropic.claude-sonnet-4-6",
+} as const;
+const defaultSettings = {
+  memory: { mode: "managed" },
+  allowedTools: ["*"],
+  skills: [],
+  truncation: { strategy: "sliding_window" },
+  environmentVariables: {},
+  networkMode: "PUBLIC",
+  authorizerType: "AWS_IAM",
+  efsAccessPoints: [],
+  s3AccessPoints: [],
+  connections: [],
+  tags: {},
+};
 const config = {
   assetSource: new FsAssetSource(),
   templateRenderer: new HandlebarsTemplateRenderer(),
@@ -40,7 +56,7 @@ test("scaffolds valid YAML with inactive examples and a resolvable prompt", asyn
   expect(data).toEqual({
     name: "assistant",
     model,
-    memory: { mode: "managed" },
+    ...defaultSettings,
   });
   expect(yaml).toMatchSnapshot();
   expect(await readFile(join(directory, "system-prompt.md"), "utf8")).toBe(
@@ -62,8 +78,13 @@ test.each([
   },
   { mode: "managed", strategies: ["EPISODIC"], eventExpiryDuration: 365 },
 ] as const)("preserves explicit memory: %j", async (memory) => {
-  const { data } = await scaffold({ memory });
+  const { data, yaml } = await scaffold({ memory });
   expect(data.memory).toEqual(memory);
+  if (memory.mode !== "managed") {
+    expect(yaml).not.toContain("# Managed memory is created for this harness.");
+    expect(yaml).not.toContain("# strategies:");
+    expect(yaml).not.toContain("# eventExpiryDuration:");
+  }
 });
 
 test("serializes supplied nested strings, arrays, maps, and zero values without example substitution", async () => {
@@ -121,10 +142,10 @@ test("serializes supplied nested strings, arrays, maps, and zero values without 
   };
   const { data, directory } = await scaffold(overrides);
   const { systemPrompt, ...expected } = HarnessSpecSchema.parse({
+    ...defaultSettings,
     name: "assistant",
     model,
     ...overrides,
-    memory: { mode: "managed" },
   });
   expect(data).toEqual(expected);
   expect(await readFile(join(directory, "system-prompt.md"), "utf8")).toBe(systemPrompt!);

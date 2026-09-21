@@ -150,6 +150,9 @@ describe("project export harness handler", () => {
       codeLocation: "app/exportmeAgent",
       protocol: "HTTP",
       runtimeVersion: "PYTHON_3_14",
+      networkMode: "PUBLIC",
+      authorizerType: "AWS_IAM",
+      tags: {},
     });
     expect(spec.harnesses).toEqual([{ name: "exportme", path: "app/exportme" }]);
 
