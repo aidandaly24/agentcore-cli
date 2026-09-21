@@ -102,13 +102,12 @@ export const createInvokeRuntimeHandler = (core: Core, io: AppIO) =>
       }
       const runtimeId = flags.id;
       const payload = flags.payload;
-      const invoke = async (signal: AbortSignal, beforeOutput: () => Promise<void>) => {
-        const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
-        const sources = await resolveRuntimeInvokeSources(
-          { payload, bearerToken: flags["bearer-token"] },
-          io.stdin,
-          signal,
-        );
+      const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
+      const invoke = async (
+        signal: AbortSignal,
+        beforeOutput: () => Promise<void>,
+        sources: Awaited<ReturnType<typeof resolveRuntimeInvokeSources>>,
+      ) => {
         const options = coreOptsFromCtx(ctx);
         const response = await invokeRuntimeTarget(
           core.runtime,
@@ -143,12 +142,17 @@ export const createInvokeRuntimeHandler = (core: Core, io: AppIO) =>
           beforeOutput,
         });
       };
-      await withUserCancellation((signal) =>
-        runWithProgress((stop) => invoke(signal, stop), {
+      await withUserCancellation(async (signal) => {
+        const sources = await resolveRuntimeInvokeSources(
+          { payload, bearerToken: flags["bearer-token"] },
+          io.stdin,
+          signal,
+        );
+        return runWithProgress((stop) => invoke(signal, stop, sources), {
           io,
           label: "Invoking runtime...",
           interactive: !jsonOutput,
-        }),
-      );
+        });
+      });
     },
   });

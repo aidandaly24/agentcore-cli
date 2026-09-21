@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import type { InvokeHarnessRequest } from "@aws-sdk/client-bedrock-agentcore";
 import type {
   GetAgentRuntimeResponse,
@@ -185,7 +186,7 @@ afterEach(async () => {
 
 describe("project invoke", () => {
   test.each([false, true])(
-    "hands the terminal to the first Runtime chunk (local=%s)",
+    "reads stdin before progress, then hands off to the first Runtime chunk (local=%s)",
     async (local) => {
       const stream = new StreamController<Uint8Array>();
       const server = local
@@ -200,7 +201,7 @@ describe("project invoke", () => {
         [
           "runtime",
           "--payload",
-          "{}",
+          "-",
           ...(server ? ["--local", "--port", String(server.port)] : []),
         ],
         { runtimes: [RUNTIME] },
@@ -211,8 +212,14 @@ describe("project invoke", () => {
         contentType: "text/plain",
         body: stream,
       });
+      const stdin = subject.io.io.stdin as unknown as PassThrough;
       const pending = subject.route();
       try {
+        await waitFor(() => stdin.listenerCount("readable") > 0);
+        stdin.write("{}");
+        await tick(120);
+        expect(subject.io.stderr()).toBe("");
+        stdin.end();
         await waitFor(() => subject.io.stderr().includes("Invoking runtime..."));
         expect(subject.io.stdout()).toBe("");
         stream.emit(Buffer.from("first"));
@@ -221,6 +228,7 @@ describe("project invoke", () => {
         await tick(120);
         expect(subject.io.stderr()).toBe(afterFirstChunk);
       } finally {
+        stdin.end();
         stream.emit(Buffer.from("second"));
         stream.end();
         await pending;

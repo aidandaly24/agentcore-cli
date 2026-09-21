@@ -88,6 +88,44 @@ async function run(
 }
 
 describe("runtime invoke", () => {
+  test.each(["payload", "bearer-token"] as const)(
+    "reads TTY %s before starting progress",
+    async (input) => {
+      const core = new TestCoreClient();
+      const stream = new StreamController<Uint8Array>();
+      core.runtime
+        .setGetResponse({
+          agentRuntimeArn: RUNTIME_ARN,
+          ...(input === "bearer-token" && { authorizerConfiguration: { customJWTAuthorizer: {} } }),
+        } as GetAgentRuntimeResponse)
+        .setInvokeResponse({ statusCode: 200, contentType: "text/plain", body: stream });
+      const io = testIO({ isTTY: true });
+      const stdin = io.io.stdin as unknown as PassThrough;
+      const pending = runCommand(core, io.io, [
+        "runtime",
+        "invoke",
+        "--id",
+        RUNTIME_ID,
+        "--payload",
+        input === "payload" ? "-" : "{}",
+        ...(input === "bearer-token" ? ["--bearer-token", "-"] : []),
+      ]);
+      try {
+        await waitFor(() => stdin.listenerCount("readable") > 0);
+        stdin.write(input === "payload" ? "{}" : "test-token");
+        await tick(120);
+        expect(io.stderr()).toBe("");
+        expect(core.runtime.calls).toEqual([]);
+        stdin.end();
+        await waitFor(() => io.stderr().includes("Invoking runtime..."));
+      } finally {
+        stdin.end();
+        stream.end();
+        await pending;
+      }
+    },
+  );
+
   test.each([false, true])(
     "hands progress to streamed output and respects JSON mode (json=%s)",
     async (json) => {

@@ -102,13 +102,12 @@ export const createProjectInvokeRuntimeHandler = (
           });
         }
 
-        const invoke = async (signal: AbortSignal, beforeOutput: () => Promise<void>) => {
-          const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
-          const sources = await resolveRuntimeInvokeSources(
-            { payload: flags.payload! },
-            io.stdin,
-            signal,
-          );
+        const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
+        const invoke = async (
+          signal: AbortSignal,
+          beforeOutput: () => Promise<void>,
+          sources: Awaited<ReturnType<typeof resolveRuntimeInvokeSources>>,
+        ) => {
           const response = await invokeLocalRuntime(
             {
               port: flags.port ?? DEV_PORTS[protocol],
@@ -143,13 +142,18 @@ export const createProjectInvokeRuntimeHandler = (
             throw new RuntimeInvokeResponseError(`HTTP ${response.statusCode}`);
           }
         };
-        await withUserCancellation((signal) =>
-          runWithProgress((stop) => invoke(signal, stop), {
+        await withUserCancellation(async (signal) => {
+          const sources = await resolveRuntimeInvokeSources(
+            { payload: flags.payload! },
+            io.stdin,
+            signal,
+          );
+          return runWithProgress((stop) => invoke(signal, stop, sources), {
             io,
             label: "Invoking runtime...",
             interactive: !jsonOutput,
-          }),
-        );
+          });
+        });
         return;
       }
 
@@ -208,13 +212,12 @@ export const createProjectInvokeRuntimeHandler = (
       if (jsonOutput && flags["output-file"] !== undefined) {
         throw new InputValidationError("--json cannot be used with --output-file");
       }
-      const invoke = async (signal: AbortSignal, beforeOutput: () => Promise<void>) => {
-        const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
-        const sources = await resolveRuntimeInvokeSources(
-          { payload: flags.payload!, bearerToken: flags["bearer-token"] },
-          io.stdin,
-          signal,
-        );
+      const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
+      const invoke = async (
+        signal: AbortSignal,
+        beforeOutput: () => Promise<void>,
+        sources: Awaited<ReturnType<typeof resolveRuntimeInvokeSources>>,
+      ) => {
         const response = await invokeRuntimeTarget(
           core.runtime,
           {
@@ -248,12 +251,17 @@ export const createProjectInvokeRuntimeHandler = (
           beforeOutput,
         });
       };
-      await withUserCancellation((signal) =>
-        runWithProgress((stop) => invoke(signal, stop), {
+      await withUserCancellation(async (signal) => {
+        const sources = await resolveRuntimeInvokeSources(
+          { payload: flags.payload!, bearerToken: flags["bearer-token"] },
+          io.stdin,
+          signal,
+        );
+        return runWithProgress((stop) => invoke(signal, stop, sources), {
           io,
           label: "Invoking runtime...",
           interactive: !jsonOutput,
-        }),
-      );
+        });
+      });
     },
   });

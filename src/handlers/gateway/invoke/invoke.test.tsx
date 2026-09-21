@@ -83,6 +83,41 @@ function configuredCore(gateway: Partial<GetGatewayResponse> = {}): TestCoreClie
 }
 
 describe("gateway invoke", () => {
+  test.each(["payload", "bearer-token"] as const)(
+    "reads TTY %s before starting progress",
+    async (input) => {
+      const core = configuredCore({
+        authorizerType: input === "bearer-token" ? "CUSTOM_JWT" : "NONE",
+      });
+      const stream = new StreamController<Uint8Array>();
+      core.gateway.setInvokeResponse({ statusCode: 200, contentType: "text/plain", body: stream });
+      const io = testIO({ isTTY: true });
+      const stdin = io.io.stdin as unknown as PassThrough;
+      const pending = runCommand(core, io.io, [
+        "gateway",
+        "invoke",
+        "--id",
+        GATEWAY_ID,
+        "--payload",
+        input === "payload" ? "-" : "{}",
+        ...(input === "bearer-token" ? ["--bearer-token", "-"] : []),
+      ]);
+      try {
+        await waitFor(() => stdin.listenerCount("readable") > 0);
+        stdin.write(input === "payload" ? "{}" : "test-token");
+        await tick(120);
+        expect(io.stderr()).toBe("");
+        expect(core.gateway.calls).toEqual([]);
+        stdin.end();
+        await waitFor(() => io.stderr().includes("Invoking gateway..."));
+      } finally {
+        stdin.end();
+        stream.end();
+        await pending;
+      }
+    },
+  );
+
   test.each([false, true])(
     "hands progress to streamed output and respects JSON mode (json=%s)",
     async (json) => {

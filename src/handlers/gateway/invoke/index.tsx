@@ -100,14 +100,13 @@ export const createInvokeGatewayHandler = (
       }
       const gatewayId = flags.id;
       const payload = flags.payload;
+      const applicationHeaders = parseGatewayInvokeHeaders(flags.header);
 
-      const invoke = async (signal: AbortSignal, beforeOutput: () => Promise<void>) => {
-        const applicationHeaders = parseGatewayInvokeHeaders(flags.header);
-        const sources = await resolveGatewayInvokeSources(
-          { payload, bearerToken: flags["bearer-token"] },
-          io.stdin,
-          signal,
-        );
+      const invoke = async (
+        signal: AbortSignal,
+        beforeOutput: () => Promise<void>,
+        sources: Awaited<ReturnType<typeof resolveGatewayInvokeSources>>,
+      ) => {
         const options = coreOptsFromCtx(ctx);
         const gateway = await core.gateway.getGateway(gatewayId, options, signal);
         const request = normalizeGatewayInvokeRequest(gateway, {
@@ -136,12 +135,17 @@ export const createInvokeGatewayHandler = (
           throw new GatewayInvokeResponseError(`HTTP ${response.statusCode}`);
         }
       };
-      await withUserCancellation((signal) =>
-        runWithProgress((stop) => invoke(signal, stop), {
+      await withUserCancellation(async (signal) => {
+        const sources = await resolveGatewayInvokeSources(
+          { payload, bearerToken: flags["bearer-token"] },
+          io.stdin,
+          signal,
+        );
+        return runWithProgress((stop) => invoke(signal, stop, sources), {
           io,
           label: "Invoking gateway...",
           interactive: !jsonOutput,
-        }),
-      );
+        });
+      });
     },
   });
