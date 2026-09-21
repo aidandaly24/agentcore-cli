@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 
-import { dirname, resolve } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -32,11 +34,11 @@ function getArg(flag) {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
-function commandHelp(path) {
+function commandHelp(path, env) {
   const result = Bun.spawnSync({
     cmd: [BIN, ...BIN_PREFIX_ARGS, ...path, "--help"],
     env: {
-      ...process.env,
+      ...env,
       NO_COLOR: "1",
       CI: "1",
       AGENTCORE_TELEMETRY_DISABLED: "1",
@@ -156,8 +158,8 @@ function isHelpOption(option) {
   return /(?:^|,\s*)-h\b|--help\b/.test(option.name);
 }
 
-function entryForCommand(path) {
-  const parsed = parseHelp(commandHelp(path));
+function entryForCommand(path, env) {
+  const parsed = parseHelp(commandHelp(path, env));
   const usagePrefix = expectedUsage(path);
 
   if (!parsed.signature.startsWith(usagePrefix)) {
@@ -171,12 +173,12 @@ function entryForCommand(path) {
     signature: parsed.signature,
     summary: parsed.summary,
     params: [...parsed.args, ...parsed.options.filter((option) => !isHelpOption(option))],
-    members: parsed.commands.map((command) => entryForCommand([...path, command])),
+    members: parsed.commands.map((command) => entryForCommand([...path, command], env)),
   };
 }
 
-function buildModel({ version, groups = DEFAULT_GROUPS }) {
-  const rootEntry = entryForCommand([]);
+function buildModel({ version, groups = DEFAULT_GROUPS, env }) {
+  const rootEntry = entryForCommand([], env);
   const discovered = new Set(rootEntry.members.map((entry) => entry.name.split(" ").at(-1)));
   const grouped = new Set(groups.flatMap((group) => group.commands));
   const missing = [...discovered].filter((command) => !grouped.has(command));
@@ -309,16 +311,25 @@ async function packageVersion() {
 
 async function main() {
   const outPath = resolve(REPOSITORY_ROOT, getArg("--out") || "command.md");
-  const model = buildModel({ version: await packageVersion() });
-  await Bun.write(outPath, renderMarkdown(model));
+  // Public reference generation must not depend on the caller's local settings.
+  const home = await mkdtemp(join(tmpdir(), "agentcore-command-reference-"));
+  try {
+    const model = buildModel({
+      version: await packageVersion(),
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+    });
+    await Bun.write(outPath, renderMarkdown(model));
 
-  const commandCount = model.groups
-    .flatMap((group) => group.entries)
-    .reduce(function count(total, entry) {
-      return total + 1 + entry.members.reduce(count, 0);
-    }, 0);
+    const commandCount = model.groups
+      .flatMap((group) => group.entries)
+      .reduce(function count(total, entry) {
+        return total + 1 + entry.members.reduce(count, 0);
+      }, 0);
 
-  process.stderr.write(`Wrote ${outPath} with ${commandCount} commands\n`);
+    process.stderr.write(`Wrote ${outPath} with ${commandCount} commands\n`);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
