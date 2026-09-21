@@ -24,6 +24,8 @@ export function isProgressGenerator<T>(
 
 export type RunWithProgressOptions = {
   io: AppIO;
+  /** A single waiting step for callback operations; cleared before their first output. */
+  label?: string;
   /** Lines of live output kept under the running step (default 5). */
   tailLines?: number;
   /**
@@ -121,33 +123,44 @@ export async function driveProgress<T>(
  * Fallback path (non-TTY or interactive: false): writes each step and warning
  * as a plain line to stderr and drops output lines (they are in the debug log).
  *
- * Generic over the operation: nothing here knows about deploys. Any command
- * whose work is an AsyncGenerator<ProgressEvent, T> can run under it.
+ * Callback operations show one transient step and receive a stop function for
+ * handing the terminal to streaming output. They stay silent outside a human TTY.
  */
 export async function runWithProgress<T>(
-  generator: AsyncGenerator<ProgressEvent, T>,
+  work: AsyncGenerator<ProgressEvent, T> | ((stop: () => Promise<void>) => Promise<T>),
   options: RunWithProgressOptions,
 ): Promise<T> {
   const interactive = options.interactive ?? options.io.stderr.isTTY === true;
-  if (!interactive) {
-    let next = await generator.next();
+  if (
+    typeof work === "function" &&
+    (!interactive || options.io.stderr.isTTY !== true || process.env.INK_SCREEN_READER === "true")
+  ) {
+    return work(async () => {});
+  }
+  if (typeof work !== "function" && !interactive) {
+    let next = await work.next();
     while (!next.done) {
       if (next.value.type === "step") options.io.stderr.write(`${next.value.message}\n`);
       if (next.value.type === "warning") {
         options.io.stderr.write(`Warning: ${next.value.message}\n`);
       }
-      next = await generator.next();
+      next = await work.next();
     }
     return next.value;
   }
 
   const tailLines = options.tailLines ?? DEFAULT_TAIL_LINES;
+  const tasks: Task[] =
+    typeof work === "function"
+      ? [{ title: options.label ?? "Working...", state: "running", tail: [] }]
+      : [];
   // Ink renders onto its `stdout` option; handing it io.stderr keeps progress
   // off the machine-readable stream, same as the plain path.
-  const instance = render(<TaskList tasks={[]} tailLines={tailLines} />, {
+  const instance = render(<TaskList tasks={tasks} tailLines={tailLines} />, {
     stdout: options.io.stderr,
     stderr: options.io.stderr,
     stdin: options.io.stdin,
+    interactive: typeof work === "function" ? true : undefined,
     // Nothing here reads input, so stdin stays out of raw mode and Ctrl+C
     // reaches the process as a normal SIGINT; Ink's exit hook restores the
     // cursor on the way down.
@@ -155,16 +168,24 @@ export async function runWithProgress<T>(
     patchConsole: false,
   });
 
+  let stopped: Promise<void> | undefined;
+  const stop = () =>
+    (stopped ??= (async () => {
+      if (typeof work === "function") instance.clear();
+      instance.unmount();
+      await instance.waitUntilExit();
+    })());
+
   // A failed step keeps its tail: the last frame stays in scrollback above the
   // error runWithExitCode prints after the rethrow.
   try {
+    if (typeof work === "function") return await work(stop);
     return await driveProgress(
-      generator,
+      work,
       (tasks) => instance.rerender(<TaskList tasks={tasks} tailLines={tailLines} />),
       tailLines,
     );
   } finally {
-    instance.unmount();
-    await instance.waitUntilExit();
+    await stop();
   }
 }

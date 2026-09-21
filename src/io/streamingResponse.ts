@@ -46,12 +46,11 @@ async function* countBytes(
   add: (size: number) => void,
   beforeFirstChunk?: () => void | Promise<void>,
 ): AsyncGenerator<Uint8Array> {
-  let started = false;
   for await (const chunk of body) {
     const snapshot = Uint8Array.from(chunk);
-    if (!started && snapshot.byteLength > 0) {
-      await beforeFirstChunk?.();
-      started = true;
+    if (snapshot.byteLength > 0 && beforeFirstChunk) {
+      await beforeFirstChunk();
+      beforeFirstChunk = undefined;
     }
     add(snapshot.byteLength);
     yield snapshot;

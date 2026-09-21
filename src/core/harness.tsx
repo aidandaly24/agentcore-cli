@@ -52,14 +52,10 @@ import { toClientConfig } from "./utils";
 export class HarnessClient implements CoreHarnessClient {
   constructor(private readonly clients: AwsClients) {}
 
-  async getHarness(
-    id: string,
-    options: CoreOptions,
-    signal?: AbortSignal,
-  ): Promise<GetHarnessResponse> {
+  async getHarness(id: string, options: CoreOptions): Promise<GetHarnessResponse> {
     return this.clients
       .control(toClientConfig(options))
-      .send(new GetHarnessCommand({ harnessId: id }), { abortSignal: signal });
+      .send(new GetHarnessCommand({ harnessId: id }));
   }
 
   async resolveRuntime(

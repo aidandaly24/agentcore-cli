@@ -7,7 +7,6 @@ import { coreOptsFromCtx } from "../../utils";
 import { JsonKey } from "../../keys";
 import { ExitCode, withUserCancellation } from "../../../runnable";
 import { renderTuiAt } from "../../../tui";
-import { runWithSpinner } from "../../../tui/spinner";
 import {
   parseRuntimeInvokeHeaders,
   resolveRuntimeInvokeSources,
@@ -102,50 +101,45 @@ export const createInvokeRuntimeHandler = (core: Core, io: AppIO) =>
       }
       const runtimeId = flags.id;
       const payload = flags.payload;
-      await runWithSpinner(
-        (stop) =>
-          withUserCancellation(async (signal) => {
-            const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
-            const sources = await resolveRuntimeInvokeSources(
-              { payload, bearerToken: flags["bearer-token"] },
-              io.stdin,
-              signal,
-            );
-            const options = coreOptsFromCtx(ctx);
-            const response = await invokeRuntimeTarget(
-              core.runtime,
-              {
-                runtimeId,
-                qualifier: flags.qualifier,
-                payload: sources.payload,
-                contentType: flags["content-type"],
-                accept: flags.accept,
-                runtimeSessionId: flags["session-id"],
-                runtimeUserId: flags["user-id"],
-                applicationHeaders,
-                bearerToken: sources.bearerToken,
-                mcpSessionId: flags["mcp-session-id"],
-                mcpProtocolVersion: flags["mcp-protocol-version"],
-                mcpMethod: flags["mcp-method"],
-                mcpName: flags["mcp-name"],
-                traceId: flags["trace-id"],
-                traceParent: flags["trace-parent"],
-                traceState: flags["trace-state"],
-                baggage: flags.baggage,
-              },
-              options,
-              signal,
-            );
-            await writeRuntimeInvokeResponse(response, {
-              stdout: io.stdout,
-              stderr: io.stderr,
-              outputFile: flags["output-file"],
-              json: jsonOutput,
-              signal,
-              beforeOutput: stop,
-            });
-          }),
-        { io, label: "Invoking runtime...", enabled: !jsonOutput },
-      );
+      await withUserCancellation(async (signal) => {
+        const applicationHeaders = parseRuntimeInvokeHeaders(flags.header);
+        const sources = await resolveRuntimeInvokeSources(
+          { payload, bearerToken: flags["bearer-token"] },
+          io.stdin,
+          signal,
+        );
+        const options = coreOptsFromCtx(ctx);
+        const response = await invokeRuntimeTarget(
+          core.runtime,
+          {
+            runtimeId,
+            qualifier: flags.qualifier,
+            payload: sources.payload,
+            contentType: flags["content-type"],
+            accept: flags.accept,
+            runtimeSessionId: flags["session-id"],
+            runtimeUserId: flags["user-id"],
+            applicationHeaders,
+            bearerToken: sources.bearerToken,
+            mcpSessionId: flags["mcp-session-id"],
+            mcpProtocolVersion: flags["mcp-protocol-version"],
+            mcpMethod: flags["mcp-method"],
+            mcpName: flags["mcp-name"],
+            traceId: flags["trace-id"],
+            traceParent: flags["trace-parent"],
+            traceState: flags["trace-state"],
+            baggage: flags.baggage,
+          },
+          options,
+          signal,
+        );
+        await writeRuntimeInvokeResponse(response, {
+          stdout: io.stdout,
+          stderr: io.stderr,
+          outputFile: flags["output-file"],
+          json: jsonOutput,
+          signal,
+        });
+      });
     },
   });

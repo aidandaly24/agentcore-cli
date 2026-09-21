@@ -587,12 +587,8 @@ export class TestHarnessClient implements CoreHarnessClient {
     return this.deleteEndpointResponse;
   }
 
-  async getHarness(
-    id: string,
-    options: CoreOptions,
-    signal?: AbortSignal,
-  ): Promise<GetHarnessResponse> {
-    this.calls.push({ method: "getHarness", args: [id, options, signal] });
+  async getHarness(id: string, options: CoreOptions): Promise<GetHarnessResponse> {
+    this.calls.push({ method: "getHarness", args: [id, options] });
     if (this.error) throw this.error;
     return this.getResponse;
   }

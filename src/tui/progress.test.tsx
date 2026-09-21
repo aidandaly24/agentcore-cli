@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { testIO } from "../testing";
+import { testIO, tick, waitFor } from "../testing";
 import {
   applyProgressEvent,
   driveProgress,
@@ -73,6 +73,37 @@ describe("runWithProgress plain path (no TTY)", () => {
 });
 
 describe("runWithProgress interactive path", () => {
+  test("stops a transient display on failure without replacing the error", async () => {
+    const io = testIO({ isTTY: true });
+    const failure = new Error("invoke failed");
+    await expect(
+      runWithProgress(
+        async () => {
+          await waitFor(() => io.stderr().includes("Waiting"));
+          throw failure;
+        },
+        { io: io.io, label: "Waiting" },
+      ),
+    ).rejects.toBe(failure);
+    const completed = io.stderr();
+    await tick(120);
+    expect(io.stderr()).toBe(completed);
+    expect(io.stdout()).toBe("");
+  });
+
+  test("callback operations stay silent in screen-reader mode", async () => {
+    const previous = process.env.INK_SCREEN_READER;
+    process.env.INK_SCREEN_READER = "true";
+    const io = testIO({ isTTY: true });
+    try {
+      expect(await runWithProgress(async () => 42, { io: io.io, label: "Waiting" })).toBe(42);
+      expect(io.stderr()).toBe("");
+    } finally {
+      if (previous === undefined) delete process.env.INK_SCREEN_READER;
+      else process.env.INK_SCREEN_READER = previous;
+    }
+  });
+
   test("renders every step completed and resolves the return value", async () => {
     const io = testIO({ isTTY: true });
 

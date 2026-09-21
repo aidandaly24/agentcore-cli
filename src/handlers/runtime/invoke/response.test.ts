@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { SilentCLIError, UserCancellationError } from "../../../errors";
-import { StreamController, waitFor } from "../../../testing";
+import { waitFor } from "../../../testing";
 import type { RuntimeInvokeResponse } from "../types";
 import { writeRuntimeInvokeResponse } from "./response";
 
@@ -47,93 +47,6 @@ function capture() {
 }
 
 describe("Runtime invoke response output", () => {
-  test("waits for progress cleanup before writing the first response bytes", async () => {
-    const stdout = capture();
-    const stderr = capture();
-    const stopping = Promise.withResolvers<void>();
-    const stopped = Promise.withResolvers<void>();
-    const pending = writeRuntimeInvokeResponse(response(), {
-      stdout: stdout.stream,
-      stderr: stderr.stream,
-      beforeOutput: async () => {
-        stopping.resolve();
-        await stopped.promise;
-      },
-    });
-    try {
-      await stopping.promise;
-      expect(stdout.bytes()).toHaveLength(0);
-      expect(stderr.bytes()).toHaveLength(0);
-    } finally {
-      stopped.resolve();
-      await pending;
-    }
-    expect(stdout.bytes().toString()).toBe("ok");
-  });
-
-  test.each(["empty", "binary", "failure"] as const)(
-    "stops progress before diagnostics for a %s response without output bytes",
-    async (kind) => {
-      const stdout = capture();
-      const stderr = capture();
-      Object.defineProperty(stdout.stream, "isTTY", { value: true });
-      let stopped = false;
-      const outputStates: boolean[] = [];
-      stderr.stream.on("data", () => outputStates.push(stopped));
-      const pending = writeRuntimeInvokeResponse(
-        response({
-          contentType: kind === "binary" ? "application/octet-stream" : "text/plain",
-          body: (async function* () {
-            if (kind === "failure") throw new Error("body failed");
-            yield* [];
-          })(),
-        }),
-        {
-          stdout: stdout.stream,
-          stderr: stderr.stream,
-          beforeOutput: () => {
-            stopped = true;
-          },
-        },
-      );
-      if (kind === "empty") await pending;
-      else await expect(pending).rejects.toThrow();
-      expect(outputStates).toEqual([true]);
-      expect(stdout.bytes()).toHaveLength(0);
-    },
-  );
-
-  test("keeps progress through file writes until the completion summary", async () => {
-    const file = join(tmpdir(), `runtime-invoke-output-${process.pid}-${files.length}`);
-    files.push(file);
-    const stdout = capture();
-    const stderr = capture();
-    const source = new StreamController<Uint8Array>();
-    let stopped = false;
-    const pending = writeRuntimeInvokeResponse(response({ body: source }), {
-      stdout: stdout.stream,
-      stderr: stderr.stream,
-      outputFile: file,
-      beforeOutput: () => {
-        stopped = true;
-      },
-    });
-    try {
-      source.emit(Buffer.from([0, 255]));
-      await waitFor(
-        async () => (await Bun.file(file).exists()) && (await Bun.file(file).bytes()).length === 2,
-      );
-      expect(stopped).toBe(false);
-      expect(stdout.bytes()).toHaveLength(0);
-      expect(stderr.bytes()).toHaveLength(0);
-    } finally {
-      source.end();
-      await pending;
-    }
-    expect(stopped).toBe(true);
-    expect(Buffer.from(await Bun.file(file).bytes())).toEqual(Buffer.from([0, 255]));
-  });
-
   test("streams exact chunks in raw mode, reports metadata, and leaves stdout open", async () => {
     const stdout = capture();
     const stderr = capture();

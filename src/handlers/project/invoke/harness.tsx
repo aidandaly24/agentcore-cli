@@ -3,8 +3,7 @@ import { InputValidationError } from "../../../errors";
 import type { AppIO } from "../../../io";
 import { createHandler, flag, ProjectKey } from "../../../router";
 import { JsonRendererKey, renderTuiAt } from "../../../tui";
-import { runWithSpinner } from "../../../tui/spinner";
-import { withUserCancellation } from "../../../runnable";
+import { runWithProgress } from "../../../tui/progress";
 import { AwsCredentialProviderKey, JsonKey, RegionKey } from "../../keys";
 import { invokeHarnessTurn } from "../../harness/invoke/operation";
 import type { Core } from "../../types";
@@ -34,52 +33,46 @@ export const createProjectInvokeHarnessHandler = (
         z.string().optional(),
       ),
     ],
-    handle: (ctx, flags) =>
-      runWithSpinner(
-        async (stop) => {
-          const project = ctx.require(ProjectKey);
-          const name = selectProjectResource(project, "harness", flags.name, "invoke");
-          const deployed = await core.projectManager.resolveDeployedResource(project, {
-            target: flags.target,
-            resourceType: "harness",
-            name,
-          });
-          const invokeCtx = ctx
-            .withValue(RegionKey, deployed.target.region)
-            .withValue(AwsCredentialProviderKey, deployed.credentialProvider);
+    handle: async (ctx, flags) => {
+      const project = ctx.require(ProjectKey);
+      const name = selectProjectResource(project, "harness", flags.name, "invoke");
+      const deployed = await core.projectManager.resolveDeployedResource(project, {
+        target: flags.target,
+        resourceType: "harness",
+        name,
+      });
+      const invokeCtx = ctx
+        .withValue(RegionKey, deployed.target.region)
+        .withValue(AwsCredentialProviderKey, deployed.credentialProvider);
 
-          if (!flags.prompt) {
-            if (invokeCtx.require(JsonKey)) {
-              throw new InputValidationError("required option '--prompt <text>' not specified");
-            }
-            let path = `/agentcore/harness/invoke/${encodeURIComponent(deployed.id)}`;
-            if (flags["session-id"]) path += `/${encodeURIComponent(flags["session-id"])}`;
-            if (flags.qualifier) path += `?qualifier=${encodeURIComponent(flags.qualifier)}`;
-            await renderInvokeTui(path, invokeCtx, core, io);
-            return;
-          }
+      if (!flags.prompt) {
+        if (invokeCtx.require(JsonKey)) {
+          throw new InputValidationError("required option '--prompt <text>' not specified");
+        }
+        let path = `/agentcore/harness/invoke/${encodeURIComponent(deployed.id)}`;
+        if (flags["session-id"]) path += `/${encodeURIComponent(flags["session-id"])}`;
+        if (flags.qualifier) path += `?qualifier=${encodeURIComponent(flags.qualifier)}`;
+        await renderInvokeTui(path, invokeCtx, core, io);
+        return;
+      }
 
-          const prompt = flags.prompt;
-          const result = await withUserCancellation((signal) =>
-            invokeHarnessTurn(
-              core.harness,
-              {
-                harnessId: deployed.id,
-                prompt,
-                qualifier: flags.qualifier,
-                sessionId: flags["session-id"],
-              },
-              coreOptsFromCtx(invokeCtx),
-              signal,
-            ),
-          );
-          await stop();
-          invokeCtx.require(JsonRendererKey).renderJson(result);
-        },
-        {
-          io,
-          label: "Invoking harness...",
-          enabled: Boolean(flags.prompt) && !ctx.require(JsonKey),
-        },
-      ),
+      const prompt = flags.prompt;
+      const invoke = () =>
+        invokeHarnessTurn(
+          core.harness,
+          {
+            harnessId: deployed.id,
+            prompt,
+            qualifier: flags.qualifier,
+            sessionId: flags["session-id"],
+          },
+          coreOptsFromCtx(invokeCtx),
+        );
+      const result = await runWithProgress(invoke, {
+        io,
+        label: "Invoking harness...",
+        interactive: !ctx.require(JsonKey),
+      });
+      invokeCtx.require(JsonRendererKey).renderJson(result);
+    },
   });
