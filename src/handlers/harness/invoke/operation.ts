@@ -21,7 +21,7 @@ export async function invokeHarnessTurn(
   options: CoreOptions,
   signal?: AbortSignal,
 ): Promise<HarnessInvokeResult> {
-  const detail = await client.getHarness(input.harnessId, options);
+  const detail = await client.getHarness(input.harnessId, options, signal);
   const sessionId = input.sessionId ?? newSessionId();
   const response = await client.invokeHarness(
     {

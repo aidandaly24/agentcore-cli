@@ -28,7 +28,7 @@ describe("harnessRuntimeFromResponse", () => {
   });
 });
 
-describe("HarnessClient.resolveRuntime", () => {
+describe.each(["getHarness", "resolveRuntime"] as const)("HarnessClient.%s", (method) => {
   test("gets the harness with the configured client and forwards cancellation", async () => {
     const configs: ClientConfig[] = [];
     const controller = new AbortController();
@@ -49,7 +49,7 @@ describe("HarnessClient.resolveRuntime", () => {
     } as unknown as AwsClients;
     const client = new HarnessClient(clients);
 
-    await client.resolveRuntime(
+    await client[method](
       "MyHarness-abc123",
       { region: "us-west-2", endpointUrl: "https://control.test" },
       controller.signal,

@@ -5,6 +5,8 @@ import type { Core } from "../../types.tsx";
 import { coreOptsFromCtx } from "../../utils.tsx";
 import { JsonKey } from "../../keys.tsx";
 import { JsonRendererKey, renderTuiAt } from "../../../tui";
+import { runWithSpinner } from "../../../tui/spinner";
+import { withUserCancellation } from "../../../runnable";
 import { InputValidationError } from "../../../errors";
 import { invokeHarnessTurn } from "./operation.ts";
 
@@ -43,15 +45,23 @@ export const createInvokeHarnessHandler = (core: Core, io: AppIO) =>
       }
 
       const opts = coreOptsFromCtx(ctx);
-      const result = await invokeHarnessTurn(
-        core.harness,
-        {
-          harnessId: flags["id"],
-          prompt: flags["prompt"],
-          qualifier: flags["qualifier"] ?? "DEFAULT",
-          sessionId: flags["session-id"],
-        },
-        opts,
+      const prompt = flags["prompt"];
+      const result = await runWithSpinner(
+        () =>
+          withUserCancellation((signal) =>
+            invokeHarnessTurn(
+              core.harness,
+              {
+                harnessId: flags["id"],
+                prompt,
+                qualifier: flags["qualifier"] ?? "DEFAULT",
+                sessionId: flags["session-id"],
+              },
+              opts,
+              signal,
+            ),
+          ),
+        { io, label: "Invoking harness...", enabled: !ctx.require(JsonKey) },
       );
       ctx.require(JsonRendererKey).renderJson(result);
     },

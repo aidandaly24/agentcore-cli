@@ -59,7 +59,7 @@ export interface CoreHarnessClient {
     request: DeleteHarnessEndpointRequest,
     options: CoreOptions,
   ): Promise<DeleteHarnessEndpointResponse>;
-  getHarness(id: string, options: CoreOptions): Promise<GetHarnessResponse>;
+  getHarness(id: string, options: CoreOptions, signal?: AbortSignal): Promise<GetHarnessResponse>;
   resolveRuntime(
     id: string,
     options: CoreOptions,
