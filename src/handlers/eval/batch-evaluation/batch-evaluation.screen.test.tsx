@@ -3,6 +3,7 @@ import type {
   BatchEvaluationSummary,
   GetBatchEvaluationResponse,
 } from "@aws-sdk/client-bedrock-agentcore";
+import type { GetBatchEvaluationResult } from "../types";
 import {
   cleanupScreens,
   renderScreen,
@@ -184,6 +185,16 @@ describe("batch-evaluation detail (raw JSON)", () => {
     expect(frame).toContain("AccessDenied");
     expect(frame).toContain("[r] retry");
 
+    core.eval.setError(new Error("metadata refresh unavailable"));
+    await screen.write("r");
+    await waitForText(screen.lastFrame, "metadata refresh unavailable");
+    expect(screen.lastFrame()).toContain("Warning:");
+    expect(screen.lastFrame()).toMatch(/cached job\s+metadata/);
+    expect(screen.lastFrame()).toContain("nightly_regression");
+    expect(screen.lastFrame()).toContain("COMPLETED");
+    expect(screen.lastFrame()).toContain("[r] retry");
+
+    core.eval.setError(undefined);
     core.eval.setBatchEvalResultsError(undefined);
     core.eval.setBatchEvalResults([
       { evaluatorId: "Builtin.Correctness", level: "Trace", sessionId: "recovered", score: 1 },
@@ -192,8 +203,43 @@ describe("batch-evaluation detail (raw JSON)", () => {
     await waitForText(screen.lastFrame, '"results"');
     expect(screen.lastFrame()).toContain("COMPLETED");
     expect(screen.lastFrame()).not.toContain("AccessDenied");
+    expect(screen.lastFrame()).not.toContain("metadata refresh unavailable");
     expect(screen.lastFrame()).not.toContain("[r] retry");
-    expect(core.eval.calls.filter((call) => call.method === "getBatchEvaluation")).toHaveLength(2);
+    expect(core.eval.calls.filter((call) => call.method === "getBatchEvaluation")).toHaveLength(3);
+  });
+
+  test("ignores repeated retry input while a refresh is pending", async () => {
+    const core = new TestCoreClient();
+    core.eval.setBatchEvalGetResponse(getResponse());
+    core.eval.setBatchEvalResultsError(new Error("AccessDenied"));
+    const screen = renderScreen("/agentcore/eval/batch-evaluation/get/be-1", { core });
+    await waitForText(screen.lastFrame, "[r] retry");
+
+    const pending = Promise.withResolvers<GetBatchEvaluationResult>();
+    let refreshCalls = 0;
+    core.eval.getBatchEvaluation = () => {
+      refreshCalls++;
+      return pending.promise;
+    };
+
+    try {
+      await Promise.all([screen.write("r"), screen.write("r"), screen.write("r")]);
+      expect(refreshCalls).toBe(1);
+      expect(screen.lastFrame()).toContain("COMPLETED");
+      expect(screen.lastFrame()).not.toContain("[r] retry");
+      await screen.write("r");
+      expect(refreshCalls).toBe(1);
+    } finally {
+      pending.resolve({
+        detail: getResponse(),
+        resultsError: new Error("results still unavailable"),
+      });
+    }
+
+    await waitForText(screen.lastFrame, "results still unavailable");
+    expect(screen.lastFrame()).toContain("[r] retry");
+    await screen.write("r");
+    expect(refreshCalls).toBe(2);
   });
 
   test("retries a failed detail query", async () => {

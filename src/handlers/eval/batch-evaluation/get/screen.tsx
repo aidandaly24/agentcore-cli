@@ -30,15 +30,17 @@ export function BatchEvaluationGetJsonScreen(props: ScreenProps) {
     <JsonDetail
       breadcrumb={["agentcore", "eval", "batch-evaluation", "get", batchEvaluationId ?? ""]}
       isPending={query.isPending}
-      error={query.isError ? (query.error as Error) : null}
+      error={query.isLoadingError ? (query.error as Error) : null}
       data={query.data?.detail}
       warning={
-        resultsError
-          ? `could not retrieve CloudWatch results (${(resultsError as Error).message}). Job status is unaffected.`
-          : undefined
+        query.isRefetchError
+          ? `could not refresh batch evaluation (${query.error.message}). Showing cached job metadata.`
+          : resultsError
+            ? `could not retrieve CloudWatch results (${(resultsError as Error).message}). Job status is unaffected.`
+            : undefined
       }
       loadingLabel="loading batch evaluation…"
-      onRetry={() => void query.refetch()}
+      onRetry={query.isFetching ? undefined : () => void query.refetch({ cancelRefetch: false })}
     />
   );
 }
