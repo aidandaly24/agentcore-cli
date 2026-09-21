@@ -29,6 +29,8 @@ export interface RootHandlerConfig {
   io: AppIO;
   logger: Logger;
   globalConfigAccessor: GlobalConfigAccessor;
+  /** Startup-resolved opt-in for Gateway mutation command registration. */
+  imperativeMutationCommands?: boolean;
   /** Host platform, defaults to `process.platform`. Tests pass "win32" to exercise Windows paths. */
   platform?: NodeJS.Platform;
 }
