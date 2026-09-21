@@ -124,30 +124,18 @@ This reference was generated from `agentcore --help` for version `1.0.0-rc.3`.
       - [`agentcore memory session list`](#agentcore-memory-session-list)
 - [Gateway commands](#gateway-commands)
   - [`agentcore gateway`](#agentcore-gateway)
-    - [`agentcore gateway create`](#agentcore-gateway-create)
-    - [`agentcore gateway update`](#agentcore-gateway-update)
     - [`agentcore gateway get`](#agentcore-gateway-get)
     - [`agentcore gateway list`](#agentcore-gateway-list)
-    - [`agentcore gateway delete`](#agentcore-gateway-delete)
     - [`agentcore gateway invoke`](#agentcore-gateway-invoke)
     - [`agentcore gateway target`](#agentcore-gateway-target)
-      - [`agentcore gateway target create`](#agentcore-gateway-target-create)
-      - [`agentcore gateway target update`](#agentcore-gateway-target-update)
       - [`agentcore gateway target get`](#agentcore-gateway-target-get)
       - [`agentcore gateway target list`](#agentcore-gateway-target-list)
-      - [`agentcore gateway target delete`](#agentcore-gateway-target-delete)
     - [`agentcore gateway connector`](#agentcore-gateway-connector)
-      - [`agentcore gateway connector create`](#agentcore-gateway-connector-create)
-      - [`agentcore gateway connector update`](#agentcore-gateway-connector-update)
       - [`agentcore gateway connector get`](#agentcore-gateway-connector-get)
       - [`agentcore gateway connector list`](#agentcore-gateway-connector-list)
-      - [`agentcore gateway connector delete`](#agentcore-gateway-connector-delete)
     - [`agentcore gateway rule`](#agentcore-gateway-rule)
-      - [`agentcore gateway rule create`](#agentcore-gateway-rule-create)
-      - [`agentcore gateway rule update`](#agentcore-gateway-rule-update)
       - [`agentcore gateway rule get`](#agentcore-gateway-rule-get)
       - [`agentcore gateway rule list`](#agentcore-gateway-rule-list)
-      - [`agentcore gateway rule delete`](#agentcore-gateway-rule-delete)
     - [`agentcore gateway policy`](#agentcore-gateway-policy)
       - [`agentcore gateway policy generate`](#agentcore-gateway-policy-generate)
 - [Payment commands](#payment-commands)
@@ -258,7 +246,6 @@ the platform for production AI agents
 - `--region <region>`: AWS region
 - `--debug`: debug logging (default: false)
 - `--json`: JSON output (default: false)
-- `--endpoint-url <endpoint-url>`: endpoint URL override
 - `-V, --version`: display the CLI version
 
 ## Project commands
@@ -1888,61 +1875,6 @@ agentcore gateway [options] [command]
 
 manage AgentCore Gateways
 
-#### `agentcore gateway create`
-
-```text
-agentcore gateway create [options]
-```
-
-create an AgentCore Gateway
-
-**Options**
-
-- `--name <name>`: the Gateway name (required)
-- `--role-arn <role-arn>`: IAM role the Gateway assumes (required)
-- `--protocol <protocol>`: restrict Target protocols to MCP; omitted allows every Target protocol
-- `--authorizer-type <authorizer-type>`: inbound authorizer: AWS\_IAM, CUSTOM\_JWT, NONE, or AUTHENTICATE\_ONLY (required)
-- `--description <description>`: Gateway description
-- `--protocol-configuration <protocol-configuration>`: MCP protocol configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--authorizer-configuration <authorizer-configuration>`: authorizer configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--kms-key-arn <kms-key-arn>`: KMS key ARN
-- `--interceptor-configurations <interceptor-configurations>`: interceptor configurations (JSON array; inline, file://&lt;path&gt;, or - for stdin)
-- `--policy-engine-arn <policy-engine-arn>`: Policy Engine ARN
-- `--policy-engine-mode <policy-engine-mode>`: Policy Engine mode: log-only or enforce
-- `--exception-level <exception-level>`: exception detail level: debug
-- `--tags <tags...>`: tags as repeated key=value or a JSON object (inline, file://&lt;path&gt;, or - for stdin)
-- `--client-token <client-token>`: idempotency token
-
-#### `agentcore gateway update`
-
-```text
-agentcore gateway update [options]
-```
-
-update an AgentCore Gateway
-
-**Options**
-
-- `--id <id>`: the Gateway ID (required)
-- `--role-arn <role-arn>`: updated IAM role ARN
-- `--description <description>`: updated Gateway description
-- `--protocol-configuration <protocol-configuration>`: replacement MCP protocol configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--authorizer-configuration <authorizer-configuration>`: replacement CUSTOM\_JWT configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--custom-transform-configuration <custom-transform-configuration>`: replacement custom transform configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--interceptor-configurations <interceptor-configurations>`: replacement interceptors (JSON array; inline, file://&lt;path&gt;, or - for stdin)
-- `--policy-engine-arn <policy-engine-arn>`: Policy Engine ARN
-- `--policy-engine-mode <policy-engine-mode>`: Policy Engine mode: log-only or enforce
-- `--exception-level <exception-level>`: exception detail level: debug
-- `--waf-configuration <waf-configuration>`: replacement WAF configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--clear-protocol`: remove the MCP-only Target restriction (default: false)
-- `--clear-description`: remove the Gateway description (default: false)
-- `--clear-protocol-configuration`: remove MCP protocol overrides (default: false)
-- `--clear-custom-transform-configuration`: remove the custom transform configuration (default: false)
-- `--clear-interceptor-configurations`: remove every interceptor (default: false)
-- `--clear-policy-engine`: detach the Policy Engine (default: false)
-- `--clear-exception-level`: return to generic invocation errors (default: false)
-- `--clear-waf-configuration`: reset WAF failure mode to FAIL\_CLOSE (default: false)
-
 #### `agentcore gateway get`
 
 ```text
@@ -1967,18 +1899,6 @@ list AgentCore Gateways
 
 - `--next-token <next-token>`: pagination token returned by a previous request
 - `--max-results <max-results>`: maximum number of items to return
-
-#### `agentcore gateway delete`
-
-```text
-agentcore gateway delete [options]
-```
-
-delete an AgentCore Gateway
-
-**Options**
-
-- `--id <id>`: the Gateway ID (required)
 
 #### `agentcore gateway invoke`
 
@@ -2011,51 +1931,6 @@ agentcore gateway target [options] [command]
 
 manage Targets for an AgentCore Gateway
 
-##### `agentcore gateway target create`
-
-```text
-agentcore gateway target create [options]
-```
-
-create a Gateway Target
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--name <name>`: Target name; optional only for AgentCore Runtime Targets
-- `--description <description>`: Target description
-- `--endpoint <endpoint>`: MCP server HTTPS endpoint
-- `--target-configuration <target-configuration>`: complete Target configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--tool-schema <tool-schema>`: MCP tool schema (inline JSON, file://&lt;path&gt;, - for stdin, or s3:// URI)
-- `--credential-provider-configurations <credential-provider-configurations>`: outbound credentials (JSON array; inline, file://&lt;path&gt;, or - for stdin)
-- `--metadata-configuration <metadata-configuration>`: metadata propagation (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--private-endpoint <private-endpoint>`: private endpoint (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--client-token <client-token>`: idempotency token
-
-##### `agentcore gateway target update`
-
-```text
-agentcore gateway target update [options]
-```
-
-update a Gateway Target
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--target-id <target-id>`: the Target ID (required)
-- `--name <name>`: updated Target name
-- `--description <description>`: updated Target description
-- `--endpoint <endpoint>`: updated endpoint for an existing MCP server Target
-- `--target-configuration <target-configuration>`: complete replacement Target configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--credential-provider-configurations <credential-provider-configurations>`: replacement outbound credentials (JSON array; inline, file://&lt;path&gt;, or - for stdin)
-- `--metadata-configuration <metadata-configuration>`: replacement metadata propagation (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--private-endpoint <private-endpoint>`: replacement private endpoint (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--clear-description`: remove the Target description (default: false)
-- `--clear-credential-provider-configurations`: remove outbound credentials (default: false)
-- `--clear-metadata-configuration`: remove metadata propagation (default: false)
-- `--clear-private-endpoint`: remove private endpoint configuration (default: false)
-
 ##### `agentcore gateway target get`
 
 ```text
@@ -2083,19 +1958,6 @@ list Targets for an AgentCore Gateway
 - `--next-token <next-token>`: pagination token returned by a previous request
 - `--max-results <max-results>`: maximum number of items to return
 
-##### `agentcore gateway target delete`
-
-```text
-agentcore gateway target delete [options]
-```
-
-delete a Gateway Target
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--target-id <target-id>`: the Target ID (required)
-
 #### `agentcore gateway connector`
 
 ```text
@@ -2103,51 +1965,6 @@ agentcore gateway connector [options] [command]
 ```
 
 manage connectors configured for an AgentCore Gateway
-
-##### `agentcore gateway connector create`
-
-```text
-agentcore gateway connector create [options]
-```
-
-create a connector-backed Gateway Target
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--name <name>`: Connector Target name (required)
-- `--description <description>`: Connector Target description
-- `--connector-configuration <connector-configuration>`: connector-backed Target configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--connector <connector>`: curated connector
-- `--knowledge-base-id <knowledge-base-id>`: Knowledge Base ID for the bedrock-knowledge-bases connector
-- `--credential-provider-configurations <credential-provider-configurations>`: one outbound credential configuration (JSON array; inline, file://&lt;path&gt;, or - for stdin); required with --connector-configuration and defaults to GATEWAY\_IAM\_ROLE with --connector
-- `--metadata-configuration <metadata-configuration>`: metadata propagation (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--private-endpoint <private-endpoint>`: private endpoint (JSON; inline, file://&lt;path&gt;, or - for stdin)
-
-##### `agentcore gateway connector update`
-
-```text
-agentcore gateway connector update [options]
-```
-
-update a connector-backed Gateway Target
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--id <id>`: the connector-backed Gateway Target ID (required)
-- `--name <name>`: updated Connector Target name
-- `--description <description>`: updated Connector Target description
-- `--connector-configuration <connector-configuration>`: complete connector-backed Target configuration (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--connector <connector>`: curated connector
-- `--knowledge-base-id <knowledge-base-id>`: Knowledge Base ID for the bedrock-knowledge-bases connector
-- `--credential-provider-configurations <credential-provider-configurations>`: replacement outbound credentials (JSON array; inline, file://&lt;path&gt;, or - for stdin)
-- `--metadata-configuration <metadata-configuration>`: replacement metadata propagation (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--private-endpoint <private-endpoint>`: replacement private endpoint (JSON; inline, file://&lt;path&gt;, or - for stdin)
-- `--clear-description`: remove the Connector Target description (default: false)
-- `--clear-credential-provider-configurations`: remove outbound credentials (default: false)
-- `--clear-metadata-configuration`: remove metadata propagation (default: false)
-- `--clear-private-endpoint`: remove private endpoint configuration (default: false)
 
 ##### `agentcore gateway connector get`
 
@@ -2176,19 +1993,6 @@ list connectors configured for an AgentCore Gateway
 - `--next-token <next-token>`: pagination token returned by a previous request
 - `--max-results <max-results>`: maximum number of items to return
 
-##### `agentcore gateway connector delete`
-
-```text
-agentcore gateway connector delete [options]
-```
-
-delete a connector-backed Gateway Target
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--id <id>`: the connector-backed Gateway Target ID (required)
-
 #### `agentcore gateway rule`
 
 ```text
@@ -2196,40 +2000,6 @@ agentcore gateway rule [options] [command]
 ```
 
 manage Rules for an AgentCore Gateway
-
-##### `agentcore gateway rule create`
-
-```text
-agentcore gateway rule create [options]
-```
-
-create a Gateway Rule
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--priority <priority>`: Rule priority from 1 to 1000000 (required)
-- `--conditions <conditions>`: Rule conditions (JSON Condition[]; inline, file://&lt;path&gt;, or - for stdin)
-- `--actions <actions>`: Rule actions (JSON Action[]; inline, file://&lt;path&gt;, or - for stdin) (required)
-- `--description <description>`: Rule description
-
-##### `agentcore gateway rule update`
-
-```text
-agentcore gateway rule update [options]
-```
-
-update a Gateway Rule
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--rule-id <rule-id>`: the Rule ID (required)
-- `--priority <priority>`: updated priority from 1 to 1000000
-- `--conditions <conditions>`: replacement conditions (JSON array; inline, file://&lt;path&gt;, or - for stdin)
-- `--clear-conditions`: make the Rule unconditional (default: false)
-- `--actions <actions>`: replacement actions (JSON array; inline, file://&lt;path&gt;, or - for stdin)
-- `--description <description>`: updated Rule description
 
 ##### `agentcore gateway rule get`
 
@@ -2257,19 +2027,6 @@ list Rules for an AgentCore Gateway
 - `--gateway-id <gateway-id>`: the ID of the Gateway (required)
 - `--next-token <next-token>`: pagination token returned by a previous request
 - `--max-results <max-results>`: maximum number of items to return
-
-##### `agentcore gateway rule delete`
-
-```text
-agentcore gateway rule delete [options]
-```
-
-delete a Gateway Rule
-
-**Options**
-
-- `--gateway-id <gateway-id>`: the parent Gateway ID (required)
-- `--rule-id <rule-id>`: the Rule ID (required)
 
 #### `agentcore gateway policy`
 
@@ -2508,7 +2265,8 @@ create an LLM-as-a-Judge evaluator
 
 - `--name <name>`: the name of the evaluator (required)
 - `--level <level>`: evaluation level (SESSION | TRACE | TOOL\_CALL) (required)
-- `--model <model>`: the Bedrock model ID used to judge (required)
+- `--model-provider <model-provider>`: model provider for the judge: Bedrock (default) or OpenResponses
+- `--model <model>`: judge model: a Bedrock model ID / ARN, or an OpenResponses model ID (required)
 - `--instructions <instructions>`: evaluation instructions (inline, file://&lt;path&gt;, or - for stdin) (required)
 - `--rating-scale <rating-scale>`: rating scale: a preset (1-5-quality | 1-3-simple | pass-fail | good-neutral-bad) or a custom RatingScale (JSON inline, file://&lt;path&gt;, or - for stdin) (required)
 - `--kms-key-arn <kms-key-arn>`: customer managed KMS key ARN for evaluator data
@@ -2526,7 +2284,8 @@ update an LLM-as-a-Judge evaluator
 
 - `--id <id>`: the ID of the evaluator to update (required)
 - `--instructions <instructions>`: evaluation instructions (inline, file://&lt;path&gt;, or - for stdin)
-- `--model <model>`: the Bedrock model ID used to judge
+- `--model-provider <model-provider>`: model provider for the judge: Bedrock (default) or OpenResponses
+- `--model <model>`: judge model: a Bedrock model ID / ARN, or an OpenResponses model ID (required when changing provider)
 - `--rating-scale <rating-scale>`: rating scale: a preset (1-5-quality | 1-3-simple | pass-fail | good-neutral-bad) or a custom RatingScale (JSON inline, file://&lt;path&gt;, or - for stdin)
 - `--kms-key-arn <kms-key-arn>`: customer managed KMS key ARN for evaluator data
 

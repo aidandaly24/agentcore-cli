@@ -839,26 +839,9 @@ branches and their `get`/`list` leaves open command menus and scoped selection
 flows. Connector is presented as a separate resource experience while using
 Gateway Target operations internally.
 
-Gateway imperative mutations are disabled by default. To opt in locally:
-
-```bash
-agentcore config imperative-mutation-commands true
-```
-
-This enables `create`, `update`, and `delete` under `gateway`, `gateway target`,
-`gateway connector`, and `gateway rule`. Set the value to `false` to disable
-them again. The setting is persisted in `~/.agentcore/config.json` and takes
-effect on the next CLI invocation or TUI session.
-
-When disabled, these commands are absent from CLI help and from the TUI's
-command-line-only section. The Gateway menu instead has a TUI-only `create`
-entry with project creation, `project add gateway --name MyGateway`, and
-`project deploy` guidance. It does not register an imperative CLI command.
-When enabled, `create` opens its CLI help rather than project guidance.
-
-The flag only gates this Gateway mutation command family. Reads, Gateway
-Invoke, policy generation, project workflows, and other resource families
-are unchanged. It is not a read-only mode or an authorization boundary.
+Create and deploy Gateways through an AgentCore project. The Gateway menu's
+TUI-only `create` entry provides `project create`,
+`project add gateway --name MyGateway`, and `project deploy` guidance.
 
 ```bash
 agentcore gateway
