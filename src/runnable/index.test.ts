@@ -1,5 +1,7 @@
 import { expect, spyOn, test } from "bun:test";
 import { CommanderError } from "commander";
+import { fileURLToPath } from "node:url";
+import { waitFor } from "../testing/timing";
 
 import {
   AgentCoreCLIError,
@@ -116,6 +118,59 @@ test("withUserCancellation preserves non-cancellation failures", async () => {
     }),
   ).rejects.toBe(failure);
 });
+
+// Windows console Ctrl+C is not equivalent to sending a POSIX signal to a child.
+test.skipIf(process.platform === "win32")(
+  "real SIGINT waits for Ink invocation cleanup, including repeated interrupts",
+  async () => {
+    const runnable = fileURLToPath(new URL("./index.tsx", import.meta.url));
+    const progress = fileURLToPath(new URL("../tui/progress.tsx", import.meta.url));
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "--eval",
+        `
+import { runWithExitCode, withUserCancellation } from ${JSON.stringify(runnable)};
+import { runWithProgress } from ${JSON.stringify(progress)};
+Object.defineProperty(process.stderr, "isTTY", { value: true });
+const initialListeners = new Set(process.listeners("SIGINT"));
+let cancellationListener;
+const code = await runWithExitCode(() => withUserCancellation(signal => {
+  cancellationListener = process.listeners("SIGINT").find(listener => !initialListeners.has(listener));
+  return runWithProgress(async () => {
+    await new Promise(resolve => {
+      signal.addEventListener("abort", () => {
+        setTimeout(() => process.kill(process.pid, "SIGINT"), 10);
+        setTimeout(resolve, 100);
+      }, { once: true });
+      process.kill(process.pid, "SIGINT");
+    });
+    process.stdout.write("cleanup complete\\n");
+  }, { io: process, label: "Waiting" });
+}));
+process.stdout.write(JSON.stringify({ code, restored: !process.listeners("SIGINT").includes(cancellationListener) }));
+process.exitCode = code;
+`,
+      ],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, INK_SCREEN_READER: "false", FORCE_COLOR: "0" },
+      },
+    );
+    const stdout = new Response(child.stdout).text();
+    const stderr = new Response(child.stderr).text();
+    try {
+      await waitFor(() => child.exitCode !== null || child.signalCode !== null, 3000);
+      expect(await child.exited).toBe(130);
+      expect(await stdout).toBe('cleanup complete\n{"code":130,"restored":true}');
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      await child.exited;
+      await Promise.all([stdout, stderr]);
+    }
+  },
+);
 
 test.each([
   [

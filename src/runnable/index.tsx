@@ -4,7 +4,8 @@ import { AgentCoreCLIError, ExitCode, SilentCLIError, UserCancellationError } fr
 export async function withUserCancellation<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
   const interrupt = () => controller.abort(new UserCancellationError());
-  process.once("SIGINT", interrupt);
+  // Ink's signal-exit handler must see our listener until cancellation cleanup settles.
+  process.on("SIGINT", interrupt);
   try {
     const result = await fn(controller.signal);
     controller.signal.throwIfAborted();
