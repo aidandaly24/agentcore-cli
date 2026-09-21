@@ -32,6 +32,9 @@ import {
 } from "../../testing";
 import { createRootHandler } from "../index";
 import { InputValidationError } from "../../errors";
+import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
+
+const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
 
 async function runWithTestCore(args: string[]): Promise<TestCoreClient> {
   const core = new TestCoreClient();
@@ -39,8 +42,8 @@ async function runWithTestCore(args: string[]): Promise<TestCoreClient> {
   const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
-    imperativeMutationCommands: true,
+    globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: MUTATION_CONFIG }),
+    globalConfig: MUTATION_CONFIG,
   });
   await root.route(["node", "agentcore", ...args, "--region", "us-west-2"]);
   return core;
@@ -51,8 +54,8 @@ describe("Gateway update command hierarchy", () => {
     const root = createRootHandler(new TestCoreClient(), {
       io: testIO().io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-      imperativeMutationCommands: true,
+      globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: MUTATION_CONFIG }),
+      globalConfig: MUTATION_CONFIG,
     });
     const gateway = root.children().find((child) => child.name() === "gateway")!;
 
@@ -284,8 +287,8 @@ async function runFixture(args: string[]): Promise<string> {
   const root = createRootHandler(createFixtureCore(), {
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
-    imperativeMutationCommands: true,
+    globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: MUTATION_CONFIG }),
+    globalConfig: MUTATION_CONFIG,
   });
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
   return io.stdout();

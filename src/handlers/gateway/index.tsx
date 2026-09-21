@@ -1,4 +1,5 @@
 import { renderTui } from "../../tui";
+import type { GlobalConfig } from "../../globalConfig";
 import type { AppIO } from "../../io";
 import { withTuiOnEmptyFlagsAndArgs } from "../../middleware";
 import { Router } from "../../router";
@@ -14,11 +15,8 @@ import { createGatewayRuleHandler } from "./rule";
 import { createGatewayTargetHandler } from "./target";
 import { createUpdateGatewayHandler } from "./update";
 
-export function createGatewayHandler(
-  core: Core,
-  io: AppIO,
-  imperativeMutationCommands = false,
-): Router {
+export function createGatewayHandler(core: Core, io: AppIO, globalConfig: GlobalConfig): Router {
+  const imperativeMutationCommands = globalConfig["imperative-mutation-commands"];
   const router = new Router("gateway", "manage AgentCore Gateways")
     .use(withTuiOnEmptyFlagsAndArgs(core, io))
     .default(renderTui(core, io))

@@ -80,7 +80,7 @@ process.exit(
         io,
         logger: rootLogger,
         globalConfigAccessor,
-        imperativeMutationCommands: globalConfig["imperative-mutation-commands"],
+        globalConfig,
       });
 
       const context = ValueContext.EmptyContext().withValue(

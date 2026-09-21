@@ -27,7 +27,9 @@ import {
 } from "../../testing";
 import { createRootHandler } from "../index";
 import { InputValidationError } from "../../errors";
+import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
 
+const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
 const REGION = "us-east-1";
 const GATEWAY_NAME = "agentcore-cli-gateway-create-fixture";
 const HTTP_TARGET_NAME = "http-fixture";
@@ -62,8 +64,8 @@ async function run(args: string[]): Promise<string> {
   const root = createRootHandler(createFixtureCore(), {
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
-    imperativeMutationCommands: true,
+    globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: MUTATION_CONFIG }),
+    globalConfig: MUTATION_CONFIG,
   });
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
   return io.stdout();

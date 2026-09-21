@@ -7,8 +7,11 @@ import {
   waitForText,
 } from "../testing";
 import type { ProjectCreateResource } from "./ProjectResourceCreateScreen";
+import { DEFAULT_GLOBAL_CONFIG } from "../globalConfig";
 
 afterEach(cleanupScreens);
+
+const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
 
 const RESOURCES = [
   {
@@ -72,7 +75,7 @@ describe("project resource creation guidance", () => {
   test.each(RESOURCES.filter(({ resource }) => resource !== "gateway"))(
     "$resource keeps project guidance when Gateway mutations are enabled",
     async ({ resource, label, addCommand }) => {
-      const r = renderScreen(`/agentcore/${resource}`, { imperativeMutationCommands: true });
+      const r = renderScreen(`/agentcore/${resource}`, { globalConfig: MUTATION_CONFIG });
       await waitForText(r.lastFrame, "type to choose a command");
       const entries = menuEntries(r.lastFrame()!);
       expect(entries.screens[0]).toBe("create");
@@ -83,7 +86,7 @@ describe("project resource creation guidance", () => {
       expect(r.lastFrame()).toContain(addCommand);
       expect(r.lastFrame()).not.toContain("this command runs from the command line");
 
-      const command = compiledRootCommand(undefined, true).commands.find(
+      const command = compiledRootCommand(undefined, MUTATION_CONFIG).commands.find(
         (candidate) => candidate.name() === resource,
       );
       expect(command?.commands.some((candidate) => candidate.name() === "create")).toBe(false);

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanupScreens, menuEntries, renderScreen, waitForText } from "../../testing";
+import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
 
 afterEach(cleanupScreens);
 const GROUPS = ["gateway", "gateway/target", "gateway/connector", "gateway/rule"];
@@ -18,7 +19,9 @@ describe("Gateway mutation menus", () => {
   });
 
   test.each(GROUPS)("%s preserves enabled CLI-only mutations", async (group) => {
-    const screen = renderScreen(`/agentcore/${group}`, { imperativeMutationCommands: true });
+    const screen = renderScreen(`/agentcore/${group}`, {
+      globalConfig: { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true },
+    });
     await waitForText(screen.lastFrame, "command line only");
     const entries = menuEntries(screen.lastFrame()!);
     expect(entries.cliOnly).toEqual(["create", "update", "delete"]);
@@ -47,7 +50,7 @@ describe("Gateway mutation menus", () => {
 
   test.each([false, true])("direct create route matches flag %s", async (enabled) => {
     const screen = renderScreen("/agentcore/gateway/create", {
-      imperativeMutationCommands: enabled,
+      globalConfig: { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": enabled },
     });
     await waitForText(
       screen.lastFrame,

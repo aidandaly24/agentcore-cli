@@ -8,14 +8,17 @@ import {
   waitForText,
 } from "../testing";
 import { isTuiCommandSupported } from "../router";
+import { DEFAULT_GLOBAL_CONFIG } from "../globalConfig";
 
 afterEach(cleanupScreens);
+
+const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
 
 // cliOnlyCommands walks the compiled Commander tree for every command without
 // a screen, so a command added later is covered without a new test. `help` is
 // Commander's own, not one of ours.
 function cliOnlyCommands(
-  command = compiledRootCommand(undefined, true),
+  command = compiledRootCommand(undefined, MUTATION_CONFIG),
   path: string[] = [],
 ): [string[], Command][] {
   const here = [...path, command.name()];
@@ -99,7 +102,7 @@ describe("every command-line-only command opens on screen", () => {
   test.each(CLI_ONLY.map(([path, command]) => [path.join(" "), path, command] as const))(
     "%s opens its menu or help, and esc returns to the parent",
     async (_label, path, command) => {
-      const r = renderScreen("/" + path.join("/"), { imperativeMutationCommands: true });
+      const r = renderScreen("/" + path.join("/"), { globalConfig: MUTATION_CONFIG });
       // Wide and tall enough that no option term wraps and nothing is below the
       // fold; scrolling and wrapping have their own tests.
       await r.resize(220, 200);
@@ -144,7 +147,7 @@ describe("paths without a screen of their own", () => {
   });
 
   test("a group drills down to a leaf's help and back", async () => {
-    const r = renderScreen("/agentcore/gateway", { imperativeMutationCommands: true });
+    const r = renderScreen("/agentcore/gateway", { globalConfig: MUTATION_CONFIG });
 
     await waitForText(r.lastFrame, "command line only");
     await r.write("create");
@@ -189,7 +192,7 @@ describe("option help groups", () => {
   });
 
   test("a command whose flags carry no group keeps a single options section", async () => {
-    const r = renderScreen("/agentcore/gateway/create", { imperativeMutationCommands: true });
+    const r = renderScreen("/agentcore/gateway/create", { globalConfig: MUTATION_CONFIG });
 
     await waitForText(r.lastFrame, "this command runs from the command line");
     const frame = r.lastFrame()!;

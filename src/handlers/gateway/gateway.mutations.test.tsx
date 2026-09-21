@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
 import { compile, ValueContext } from "../../router";
 import {
   createSilentLogger,
@@ -7,18 +8,23 @@ import {
   testIO,
 } from "../../testing";
 import { createRootHandler } from "../index";
+import { createGatewayHandler } from "./index";
 
 const GROUPS = [[], ["target"], ["connector"], ["rule"]];
 const MUTATIONS = ["create", "update", "delete"];
 
-function setup(imperativeMutationCommands?: boolean) {
+function setup(enabled?: boolean) {
   const core = new TestCoreClient();
   const io = testIO();
+  const globalConfig =
+    enabled === undefined
+      ? undefined
+      : { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": enabled };
   const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
-    imperativeMutationCommands,
+    globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: globalConfig }),
+    globalConfig,
   });
   const command = compile(root, ValueContext.EmptyContext());
   command.configureOutput({ writeErr: () => {}, writeOut: () => {} });
@@ -26,6 +32,37 @@ function setup(imperativeMutationCommands?: boolean) {
 }
 
 describe("Gateway imperative mutation availability", () => {
+  test("Gateway reads command availability from the resolved config", () => {
+    for (const enabled of [false, true]) {
+      const gateway = createGatewayHandler(new TestCoreClient(), testIO().io, {
+        ...DEFAULT_GLOBAL_CONFIG,
+        "imperative-mutation-commands": enabled,
+      });
+      const names = gateway.children().map((child) => child.name());
+      for (const mutation of MUTATIONS) {
+        expect(names.includes(mutation)).toBe(enabled);
+      }
+    }
+  });
+
+  test("constructs the tree from the startup snapshot without rereading config", () => {
+    let reads = 0;
+    const globalConfigAccessor = new TestGlobalConfigAccessor();
+    globalConfigAccessor.get = async () => {
+      reads++;
+      throw new Error("Router construction must not read config");
+    };
+    const root = createRootHandler(new TestCoreClient(), {
+      io: testIO().io,
+      logger: createSilentLogger(),
+      globalConfigAccessor,
+      globalConfig: { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true },
+    });
+    const gateway = root.children().find((child) => child.name() === "gateway")!;
+    expect(gateway.children().map((child) => child.name())).toContain("create");
+    expect(reads).toBe(0);
+  });
+
   test.each([undefined, false, true])("builds help and commands for flag %s", (enabled) => {
     const { command } = setup(enabled);
     const gateway = command.commands.find((child) => child.name() === "gateway")!;

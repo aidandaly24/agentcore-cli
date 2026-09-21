@@ -20,7 +20,9 @@ import { PathKey } from "../../router";
 import { JsonKey } from "../keys";
 import { createGeneratePolicyHandler } from "./policy/generate";
 import type { Core } from "../types";
+import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
 
+const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
 const REGION = "us-west-2";
 const GATEWAY_ID = "gateway-1";
 const TARGET_ID = "target-1";
@@ -34,8 +36,8 @@ async function run<C extends Core>(
   const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
-    imperativeMutationCommands: true,
+    globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: MUTATION_CONFIG }),
+    globalConfig: MUTATION_CONFIG,
   });
 
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
@@ -47,8 +49,8 @@ function supportsTui(path: readonly string[]): boolean {
     createRootHandler(new TestCoreClient(), {
       io: testIO().io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-      imperativeMutationCommands: true,
+      globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: MUTATION_CONFIG }),
+      globalConfig: MUTATION_CONFIG,
     }),
     ValueContext.EmptyContext(),
   );
@@ -66,8 +68,8 @@ describe("gateway command hierarchy", () => {
     const root = createRootHandler(new TestCoreClient(), {
       io: testIO().io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-      imperativeMutationCommands: true,
+      globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: MUTATION_CONFIG }),
+      globalConfig: MUTATION_CONFIG,
     });
     const gateway = root.children().find((child) => child.name() === "gateway");
     const target = gateway?.children().find((child) => child.name() === "target");
