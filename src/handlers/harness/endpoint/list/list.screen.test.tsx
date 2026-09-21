@@ -132,4 +132,21 @@ describe("harness endpoint list screen", () => {
     expect(call.args[1]).toBe("prod");
     r.unmount();
   });
+
+  test("retries a failed endpoint detail without losing its selectors", async () => {
+    const core = new TestCoreClient();
+    core.harness.setError(new Error("endpoint unavailable"));
+    const r = renderScreen("/agentcore/harness/endpoint/get/MyHarness-abc123/prod", { core });
+    await waitForText(r.lastFrame, "endpoint unavailable");
+    expect(r.lastFrame()).toContain("[r] retry");
+
+    core.harness.setError(undefined).setGetEndpointResponse({ endpoint: endpoint() });
+    await r.write("r");
+    await waitForText(r.lastFrame, '"endpointName"');
+    expect(r.lastFrame()).toContain('"prod"');
+    expect(r.lastFrame()).not.toContain("[r] retry");
+    const calls = core.harness.calls.filter((call) => call.method === "getHarnessEndpoint");
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.args.slice(0, 2)).toEqual(["MyHarness-abc123", "prod"]);
+  });
 });

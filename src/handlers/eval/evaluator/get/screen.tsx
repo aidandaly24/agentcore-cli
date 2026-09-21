@@ -15,12 +15,11 @@ function useEvaluatorDetail({ ctx, core }: ScreenProps, evaluatorId: string | un
   });
 }
 
-// evaluatorKind names the arm of the evaluatorConfig union in display terms. The
-// GetEvaluator response has no type field of its own (unlike the list summary);
-// the kind is which arm of the config is populated.
+// Configuration kind is distinct from the resource's evaluatorType (e.g. Builtin).
 function evaluatorKind(evaluator: GetEvaluatorResponse | undefined): string {
   if (evaluator?.evaluatorConfig?.llmAsAJudge) return "LLM-as-a-Judge";
   if (evaluator?.evaluatorConfig?.codeBased) return "code-based";
+  if (evaluator?.evaluatorConfig?.derived) return "derived";
   return "-";
 }
 

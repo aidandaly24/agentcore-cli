@@ -38,13 +38,14 @@ export function JsonDetail({
 }: JsonDetailProps) {
   const navigate = useNavigate();
   const scrollRef = useRef<ScrollViewRef>(null);
+  const retryable = !isPending && (error || warning) && onRetry;
 
   useInput((input, key) => {
     if (key.escape) {
       navigate(-1);
       return;
     }
-    if (input === "r" && error && onRetry) {
+    if (input === "r" && retryable) {
       onRetry();
       return;
     }
@@ -61,7 +62,7 @@ export function JsonDetail({
       breadcrumb={breadcrumb}
       keyHints={[
         { key: "↑↓/jk", label: "navigate" },
-        ...(error && onRetry ? [{ key: "r", label: "retry" }] : []),
+        ...(retryable ? [{ key: "r", label: "retry" }] : []),
         { key: "esc", label: "back" },
         { key: "ctrl+c", label: "quit" },
       ]}

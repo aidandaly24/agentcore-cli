@@ -158,6 +158,9 @@ describe("online-insight detail", () => {
     expect(frame).toMatch(/execution\s+ENABLED/);
     expect(frame).toMatch(/insights\s+2/);
     expect(frame).toContain("DAILY, WEEKLY");
+    expect(frame).toMatch(/arn\s+arn:aws:bedrock-agentcore:/);
+    expect(frame.replace(/\s+/g, "")).toContain(getConfigResponse().onlineEvaluationConfigArn!);
+    expect(frame.replace(/\s+/g, "")).toContain(getConfigResponse().evaluationExecutionRoleArn!);
     expect(frame).not.toContain("evaluators");
     expect(core.eval.calls.find((call) => call.method === "getOnlineInsight")).toEqual({
       method: "getOnlineInsight",

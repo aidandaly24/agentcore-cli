@@ -38,6 +38,7 @@ export function OnlineInsightGetScreen(props: ScreenProps) {
         clustering: frequencies.length > 0 ? frequencies.join(", ") : "-",
         ...(config?.failureReason ? { failureReason: config.failureReason } : {}),
         role: config?.evaluationExecutionRoleArn ?? "-",
+        arn: config?.onlineEvaluationConfigArn ?? "",
       }}
       actions={
         configId && config

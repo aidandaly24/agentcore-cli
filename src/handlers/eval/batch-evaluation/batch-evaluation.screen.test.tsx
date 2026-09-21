@@ -182,6 +182,18 @@ describe("batch-evaluation detail (raw JSON)", () => {
     expect(frame).not.toContain('"results"'); // results omitted, screen didn't crash
     expect(frame).toContain("could not retrieve CloudWatch results"); // warned, not silent
     expect(frame).toContain("AccessDenied");
+    expect(frame).toContain("[r] retry");
+
+    core.eval.setBatchEvalResultsError(undefined);
+    core.eval.setBatchEvalResults([
+      { evaluatorId: "Builtin.Correctness", level: "Trace", sessionId: "recovered", score: 1 },
+    ]);
+    await screen.write("r");
+    await waitForText(screen.lastFrame, '"results"');
+    expect(screen.lastFrame()).toContain("COMPLETED");
+    expect(screen.lastFrame()).not.toContain("AccessDenied");
+    expect(screen.lastFrame()).not.toContain("[r] retry");
+    expect(core.eval.calls.filter((call) => call.method === "getBatchEvaluation")).toHaveLength(2);
   });
 
   test("retries a failed detail query", async () => {

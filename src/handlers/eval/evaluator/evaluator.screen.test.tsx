@@ -192,6 +192,30 @@ describe("evaluator detail", () => {
     await waitForText(locked.lastFrame, "locked");
   });
 
+  test("labels a derived evaluator without changing unknown kinds", async () => {
+    const core = new TestCoreClient();
+    core.eval.setGetResponse(
+      getEvaluatorResponse({
+        evaluatorType: "CustomDerived",
+        evaluatorConfig: {
+          derived: {
+            baseEvaluatorId: "Builtin.Helpfulness",
+            modelConfig: { bedrockEvaluatorModelConfig: { modelId: "amazon.nova-pro-v1:0" } },
+          },
+        },
+      }),
+    );
+    const screen = renderScreen("/agentcore/eval/evaluator/get/ev-1", { core });
+    await waitForText(screen.lastFrame, "show the full JSON definition");
+    expect(screen.lastFrame()).toMatch(/kind\s+derived/);
+    screen.unmount();
+
+    core.eval.setGetResponse(getEvaluatorResponse({ evaluatorConfig: undefined }));
+    const unknown = renderScreen("/agentcore/eval/evaluator/get/ev-1", { core });
+    await waitForText(unknown.lastFrame, "show the full JSON definition");
+    expect(unknown.lastFrame()).toMatch(/kind\s+-/);
+  });
+
   test("opens the complete evaluator JSON", async () => {
     const core = new TestCoreClient();
     core.eval.setGetResponse(getEvaluatorResponse());

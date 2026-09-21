@@ -35,6 +35,7 @@ export function OnlineEvalGetScreen(props: ScreenProps) {
         evaluators: config?.evaluators?.length.toString() ?? "0",
         ...(config?.failureReason ? { failureReason: config.failureReason } : {}),
         role: config?.evaluationExecutionRoleArn ?? "-",
+        arn: config?.onlineEvaluationConfigArn ?? "",
       }}
       actions={
         configId && config

@@ -159,6 +159,9 @@ describe("online-eval detail", () => {
     expect(frame).toMatch(/sampling\s+5%/);
     expect(frame).toMatch(/execution\s+ENABLED/);
     expect(frame).toMatch(/evaluators\s+1/);
+    expect(frame).toMatch(/arn\s+arn:aws:bedrock-agentcore:/);
+    expect(frame.replace(/\s+/g, "")).toContain(getConfigResponse().onlineEvaluationConfigArn!);
+    expect(frame.replace(/\s+/g, "")).toContain(getConfigResponse().evaluationExecutionRoleArn!);
     expect(core.eval.calls.find((call) => call.method === "getOnlineEvaluationConfig")).toEqual({
       method: "getOnlineEvaluationConfig",
       args: ["oec-1", { region: "us-east-1", endpointUrl: evalEndpointUrl }],

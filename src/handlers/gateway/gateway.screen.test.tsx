@@ -178,6 +178,8 @@ describe("Gateway menu and list", () => {
     await waitForText(screen.lastFrame, "show the full JSON definition");
     expect(screen.lastFrame()).toContain(`agentcore → gateway → get → ${GATEWAY_ID}`);
     const frame = screen.lastFrame()!;
+    expect(frame).toMatch(/arn\s+arn:aws:bedrock-agentcore:/);
+    expect(frame.replace(/\s+/g, "")).toContain(gatewayDetail().gatewayArn!);
     for (const action of ["detail", "targets", "connectors", "rules"]) {
       expect(frame).toContain(action);
     }
@@ -188,6 +190,26 @@ describe("Gateway menu and list", () => {
       method: "getGateway",
       args: [GATEWAY_ID, { region: "us-east-1", endpointUrl: ENDPOINT }],
     });
+  });
+
+  test("shows status reasons only when the Gateway provides them", async () => {
+    const core = new TestCoreClient();
+    core.gateway.setGetResponse(
+      gatewayDetail({ status: "FAILED", statusReasons: ["Role is unavailable", "Target failed"] }),
+    );
+    const screen = renderScreen(`/agentcore/gateway/get/${encodeURIComponent(GATEWAY_ID)}`, {
+      core,
+    });
+    await waitForText(screen.lastFrame, "show the full JSON definition");
+    expect(screen.lastFrame()).toMatch(/statusReasons\s+Role is unavailable; Target failed/);
+    screen.unmount();
+
+    core.gateway.setGetResponse(gatewayDetail({ statusReasons: [] }));
+    const ready = renderScreen(`/agentcore/gateway/get/${encodeURIComponent(GATEWAY_ID)}`, {
+      core,
+    });
+    await waitForText(ready.lastFrame, "show the full JSON definition");
+    expect(ready.lastFrame()).not.toContain("statusReasons");
   });
 
   test("opens complete Gateway JSON from the detail action", async () => {

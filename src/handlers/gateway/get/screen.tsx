@@ -28,9 +28,13 @@ export function GatewayGetScreen(props: ScreenProps) {
         name: detail.data?.name ?? "",
         id: detail.data?.gatewayId ?? gatewayId ?? "",
         status: detail.data?.status ?? "",
+        ...(detail.data?.statusReasons?.length
+          ? { statusReasons: detail.data.statusReasons.join("; ") }
+          : {}),
         protocol: detail.data?.protocolType ?? "unrestricted",
         authorizer: detail.data?.authorizerType ?? "-",
         url: detail.data?.gatewayUrl ?? "",
+        arn: detail.data?.gatewayArn ?? "",
       }}
       actions={
         gatewayId && detail.data

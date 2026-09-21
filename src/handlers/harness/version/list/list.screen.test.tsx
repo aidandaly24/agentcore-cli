@@ -166,4 +166,25 @@ describe("harness version list screen", () => {
     expect(call.args[1]).toBe("42");
     r.unmount();
   });
+
+  test("retries a failed version detail without losing its selectors", async () => {
+    const core = new TestCoreClient();
+    core.harness.setError(new Error("version unavailable"));
+    const r = renderScreen("/agentcore/harness/version/get/MyHarness-abc123/42", { core });
+    await waitForText(r.lastFrame, "version unavailable");
+    expect(r.lastFrame()).toContain("[r] retry");
+
+    core.harness.setError(undefined).setGetVersionResponse({
+      harness: {
+        ...version({ harnessVersion: "42" }),
+      },
+    } as Awaited<ReturnType<TestCoreClient["harness"]["getHarnessVersion"]>>);
+    await r.write("r");
+    await waitForText(r.lastFrame, '"harnessVersion"');
+    expect(r.lastFrame()).toContain('"42"');
+    expect(r.lastFrame()).not.toContain("[r] retry");
+    const calls = core.harness.calls.filter((call) => call.method === "getHarnessVersion");
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.args.slice(0, 2)).toEqual(["MyHarness-abc123", "42"]);
+  });
 });

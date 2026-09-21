@@ -60,7 +60,24 @@ describe("harness hub screen", () => {
     expect(frame).toContain("MyHarness-abc123");
     expect(frame).toContain("READY");
     expect(frame).toMatch(/version\s+1/);
+    expect(frame).not.toContain("failureReason");
     r.unmount();
+  });
+
+  test("shows failure diagnostics and leaves an unknown version unknown", async () => {
+    const core = new TestCoreClient();
+    core.harness.setGetResponse({
+      harness: {
+        ...getResponse().harness!,
+        harnessVersion: undefined,
+        status: "CREATE_FAILED",
+        failureReason: "Execution role is unavailable",
+      },
+    });
+    const r = renderScreen("/agentcore/harness/get/MyHarness-abc123", { core });
+    await waitForText(r.lastFrame, "show the full JSON definition");
+    expect(r.lastFrame()).toMatch(/failureReason\s+Execution role is unavailable/);
+    expect(r.lastFrame()).toMatch(/version\s+-/);
   });
 
   test("lists the harness actions", async () => {
@@ -274,6 +291,131 @@ async function focusTree(r: ReturnType<typeof renderScreen>, row = 0) {
 }
 
 describe("harness hub linked resources", () => {
+  test("keeps dense linked resources readable and focused across terminal resizes", async () => {
+    const gateways = Array.from({ length: 10 }, (_, index) => `tools-Gw${index}123456`);
+    const { core, r } = linkedHubScreen(
+      linkedHarness({
+        tools: gateways.map((id) => ({
+          type: "agentcore_gateway",
+          config: { agentCoreGateway: { gatewayArn: `${LINK_ARN}:gateway/${id}` } },
+        })),
+        model: { bedrockModelConfig: { modelId: "amazon.nova-pro-v1:0" } },
+      }),
+    );
+    await waitForText(r.lastFrame, gateways[9]!);
+    await r.resize(80, 24);
+    expect(r.lastFrame()).toMatch(/status\s+READY/);
+    expect(r.lastFrame()).toMatch(/version\s+1/);
+    expect(r.lastFrame()).toContain("[pgup/pgdn] scroll");
+    await focusTree(r);
+
+    for (const id of [RUNTIME_ID, MEMORY_ID, ...gateways]) {
+      expect(markedLines(r.lastFrame())).toHaveLength(1);
+      expect(markedLines(r.lastFrame())[0]).toContain(id);
+      await r.press("down");
+    }
+    await r.resize(60, 16);
+    expect(markedLines(r.lastFrame())[0]).toContain(gateways[9]!);
+    await r.write("\u001b[5~");
+    await r.write("\u001b[5~");
+    expect(markedLines(r.lastFrame())).toHaveLength(0);
+    await r.press("down");
+    expect(markedLines(r.lastFrame())[0]).toContain(gateways[9]!);
+    await r.resize(100, 40);
+    expect(r.lastFrame()).toMatch(/status\s+READY/);
+    expect(r.lastFrame()).toMatch(/version\s+1/);
+    expect(markedLines(r.lastFrame())[0]).toContain(gateways[9]!);
+
+    await r.press("return");
+    await waitFor(() => core.gateway.calls.some(({ method }) => method === "getGateway"));
+    expect(core.gateway.calls.find(({ method }) => method === "getGateway")!.args[0]).toBe(
+      gateways[9]!,
+    );
+    await r.press("escape");
+    await waitForText(r.lastFrame, "linked resources");
+  });
+
+  test("keeps nested rows visible when collapsing and expanding a scrolled tree", async () => {
+    const { r } = linkedHubScreen();
+    await waitForText(r.lastFrame, "linked resources");
+    await r.resize(80, 16);
+    await focusTree(r, 2);
+    expect(markedLines(r.lastFrame())[0]).toContain(GATEWAY_ID);
+    await r.press("left");
+    await r.press("down");
+    expect(markedLines(r.lastFrame())[0]).toContain("browser");
+    await r.press("up");
+    await r.press("right");
+    await r.press("down");
+    expect(markedLines(r.lastFrame())[0]).toContain("github-oauth");
+    await r.press("up");
+    await r.press("left");
+    for (let index = 0; index < 8; index++) await r.press("up");
+    expect(r.lastFrame()).toMatch(/status\s+READY/);
+    expect(markedLines(r.lastFrame())[0]).toContain("detail");
+  });
+
+  test("pages through long diagnostics without hiding the first action on navigation", async () => {
+    const core = new TestCoreClient();
+    core.harness.setGetResponse({
+      harness: {
+        ...getResponse().harness!,
+        status: "CREATE_FAILED",
+        failureReason: Array.from({ length: 30 }, (_, index) => `Diagnostic line ${index}`).join(
+          "\n",
+        ),
+      },
+    });
+    const r = renderScreen("/agentcore/harness/get/MyHarness-abc123", { core });
+    await waitForText(r.lastFrame, "Diagnostic line 0");
+    await r.resize(80, 16);
+    for (let index = 0; index < 4; index++) await r.write("\u001b[5~");
+    expect(r.lastFrame()).toContain("Diagnostic line 0");
+    expect(r.lastFrame()).not.toContain("Diagnostic line 29");
+    await r.write("\u001b[6~");
+    await r.write("\u001b[6~");
+    await waitForText(r.lastFrame, "Diagnostic line 29");
+    await r.press("down");
+    expect(markedLines(r.lastFrame())[0]).toContain("endpoints");
+    await r.press("up");
+    expect(markedLines(r.lastFrame())[0]).toContain("detail");
+    for (let index = 0; index < 4; index++) await r.write("\u001b[5~");
+    expect(r.lastFrame()).toContain("Diagnostic line 0");
+    expect(r.lastFrame()).toMatch(/status\s+CREATE_FAILED/);
+    expect(markedLines(r.lastFrame())).toHaveLength(0);
+    await r.press("up");
+    expect(markedLines(r.lastFrame())[0]).toContain("detail");
+    await r.resize(100, 50);
+    expect(r.lastFrame()).toContain("Diagnostic line 29");
+    expect(markedLines(r.lastFrame())[0]).toContain("detail");
+  });
+
+  test("can scroll to a newly opened no-detail hint without changing selection", async () => {
+    const { r } = linkedHubScreen(
+      linkedHarness({
+        tools: [
+          ...Array.from({ length: 10 }, (_, index) => ({
+            type: "agentcore_gateway" as const,
+            config: {
+              agentCoreGateway: { gatewayArn: `${LINK_ARN}:gateway/tools-Gw${index}123456` },
+            },
+          })),
+          { type: "agentcore_browser", config: { agentCoreBrowser: {} } },
+        ],
+        model: { bedrockModelConfig: { modelId: "amazon.nova-pro-v1:0" } },
+      }),
+    );
+    await waitForText(r.lastFrame, "linked resources");
+    await r.resize(80, 16);
+    await focusTree(r);
+    await r.write("G");
+    expect(markedLines(r.lastFrame())[0]).toContain("browser");
+    await r.press("return");
+    await r.write("\u001b[6~");
+    await waitForText(r.lastFrame, "browser default has no detail view.");
+    expect(markedLines(r.lastFrame())[0]).toContain("browser");
+  });
+
   test("lists one row per linked resource under a titled divider", async () => {
     const { r } = linkedHubScreen();
 

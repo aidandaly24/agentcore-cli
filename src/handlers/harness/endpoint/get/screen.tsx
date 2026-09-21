@@ -23,6 +23,7 @@ export function HarnessGetEndpointScreen({ ctx, core }: ScreenProps) {
       error={detail.isError ? (detail.error as Error) : null}
       data={detail.data?.endpoint}
       loadingLabel="loading endpoint…"
+      onRetry={() => void detail.refetch()}
     />
   );
 }

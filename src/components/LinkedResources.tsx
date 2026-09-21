@@ -1,5 +1,5 @@
-import { useContext, useState } from "react";
-import { Box, Text } from "ink";
+import { useContext, useState, type Ref } from "react";
+import { Box, Text, type DOMElement } from "ink";
 import { RegionPinContext } from "../handlers/utils";
 import { TreeView, type TreeNode } from "./ui/tree-view";
 import { Divider } from "./ui/divider";
@@ -61,6 +61,8 @@ export interface LinkedResourcesTreeProps {
   focus: boolean;
   /** Up on the first row hands focus back; see TreeView's onUpFromFirst. */
   onUpFromFirst?: () => void;
+  focusedRowRef?: Ref<DOMElement>;
+  onContentChange?: () => void;
   onOpen: (route: string) => void;
 }
 
@@ -71,6 +73,8 @@ export function LinkedResourcesTree({
   title = "linked resources",
   focus,
   onUpFromFirst,
+  focusedRowRef,
+  onContentChange,
   onOpen,
 }: LinkedResourcesTreeProps) {
   const [hint, setHint] = useState<string>();
@@ -83,6 +87,7 @@ export function LinkedResourcesTree({
       return;
     }
     setHint(node.data?.hint);
+    onContentChange?.();
   };
 
   return (
@@ -96,6 +101,8 @@ export function LinkedResourcesTree({
           focusMarker
           focus={focus}
           onUpFromFirst={onUpFromFirst}
+          focusedRowRef={focusedRowRef}
+          onToggle={onContentChange}
         />
         {hint !== undefined && (
           <Box marginTop={1}>
