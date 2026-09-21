@@ -151,6 +151,51 @@ test("serializes supplied nested strings, arrays, maps, and zero values without 
   expect(await readFile(join(directory, "system-prompt.md"), "utf8")).toBe(systemPrompt!);
 });
 
+test("renders supplied deployment settings once in their sections", async () => {
+  const overrides: Partial<z.input<typeof HarnessSpecSchema>> = {
+    networkMode: "VPC",
+    networkConfig: {
+      vpcId: "vpc-0123456789abcdef0",
+      subnets: ["subnet-0123456789abcdef0"],
+      securityGroups: ["sg-0123456789abcdef0"],
+    },
+    authorizerType: "CUSTOM_JWT",
+    authorizerConfiguration: {
+      customJwtAuthorizer: {
+        discoveryUrl: "https://example.com/.well-known/openid-configuration",
+        allowedAudience: ["assistant"],
+      },
+    },
+    lifecycleConfig: { idleRuntimeSessionTimeout: 300, maxLifetime: 3600 },
+    sessionStoragePath: "/mnt/session",
+    efsAccessPoints: [
+      {
+        accessPointArn:
+          "arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-0123456789abcdef0",
+        mountPath: "/mnt/efs",
+      },
+    ],
+    s3AccessPoints: [
+      {
+        accessPointArn:
+          "arn:aws:s3files:us-east-1:123456789012:file-system/fs-0123456789abcdef0/access-point/fsap-0123456789abcdef0",
+        mountPath: "/mnt/s3",
+      },
+    ],
+    connections: [
+      {
+        to: {
+          type: "memory",
+          arn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:memory/existing-1234567890",
+        },
+        access: "read",
+      },
+    ],
+  };
+  const { data } = await scaffold(overrides);
+  expect(data).toEqual({ name: "assistant", model, ...defaultSettings, ...overrides });
+});
+
 test("writes supplied instructions to the conventional prompt file", async () => {
   const systemPrompt = "\uFEFFBe concise.\r\n";
   const { data, directory } = await scaffold({ systemPrompt });
