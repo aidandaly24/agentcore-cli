@@ -1,9 +1,9 @@
 import z from "zod";
-import { InputValidationError, RuntimeInvokeResponseError } from "../../../errors";
+import { ExitCode, InputValidationError, RuntimeInvokeResponseError } from "../../../errors";
 import { invokeLocalRuntime } from "../../../core/dev/localInvoke";
 import { DEV_PORTS } from "../../../core/dev/port";
 import type { AppIO } from "../../../io";
-import { ExitCode, withUserCancellation } from "../../../runnable";
+import { withUserCancellation } from "../../../runnable";
 import { createHandler, flag, ProjectKey } from "../../../router";
 import { renderTuiAt } from "../../../tui";
 import { runWithProgress } from "../../../tui/progress";
@@ -30,10 +30,10 @@ export const createProjectInvokeRuntimeHandler = (
     description: "invoke a Runtime from the current project",
     flags: [
       flag("name", "the logical project Runtime name", z.string().optional()),
-      flag("local", "invoke a local HTTP Runtime development server", z.boolean()),
+      flag("local", "invoke a local Runtime development server", z.boolean()),
       flag(
         "port",
-        "local HTTP Runtime development server port (default: 8080)",
+        "local Runtime development server port (defaults: HTTP/AG-UI 8080, MCP 8000, A2A 9000)",
         z.coerce.number().int().min(1).max(65535).optional(),
       ),
       flag("target", "project deployment target (default: default)", z.string().optional()),
@@ -74,18 +74,27 @@ export const createProjectInvokeRuntimeHandler = (
         if (jsonOutput && flags["output-file"] !== undefined) {
           throw new InputValidationError("--json cannot be used with --output-file");
         }
+        const name = selectProjectResource(project, "runtime", flags.name, "invoke");
+        const runtime = project.spec.runtimes.find((candidate) => candidate.name === name)!;
+        const protocol = runtime.protocol ?? "HTTP";
         const unsupportedFlag = Object.entries({
-          name: flags.name,
           target: flags.target,
           qualifier: flags.qualifier,
           "bearer-token": flags["bearer-token"],
-          "mcp-session-id": flags["mcp-session-id"],
-          "mcp-protocol-version": flags["mcp-protocol-version"],
-          "mcp-method": flags["mcp-method"],
-          "mcp-name": flags["mcp-name"],
         }).find(([, value]) => value !== undefined)?.[0];
         if (unsupportedFlag !== undefined) {
           throw new InputValidationError(`--${unsupportedFlag} cannot be used with --local`);
+        }
+        if (
+          protocol !== "MCP" &&
+          [
+            flags["mcp-session-id"],
+            flags["mcp-protocol-version"],
+            flags["mcp-method"],
+            flags["mcp-name"],
+          ].some((value) => value !== undefined)
+        ) {
+          throw new InputValidationError("MCP options are only valid for MCP Runtimes");
         }
         if (flags.payload === undefined) {
           throw new InputValidationError("required option '--payload <payload>' not specified", {
@@ -102,13 +111,18 @@ export const createProjectInvokeRuntimeHandler = (
           );
           const response = await invokeLocalRuntime(
             {
-              port: flags.port ?? DEV_PORTS.HTTP,
+              port: flags.port ?? DEV_PORTS[protocol],
+              protocol,
               payload: sources.payload,
               contentType: flags["content-type"],
               accept: flags.accept,
               runtimeSessionId: flags["session-id"],
               runtimeUserId: flags["user-id"],
               applicationHeaders,
+              mcpSessionId: flags["mcp-session-id"],
+              mcpProtocolVersion: flags["mcp-protocol-version"],
+              mcpMethod: flags["mcp-method"],
+              mcpName: flags["mcp-name"],
               traceId: flags["trace-id"],
               traceParent: flags["trace-parent"],
               traceState: flags["trace-state"],

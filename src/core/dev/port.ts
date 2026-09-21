@@ -1,4 +1,4 @@
-import { InputValidationError } from "../../errors";
+import { AgentCoreCLIError, ERROR_SOURCE, InputValidationError } from "../../errors";
 import type { ProjectRuntime } from "../../projectSchemas/runtime";
 import type { PortChecker } from "../../io";
 
@@ -10,12 +10,13 @@ export type DevPort = {
   requestedPort: number;
 };
 
-export class PortInUseError extends InputValidationError {
+export class PortInUseError extends AgentCoreCLIError {
   constructor(port: number) {
     super(
       `Port ${port} is already in use. Find the process with ` +
         `'lsof -i :${port}' (macOS/Linux) or 'netstat -ano | findstr :${port}' (Windows), ` +
         "then stop it or choose a different --port.",
+      { source: ERROR_SOURCE.USER },
     );
   }
 }
@@ -27,6 +28,31 @@ export async function resolveDevPort(
   signal: AbortSignal,
 ): Promise<DevPort> {
   return findFreePort(DEV_PORTS[protocol ?? "HTTP"], explicitPort, checkPort, signal);
+}
+
+/** Resolve distinct ports for runtimes before launching any of them. */
+export async function resolveDevPorts(
+  runtimes: ProjectRuntime[],
+  explicitPort: number | undefined,
+  checkPort: PortChecker,
+  signal: AbortSignal,
+): Promise<Map<string, number>> {
+  const ports = new Map<string, number>();
+  const reservedPorts = new Set<number>();
+
+  for (const runtime of runtimes) {
+    const { port } = await resolveDevPort(
+      runtime.protocol,
+      explicitPort,
+      async (candidate, checkSignal) =>
+        !reservedPorts.has(candidate) && checkPort(candidate, checkSignal),
+      signal,
+    );
+    ports.set(runtime.name, port);
+    reservedPorts.add(port);
+  }
+
+  return ports;
 }
 
 /**

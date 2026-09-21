@@ -22,7 +22,7 @@ Run the agent locally from the project root:
 
 ```bash
 agentcore project dev
-agentcore project invoke runtime --local --payload '{"prompt":"What is 2 plus 3?"}'
+agentcore project invoke runtime --local --name {{name}} --payload '{"prompt":"What is 2 plus 3?"}'
 ```
 
 Environment variables for local development go in `agentcore/.env.local`

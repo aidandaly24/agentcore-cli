@@ -7,9 +7,10 @@ import type {
   GetHarnessResponse,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type { ProjectBackend, ResolveDeployedResourcesBackendInput } from "../../../core/project";
+import { ExitCode } from "../../../errors";
 import { startHttpServer, type HttpServerHandle } from "../../../io";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
-import { ExitCode, runWithExitCode } from "../../../runnable";
+import { runWithExitCode } from "../../../runnable";
 import { ProjectKey, ValueContext, type Context } from "../../../router";
 import {
   createSilentLogger,
@@ -241,7 +242,7 @@ describe("project invoke", () => {
     else expect(subject.io.stdout()).toBe("runtime response");
   });
 
-  test("invokes a local Runtime directly without resolving project resources", async () => {
+  test("auto-selects the sole local Runtime without resolving deployed resources", async () => {
     let request:
       | {
           method: string;
@@ -274,7 +275,7 @@ describe("project invoke", () => {
 
     const { core, io, resolved } = await run(
       ["runtime", "--local", "--port", String(server.port), "--payload", payload],
-      {},
+      { runtimes: [RUNTIME] },
       { writeTargets: false },
     );
 
@@ -339,6 +340,8 @@ describe("project invoke", () => {
       [
         "runtime",
         "--local",
+        "--name",
+        RUNTIME.name,
         "--port",
         String(server.port),
         "--payload",
@@ -362,7 +365,7 @@ describe("project invoke", () => {
         "--baggage",
         "tenant=retail",
       ],
-      {},
+      { runtimes: [RUNTIME] },
       { writeTargets: false },
     );
 
@@ -381,8 +384,8 @@ describe("project invoke", () => {
     try {
       const code = await runWithExitCode(async () => {
         await run(
-          ["runtime", "--local", "--port", String(port), "--payload", "{}"],
-          {},
+          ["runtime", "--local", "--name", RUNTIME.name, "--port", String(port), "--payload", "{}"],
+          { runtimes: [RUNTIME] },
           { writeTargets: false },
         );
       });
@@ -405,8 +408,17 @@ describe("project invoke", () => {
     }));
     servers.push(server);
     const subject = await routedCommand(
-      ["runtime", "--local", "--port", String(server.port), "--payload", "{}"],
-      {},
+      [
+        "runtime",
+        "--local",
+        "--name",
+        RUNTIME.name,
+        "--port",
+        String(server.port),
+        "--payload",
+        "{}",
+      ],
+      { runtimes: [RUNTIME] },
       { writeTargets: false },
     );
 
@@ -418,6 +430,83 @@ describe("project invoke", () => {
   });
 
   test.each([
+    ["HTTP", "checkout", undefined, "/invocations", "text/event-stream"],
+    ["AG-UI", "assistant", "AGUI", "/invocations", "text/event-stream"],
+    ["MCP", "tools", "MCP", "/mcp", "application/json, text/event-stream"],
+    ["A2A", "peer", "A2A", "/", "text/event-stream"],
+  ] as const)(
+    "routes a named local %s Runtime to its protocol endpoint",
+    async (_label, name, protocol, path, expectedAccept) => {
+      let request:
+        | {
+            url: string;
+            accept: string | undefined;
+            mcpSessionId: string | undefined;
+            mcpProtocolVersion: string | undefined;
+            mcpMethod: string | undefined;
+            mcpName: string | undefined;
+          }
+        | undefined;
+      const server = await startHttpServer((received) => {
+        request = {
+          url: received.url,
+          accept: header(received.headers.accept),
+          mcpSessionId: header(received.headers["mcp-session-id"]),
+          mcpProtocolVersion: header(received.headers["mcp-protocol-version"]),
+          mcpMethod: header(received.headers["mcp-method"]),
+          mcpName: header(received.headers["mcp-name"]),
+        };
+        return { status: 204 };
+      });
+      servers.push(server);
+      const runtimes = [
+        RUNTIME,
+        { ...RUNTIME, name: "assistant", protocol: "AGUI" },
+        { ...RUNTIME, name: "tools", protocol: "MCP" },
+        { ...RUNTIME, name: "peer", protocol: "A2A" },
+      ];
+      const mcpArgs =
+        protocol === "MCP"
+          ? [
+              "--mcp-session-id",
+              "mcp-session",
+              "--mcp-protocol-version",
+              "2025-06-18",
+              "--mcp-method",
+              "tools/call",
+              "--mcp-name",
+              "weather",
+            ]
+          : [];
+
+      await run(
+        [
+          "runtime",
+          "--local",
+          "--name",
+          name,
+          "--port",
+          String(server.port),
+          "--payload",
+          "{}",
+          ...mcpArgs,
+        ],
+        { runtimes },
+        { writeTargets: false },
+      );
+
+      expect(request).toEqual({
+        url: path,
+        accept: expectedAccept,
+        mcpSessionId: protocol === "MCP" ? "mcp-session" : undefined,
+        mcpProtocolVersion: protocol === "MCP" ? "2025-06-18" : undefined,
+        mcpMethod: protocol === "MCP" ? "tools/call" : undefined,
+        mcpName: protocol === "MCP" ? "weather" : undefined,
+      });
+    },
+  );
+
+  test.each([
     {
       name: "requires --local with --port",
       args: ["runtime", "--port", "8081", "--payload", "{}"],
@@ -425,16 +514,44 @@ describe("project invoke", () => {
     },
     {
       name: "rejects deployed-only flags locally",
-      args: ["runtime", "--local", "--payload", "{}", "--target", "prod"],
+      args: ["runtime", "--local", "--name", RUNTIME.name, "--payload", "{}", "--target", "prod"],
       message: "--target cannot be used with --local",
     },
     {
       name: "requires a local payload",
-      args: ["runtime", "--local"],
+      args: ["runtime", "--local", "--name", RUNTIME.name],
       message: "required option '--payload <payload>' not specified",
     },
+    {
+      name: "rejects MCP options for a local non-MCP Runtime",
+      args: [
+        "runtime",
+        "--local",
+        "--name",
+        RUNTIME.name,
+        "--payload",
+        "{}",
+        "--mcp-method",
+        "tools/list",
+      ],
+      message: "MCP options are only valid for MCP Runtimes",
+    },
   ])("$name", async ({ args, message }) => {
-    await expect(run([...args], {}, { writeTargets: false })).rejects.toThrow(message);
+    await expect(run([...args], { runtimes: [RUNTIME] }, { writeTargets: false })).rejects.toThrow(
+      message,
+    );
+  });
+
+  test("requires --name when invoking one of multiple local Runtimes", async () => {
+    await expect(
+      run(
+        ["runtime", "--local", "--payload", "{}"],
+        {
+          runtimes: [RUNTIME, { ...RUNTIME, name: "inventory" }],
+        },
+        { writeTargets: false },
+      ),
+    ).rejects.toThrow("Project has multiple Runtimes. Specify --name: checkout, inventory.");
   });
 
   test("invokes the sole Runtime with its existing payload contract in the target region", async () => {

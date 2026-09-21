@@ -3,11 +3,12 @@ import z from "zod";
 import { createInspectorHandler } from "../../../core/dev/inspector/server";
 import type { InspectorDeps } from "../../../core/dev/inspector/types";
 import { rewriteOtelEndpointForContainer } from "../../../core/dev/otel/collector";
-import { findFreePort, resolveDevPort } from "../../../core/dev/port";
+import { findFreePort, resolveDevPort, resolveDevPorts } from "../../../core/dev/port";
 import { projectSpecPath } from "../../../core/project/fsUtils";
 import { DevSupervisor, type SupervisorConfig } from "../../../core/dev/supervisor";
 import type { ProjectRuntime } from "../../../projectSchemas/runtime";
 import {
+  AgentCoreCLIError,
   InputValidationError,
   ResourceNotFoundError,
   SilentCLIError,
@@ -197,6 +198,10 @@ export const createDevProjectHandler = (config: DevProjectHandlerConfig) =>
           return;
         }
 
+        const assignedPorts =
+          flags.mode === "headless"
+            ? await resolveDevPorts(runtimes, flags.port, config.checkPort, controller.signal)
+            : undefined;
         const supervisor = new DevSupervisor({
           runtimes,
           projectRoot: project.rootPath,
@@ -204,15 +209,23 @@ export const createDevProjectHandler = (config: DevProjectHandlerConfig) =>
           getDevEnvVarsForRuntime,
           // The --port guard above rejects an explicit port with more than one
           // runtime, so passing flags.port here only ever applies to a lone one.
-          resolvePort: async (runtime) =>
-            (
+          resolvePort: async (runtime) => {
+            if (assignedPorts) {
+              const assignedPort = assignedPorts.get(runtime.name);
+              if (assignedPort === undefined) {
+                throw new AgentCoreCLIError(`No port was assigned to runtime '${runtime.name}'.`);
+              }
+              return assignedPort;
+            }
+            return (
               await resolveDevPort(
                 runtime.protocol,
                 flags.port,
                 config.checkPort,
                 controller.signal,
               )
-            ).port,
+            ).port;
+          },
           waitReady: config.waitReady,
           signal: controller.signal,
         });

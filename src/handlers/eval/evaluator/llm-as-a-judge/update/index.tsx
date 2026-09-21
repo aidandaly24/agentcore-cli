@@ -4,7 +4,7 @@ import { JsonRendererKey } from "../../../../../tui";
 import { SourceResolver, type AppIO } from "../../../../../io";
 import type { Core } from "../../../../types";
 import { coreOptsFromCtx } from "../../../../utils";
-import { ratingScaleFlag, resolveRatingScale } from "../sharedFlags";
+import { modelProviderFlag, ratingScaleFlag, resolveRatingScale } from "../sharedFlags";
 
 export const createLlmAsAJudgeUpdateHandler = (core: Core, io: AppIO) =>
   createHandler({
@@ -17,7 +17,12 @@ export const createLlmAsAJudgeUpdateHandler = (core: Core, io: AppIO) =>
         "evaluation instructions (inline, file://<path>, or - for stdin)",
         z.string().optional(),
       ),
-      flag("model", "the Bedrock model ID used to judge", z.string().optional()),
+      modelProviderFlag,
+      flag(
+        "model",
+        "judge model: a Bedrock model ID / ARN, or an OpenResponses model ID (required when changing provider)",
+        z.string().optional(),
+      ),
       ratingScaleFlag.optional(),
       flag("kms-key-arn", "customer managed KMS key ARN for evaluator data", z.string().optional()),
     ],
@@ -31,6 +36,9 @@ export const createLlmAsAJudgeUpdateHandler = (core: Core, io: AppIO) =>
         {
           instructions,
           model: flags["model"],
+          // Undefined when omitted, so the update preserves the evaluator's
+          // existing provider (the enum schema already validated any value).
+          modelProvider: flags["model-provider"],
           ratingScale,
           kmsKeyArn: flags["kms-key-arn"],
         },

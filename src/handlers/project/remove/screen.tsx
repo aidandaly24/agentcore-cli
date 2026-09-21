@@ -10,6 +10,7 @@ import type { ProjectSpec } from "../../../projectSchemas/project";
 import type { Project, RemoveResourceInput } from "../types";
 import type { ScreenProps } from "../../types";
 import { ProjectGate, projectQueryKey } from "../ProjectGate";
+import { APP_CODE_RETAINED_NOTICE, shouldShowAppCodeNotice } from "./notice";
 
 type RootResourceType =
   | "runtime"
@@ -362,6 +363,9 @@ function RemoveConfirm({
         return {
           rows: {
             removed: `${config.resourceType} '${resource.name}'`,
+            ...(shouldShowAppCodeNotice(resource.resourceType)
+              ? { notes: APP_CODE_RETAINED_NOTICE }
+              : {}),
             ...(result.removedEnvKeys.length > 0
               ? { "env removed": result.removedEnvKeys.join(", ") }
               : {}),
@@ -426,6 +430,7 @@ function RemoveAllConfirm({ project, core }: { project: Project; core: ScreenPro
         return {
           rows: {
             removed: "all resources",
+            notes: APP_CODE_RETAINED_NOTICE,
             ...(result.removedEnvKeys.length > 0
               ? { "env removed": result.removedEnvKeys.join(", ") }
               : {}),

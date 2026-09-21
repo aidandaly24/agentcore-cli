@@ -6,8 +6,8 @@ import { PassThrough } from "node:stream";
 import type { GetGatewayResponse } from "@aws-sdk/client-bedrock-agentcore-control";
 import { CommanderError } from "commander";
 import type { AppIO } from "../../../io";
-import { UserCancellationError, InputValidationError } from "../../../errors";
-import { ExitCode, runWithExitCode } from "../../../runnable";
+import { ExitCode, InputValidationError, UserCancellationError } from "../../../errors";
+import { runWithExitCode } from "../../../runnable";
 import {
   createSilentLogger,
   expectError,
@@ -178,8 +178,6 @@ describe("gateway invoke", () => {
       "mcp-session",
       "--mcp-protocol-version",
       "2025-06-18",
-      "--endpoint-url",
-      "https://control.example.test",
     ]);
 
     const request = core.gateway.calls.find((call) => call.method === "invokeGateway")!
@@ -196,10 +194,7 @@ describe("gateway invoke", () => {
       mcpSessionId: "mcp-session",
       mcpProtocolVersion: "2025-06-18",
     });
-    expect(core.gateway.calls[0]!.args[1]).toEqual({
-      region: REGION,
-      endpointUrl: "https://control.example.test",
-    });
+    expect(core.gateway.calls[0]!.args[1]).toEqual({ region: REGION });
   });
 
   test("supports GET without a payload", async () => {

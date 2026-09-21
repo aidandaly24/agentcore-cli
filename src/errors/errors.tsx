@@ -1,6 +1,7 @@
 import { ServiceException } from "@smithy/core/client";
 import { CommanderError } from "commander";
 import { join } from "node:path";
+import { ExitCode } from "./exitCode";
 import { ERROR_SOURCE, type ErrorSource } from "./types";
 
 export interface AgentCoreCLIErrorOptions extends ErrorOptions {
@@ -79,12 +80,20 @@ export class SilentCLIError extends AgentCoreCLIError {}
 /** Error raised for invalid user input. */
 export class InputValidationError extends AgentCoreCLIError {
   constructor(message?: string, options?: Omit<AgentCoreCLIErrorOptions, "source">) {
-    super(message, { ...options, source: ERROR_SOURCE.USER });
+    super(message, {
+      ...options,
+      exitCode: options?.exitCode ?? ExitCode.USAGE,
+      source: ERROR_SOURCE.USER,
+    });
   }
 }
 
 /** Error raised when valid user input references a resource that does not exist. */
-export class ResourceNotFoundError extends InputValidationError {}
+export class ResourceNotFoundError extends AgentCoreCLIError {
+  constructor(message?: string, options?: Omit<AgentCoreCLIErrorOptions, "source">) {
+    super(message, { ...options, source: ERROR_SOURCE.USER });
+  }
+}
 
 /** Error raised when a command or operation has not been implemented yet. */
 export class NotImplementedError extends AgentCoreCLIError {
@@ -100,9 +109,9 @@ export class InvalidEnvironmentError extends AgentCoreCLIError {
   }
 }
 
-export class SourceResolutionError extends InputValidationError {
+export class SourceResolutionError extends AgentCoreCLIError {
   constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
+    super(message, { ...options, source: ERROR_SOURCE.USER });
     this.name = "SourceResolutionError";
   }
 }

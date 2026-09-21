@@ -785,8 +785,8 @@ invoke a Runtime from the current project
 **Options**
 
 - `--name <name>`: the logical project Runtime name
-- `--local`: invoke a local HTTP Runtime development server (default: false)
-- `--port <port>`: local HTTP Runtime development server port (default: 8080)
+- `--local`: invoke a local Runtime development server (default: false)
+- `--port <port>`: local Runtime development server port (defaults: HTTP/AG-UI 8080, MCP 8000, A2A 9000)
 - `--target <target>`: project deployment target (default: default)
 - `--payload <payload>`: the inline payload to send
 - `--qualifier <qualifier>`: the Runtime endpoint qualifier

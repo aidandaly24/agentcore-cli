@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -13,6 +14,7 @@ import {
   cleanupScreens,
   TestCoreClient,
 } from "../../../testing";
+import { APP_CODE_RETAINED_NOTICE } from "./notice";
 
 const RUNTIME = "agent_python_minimal";
 
@@ -372,6 +374,10 @@ describe("project remove screen", () => {
     await waitForText(r.lastFrame, "Resource removed");
 
     expect((await readSpec(specPath)).runtimes).toEqual([]);
+    const successFrame = r.lastFrame()!.replace(/\s+/g, " ");
+    expect(successFrame).toContain(APP_CODE_RETAINED_NOTICE);
+    expect(successFrame).toContain("notes");
+    expect(existsSync(join(project.rootPath, "app", RUNTIME))).toBe(true);
     r.unmount();
   });
 
@@ -454,6 +460,7 @@ describe("project remove screen", () => {
     await waitForText(confirm.lastFrame, "Resource removed");
 
     expect((await readSpec(specPath)).policyEngines[0]!.policies).toEqual([]);
+    expect(confirm.lastFrame()).not.toContain(APP_CODE_RETAINED_NOTICE);
     confirm.unmount();
   });
 
@@ -478,6 +485,9 @@ describe("project remove screen", () => {
     await waitForText(r.lastFrame, "Remove every resource from project orders?");
     await r.write("y");
     await waitForText(r.lastFrame, "All resources removed");
+    const successFrame = r.lastFrame()!.replace(/\s+/g, " ");
+    expect(successFrame).toContain(APP_CODE_RETAINED_NOTICE);
+    expect(successFrame).toContain("notes");
     await r.press("return");
 
     // Back on the picker, refreshed from the emptied project.

@@ -3,9 +3,15 @@ import { createHandler, flag } from "../../../../../router";
 import { InputValidationError } from "../../../../../errors";
 import { JsonRendererKey } from "../../../../../tui";
 import { SourceResolver, type AppIO } from "../../../../../io";
+import { isValidEvaluatorModelId } from "../../../../../projectSchemas/evaluator";
 import type { Core } from "../../../../types";
 import { coreOptsFromCtx, parseJsonFlag } from "../../../../utils";
-import { ratingScaleFlag, resolveRatingScale } from "../sharedFlags";
+import {
+  buildEvaluatorModelConfig,
+  modelProviderFlag,
+  ratingScaleFlag,
+  resolveRatingScale,
+} from "../sharedFlags";
 import { LEVELS } from "../../levels";
 
 export const createLlmAsAJudgeCreateHandler = (core: Core, io: AppIO) =>
@@ -15,7 +21,12 @@ export const createLlmAsAJudgeCreateHandler = (core: Core, io: AppIO) =>
     flags: [
       flag("name", "the name of the evaluator", z.string().min(1)),
       flag("level", `evaluation level (${LEVELS.join(" | ")})`, z.enum(LEVELS)),
-      flag("model", "the Bedrock model ID used to judge", z.string().min(1)),
+      modelProviderFlag,
+      flag(
+        "model",
+        "judge model: a Bedrock model ID / ARN, or an OpenResponses model ID",
+        z.string().min(1),
+      ),
       flag(
         "instructions",
         "evaluation instructions (inline, file://<path>, or - for stdin)",
@@ -30,6 +41,16 @@ export const createLlmAsAJudgeCreateHandler = (core: Core, io: AppIO) =>
       ),
     ],
     handle: async (ctx, flags) => {
+      // An omitted provider defaults to Bedrock, matching the old CLI.
+      const modelProvider = flags["model-provider"] ?? "Bedrock";
+      if (!isValidEvaluatorModelId(modelProvider, flags["model"])) {
+        throw new InputValidationError(
+          modelProvider === "Bedrock"
+            ? `invalid --model "${flags["model"]}": expected a Bedrock model ID or an inference-profile/foundation-model ARN`
+            : `invalid --model "${flags["model"]}": expected an OpenResponses model ID`,
+        );
+      }
+
       const source = new SourceResolver({ stdin: io.stdin });
       const instructions = await source.resolveText("instructions", flags["instructions"]);
       if (instructions.length === 0) {
@@ -49,7 +70,7 @@ export const createLlmAsAJudgeCreateHandler = (core: Core, io: AppIO) =>
             llmAsAJudge: {
               instructions,
               ratingScale,
-              modelConfig: { bedrockEvaluatorModelConfig: { modelId: flags["model"] } },
+              modelConfig: buildEvaluatorModelConfig(modelProvider, flags["model"]),
             },
           },
           kmsKeyArn: flags["kms-key-arn"],

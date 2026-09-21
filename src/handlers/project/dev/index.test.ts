@@ -289,6 +289,18 @@ describe("project dev headless multi-agent", () => {
     expect(subject.collector.state.closed).toBe(1);
   });
 
+  test("assigns distinct ports to runtimes launched together", async () => {
+    const codeZip = stayingRunner();
+    const container = stayingRunner();
+    const subject = harness({ project: twoRuntimes(), codeZip, container });
+    const { pending } = await supervised(subject);
+
+    expect([codeZip.inputs[0]?.port, container.inputs[0]?.port]).toEqual([8080, 8081]);
+
+    process.emit("SIGINT", "SIGINT");
+    await expect(pending).rejects.toMatchObject({ exitCode: 130 });
+  });
+
   test("one agent failing to start leaves the others running", async () => {
     const subject = harness({
       project: twoRuntimes(),

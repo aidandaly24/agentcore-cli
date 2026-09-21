@@ -12,8 +12,8 @@ import {
 import type { AppIO } from "../io";
 import type { Core } from "../handlers/types";
 import { JsonKey } from "../handlers/keys";
-import { InvalidEnvironmentError } from "../errors";
-import { ExitCode } from "../runnable";
+import { ExitCode, InvalidEnvironmentError } from "../errors";
+import { TuiExitMessageKey } from "./exitMessage";
 
 // renderJson pretty-prints a value as indented JSON. It is the output
 // counterpart to renderTui: handlers call it to emit machine-readable results
@@ -54,9 +54,14 @@ export async function renderTuiAt(
     });
   }
 
+  let exitMessage: string | undefined;
+  const tuiContext = ctx.withValue(TuiExitMessageKey, (message) => {
+    exitMessage = message;
+  });
+
   // alternateScreen switches the terminal to its alternate buffer so the TUI
   // takes over the screen and the prior scrollback is restored on exit (like Vim).
-  const { waitUntilExit } = render(<Root path={path} ctx={ctx} core={core} />, {
+  const { waitUntilExit } = render(<Root path={path} ctx={tuiContext} core={core} />, {
     stdin: io.stdin,
     stdout: io.stdout,
     stderr: io.stderr,
@@ -65,6 +70,9 @@ export async function renderTuiAt(
     incrementalRendering: true,
   });
   await waitUntilExit();
+  if (exitMessage !== undefined) {
+    io.stdout.write(exitMessage.endsWith("\n") ? exitMessage : `${exitMessage}\n`);
+  }
 }
 
 // renderTui builds the root DefaultHandle that mounts the Ink React tree. It

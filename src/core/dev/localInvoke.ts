@@ -1,16 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { InputValidationError, InvalidEnvironmentError } from "../../errors";
+import type { ProtocolMode } from "../../projectSchemas/constants";
 import { abortable } from "../abortable";
 import type { RuntimeInvokeResponse } from "../invokeRuntime";
 
 export type LocalRuntimeInvokeRequest = {
   port: number;
+  protocol: ProtocolMode;
   payload: Uint8Array;
   contentType?: string;
   accept?: string;
   runtimeSessionId?: string;
   runtimeUserId?: string;
   applicationHeaders?: [string, string][];
+  mcpSessionId?: string;
+  mcpProtocolVersion?: string;
+  mcpMethod?: string;
+  mcpName?: string;
   traceId?: string;
   traceParent?: string;
   traceState?: string;
@@ -18,6 +24,12 @@ export type LocalRuntimeInvokeRequest = {
 };
 
 async function* emptyBody(): AsyncGenerator<Uint8Array> {}
+
+function invocationPath(protocol: ProtocolMode): string {
+  if (protocol === "MCP") return "/mcp";
+  if (protocol === "A2A") return "/";
+  return "/invocations";
+}
 
 export async function invokeLocalRuntime(
   request: LocalRuntimeInvokeRequest,
@@ -29,7 +41,17 @@ export async function invokeLocalRuntime(
     headers = new Headers(request.applicationHeaders);
     for (const [name, value] of [
       ["Content-Type", request.contentType ?? "application/json"],
-      ["Accept", request.accept ?? "text/event-stream"],
+      [
+        "Accept",
+        request.accept ??
+          (request.protocol === "MCP"
+            ? "application/json, text/event-stream"
+            : "text/event-stream"),
+      ],
+      ["Mcp-Session-Id", request.mcpSessionId],
+      ["Mcp-Protocol-Version", request.mcpProtocolVersion],
+      ["Mcp-Method", request.mcpMethod],
+      ["Mcp-Name", request.mcpName],
       ["X-Amzn-Bedrock-AgentCore-Runtime-Session-Id", runtimeSessionId],
       ["X-Amzn-Bedrock-AgentCore-Runtime-User-Id", request.runtimeUserId ?? "default"],
       ["X-Amzn-Trace-Id", request.traceId],
@@ -45,7 +67,7 @@ export async function invokeLocalRuntime(
 
   let response: Response;
   try {
-    response = await fetch(`http://127.0.0.1:${request.port}/invocations`, {
+    response = await fetch(`http://127.0.0.1:${request.port}${invocationPath(request.protocol)}`, {
       method: "POST",
       redirect: "manual",
       headers,

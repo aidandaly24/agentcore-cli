@@ -18,6 +18,7 @@ import {
 import { projectSpec, writeProjectSpec } from "../add/gateway-test-support";
 import { credentialEnvVarName } from "../../../projectSchemas/credential";
 import { ENV_LOCAL_RELATIVE_PATH } from "../../../core/project/envLocal";
+import { APP_CODE_RETAINED_NOTICE } from "./notice";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(() => Promise.all(cleanups.splice(0).map((cleanup) => cleanup())));
@@ -39,6 +40,7 @@ type RemoveCase = {
   commands: string[][];
   specKey: string;
   expectedRemaining: string[];
+  showsAppCodeNotice?: boolean;
 };
 
 describe("project remove", () => {
@@ -46,22 +48,24 @@ describe("project remove", () => {
   // remaining resources are left.
   test.each<RemoveCase>([
     {
-      label: "harness",
-      commands: [
-        ["add", "harness", "--name", "my_harness"],
-        ["remove", "harness", "--name", "my_harness"],
-      ],
-      specKey: "harnesses",
-      expectedRemaining: [],
-    },
-    {
       label: "runtime",
       commands: [["remove", "runtime", "--name", "agent_python_minimal"]],
       specKey: "runtimes",
       expectedRemaining: [],
+      showsAppCodeNotice: true,
     },
     {
-      label: "removes one harness while leaving others intact",
+      label: "evaluator",
+      commands: [
+        ["add", "evaluator", "code-based", "--name", "custom_eval", "--level", "TOOL_CALL"],
+        ["remove", "evaluator", "--name", "custom_eval"],
+      ],
+      specKey: "evaluators",
+      expectedRemaining: [],
+      showsAppCodeNotice: true,
+    },
+    {
+      label: "harness",
       commands: [
         ["add", "harness", "--name", "keep_me"],
         ["add", "harness", "--name", "remove_me"],
@@ -69,6 +73,7 @@ describe("project remove", () => {
       ],
       specKey: "harnesses",
       expectedRemaining: ["keep_me"],
+      showsAppCodeNotice: true,
     },
     {
       label: "gateway",
@@ -145,19 +150,22 @@ describe("project remove", () => {
       specKey: "memories",
       expectedRemaining: [],
     },
-  ])("$label", async ({ commands, specKey, expectedRemaining }) => {
+  ])("$label", async ({ commands, specKey, expectedRemaining, showsAppCodeNotice }) => {
     const { projectRoot, cleanup } = await initProject({
       flags: ["--template", "agent-python-minimal"],
     });
     cleanups.push(cleanup);
 
+    let stderr = "";
     for (const cmd of commands) {
-      await run(cmd);
+      const { io } = await run(cmd);
+      stderr = io.stderr();
     }
 
     const agentcoreJson = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     const remaining = (agentcoreJson[specKey] ?? []) as { name: string }[];
     expect(remaining.map((r) => r.name)).toEqual(expectedRemaining);
+    expect(stderr.includes(APP_CODE_RETAINED_NOTICE)).toBe(showsAppCodeNotice ?? false);
   });
 
   test("removing a non-existent resource fails with a not-found error", async () => {
@@ -609,6 +617,7 @@ describe("project remove all", () => {
     expect(await Bun.file(envPath).text()).not.toContain(envKey);
     expect(io.stderr()).toContain(`removed '${envKey}' from ${ENV_LOCAL_RELATIVE_PATH}`);
     expect(io.stderr()).toContain("removed all resources from project");
+    expect(io.stderr()).toContain(APP_CODE_RETAINED_NOTICE);
     expect(io.stdout()).toBe("");
   });
 
