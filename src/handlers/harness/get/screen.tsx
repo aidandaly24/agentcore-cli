@@ -306,7 +306,7 @@ export function HarnessGetScreen(props: ScreenProps) {
         id: harness?.harnessId ?? "",
         status: harness?.status ?? "",
         ...(harness?.failureReason ? { failureReason: harness.failureReason } : {}),
-        version: harness?.harnessVersion?.toString() ?? "-",
+        version: harness?.harnessVersion?.toString() ?? "0",
         arn: harness?.arn ?? "",
       }}
       actions={

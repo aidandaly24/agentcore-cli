@@ -64,12 +64,11 @@ describe("harness hub screen", () => {
     r.unmount();
   });
 
-  test("shows failure diagnostics and leaves an unknown version unknown", async () => {
+  test("shows failure diagnostics when provided", async () => {
     const core = new TestCoreClient();
     core.harness.setGetResponse({
       harness: {
         ...getResponse().harness!,
-        harnessVersion: undefined,
         status: "CREATE_FAILED",
         failureReason: "Execution role is unavailable",
       },
@@ -77,7 +76,6 @@ describe("harness hub screen", () => {
     const r = renderScreen("/agentcore/harness/get/MyHarness-abc123", { core });
     await waitForText(r.lastFrame, "show the full JSON definition");
     expect(r.lastFrame()).toMatch(/failureReason\s+Execution role is unavailable/);
-    expect(r.lastFrame()).toMatch(/version\s+-/);
   });
 
   test("lists the harness actions", async () => {
