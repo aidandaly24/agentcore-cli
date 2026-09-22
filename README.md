@@ -83,6 +83,8 @@ Global flags (declared at the root, available on every command):
 | `--json`   | Emit machine-readable JSON instead of launching the TUI.                                    |
 | `--debug`  | Debug logging.                                                                              |
 
+Run `agentcore --version` to check the installed CLI version.
+
 ## Extending the CDK app
 
 `agentcore/cdk/` has two source files. `bin/cdk.ts` reads the project once
