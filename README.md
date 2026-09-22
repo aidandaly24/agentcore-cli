@@ -40,7 +40,7 @@ Run this alternative from outside an existing project:
 agentcore project create --name MyAgent --template agent-python-strands
 ```
 
-See [command examples](docs/command-examples.md) for additional templates,
+See the [usage guide](docs/usage.md) for additional templates,
 imports, invocation, and resource management.
 
 ## Command Surface
@@ -140,9 +140,6 @@ declares, not the ones you add in the stack.
 
 ## Documentation
 
-- [Command examples](docs/command-examples.md): project workflows, Harness, Memory, Identity, and evaluators.
-- [Runtime](docs/runtime.md): inspection, invocation, response handling, and shell access.
-- [Gateway](docs/gateway.md): inspection, policy generation, authentication, and invocation.
-- [Payments](docs/payments.md): manager, connector, session, instrument, and balance inspection.
+- [Usage](docs/usage.md): project workflows, resource operations, invocation, and shell access.
 - [Configuration](docs/configuration.md): Harness YAML, prompt handling, credentials, and global settings.
 - [Contributing](CONTRIBUTING.md): development, builds, architecture, and testing.
