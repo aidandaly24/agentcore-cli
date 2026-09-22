@@ -1,7 +1,11 @@
 import { existsSync } from "node:fs";
-import { stringify } from "yaml";
+import { Scalar, stringify } from "yaml";
 import { ZodError, z } from "zod";
-import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
+import {
+  HarnessModelProviderSchema,
+  HarnessSpecSchema,
+  type HarnessSpec,
+} from "../../../projectSchemas/harness";
 import { FsTreeNode } from "./fsTree";
 import { InputValidationError, ResourceNotFoundError } from "../../../errors/errors";
 import type { TemplateRenderer, TemplateResolver } from "./types";
@@ -82,8 +86,12 @@ export function getHarnessTemplateResolver(
 }
 
 function buildTemplateContext(spec: HarnessSpec) {
+  const provider = new Scalar(spec.model.provider);
+  provider.comment = ` ${HarnessModelProviderSchema.options
+    .filter((value) => value !== spec.model.provider)
+    .join(", ")}`;
   const yaml = Object.fromEntries(
-    Object.entries(spec)
+    Object.entries({ ...spec, model: { ...spec.model, provider } })
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [
         key,

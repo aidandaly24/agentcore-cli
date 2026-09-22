@@ -2,8 +2,6 @@
 
 {{yaml.name}}
 
-# Supported providers: bedrock, open_ai, gemini, lite_llm.
-# Omitted tuning settings are left to the service and provider unless explicitly set by this file.
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessModelConfiguration.html
 {{yaml.model}}
 {{#unless model.temperature includeZero=true}}
@@ -33,9 +31,6 @@
 #   You are a helpful assistant.
 #   Ask for clarification when a request is ambiguous.
 
-{{#if (eq memory.mode "managed")}}
-# Managed memory is created for this harness.
-{{/if}}
 # Remove this block or set mode to disabled to turn memory off.
 # For existing memory, set mode to existing and add arn or name (for a memory in this project).
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessMemoryConfiguration.html
@@ -50,7 +45,7 @@
 {{/if}}
 
 # Add tools alongside the harness's built-in shell and file operations.
-# Choose a unique name for each entry. The harness uses this name for the tool.
+# Choose a unique name for each entry.
 # For Remote MCP, Gateway, Browser, Code Interpreter, and other tool configurations, see:
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTool.html
 {{#if tools.length}}
@@ -65,8 +60,7 @@
 {{/if}}
 
 # Limit which available tools the agent can use. "*" allows all available tools.
-# Restrict with patterns such as "@builtin" or "@research/search".
-# AWS permissions must still be configured separately.
+# Restrict with patterns such as "@builtin".
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-tools.html
 {{#if yaml.allowedTools}}
 {{yaml.allowedTools}}
@@ -75,7 +69,6 @@ allowedTools: ["*"]
 {{/if}}
 
 # Load skills from S3 (s3Uri), Git (gitUrl), container files (path), or bundled AWS skills (awsSkills).
-# With gitUrl, path is a folder in that repository. A standalone path is inside the harness container.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html
 {{yaml.skills}}
 

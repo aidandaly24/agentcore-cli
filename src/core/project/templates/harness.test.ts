@@ -212,16 +212,17 @@ test("preserves explicit empty settings and disabled truncation", async () => {
 });
 
 test.each([
-  ["bedrock", "converse_stream"],
-  ["open_ai", "responses"],
-  ["gemini", undefined],
-  ["lite_llm", undefined],
-] as const)("shows a compatible API format example for %s", async (provider, apiFormat) => {
+  ["bedrock", "converse_stream", "open_ai, gemini, lite_llm"],
+  ["open_ai", "responses", "bedrock, gemini, lite_llm"],
+  ["gemini", undefined, "bedrock, open_ai, lite_llm"],
+  ["lite_llm", undefined, "bedrock, open_ai, gemini"],
+] as const)("shows compatible model examples for %s", async (provider, apiFormat, alternatives) => {
   const { yaml } = await scaffold({
     model: { provider, modelId: "example", apiKeyArn: "arn:example" },
   });
   if (apiFormat) expect(yaml).toContain(`# apiFormat: ${apiFormat}`);
   else expect(yaml).not.toContain("# apiFormat:");
+  expect(yaml).toContain(`provider: ${provider} # ${alternatives}`);
 });
 
 test("keeps the sliding-window size optional", async () => {
