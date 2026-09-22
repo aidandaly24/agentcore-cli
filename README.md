@@ -4,6 +4,8 @@
 **[AWS Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/)**. AgentCore is Amazon's
 platform for building and running production AI agents.
 
+**[Amazon Bedrock AgentCore documentation](https://docs.aws.amazon.com/bedrock-agentcore/)**
+
 It gives you two ways to work, from the same package:
 
 - **A scriptable CLI** — composed of flag-driven commands with JSON output (`--json`) for
@@ -39,9 +41,6 @@ Run this alternative from outside an existing project:
 ```bash
 agentcore project create --name MyAgent --template agent-python-strands
 ```
-
-See the [usage guide](docs/usage.md) for additional templates,
-imports, invocation, and resource management.
 
 ## Command Surface
 
@@ -140,6 +139,6 @@ declares, not the ones you add in the stack.
 
 ## Documentation
 
-- [Usage](docs/usage.md): project workflows, resource operations, invocation, and shell access.
+- [Amazon Bedrock AgentCore documentation](https://docs.aws.amazon.com/bedrock-agentcore/): service guides and API references.
 - [Harness project configuration](docs/harness-project-configuration.md): Harness YAML, prompts, tools, skills, and environment settings.
 - [Contributing](CONTRIBUTING.md): development, builds, architecture, and testing.

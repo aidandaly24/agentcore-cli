@@ -379,7 +379,7 @@ skills:
 
 For a private repository, store its access token in an AgentCore Identity API-key
 credential provider. The project deployment path resolves `auth.credentialName`
-from the [project credentials](usage.md#project-credentials) declared in
+from the [project credentials](../command.md#agentcore-project-add-credentials) declared in
 `agentcore.json`:
 
 ```yaml
@@ -471,7 +471,7 @@ rather than being silently skipped.
 Exporting a Harness to a code-owned Runtime has additional limits: filesystem
 skills are rejected, and bundled AWS skills are omitted with an explanation in
 `EXPORT_NOTES.md`. S3 and Git sources are supported by the exporter. See
-[Export a Harness](usage.md#export-a-harness).
+[Export a Harness](../command.md#agentcore-project-export-harness).
 
 See [Harness skills](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html)
 and the [Agent Skills format](https://agentskills.io/specification) for source
