@@ -2,9 +2,30 @@
 
 [Back to README](README.md)
 
-[Development](#development) | [Build](#build) | [Architecture](#architecture--patterns) | [Testing](#testing)
+[Contribution requirements](#before-opening-a-pull-request) | [Development](#development) | [Build](#build) | [Architecture](#architecture--patterns) | [Testing](#testing)
 
 Run development commands from the repository root.
+
+## Before Opening a Pull Request
+
+- **Link an issue.** Every PR needs a related [GitHub issue](https://github.com/aws/agentcore-cli/issues).
+  Open one if none exists, and discuss larger changes with the maintainers before implementing them.
+- **Use the PR template.** Complete the repository's
+  [pull request template](https://github.com/aws/agentcore-cli/blob/main/.github/pull_request_template.md),
+  including the issue, a description of the change, and your test results.
+- **Keep the change focused.** Work on a feature branch in your fork and keep unrelated fixes
+  out of the PR. Use conventional commit messages such as `fix:`, `feat:`, or `docs:`.
+- **Add or update tests.** Cover behavior changes and add a regression test for bug fixes.
+  Update affected fixtures and snapshots. Do not disable tests or remove assertions to make checks pass.
+- **Run the checks.** Unit tests, typechecking, linting, formatting, and the build must pass:
+  `bun test`, `bun run typecheck`, `bun run lint:check`, `bun run format:check`, and `bun run build`.
+  Run the relevant [end-to-end tests](e2eTest/README.md) for changes to deployment or AWS interactions.
+  All required CI checks must pass before merge.
+- **Keep the documentation current.** Update affected commands, examples, and configuration
+  guidance. Call out breaking changes and any migration steps in the PR.
+- **Report what you verified.** List the checks you ran and their results. State explicitly
+  when a test could not be run and why. Do not include credentials or customer data in code,
+  fixtures, or logs.
 
 ## Development
 
