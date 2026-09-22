@@ -141,5 +141,5 @@ declares, not the ones you add in the stack.
 ## Documentation
 
 - [Usage](docs/usage.md): project workflows, resource operations, invocation, and shell access.
-- [Configuration](docs/configuration.md): Harness YAML, prompt handling, credentials, and global settings.
+- [Harness project configuration](docs/harness-project-configuration.md): Harness YAML, prompts, tools, skills, and environment settings.
 - [Contributing](CONTRIBUTING.md): development, builds, architecture, and testing.

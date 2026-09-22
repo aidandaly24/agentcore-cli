@@ -3,9 +3,11 @@
 [Back to README](../README.md) | [Command reference](../command.md)
 
 Examples are independent. Replace angle-bracket placeholders with your resource
-identifiers before running them. See [Configuration](configuration.md) for
-Harness YAML, prompt handling, credentials, and global settings.
+identifiers before running them. See
+[Harness project configuration](harness-project-configuration.md) for
+Harness YAML, prompts, tools, skills, and environment settings.
 
+- [Values from files or stdin](#values-from-files-or-stdin)
 - [Project workflows](#project-workflows)
 - [Harness](#harness)
 - [Runtime](#runtime)
@@ -14,6 +16,12 @@ Harness YAML, prompt handling, credentials, and global settings.
 - [Identity](#identity)
 - [Payments](#payments)
 - [Evaluators](#evaluators)
+
+## Values From Files or Stdin
+
+Flags that support file or stdin input accept inline values, `file://<path>`,
+or `-`. For example, use `--instructions file://order-quality.txt` or
+`--instructions -`. Only one flag per command can read stdin.
 
 ## Project Workflows
 
@@ -163,7 +171,7 @@ credential providers wired to that harness, each opening in its own region.
 Removal updates the project specification and keeps code under `app/`.
 Deploy the project afterward to apply resource removals in AWS. For credential
 provider cleanup and target teardown behavior, see
-[Project Credentials](configuration.md#project-credentials).
+[Project Credentials](#project-credentials).
 
 ```bash
 # Remove resources from a project's spec (run inside the project)
@@ -173,6 +181,27 @@ agentcore project remove gateway-target --gateway tools --name search
 agentcore project remove all                         # y/N prompt; empties every collection
 agentcore project remove all --yes                   # non-interactive
 ```
+
+### Project Credentials
+
+Declare credentials in `agentcore/agentcore.json`. Secret values live in the
+gitignored `agentcore/.env.local` file under `AGENTCORE_CREDENTIAL_<NAME>`,
+with field suffixes for OAuth2 and payment credentials.
+
+`project deploy` creates Identity providers named
+`<project>_<target>_<credential>` before building the CDK app. It records their
+ARNs by logical credential name in `deployed-state.json`, separately for each
+target.
+
+Removing a credential from the spec does not immediately delete its provider.
+The next deploy to each target deletes that provider after updating the stack.
+Tearing down a target deletes the API-key, OAuth2, and payment providers it owns.
+Providers not recorded as target-owned are left untouched.
+
+Delete unused, untracked providers explicitly with
+`agentcore identity api-key-credential-provider delete`,
+`agentcore identity oauth2-credential-provider delete`, or the service's
+`DeletePaymentCredentialProvider` API.
 
 ## Harness
 
@@ -581,7 +610,7 @@ agentcore identity oauth2-credential-provider get
 [Command reference](../command.md#payment-commands)
 
 For project-managed credential providers and their cleanup behavior, see
-[Project Credentials](configuration.md#project-credentials).
+[Project Credentials](#project-credentials).
 
 ### Inspect AgentCore Payments
 
