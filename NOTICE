@@ -4,15 +4,7 @@ Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 This product includes the following third-party software/licensing:
 
-** @aws-cdk/toolkit-lib - https://github.com/aws/aws-cdk-cli
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
-** @aws-sdk/client-application-signals - https://github.com/aws/aws-sdk-js-v3
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
-** @aws-sdk/client-bedrock-agent - https://github.com/aws/aws-sdk-js-v3
+** @aws-cdk/toolkit-lib - https://github.com/aws/aws-cdk
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 License: Apache-2.0
 
@@ -24,15 +16,15 @@ License: Apache-2.0
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 License: Apache-2.0
 
+** @aws-sdk/client-bedrock-runtime - https://github.com/aws/aws-sdk-js-v3
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+License: Apache-2.0
+
 ** @aws-sdk/client-cloudformation - https://github.com/aws/aws-sdk-js-v3
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 License: Apache-2.0
 
-** @aws-sdk/client-cloudwatch-logs - https://github.com/aws/aws-sdk-js-v3
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
-** @aws-sdk/client-iam - https://github.com/aws/aws-sdk-js-v3
+** @aws-sdk/client-resource-groups-tagging-api - https://github.com/aws/aws-sdk-js-v3
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 License: Apache-2.0
 
@@ -40,28 +32,7 @@ License: Apache-2.0
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 License: Apache-2.0
 
-** @aws-sdk/client-xray - https://github.com/aws/aws-sdk-js-v3
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
 ** @aws-sdk/credential-providers - https://github.com/aws/aws-sdk-js-v3
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
-** @aws-sdk/util-endpoints - https://github.com/aws/aws-sdk-js-v3
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
-** @aws/agent-inspector - https://github.com/aws/agent-inspector
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
-** @opentelemetry/api, @opentelemetry/exporter-metrics-otlp-http,
-   @opentelemetry/otlp-transformer, @opentelemetry/resources,
-   @opentelemetry/sdk-metrics - https://github.com/open-telemetry/opentelemetry-js
-License: Apache-2.0
-
-** @smithy/core - https://github.com/smithy-lang/smithy-typescript
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 License: Apache-2.0
 
@@ -69,20 +40,20 @@ License: Apache-2.0
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 License: Apache-2.0
 
-** @tanstack/react-query - https://github.com/TanStack/query
-Copyright (c) 2021-present Tanner Linsley
-License: MIT
-
-** bedrock-agentcore - https://github.com/aws/bedrock-agentcore-sdk-typescript
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-License: Apache-2.0
-
-** cli-truncate - https://github.com/sindresorhus/cli-truncate
-Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
+** @commander-js/extra-typings - https://github.com/tj/commander.js
+Copyright (c) 2011 TJ Holowaychuk <tj@vision-media.ca>
 License: MIT
 
 ** commander - https://github.com/tj/commander.js
 Copyright (c) 2011 TJ Holowaychuk <tj@vision-media.ca>
+License: MIT
+
+** dotenv - https://github.com/motdotla/dotenv
+Copyright (c) 2015, Scott Motte
+License: BSD-2-Clause
+
+** fflate - https://github.com/101arrowz/fflate
+Copyright (c) 2020 Arjun Barrett
 License: MIT
 
 ** handlebars - https://github.com/handlebars-lang/handlebars.js
@@ -90,59 +61,21 @@ Copyright (C) 2011-2019 by Yehuda Katz
 License: MIT
 
 ** ink - https://github.com/vadimdemedes/ink
-Copyright (c) Vadym Demedes <vadimdemedes@hey.com> (https://github.com/vadimdemedes)
+Copyright (c) Vadim Demedes <vdemedes@gmail.com> (https://vadimdemedes.com)
+License: MIT
+
+** ink-link - https://github.com/sindresorhus/ink-link
 Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 License: MIT
 
-** ink-scroll-view - https://github.com/ByteLandTechnology/ink-scroll-view
-Copyright (c) 2025 ByteLand Technology Limited
+** ink-spinner - https://github.com/vadimdemedes/ink-spinner
+Copyright (c) Vadim Demedes <vdemedes@gmail.com> (https://vadimdemedes.com)
 License: MIT
 
-** InkUI (vendored components in src/components/ui/) - https://github.com/kamlesh723/InkUI
-Copyright (c) 2024 Kamlesh Yadav
-License: MIT
-
-** lodash - https://github.com/lodash/lodash
-Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
-Based on Underscore.js, copyright Jeremy Ashkenas,
-DocumentCloud and Investigative Reporters & Editors <http://underscorejs.org/>
-License: MIT
-
-** react, react-devtools-core - https://github.com/facebook/react
+** react - https://github.com/facebook/react
 Copyright (c) Meta Platforms, Inc. and affiliates.
 License: MIT
 
-** react-router - https://github.com/remix-run/react-router
-Copyright (c) React Training LLC 2015-2019
-Copyright (c) Remix Software Inc. 2020-2021
-Copyright (c) Shopify Inc. 2022-2023
-License: MIT
-
-** semver - https://github.com/npm/node-semver
-Copyright (c) Isaac Z. Schlueter and Contributors
-License: ISC
-
-** string-width - https://github.com/sindresorhus/string-width
-Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
-License: MIT
-
-** winston - https://github.com/winstonjs/winston
-Copyright (c) 2010 Charlie Robbins
-License: MIT
-
-** winston-daily-rotate-file - https://github.com/winstonjs/winston-daily-rotate-file
-Copyright (c) 2015-2024 winstonjs
-License: MIT
-
-** yaml - https://github.com/eemeli/yaml
-Copyright Eemeli Aro <eemeli@gmail.com>
-License: ISC
-
 ** zod - https://github.com/colinhacks/zod
-Copyright (c) 2025 Colin McDonnell
+Copyright (c) 2020 Colin McDonnell
 License: MIT
-
-** Bun (standalone executables) - https://github.com/oven-sh/bun
-License: MIT for Bun itself; bundled components have separate licenses,
-including LGPL for JavaScriptCore/WebKit.
-See https://github.com/oven-sh/bun/blob/bun-v1.4.0/LICENSE.md

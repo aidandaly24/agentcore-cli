@@ -10,7 +10,7 @@ Closes #
 
 ## Documentation PR
 
-<!-- Link any related documentation PR, or state that documentation is included here or not applicable. -->
+<!-- Link to related associated PR in the agent-docs repo -->
 
 ## Type of Change
 
@@ -26,13 +26,10 @@ Closes #
 
 How have you tested the change?
 
-- [ ] I ran `bun test`
-- [ ] I ran the relevant end-to-end tests with `bun run test:e2e`, or explained why they are not applicable
-- [ ] I ran `bun run typecheck`
-- [ ] I ran `bun run lint:check`
-- [ ] I ran `bun run format:check`
-- [ ] I ran `bun run build`
-- [ ] If I modified `src/assets/`, I updated affected snapshots with `bun test <test-file> --update-snapshots` and committed them
+- [ ] I ran `npm run test:unit` and `npm run test:integ`
+- [ ] I ran `npm run typecheck`
+- [ ] I ran `npm run lint`
+- [ ] If I modified `src/assets/`, I ran `npm run test:update-snapshots` and committed the updated snapshots
 
 ## Checklist
 
