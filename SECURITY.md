@@ -5,12 +5,22 @@
 At AWS, we take security seriously. We appreciate your efforts to responsibly disclose your findings and will make every
 effort to acknowledge your contributions.
 
+To report a security issue, please use one of the following methods:
+
+### Option 1: Report through AWS Security
+
 Please report security issues to AWS Security via:
 
 - **Email**: [aws-security@amazon.com](mailto:aws-security@amazon.com)
 - **Web**: [AWS Vulnerability Reporting](https://aws.amazon.com/security/vulnerability-reporting/)
 
-Do not report security vulnerabilities through public GitHub issues.
+### Option 2: Create a Private Security Advisory
+
+For non-critical issues, you may also use GitHub's private security advisory feature:
+
+1. Go to the Security tab of this repository
+2. Click on "Report a vulnerability"
+3. Fill out the form with details about the vulnerability
 
 ## What to Include in Your Report
 
