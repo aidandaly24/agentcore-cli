@@ -69,7 +69,6 @@ allowedTools: ["*"]
 {{/if}}
 
 # Load skills from S3 (s3Uri), Git (gitUrl), container files (path), or bundled AWS skills (awsSkills).
-# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessSkillAwsSkillsSource.html
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html
 {{yaml.skills}}
 
