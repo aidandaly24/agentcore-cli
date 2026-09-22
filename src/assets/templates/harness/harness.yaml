@@ -207,14 +207,12 @@ efsAccessPoints: []
 s3AccessPoints: []
 {{/if}}
 
+{{#if yaml.connections}}
 # Grant access to existing resources and expose their connection details as environment variables.
 # This does not add agent tools; declare those under tools.
-{{#if yaml.connections}}
 {{yaml.connections}}
-{{else}}
-connections: []
-{{/if}}
 
+{{/if}}
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html
 {{#if yaml.tags}}
 {{yaml.tags}}

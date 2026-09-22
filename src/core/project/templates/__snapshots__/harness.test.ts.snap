@@ -108,10 +108,6 @@ authorizerType: AWS_IAM
 efsAccessPoints: []
 s3AccessPoints: []
 
-# Grant access to existing resources and expose their connection details as environment variables.
-# This does not add agent tools; declare those under tools.
-connections: []
-
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html
 tags: {}
 "

@@ -24,7 +24,6 @@ const defaultSettings = {
   authorizerType: "AWS_IAM",
   efsAccessPoints: [],
   s3AccessPoints: [],
-  connections: [],
   tags: {},
 };
 const config = {
