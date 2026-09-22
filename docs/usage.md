@@ -1,0 +1,673 @@
+# Usage
+
+[Back to README](../README.md) | [Command reference](../command.md)
+
+Examples are independent. Replace angle-bracket placeholders with your resource
+identifiers before running them. See [Configuration](configuration.md) for
+Harness YAML, prompt handling, credentials, and global settings.
+
+- [Project workflows](#project-workflows)
+- [Harness](#harness)
+- [Runtime](#runtime)
+- [Memory](#memory)
+- [Gateway](#gateway)
+- [Identity](#identity)
+- [Payments](#payments)
+- [Evaluators](#evaluators)
+
+## Project Workflows
+
+### Create a Project
+
+The default is a managed Harness project configured by specification, without
+model-loop code to maintain:
+
+```bash
+agentcore project create --name MyAssistant
+cd MyAssistant && agentcore project deploy
+agentcore project invoke harness --prompt "hello"
+```
+
+Run `agentcore project create` bare in a terminal for the guided wizard
+(name, Harness or template, confirmation), which drives the same creation path.
+
+### Runtime Templates
+
+Select a template to scaffold Runtime code. `agent-python-strands` and its
+container variant accept `--model-provider` and `--api-key`.
+`agent-python-strands-container` provides a container build; other templates
+are CodeZip-only. Use `empty` for a project with no Runtime or Harness.
+Each command below is an alternative and runs from outside an existing project:
+
+```bash
+agentcore project create --name MyAgent --template agent-python-strands
+# The same Strands agent built as a container image, with a Dockerfile.
+agentcore project create --name MyAgent --template agent-python-strands-container
+# A LangChain agent on Bedrock, built with create_agent.
+agentcore project create --name MyAgent --template agent-python-langchain
+```
+
+### Import a Bedrock Agent
+
+Translate an existing Amazon Bedrock Agent version into editable Runtime code
+with `project add runtime --type import` from inside a project. The selected
+alias identifies the immutable source version; generated code invokes models
+and translated tools directly rather than proxying the alias. Use `--framework`
+`strands` (default) or `langgraph`. The alias must point at a prepared version,
+not the mutable DRAFT that the built-in test alias (`TSTALIASID`) routes to.
+Anything that could not be translated is listed in the generated `IMPORT_NOTES.md`.
+
+```bash
+agentcore project add runtime --name MyImportedAgent --type import \
+  --agent-id A1B2C3D4E5 --agent-alias-id XYZ123ABC4 --region us-east-1 \
+  --framework strands
+```
+
+### Export a Harness
+
+`project export harness` "ejects" a harness to code you own: it renders a
+Python Strands agent under `app/<target-agent-name>/` mapping the harness spec
+(model, system prompt, tools, skills, memory, execution limits), registers the
+new runtime in `agentcore.json` (the harness entry stays), and writes an
+`EXPORT_NOTES.md` in the agent directory listing anything that could not be
+mapped mechanically. Pass `--name <harness>` for an in-project harness or
+`--arn <harnessArn>` to fetch a deployed one (the fetch uses the region
+embedded in the ARN); `--target-agent-name` overrides the default
+`<harnessName>Agent`. The exported agent is always a `CodeZip` runtime: it
+declares its own dependencies, so it needs no image build. If the harness used a
+pre-built container image or a custom Dockerfile, that is reported in
+`EXPORT_NOTES.md` rather than rebuilt. Path-based skills are not supported,
+since the exported agent has no container filesystem to read them from.
+
+### Invoke a Project Resource
+
+Run `agentcore project invoke` from inside a project to choose a deployed
+Runtime or Harness interactively. Headless invocation keeps each resource's
+existing input contract:
+
+```bash
+agentcore project invoke runtime \
+  --name checkout \
+  --payload '{"prompt":"Check order 123."}' \
+  --content-type application/json
+
+agentcore project invoke harness \
+  --name support \
+  --prompt "Help with my account."
+```
+
+Use `--target` to select a deployment target. When a project declares exactly
+one resource of the requested type, `--name` may be omitted.
+
+### Inspect Project Logs
+
+Project logging resolves a logical resource name through the selected
+deployment target, so physical IDs and deployment regions do not need to be
+supplied:
+
+```bash
+agentcore project log runtime
+agentcore project log runtime --name checkout --target production
+agentcore project log runtime --name checkout --since 1h --level error
+agentcore project log harness
+agentcore project log harness --name support --target production
+agentcore project log harness --name support --since 1h --level error
+```
+
+When the project declares exactly one resource of the requested type, `--name`
+may be omitted. For Harnesses, the CLI also resolves the managed Harness to its
+underlying Runtime before reading CloudWatch. Use the imperative
+`agentcore runtime logs` or `agentcore harness logs` commands when addressing a
+physical resource directly or working outside a project.
+
+### Inspect Project Traces
+
+Project tracing uses the same logical resource and deployment target
+resolution, then lists or downloads traces from the resolved Runtime's
+deployment region:
+
+```bash
+agentcore project traces runtime list
+agentcore project traces runtime list --name checkout --target production --since 30m
+agentcore project traces runtime get <traceId> --name checkout --output trace.json
+agentcore project traces harness list
+agentcore project traces harness list --name support --target production --since 30m
+agentcore project traces harness get <traceId> --name support --output trace.json
+```
+
+When the project declares exactly one resource of the requested type, `--name`
+may be omitted. For Harnesses, the CLI resolves the underlying Runtime before
+querying its traces. Use the imperative `agentcore runtime traces` or
+`agentcore harness traces` commands when addressing a physical resource
+directly or working outside a project.
+
+```bash
+# Resolve project resources by logical name and deployment target
+agentcore project log harness --name support --target production --since 1h
+agentcore project traces runtime list --name checkout --target production --since 30m
+agentcore project traces runtime get <traceId> --name checkout --output trace.json
+agentcore project traces harness list --name support --target production --since 30m
+agentcore project traces harness get <traceId> --name support --output trace.json
+```
+
+### Linked Resource Views
+
+A bare `project status` opens a Linked Resources view that groups the project's
+resources by agent and forwards to each deployed resource's detail page.
+The harness hub (`harness get`) ends with the same kind of Linked Resources tree
+for the Runtime, Memory, Gateway, Browser, Code Interpreter and
+credential providers wired to that harness, each opening in its own region.
+
+### Remove Project Resources
+
+Removal updates the project specification and keeps code under `app/`.
+Deploy the project afterward to apply resource removals in AWS. For credential
+provider cleanup and target teardown behavior, see
+[Project Credentials](configuration.md#project-credentials).
+
+```bash
+# Remove resources from a project's spec (run inside the project)
+agentcore project remove memory --name recall
+agentcore project remove credential --name svc-key   # also deletes its .env.local entries
+agentcore project remove gateway-target --gateway tools --name search
+agentcore project remove all                         # y/N prompt; empties every collection
+agentcore project remove all --yes                   # non-interactive
+```
+
+## Harness
+
+```bash
+# Create a harness; a default execution role is created for you.
+agentcore harness create \
+  --name my-agent \
+  --system-prompt "You are a helpful assistant." \
+  --model '{"bedrockModelConfig":{"modelId":"us.anthropic.claude-sonnet-4-5-20250929-v1:0"}}' \
+  --json
+
+# List and inspect
+agentcore harness list --json
+agentcore harness get --id <harnessId> --json
+
+# One-shot prompt (buffers the service stream, then prints the completed transcript as JSON)
+agentcore harness invoke --id <harnessId> --prompt "Summarize this repo." --json
+
+# Interactive chat (no --prompt): opens the TUI chat at that harness/session
+agentcore harness invoke --id <harnessId>
+agentcore harness invoke --id <harnessId> --session-id <session> --qualifier PROD
+
+# Run a shell command inside the agent runtime
+agentcore harness exec --id <harnessId> --command "ls -la" --json
+```
+
+## Runtime
+
+[Command reference](../command.md#runtime-commands)
+
+To invoke or inspect logs and traces by project resource name rather than a
+physical Runtime ID, see [project workflows](#project-workflows).
+For resource picker behavior, see
+[Runtime and Memory menus](#runtime-and-memory-menus).
+
+### Inspect Runtimes
+
+```bash
+# Inspect deployed Runtimes without project configuration or deployment
+agentcore runtime get --id <runtimeId>
+agentcore runtime list --max-results 20
+agentcore runtime version get --id <runtimeId> --version <version>
+agentcore runtime version list --id <runtimeId> --max-results 20
+agentcore runtime endpoint get --id <runtimeId> --qualifier DEFAULT
+agentcore runtime endpoint list --id <runtimeId> --max-results 20
+
+# Follow a Runtime's logs live by resource ID (Ctrl+C to stop)
+agentcore runtime logs --id <runtimeId>
+agentcore runtime logs --id <runtimeId> --level error --query "database"
+
+# Search a past window instead (--since/--until switch to search mode)
+agentcore runtime logs --id <runtimeId> --since 1h --limit 100
+agentcore runtime logs --id <runtimeId> --since 2026-08-30T12:00:00Z --until now --json
+
+# List recent traces (they take 2-3 minutes to appear), then download one
+agentcore runtime traces list --id <runtimeId> --since 30m
+agentcore runtime traces get <traceId> --id <runtimeId> --output trace.json
+```
+
+### Invoke a Runtime
+
+Headless invocation accepts inline, file, or stdin payload bytes:
+
+```bash
+# Inline
+agentcore runtime invoke \
+  --id <runtimeId> \
+  --payload '{"action":"status"}' \
+  --content-type application/json \
+  --accept text/event-stream
+
+# File
+agentcore runtime invoke --id <runtimeId> --payload file://request.json
+
+# stdin
+cat request.json | agentcore runtime invoke --id <runtimeId> --payload -
+```
+
+CUSTOM_JWT Runtimes require `--bearer-token`. The token accepts the same inline,
+`file://`, or stdin sources as the payload; payload and token cannot both read
+stdin.
+
+```bash
+agentcore runtime invoke \
+  --id <runtimeId> \
+  --payload file://request.json \
+  --bearer-token file://$HOME/.config/agentcore/runtime-token
+```
+
+For MCP Runtimes, initialize first, then pass the returned Runtime and MCP
+session IDs to later methods. MCP requests accept both JSON and SSE responses.
+
+```bash
+agentcore runtime invoke \
+  --id <runtimeId> \
+  --payload '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"agentcore-cli","version":"1"}}}' \
+  --accept 'application/json, text/event-stream' \
+  --mcp-protocol-version 2025-03-26 \
+  --mcp-method initialize
+
+agentcore runtime invoke \
+  --id <runtimeId> \
+  --payload '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  --accept 'application/json, text/event-stream' \
+  --session-id <returnedRuntimeSessionId> \
+  --mcp-session-id <returnedMcpSessionId> \
+  --mcp-protocol-version 2025-03-26 \
+  --mcp-method tools/list
+```
+
+Raw stdout always streams exact response bytes as they arrive, regardless of
+content type. `--output-file` streams the same bytes directly to disk. Binary or
+unknown responses require `--output-file` or `--json` when stdout is a terminal.
+Response metadata is written to stderr.
+
+`--json` buffers the complete response, including streaming representations, and
+emits one metadata envelope without interpreting the customer body. If a raw or
+file response fails, bytes already written remain available and the stderr
+summary reports `complete=false`. A failed JSON response emits no partial
+envelope.
+
+```bash
+agentcore runtime invoke \
+  --id <runtimeId> \
+  --payload file://request.bin \
+  --content-type application/octet-stream \
+  --accept application/octet-stream \
+  --output-file response.bin
+
+agentcore runtime invoke --id <runtimeId> --payload '{"action":"status"}' --json
+# {"statusCode":200,"contentType":"application/json","bodyEncoding":"utf8","body":"{\"ok\":true}","complete":true}
+```
+
+Without `--payload`, Runtime Invoke opens a persistent JSON console for repeated
+requests. The console sends inline `application/json` payloads and renders each
+response according to its returned content type. Bare invoke opens the Runtime
+and endpoint pickers; `--id` skips the Runtime picker, and `--id` plus
+`--qualifier` opens the console directly. `--session-id` resumes that Runtime
+session in the console. `--user-id`, `--header`, and `--bearer-token` seed
+request context that persists across sends and endpoint changes within that
+Runtime. The console never displays their values, and switching Runtimes clears
+them. Interactive bearer tokens may be inline or `file://` sources, but not
+stdin.
+
+| Shortcut      | Action                                       |
+| ------------- | -------------------------------------------- |
+| `Enter`       | Send the JSON request                        |
+| `Shift+Enter` | Insert a newline                             |
+| `Ctrl+T`      | Change Runtime or endpoint                   |
+| `Ctrl+V`      | Toggle raw and pretty completed JSON         |
+| `Esc`         | Interrupt an active request or navigate back |
+| `↑`/`↓`       | Scroll response history                      |
+
+Runtime Invoke accepts Runtime IDs from the current account only. It does not
+accept ARNs, `--version`, `--interactive`, cross-account targets, or custom
+request paths. All requests use the Runtime `/invocations` route, including MCP
+Runtimes.
+
+### Open a Runtime shell
+
+Runtime Shell opens a persistent interactive terminal in a Runtime session.
+Bare shell opens the Runtime and endpoint pickers. `--id` skips the Runtime
+picker, and `--id` plus `--qualifier` connects directly.
+
+```bash
+agentcore runtime shell
+agentcore runtime shell --id <runtimeId>
+agentcore runtime shell --id <runtimeId> --qualifier DEFAULT
+```
+
+Use `--session-id` to open the shell in a specific Runtime session/VM:
+
+```bash
+agentcore runtime shell \
+  --id <runtimeId> \
+  --qualifier DEFAULT \
+  --session-id <runtimeSessionId>
+```
+
+CUSTOM_JWT Runtimes require `--bearer-token`. Interactive bearer tokens may be
+inline or `file://` sources, but not stdin.
+
+The shell forwards terminal input byte-for-byte, including `Ctrl+C`, `Ctrl+D`,
+escape sequences, and full-screen terminal applications. Terminal resize events
+update the remote PTY. Running `exit` or sending `Ctrl+D` terminates the remote
+shell.
+
+Runtime Shell requires TTY stdin and stdout and does not support `--json`.
+
+## Memory
+
+```bash
+# Inspect AgentCore Memories without project configuration or deployment
+agentcore memory get --id <memoryId>
+agentcore memory get --id <memoryId> --view without_decryption
+agentcore memory list --max-results 20
+agentcore memory event get --id <memoryId> --actor-id <actorId> --session-id <sessionId> --event-id <eventId>
+agentcore memory event list --id <memoryId> --actor-id <actorId> --session-id <sessionId> --max-results 20
+agentcore memory record get --id <memoryId> --record-id <recordId>
+agentcore memory record list --id <memoryId> --namespace <namespace> --max-results 20
+```
+
+### Runtime and Memory Menus
+
+Bare Runtime branches and leaves, plus `memory`, `memory get`, and `memory list`,
+require a TTY on stdin and stdout.
+The Runtime and Memory menus include a TUI-only `create` entry that explains
+their project-based creation flow. It points to `project create` and the
+matching `project add` command without adding unsupported imperative
+`runtime create` or `memory create` commands.
+For Runtime Invoke, supplying a payload or headless-only request or output flags
+runs headlessly; `--session-id` can instead seed the persistent console.
+Supplying Memory operation flags runs those commands headlessly, and `--json`
+always suppresses TUI rendering. The `memory event`, `memory record`,
+`memory actor`, and `memory session` groups open interactive menus when run
+bare in a terminal; their supported leaves provide scoped selection flows.
+Headless calls require the resource selectors shown by each command's help.
+
+```bash
+agentcore runtime
+agentcore runtime list
+agentcore runtime get
+agentcore runtime version list
+agentcore runtime endpoint list
+agentcore memory
+agentcore memory list
+agentcore memory get
+agentcore memory event
+agentcore memory record
+agentcore memory actor
+agentcore memory session
+```
+
+## Gateway
+
+[Command reference](../command.md#gateway-commands)
+
+For project resource names and deployment targets, see
+[command examples](#project-workflows).
+
+### Inspect Gateways and Generate Policies
+
+```bash
+# Inspect Gateway resources without project configuration or deployment
+agentcore gateway get --id <gatewayId>
+agentcore gateway list --max-results 20
+agentcore gateway invoke --id <gatewayId> --payload file://request.json
+agentcore gateway invoke --id <gatewayId> # open the persistent JSON console
+agentcore gateway target get --gateway-id <gatewayId> --target-id <targetId>
+agentcore gateway target list --gateway-id <gatewayId> --max-results 20
+agentcore gateway connector get --gateway-id <gatewayId> --id <targetId>
+agentcore gateway connector list --gateway-id <gatewayId> --max-results 20
+agentcore gateway rule get --gateway-id <gatewayId> --rule-id <ruleId>
+agentcore gateway rule list --gateway-id <gatewayId> --max-results 20
+agentcore gateway policy generate --gateway-id <gatewayId> --prompt "forbid IAM callers from every tool"
+agentcore gateway policy generate --gateway-id <gatewayArn> --prompt file://policy.txt --json
+# Pipe the generated Cedar into a project (run inside the project)
+agentcore gateway policy generate --gateway-id <gatewayId> --prompt "..." \
+  | agentcore project add policy --engine Guardrails --name Generated --statement -
+```
+
+### Invoke a Gateway
+
+Gateway Invoke is a project-independent HTTP request command with headless and
+interactive modes. It gets the Gateway by ID, uses the returned HTTPS origin,
+selects authentication from the Gateway's authorizer, and preserves the request
+and response bodies.
+
+```bash
+# MCP Gateway: use the exact gatewayUrl returned by GetGateway.
+agentcore gateway invoke \
+  --id <gatewayId> \
+  --payload '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"agentcore-cli","version":"1"}}}' \
+  --accept 'application/json, text/event-stream' \
+  --mcp-protocol-version 2025-03-26
+
+# HTTP target: --path is relative to the Gateway origin.
+agentcore gateway invoke \
+  --id <gatewayId> \
+  --path support-agent/invocations \
+  --payload file://request.json \
+  --session-id <runtimeSessionId>
+
+# Inference target.
+agentcore gateway invoke \
+  --id <gatewayId> \
+  --path inference/v1/messages \
+  --payload file://message.json \
+  --json
+
+# GET requests do not accept a payload.
+agentcore gateway invoke \
+  --id <gatewayId> \
+  --method GET \
+  --path inference/v1/models
+```
+
+`--path` replaces the path in the returned Gateway URL while retaining its
+origin. It must remain relative to the selected Gateway and may include a query
+string. Omitting it uses the returned `gatewayUrl` exactly. Supported methods
+are `GET`, `POST` (the default), and `DELETE`. POST requires `--payload`; DELETE
+may include one. Payloads accept inline bytes, `file://<path>`, or `-` for stdin.
+
+Authentication follows `GetGateway.authorizerType`: `AWS_IAM` and
+`AUTHENTICATE_ONLY` requests use SigV4, `CUSTOM_JWT` requires `--bearer-token`,
+and `NONE` uses unsigned HTTPS. Bearer tokens accept inline, `file://`, or stdin
+sources; payload and token cannot both read stdin.
+
+Raw responses stream exact bytes to stdout. `--output-file` streams those bytes
+to disk, while `--json` buffers one envelope containing status, selected session
+and request metadata, body encoding, and body. Binary or unknown output requires
+`--output-file` or `--json` when stdout is a terminal. Response metadata goes to
+stderr in raw and file modes. Redirects are returned without being followed.
+Non-2xx response bodies use the selected output mode before the command exits
+with a failure status.
+
+Without `--payload`, Gateway Invoke opens a persistent POST JSON console. Bare
+invoke opens the Gateway picker, while `--id` opens the selected Gateway
+directly. `--path`, `--session-id`, MCP session flags, `--header`, and
+`--bearer-token` seed the console. Interactive bearer tokens may be inline or
+`file://` sources, but not stdin. Explicit headless-only flags such as
+`--method`, `--accept`, `--content-type`, `--output-file`, or `--json` keep the
+command headless.
+
+The console generates and displays a Runtime session ID, adopts returned Runtime
+and MCP sessions, and streams textual responses as they arrive. An empty path
+uses the exact `gatewayUrl`; `Ctrl+P` edits the raw Gateway-relative path and
+`Ctrl+T` switches Gateways. Switching Gateways clears request context, while
+changing paths preserves the draft and Gateway authentication but starts fresh
+sessions.
+
+| Shortcut      | Action                                       |
+| ------------- | -------------------------------------------- |
+| `Enter`       | Send the JSON request                        |
+| `Shift+Enter` | Insert a newline                             |
+| `Ctrl+P`      | Edit the Gateway-relative path               |
+| `Ctrl+T`      | Change Gateway                               |
+| `Ctrl+V`      | Toggle raw and pretty completed JSON         |
+| `Esc`         | Interrupt an active request or navigate back |
+| `↑`/`↓`       | Scroll response history                      |
+
+Gateway Invoke has no request-type selector, target/path discovery,
+tool/model discovery command, authentication editor, or protocol-specific
+payload builder. Callers provide the Gateway-relative route and protocol payload
+directly. GET and DELETE remain available through headless invoke.
+
+### Interactive Menus
+
+The Gateway TUI is read-only: bare Gateway, Target, Connector, and Rule
+branches and their `get`/`list` leaves open command menus and scoped selection
+flows. Connector is presented as a separate resource experience while using
+Gateway Target operations internally.
+
+Create and deploy Gateways through an AgentCore project. The Gateway menu's
+TUI-only `create` entry provides `project create`,
+`project add gateway --name MyGateway`, and `project deploy` guidance.
+
+```bash
+agentcore gateway
+agentcore gateway list
+agentcore gateway get
+agentcore gateway target list
+agentcore gateway target get
+agentcore gateway connector list
+agentcore gateway connector get
+agentcore gateway rule list
+agentcore gateway rule get
+```
+
+## Identity
+
+```bash
+# Manage API key credential providers
+agentcore identity api-key-credential-provider create --name my-provider --api-key <key>
+agentcore identity api-key-credential-provider get --name my-provider
+agentcore identity api-key-credential-provider list --max-results 10
+agentcore identity api-key-credential-provider update --name my-provider --api-key <new-key>
+agentcore identity api-key-credential-provider delete --name my-provider
+
+# Manage OAuth2 credential providers (guided Custom OAuth2, or --provider-configuration for other vendors)
+agentcore identity oauth2-credential-provider create \
+  --name my-oauth-provider \
+  --vendor CustomOauth2 \
+  --client-id <client-id> \
+  --discovery-url https://issuer.example.com/.well-known/openid-configuration \
+  --client-secret -
+agentcore identity oauth2-credential-provider get --name my-oauth-provider
+agentcore identity oauth2-credential-provider list --max-results 10
+agentcore identity oauth2-credential-provider delete --name my-oauth-provider
+```
+
+The Identity TUI is read-only: bare `identity` branches and the `get`/`list`
+leaves open interactive menus and detail views. Mutations (`create`, `update`,
+`delete`) remain available through the CLI and are omitted from the TUI menus.
+
+```bash
+agentcore identity
+agentcore identity api-key-credential-provider list
+agentcore identity api-key-credential-provider get
+agentcore identity oauth2-credential-provider list
+agentcore identity oauth2-credential-provider get
+```
+
+## Payments
+
+[Command reference](../command.md#payment-commands)
+
+For project-managed credential providers and their cleanup behavior, see
+[Project Credentials](configuration.md#project-credentials).
+
+### Inspect AgentCore Payments
+
+The `payment` commands call the Payments control and data planes directly, with
+no project involved. This command family currently provides read-only inspection
+of existing managers, connectors, sessions, instruments, and payment credential
+providers. It does not create IAM roles or change provider credentials.
+
+Choose a manager from `manager list` and use its `paymentManagerId` below:
+
+```bash
+agentcore payment manager list --json
+MANAGER_ID='<paymentManagerId from manager list>'
+agentcore payment manager get --id "$MANAGER_ID"
+agentcore payment connector list --manager-id "$MANAGER_ID"
+```
+
+`--user-id` is the application user ID used when the session or instrument was
+created, not an IAM username or AWS profile. Session and instrument reads require
+it with IAM authentication; their lists return that user's resources, not every
+user's resources under the manager.
+
+```bash
+USER_ID='alice' # Use the application user ID associated with the resources.
+agentcore payment session list --manager-id "$MANAGER_ID" --user-id "$USER_ID"
+agentcore payment instrument list --manager-id "$MANAGER_ID" --user-id "$USER_ID"
+
+# Use paymentInstrumentId and paymentConnectorId from the same instrument list item.
+INSTRUMENT_ID='<paymentInstrumentId>'
+CONNECTOR_ID='<paymentConnectorId>'
+agentcore payment instrument get --manager-id "$MANAGER_ID" \
+  --instrument-id "$INSTRUMENT_ID" --user-id "$USER_ID"
+agentcore payment instrument balance --manager-id "$MANAGER_ID" \
+  --connector-id "$CONNECTOR_ID" --instrument-id "$INSTRUMENT_ID" \
+  --user-id "$USER_ID" --chain BASE_SEPOLIA
+```
+
+To inspect connector or credential provider metadata:
+
+```bash
+agentcore payment connector get --manager-id "$MANAGER_ID" --connector-id "$CONNECTOR_ID"
+agentcore identity payment-credential-provider list --json
+agentcore identity payment-credential-provider get --name '<provider name>'
+```
+
+The optional `--agent-name` on session and instrument reads labels the request for
+observability. It does not select an AgentCore agent or filter the results.
+
+`instrument get` returns instrument metadata without querying balances. `balance`
+requires an explicit chain and defaults to `--token USDC`; wallet network families
+such as ETHEREUM do not identify whether to query mainnet or a testnet. The JSON
+response retains the raw atomic amount string and decimals. A service error is
+reported as an error, never converted to a zero balance.
+
+Data-plane commands work against managers that use the `AWS_IAM` authorizer.
+The CLI resolves `--manager-id` through `GetPaymentManager` in the configured
+region, then supplies the returned ARN to the data-plane API. Callers need
+`bedrock-agentcore:GetPaymentManager` as well as the relevant data-plane action.
+Region resolution follows the other imperative commands: `--region`, environment
+variables, the active AWS profile, then the CLI default.
+A `CUSTOM_JWT` manager accepts only bearer tokens on its data plane, which
+these commands do not send yet; the CLI reports that limitation before calling
+the data plane.
+
+## Evaluators
+
+```bash
+# Manage evaluators
+# Create an LLM-as-a-Judge evaluator with a rating-scale preset.
+agentcore eval evaluator llm-as-a-judge create \
+  --name order-support-quality \
+  --level SESSION \
+  --model us.anthropic.claude-sonnet-4-5-20250929-v1:0 \
+  --instructions "Judge from {context} whether the order-support agent answered correctly." \
+  --rating-scale 1-5-quality \
+  --json
+
+# Create a code-based (Lambda-backed) evaluator; timeout defaults to the service value.
+agentcore eval evaluator code-based create \
+  --name refund-policy-compliance \
+  --level SESSION \
+  --lambda-arn arn:aws:lambda:us-west-2:123456789012:function:refund-policy \
+  --json
+
+# Get, list, delete.
+agentcore eval evaluator get --id <evaluatorId> --json
+agentcore eval evaluator list --max-results 20 --json
+agentcore eval evaluator delete --id <evaluatorId> --json
+```
