@@ -1,6 +1,6 @@
 name: Bug Report
 description: Report a bug or unexpected behavior
-labels: ['bug']
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
@@ -49,7 +49,7 @@ body:
     attributes:
       label: CLI Version
       description: Output of `agentcore --version`
-      placeholder: '1.0.0'
+      placeholder: "1.0.0"
     validations:
       required: false
 
