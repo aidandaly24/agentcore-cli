@@ -343,13 +343,16 @@ describe("project status screen", () => {
     // launch region again.
     await screen.press("escape");
     await waitForText(screen.lastFrame, "❯ project");
-    await screen.write("harness");
+    await screen.write("eval");
     await screen.press("return");
-    await waitForText(screen.lastFrame, "agentcore → harness");
+    await waitForText(screen.lastFrame, "agentcore → eval");
+    await screen.write("evaluator");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "agentcore → eval → evaluator");
     await screen.write("list");
     await screen.press("return");
-    await waitFor(() => value.harness.calls.some(({ method }) => method === "listHarnesses"));
-    const listCall = value.harness.calls.find(({ method }) => method === "listHarnesses")!;
+    await waitFor(() => value.eval.calls.some(({ method }) => method === "listEvaluators"));
+    const listCall = value.eval.calls.find(({ method }) => method === "listEvaluators")!;
     expect(listCall.args[2]).toMatchObject({ region: "us-east-1" });
   });
 

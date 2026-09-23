@@ -1,5 +1,11 @@
 import { test, expect, describe, afterEach } from "bun:test";
-import { cleanupScreens, renderScreen, tick, waitForText } from "../testing";
+import {
+  cleanupScreens,
+  renderScreen,
+  renderImperativeScreen,
+  tick,
+  waitForText,
+} from "../testing";
 
 afterEach(cleanupScreens);
 
@@ -10,17 +16,14 @@ afterEach(cleanupScreens);
 describe("menu rendering", () => {
   test("lists the current command's subcommands with their descriptions", async () => {
     const r = renderScreen("/agentcore");
-    await waitForText(r.lastFrame, "harness");
+    await waitForText(r.lastFrame, "type to choose a command");
 
     const frame = r.lastFrame()!;
-    expect(frame).toContain("harness");
-    expect(frame).toContain("manage AgentCore harnesses");
-    expect(frame).toContain("runtime");
-    expect(frame).toContain("inspect AgentCore Runtimes");
-    expect(frame).toContain("memory");
-    expect(frame).toContain("inspect AgentCore Memories");
-    expect(frame).toContain("gateway");
-    expect(frame).toContain("manage AgentCore Gateways");
+    expect(frame).toContain("project");
+    expect(frame).toContain("eval");
+    for (const family of ["harness", "identity", "runtime", "memory", "gateway", "payment"]) {
+      expect(frame).not.toMatch(new RegExp(`\\b${family}\\b`));
+    }
     expect(frame).toContain("config");
     expect(frame).toContain("read/write global config values");
     r.unmount();
@@ -33,7 +36,7 @@ describe("menu rendering", () => {
   });
 
   test("renders the harness subcommands when mounted at the harness path", async () => {
-    const r = renderScreen("/agentcore/harness");
+    const r = renderImperativeScreen("/agentcore/harness");
     await waitForText(r.lastFrame, "list");
 
     const frame = r.lastFrame()!;
@@ -45,7 +48,7 @@ describe("menu rendering", () => {
 
   test("highlights the first option by default", async () => {
     const r = renderScreen("/agentcore");
-    await waitForText(r.lastFrame, "harness");
+    await waitForText(r.lastFrame, "type to choose a command");
     // The focus caret marks the highlighted row; the first option is project.
     expect(r.lastFrame()).toContain("❯ project");
     r.unmount();
@@ -54,7 +57,7 @@ describe("menu rendering", () => {
 
 describe("filtering", () => {
   test("typing narrows the options to matches", async () => {
-    const r = renderScreen("/agentcore/harness");
+    const r = renderImperativeScreen("/agentcore/harness");
     await waitForText(r.lastFrame, "list");
 
     await r.write("cr"); // matches "create" only
@@ -68,7 +71,7 @@ describe("filtering", () => {
   });
 
   test("filtering is case-insensitive", async () => {
-    const r = renderScreen("/agentcore/harness");
+    const r = renderImperativeScreen("/agentcore/harness");
     await waitForText(r.lastFrame, "list");
 
     await r.write("LIST");
@@ -77,7 +80,7 @@ describe("filtering", () => {
   });
 
   test("shows a no-matches message when nothing matches", async () => {
-    const r = renderScreen("/agentcore/harness");
+    const r = renderImperativeScreen("/agentcore/harness");
     await waitForText(r.lastFrame, "list");
 
     await r.write("zzz");
@@ -92,10 +95,10 @@ describe("navigation", () => {
     await waitForText(r.lastFrame, "❯ project");
 
     await r.press("down");
-    await waitForText(r.lastFrame, "❯ harness");
+    await waitForText(r.lastFrame, "❯ eval");
 
     await r.press("down");
-    await waitForText(r.lastFrame, "❯ identity");
+    await waitForText(r.lastFrame, "❯ feedback");
     r.unmount();
   });
 
@@ -115,16 +118,15 @@ describe("navigation", () => {
     await waitForText(r.lastFrame, "❯ project");
 
     await r.press("down");
-    await waitForText(r.lastFrame, "❯ harness");
+    await waitForText(r.lastFrame, "❯ eval");
     await r.press("return");
-    // The harness screen is itself a RouterScreen showing harness subcommands.
-    await waitForText(r.lastFrame, "agentcore → harness");
-    expect(r.lastFrame()).toContain("list");
+    await waitForText(r.lastFrame, "agentcore → eval");
+    expect(r.lastFrame()).toContain("evaluator");
     r.unmount();
   });
 
   test("esc from a nested menu returns to the parent menu", async () => {
-    const r = renderScreen("/agentcore/harness");
+    const r = renderImperativeScreen("/agentcore/harness");
     await waitForText(r.lastFrame, "agentcore → harness");
 
     await r.press("escape");

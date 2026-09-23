@@ -77,12 +77,14 @@ export function createRootHandler(core: Core, config: RootHandlerConfig): Router
   // Install sub handlers. Registration order is menu/help order; project is
   // the primary workflow, so it goes first.
   root.handler(createProjectHandler({ core, io }));
-  root.handler(createHarnessHandler(core, io));
-  root.handler(createIdentityHandler(core, io));
-  root.handler(createRuntimeHandler(core, io));
-  root.handler(createMemoryHandler(core, io));
-  root.handler(createGatewayHandler(core, io, globalConfig));
-  root.handler(createPaymentHandler(core, io));
+  if (globalConfig["imperative-commands"]) {
+    root.handler(createHarnessHandler(core, io));
+    root.handler(createIdentityHandler(core, io));
+    root.handler(createRuntimeHandler(core, io));
+    root.handler(createMemoryHandler(core, io));
+    root.handler(createGatewayHandler(core, io, globalConfig));
+    root.handler(createPaymentHandler(core, io));
+  }
   root.handler(createEvalHandler(core, io));
   root.handler(createFeedbackHandler(core, io));
   root.handler(createConfigHandler());

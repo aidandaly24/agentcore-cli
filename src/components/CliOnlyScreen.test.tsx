@@ -5,14 +5,15 @@ import {
   compiledRootCommand,
   menuEntries,
   renderScreen,
+  renderImperativeScreen,
+  IMPERATIVE_GLOBAL_CONFIG,
   waitForText,
 } from "../testing";
 import { isTuiCommandSupported } from "../router";
-import { DEFAULT_GLOBAL_CONFIG } from "../globalConfig";
 
 afterEach(cleanupScreens);
 
-const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
+const MUTATION_CONFIG = { ...IMPERATIVE_GLOBAL_CONFIG, "imperative-mutation-commands": true };
 
 // cliOnlyCommands walks the compiled Commander tree for every command without
 // a screen, so a command added later is covered without a new test. `help` is
@@ -39,8 +40,8 @@ describe("menus list command-line-only subcommands below a divider", () => {
 
     await waitForText(r.lastFrame, "command line only");
     expect(menuEntries(r.lastFrame()!)).toEqual({
-      screens: ["project", "harness", "identity", "runtime", "memory", "gateway", "eval"],
-      cliOnly: ["payment", "feedback", "config", "update"],
+      screens: ["project", "eval"],
+      cliOnly: ["feedback", "config", "update"],
     });
     r.unmount();
   });
@@ -65,7 +66,7 @@ describe("menus list command-line-only subcommands below a divider", () => {
   });
 
   test("the harness menu", async () => {
-    const r = renderScreen("/agentcore/harness");
+    const r = renderImperativeScreen("/agentcore/harness");
 
     await waitForText(r.lastFrame, "command line only");
     expect(menuEntries(r.lastFrame()!)).toEqual({
@@ -86,7 +87,7 @@ describe("menus list command-line-only subcommands below a divider", () => {
   });
 
   test("the divider is omitted when nothing is command line only", async () => {
-    const r = renderScreen("/agentcore/harness/endpoint");
+    const r = renderImperativeScreen("/agentcore/harness/endpoint");
 
     await waitForText(r.lastFrame, "manage harness endpoints");
     expect(r.lastFrame()).not.toContain("command line only");
@@ -141,7 +142,7 @@ describe("paths without a screen of their own", () => {
 
     await waitForText(() => r.frames.join("\n"), "Usage:");
     const output = r.frames.join("\n");
-    expect(output).toContain("harness");
+    expect(output).toContain("project");
     expect(output).not.toContain("command line only");
     r.unmount();
   });

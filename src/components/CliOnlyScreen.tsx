@@ -1,13 +1,12 @@
 import { useRef, type ReactNode } from "react";
 import { Box, Text, useInput, useWindowSize } from "ink";
 import { ScrollView, type ScrollViewRef } from "ink-scroll-view";
-import type { Command } from "commander";
 import { useLocation, useNavigate } from "react-router";
 import { CommandKey, commandParameterDetails } from "../router";
 import type { ScreenProps } from "../handlers/types";
 import { Layout } from "./Layout";
 import { KeyValueTable } from "./KeyValueTable";
-import { RouterScreen, resolveCommand } from "./RouterScreen";
+import { RouterScreen, commandPath, resolveCommand } from "./RouterScreen";
 import { darkTheme } from "./ui/_core.js";
 
 const theme = darkTheme;
@@ -171,10 +170,4 @@ export function CommandFallbackScreen({
   ) : (
     <CliOnlyScreen {...props} path={resolved} />
   );
-}
-
-function commandPath(command: Command): string[] {
-  const names: string[] = [];
-  for (let cur: Command | null = command; cur; cur = cur.parent) names.unshift(cur.name());
-  return names;
 }

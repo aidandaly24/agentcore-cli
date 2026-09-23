@@ -12,12 +12,6 @@ describe("createRootHandler", () => {
     expect(root.name()).toBe("agentcore");
     expect(root.children().map((c) => c.name())).toEqual([
       "project",
-      "harness",
-      "identity",
-      "runtime",
-      "memory",
-      "gateway",
-      "payment",
       "eval",
       "feedback",
       "config",

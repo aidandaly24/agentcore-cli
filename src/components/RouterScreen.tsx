@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Box, Text, useApp, useInput, useStdin } from "ink";
 import type { Command } from "commander";
-import { useNavigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 import { CommandKey, isTuiCommandSupported } from "../router";
 import { Layout } from "./Layout";
 import { Divider } from "./ui/divider";
@@ -35,6 +35,12 @@ export function resolveCommand(launch: Command, path: string[]): Command {
   return cur;
 }
 
+export function commandPath(command: Command): string[] {
+  const names: string[] = [];
+  for (let cur: Command | null = command; cur; cur = cur.parent) names.unshift(cur.name());
+  return names;
+}
+
 interface Option {
   name: string;
   description: string;
@@ -63,7 +69,21 @@ export interface RouterScreenProps extends ScreenProps {
 // Command) as navigable options below. Selecting an option routes to that
 // subcommand's screen. Subcommands without a screen are listed below a divider
 // and open their help instead (see CliOnlyScreen).
-export function RouterScreen({ ctx, path, tuiOnlyCommands = [] }: RouterScreenProps) {
+export function RouterScreen(props: RouterScreenProps) {
+  const command = resolveCommand(props.ctx.require(CommandKey), props.path);
+  const resolvedPath = commandPath(command);
+  // Project views reuse resource screens, but disabled command menus do not exist.
+  if (resolvedPath.join("/") !== props.path.join("/")) {
+    return <Navigate to={"/" + resolvedPath.join("/")} replace />;
+  }
+  return <CommandMenu {...props} command={command} />;
+}
+
+function CommandMenu({
+  path,
+  tuiOnlyCommands = [],
+  command,
+}: RouterScreenProps & { command: Command }) {
   const navigate = useNavigate();
   const { isRawModeSupported } = useStdin();
   const { exit } = useApp();
@@ -75,7 +95,6 @@ export function RouterScreen({ ctx, path, tuiOnlyCommands = [] }: RouterScreenPr
     pinRegion(undefined);
   }, [pinRegion]);
 
-  const command = resolveCommand(ctx.require(CommandKey), path);
   // Screen-backed commands first, then the command-line-only ones, so the
   // divider between them falls at one place in the list.
   const options: Option[] = useMemo(() => {

@@ -10,12 +10,12 @@ const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
 const DEFAULT_GROUPS = [
   { id: "global-options", title: "Global options", commands: [] },
   { id: "project", title: "Project commands", commands: ["project"] },
-  { id: "harness", title: "Harness commands", commands: ["harness"] },
-  { id: "identity", title: "Identity commands", commands: ["identity"] },
-  { id: "runtime", title: "Runtime commands", commands: ["runtime"] },
-  { id: "memory", title: "Memory commands", commands: ["memory"] },
-  { id: "gateway", title: "Gateway commands", commands: ["gateway"] },
-  { id: "payment", title: "Payment commands", commands: ["payment"] },
+  { id: "harness", title: "Harness commands", commands: ["harness"], optional: true },
+  { id: "identity", title: "Identity commands", commands: ["identity"], optional: true },
+  { id: "runtime", title: "Runtime commands", commands: ["runtime"], optional: true },
+  { id: "memory", title: "Memory commands", commands: ["memory"], optional: true },
+  { id: "gateway", title: "Gateway commands", commands: ["gateway"], optional: true },
+  { id: "payment", title: "Payment commands", commands: ["payment"], optional: true },
   { id: "evaluation", title: "Evaluation commands", commands: ["eval"] },
   {
     id: "settings",
@@ -182,7 +182,10 @@ function buildModel({ version, groups = DEFAULT_GROUPS, env }) {
   const discovered = new Set(rootEntry.members.map((entry) => entry.name.split(" ").at(-1)));
   const grouped = new Set(groups.flatMap((group) => group.commands));
   const missing = [...discovered].filter((command) => !grouped.has(command));
-  const unknown = [...grouped].filter((command) => !discovered.has(command));
+  const unknown = groups
+    .filter((group) => !group.optional)
+    .flatMap((group) => group.commands)
+    .filter((command) => !discovered.has(command));
 
   if (missing.length) {
     throw new Error(`Top-level commands missing from groups: ${missing.join(", ")}`);
@@ -197,13 +200,17 @@ function buildModel({ version, groups = DEFAULT_GROUPS, env }) {
 
   return {
     version,
-    groups: groups.map((group) => ({
-      title: group.title,
-      entries:
-        group.id === "global-options"
-          ? [{ ...rootEntry, members: [] }]
-          : group.commands.map((command) => entriesByCommand.get(command)),
-    })),
+    groups: groups
+      .filter(
+        (group) => !group.optional || group.commands.some((command) => discovered.has(command)),
+      )
+      .map((group) => ({
+        title: group.title,
+        entries:
+          group.id === "global-options"
+            ? [{ ...rootEntry, members: [] }]
+            : group.commands.map((command) => entriesByCommand.get(command)),
+      })),
   };
 }
 

@@ -27,7 +27,9 @@ describe("HelpScreen", () => {
 
     const output = frames.join("\n");
     expect(output).toContain("Usage:");
-    expect(output).toContain("harness");
+    expect(output).toContain("project");
+    expect(output).toContain("eval");
+    expect(output).not.toContain("harness");
     expect(output).toContain("config");
   });
 });

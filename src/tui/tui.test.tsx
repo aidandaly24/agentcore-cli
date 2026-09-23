@@ -2,8 +2,10 @@ import { test, expect, describe } from "bun:test";
 import { createRootHandler } from "../handlers";
 import { ExitCode, InvalidEnvironmentError } from "../errors";
 import { renderJson } from "./index";
+import { DEFAULT_GLOBAL_CONFIG } from "../globalConfig";
 import {
   createSilentLogger,
+  IMPERATIVE_GLOBAL_CONFIG,
   TestCoreClient,
   TestGlobalConfigAccessor,
   testIO,
@@ -25,12 +27,13 @@ describe("--json short-circuits the TUI", () => {
   // instead of launching the interactive TUI (renderTui's JSON branch). This
   // keeps the CLI scriptable and, importantly, keeps these tests from trying to
   // mount Ink against a non-TTY stdin.
-  async function runRoot(args: string[]): Promise<string> {
+  async function runRoot(args: string[], globalConfig = DEFAULT_GLOBAL_CONFIG): Promise<string> {
     const io = testIO();
     const root = createRootHandler(new TestCoreClient(), {
       io: io.io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
+      globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: globalConfig }),
+      globalConfig,
     });
     await root.route(["node", "agentcore", ...args, "--json"]);
     return io.stdout();
@@ -39,11 +42,12 @@ describe("--json short-circuits the TUI", () => {
   test("bare `agentcore --json` prints help rather than opening the TUI", async () => {
     const out = await runRoot([]);
     expect(out).toContain("Usage:");
-    expect(out).toContain("harness");
+    expect(out).toContain("project");
+    expect(out).not.toContain("harness");
   });
 
   test("`agentcore harness --json` prints the harness command's help", async () => {
-    const out = await runRoot(["harness"]);
+    const out = await runRoot(["harness"], IMPERATIVE_GLOBAL_CONFIG);
     expect(out).toContain("Usage:");
     // The harness subcommands are listed in its help.
     expect(out).toContain("list");
@@ -94,7 +98,10 @@ describe("TUI stream boundary", () => {
     const root = createRootHandler(core, {
       io: streams.io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
+      globalConfigAccessor: new TestGlobalConfigAccessor({
+        initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+      }),
+      globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     });
     const routePromise = root.route(["node", "agentcore", "runtime", "list"]);
     const listCalls = () => core.runtime.calls.filter((call) => call.method === "listRuntimes");
