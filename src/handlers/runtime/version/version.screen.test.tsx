@@ -5,7 +5,7 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   waitFor,
   waitForText,

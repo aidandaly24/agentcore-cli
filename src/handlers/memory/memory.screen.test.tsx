@@ -8,7 +8,7 @@ import { QueryClient } from "@tanstack/react-query";
 import stringWidth from "string-width";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   tick,
   waitFor,

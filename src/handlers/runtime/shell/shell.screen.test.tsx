@@ -5,7 +5,7 @@ import { ValueContext } from "../../../router";
 import type { RuntimeShellSession } from "../types";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   tick,
   type TtyInput,

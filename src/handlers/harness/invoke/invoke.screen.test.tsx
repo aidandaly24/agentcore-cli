@@ -5,7 +5,7 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore";
 import type { GetHarnessResponse, HarnessSummary } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   waitForText,
   waitFor,
   cleanupScreens,

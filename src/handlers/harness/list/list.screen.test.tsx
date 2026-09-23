@@ -1,7 +1,7 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import type { HarnessSummary } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   waitForText,
   waitFor,
   cleanupScreens,

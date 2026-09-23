@@ -1,7 +1,7 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import type { HarnessEndpoint } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   waitForText,
   waitFor,
   cleanupScreens,
@@ -66,7 +66,9 @@ describe("harness endpoint delete screen", () => {
 
   test("`y` calls DeleteHarnessEndpoint and shows the result", async () => {
     const core = coreWithEndpoint();
-    const r = renderScreen("/agentcore/harness/endpoint/delete/MyHarness-abc123/prod", { core });
+    const r = renderScreen("/agentcore/harness/endpoint/delete/MyHarness-abc123/prod", {
+      core,
+    });
 
     await waitForText(r.lastFrame, "Delete endpoint prod?");
     await r.write("y");
@@ -80,7 +82,9 @@ describe("harness endpoint delete screen", () => {
 
   test("`n` cancels without calling DeleteHarnessEndpoint", async () => {
     const core = coreWithEndpoint();
-    const r = renderScreen("/agentcore/harness/endpoint/delete/MyHarness-abc123/prod", { core });
+    const r = renderScreen("/agentcore/harness/endpoint/delete/MyHarness-abc123/prod", {
+      core,
+    });
 
     await waitForText(r.lastFrame, "Delete endpoint prod?");
     await r.write("n");

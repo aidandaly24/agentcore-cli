@@ -9,7 +9,7 @@ import type {
   Harness,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   waitForText,
   waitFor,
   cleanupScreens,

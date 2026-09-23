@@ -6,7 +6,7 @@ import type {
 import { QueryClient } from "@tanstack/react-query";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   tick,
   waitFor,
@@ -190,7 +190,9 @@ describe("runtime hub", () => {
   test("shows the Runtime failure reason only when the service provides one", async () => {
     const healthyCore = new TestCoreClient();
     healthyCore.runtime.setGetResponse(getRuntimeResponse());
-    const healthy = renderScreen("/agentcore/runtime/get/runtime-123", { core: healthyCore });
+    const healthy = renderScreen("/agentcore/runtime/get/runtime-123", {
+      core: healthyCore,
+    });
 
     await waitForText(healthy.lastFrame, "show the full JSON definition");
     expect(healthy.lastFrame()).not.toContain("failureReason");
@@ -203,7 +205,9 @@ describe("runtime hub", () => {
         failureReason: "Image could not be pulled",
       }),
     );
-    const failed = renderScreen("/agentcore/runtime/get/runtime-123", { core: failedCore });
+    const failed = renderScreen("/agentcore/runtime/get/runtime-123", {
+      core: failedCore,
+    });
 
     await waitForText(failed.lastFrame, "Image could not be pulled");
     expect(failed.lastFrame()).toMatch(/failureReason\s+Image could not be pulled/);

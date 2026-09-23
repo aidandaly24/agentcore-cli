@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { Command } from "commander";
 import { isTuiCommandSupported } from "../router";
-import { cleanupScreens, compiledRootCommand, renderScreen, waitFor } from "../testing";
+import {
+  cleanupScreens,
+  compiledRootCommand,
+  IMPERATIVE_GLOBAL_CONFIG,
+  renderImperativeScreen as renderScreen,
+  waitFor,
+} from "../testing";
 
 afterEach(cleanupScreens);
 
@@ -41,7 +47,7 @@ function firstLine(frame: string | undefined): string {
   return (frame ?? "").split("\n")[0]?.trim() ?? "";
 }
 
-const SCREENS = screenCommands(compiledRootCommand(), []);
+const SCREENS = screenCommands(compiledRootCommand(undefined, IMPERATIVE_GLOBAL_CONFIG), []);
 
 describe("every command with a screen", () => {
   test("there are screens to cover", () => {

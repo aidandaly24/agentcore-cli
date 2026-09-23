@@ -3,7 +3,7 @@ import type { ActorSummary, SessionSummary } from "@aws-sdk/client-bedrock-agent
 import type { MemorySummary } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   waitFor,
   waitForText,

@@ -11,7 +11,7 @@ import {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   waitForText,
   menuEntries,
@@ -124,7 +124,10 @@ describe("Gateway menu and list", () => {
 
   test("renders Gateway identity and calls list with exact Core options", async () => {
     const core = coreWithGateways([gateway()]);
-    const screen = renderScreen("/agentcore/gateway/list", { core, endpointUrl: ENDPOINT });
+    const screen = renderScreen("/agentcore/gateway/list", {
+      core,
+      endpointUrl: ENDPOINT,
+    });
 
     await waitForText(screen.lastFrame, "checkout-gateway");
     const frame = screen.lastFrame()!;
@@ -171,7 +174,10 @@ describe("Gateway menu and list", () => {
   test("selects a Gateway and renders only read-only hub actions", async () => {
     const core = coreWithGateways([gateway()]);
     core.gateway.setGetResponse(gatewayDetail());
-    const screen = renderScreen("/agentcore/gateway/list", { core, endpointUrl: ENDPOINT });
+    const screen = renderScreen("/agentcore/gateway/list", {
+      core,
+      endpointUrl: ENDPOINT,
+    });
 
     await waitForText(screen.lastFrame, "checkout-gateway");
     await screen.press("return");

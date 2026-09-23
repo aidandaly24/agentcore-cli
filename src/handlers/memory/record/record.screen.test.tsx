@@ -7,7 +7,7 @@ import type {
 import type { MemorySummary } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   waitFor,
   waitForText,

@@ -6,7 +6,13 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import { QueryClient } from "@tanstack/react-query";
 import stringWidth from "string-width";
-import { cleanupScreens, renderScreen, TestCoreClient, waitFor, waitForText } from "../testing";
+import {
+  cleanupScreens,
+  renderImperativeScreen as renderScreen,
+  TestCoreClient,
+  waitFor,
+  waitForText,
+} from "../testing";
 
 afterEach(cleanupScreens);
 

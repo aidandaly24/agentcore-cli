@@ -1,7 +1,7 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import type { HarnessEndpoint } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   waitForText,
   waitFor,
   cleanupScreens,
@@ -136,7 +136,9 @@ describe("harness endpoint list screen", () => {
   test("retries a failed endpoint detail without losing its selectors", async () => {
     const core = new TestCoreClient();
     core.harness.setError(new Error("endpoint unavailable"));
-    const r = renderScreen("/agentcore/harness/endpoint/get/MyHarness-abc123/prod", { core });
+    const r = renderScreen("/agentcore/harness/endpoint/get/MyHarness-abc123/prod", {
+      core,
+    });
     await waitForText(r.lastFrame, "endpoint unavailable");
     expect(r.lastFrame()).toContain("[r] retry");
 

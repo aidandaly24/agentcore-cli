@@ -8,7 +8,7 @@ import type {
 import type { RuntimeInvokeRequest } from "../types";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   waitFor,
   waitForText,
@@ -338,7 +338,9 @@ describe("Runtime invoke JSON console", () => {
     core.runtime.setGetResponse({
       agentRuntimeArn: `arn:aws:bedrock-agentcore:${REGION}:123456789012:runtime/${runtimeId}`,
     } as GetAgentRuntimeResponse);
-    const screen = renderScreen(`/agentcore/runtime/invoke/${runtimeId}/${QUALIFIER}`, { core });
+    const screen = renderScreen(`/agentcore/runtime/invoke/${runtimeId}/${QUALIFIER}`, {
+      core,
+    });
 
     await waitForText(screen.lastFrame, "Ready");
     await screen.resize(80, 24);

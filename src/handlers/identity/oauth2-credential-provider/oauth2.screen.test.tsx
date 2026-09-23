@@ -6,7 +6,7 @@ import type {
 import { QueryClient } from "@tanstack/react-query";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   tick,
   waitFor,
@@ -79,7 +79,9 @@ describe("OAuth2 credential provider picker", () => {
         lastUpdatedTime: new Date("2026-07-21T02:03:04.000Z"),
       }),
     ]);
-    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/list", { core });
+    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/list", {
+      core,
+    });
 
     await waitForText(screen.lastFrame, "visible-provider");
     const frame = screen.lastFrame()!;
@@ -91,7 +93,10 @@ describe("OAuth2 credential provider picker", () => {
 
   test("calls listOauth2CredentialProviders with exact Core options", async () => {
     const core = coreWithProviders([providerItem()]);
-    renderScreen("/agentcore/identity/oauth2-credential-provider/list", { core, endpointUrl });
+    renderScreen("/agentcore/identity/oauth2-credential-provider/list", {
+      core,
+      endpointUrl,
+    });
 
     await waitFor(() =>
       core.identity.calls.some((call) => call.method === "listOauth2CredentialProviders"),
@@ -108,7 +113,9 @@ describe("OAuth2 credential provider picker", () => {
 
   test("caps maxResults at the service limit of 20 on a tall terminal", async () => {
     const core = coreWithProviders([providerItem()]);
-    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/list", { core });
+    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/list", {
+      core,
+    });
     // Terminal taller than the 20-row service cap: page size must still clamp.
     await screen.resize(120, 60);
 
@@ -132,7 +139,9 @@ describe("OAuth2 credential provider picker", () => {
       nextToken: "page-2",
     });
     core.identity.setListOauth2Response({ credentialProviders: [] }, "page-2");
-    const paged = renderScreen("/agentcore/identity/oauth2-credential-provider/list", { core });
+    const paged = renderScreen("/agentcore/identity/oauth2-credential-provider/list", {
+      core,
+    });
 
     await waitForText(paged.lastFrame, "page 1 · more →");
     await paged.write("l");
@@ -142,7 +151,9 @@ describe("OAuth2 credential provider picker", () => {
 
   test("bare get redirects to the picker", async () => {
     const core = coreWithProviders([providerItem({ name: "redirected" })]);
-    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/get", { core });
+    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/get", {
+      core,
+    });
 
     await waitForText(screen.lastFrame, "redirected");
     expect(core.identity.calls[0]?.method).toBe("listOauth2CredentialProviders");
@@ -152,7 +163,9 @@ describe("OAuth2 credential provider picker", () => {
     const name = "oauth2 blue";
     const core = coreWithProviders([providerItem({ name })]);
     core.identity.setGetOauth2Response(getResponse({ name }));
-    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/list", { core });
+    const screen = renderScreen("/agentcore/identity/oauth2-credential-provider/list", {
+      core,
+    });
 
     await waitForText(screen.lastFrame, name);
     await screen.press("return");

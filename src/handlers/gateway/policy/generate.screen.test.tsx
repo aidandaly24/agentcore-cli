@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { GatewaySummary, GetGatewayResponse } from "@aws-sdk/client-bedrock-agentcore-control";
-import { cleanupScreens, renderScreen, TestCoreClient, waitForText } from "../../../testing";
+import {
+  cleanupScreens,
+  renderImperativeScreen as renderScreen,
+  TestCoreClient,
+  waitForText,
+} from "../../../testing";
 
 afterEach(cleanupScreens);
 
@@ -86,7 +91,9 @@ describe("gateway policy generate screen", () => {
         { statement: PERMIT, findings: [] },
       ],
     };
-    const screen = renderScreen(`/agentcore/gateway/policy/generate/${GATEWAY_ID}`, { core });
+    const screen = renderScreen(`/agentcore/gateway/policy/generate/${GATEWAY_ID}`, {
+      core,
+    });
     await waitForText(screen.lastFrame, PLACEHOLDER);
 
     await screen.write("forbid IAM callers");
@@ -113,7 +120,9 @@ describe("gateway policy generate screen", () => {
   test("aborts the run and returns to the picker on esc while generating", async () => {
     const core = coreWith(ENGINE_ARN);
     core.policy.hang = true;
-    const screen = renderScreen(`/agentcore/gateway/policy/generate/${GATEWAY_ID}`, { core });
+    const screen = renderScreen(`/agentcore/gateway/policy/generate/${GATEWAY_ID}`, {
+      core,
+    });
     await waitForText(screen.lastFrame, PLACEHOLDER);
 
     await screen.write("x");
@@ -128,7 +137,9 @@ describe("gateway policy generate screen", () => {
   test("shows the error and returns to the form on esc", async () => {
     const core = coreWith(ENGINE_ARN);
     core.policy.error = new Error("policy generation 'gen-1' failed: bad prompt");
-    const screen = renderScreen(`/agentcore/gateway/policy/generate/${GATEWAY_ID}`, { core });
+    const screen = renderScreen(`/agentcore/gateway/policy/generate/${GATEWAY_ID}`, {
+      core,
+    });
     await waitForText(screen.lastFrame, PLACEHOLDER);
 
     await screen.write("x");

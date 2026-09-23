@@ -6,7 +6,7 @@ import type {
 import { QueryClient } from "@tanstack/react-query";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   tick,
   waitFor,
@@ -76,7 +76,9 @@ describe("API key credential provider picker", () => {
         lastUpdatedTime: new Date("2026-07-21T02:03:04.000Z"),
       }),
     ]);
-    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/list", { core });
+    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/list", {
+      core,
+    });
 
     await waitForText(screen.lastFrame, "visible-provider");
     const frame = screen.lastFrame()!;
@@ -88,7 +90,10 @@ describe("API key credential provider picker", () => {
 
   test("calls listApiKeyCredentialProviders with exact Core options", async () => {
     const core = coreWithProviders([providerItem()]);
-    renderScreen("/agentcore/identity/api-key-credential-provider/list", { core, endpointUrl });
+    renderScreen("/agentcore/identity/api-key-credential-provider/list", {
+      core,
+      endpointUrl,
+    });
 
     await waitFor(() =>
       core.identity.calls.some((call) => call.method === "listApiKeyCredentialProviders"),
@@ -105,7 +110,9 @@ describe("API key credential provider picker", () => {
 
   test("caps maxResults at the service limit of 20 on a tall terminal", async () => {
     const core = coreWithProviders([providerItem()]);
-    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/list", { core });
+    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/list", {
+      core,
+    });
     // Terminal taller than the 20-row service cap: page size must still clamp.
     await screen.resize(120, 60);
 
@@ -129,7 +136,9 @@ describe("API key credential provider picker", () => {
       nextToken: "page-2",
     });
     core.identity.setListApiKeyResponse({ credentialProviders: [] }, "page-2");
-    const paged = renderScreen("/agentcore/identity/api-key-credential-provider/list", { core });
+    const paged = renderScreen("/agentcore/identity/api-key-credential-provider/list", {
+      core,
+    });
 
     await waitForText(paged.lastFrame, "page 1 · more →");
     await paged.write("l");
@@ -141,7 +150,9 @@ describe("API key credential provider picker", () => {
 
   test("bare get redirects to the picker", async () => {
     const core = coreWithProviders([providerItem({ name: "redirected" })]);
-    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/get", { core });
+    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/get", {
+      core,
+    });
 
     await waitForText(screen.lastFrame, "redirected");
     expect(core.identity.calls[0]?.method).toBe("listApiKeyCredentialProviders");
@@ -151,7 +162,9 @@ describe("API key credential provider picker", () => {
     const name = "api key blue";
     const core = coreWithProviders([providerItem({ name })]);
     core.identity.setGetApiKeyResponse(getResponse({ name }));
-    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/list", { core });
+    const screen = renderScreen("/agentcore/identity/api-key-credential-provider/list", {
+      core,
+    });
 
     await waitForText(screen.lastFrame, name);
     await screen.press("return");

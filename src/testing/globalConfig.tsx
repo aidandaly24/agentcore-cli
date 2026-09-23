@@ -4,6 +4,11 @@ import {
   type GlobalConfigAccessor,
 } from "../globalConfig";
 
+export const IMPERATIVE_GLOBAL_CONFIG: GlobalConfig = {
+  ...DEFAULT_GLOBAL_CONFIG,
+  "imperative-commands": true,
+};
+
 type TestGlobalConfigAccessorOptions = {
   initialConfigData?: GlobalConfig;
 };

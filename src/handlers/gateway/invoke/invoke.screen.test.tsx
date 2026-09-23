@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import type { GatewaySummary, GetGatewayResponse } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
   cleanupScreens,
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   TestCoreClient,
   waitFor,
   waitForText,

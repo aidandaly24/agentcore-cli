@@ -3,15 +3,15 @@ import {
   cleanupScreens,
   compiledRootCommand,
   menuEntries,
-  renderScreen,
+  renderImperativeScreen,
+  IMPERATIVE_GLOBAL_CONFIG,
   waitForText,
 } from "../testing";
 import type { ProjectCreateResource } from "./ProjectResourceCreateScreen";
-import { DEFAULT_GLOBAL_CONFIG } from "../globalConfig";
 
 afterEach(cleanupScreens);
 
-const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
+const MUTATION_CONFIG = { ...IMPERATIVE_GLOBAL_CONFIG, "imperative-mutation-commands": true };
 
 const RESOURCES = [
   {
@@ -43,7 +43,7 @@ describe("project resource creation guidance", () => {
   test.each(RESOURCES)(
     "$resource lists create in its TUI menu and opens project instructions",
     async ({ resource, label, parentDescription, addCommand }) => {
-      const r = renderScreen(`/agentcore/${resource}`);
+      const r = renderImperativeScreen(`/agentcore/${resource}`);
 
       await waitForText(r.lastFrame, "❯ create");
       expect(menuEntries(r.lastFrame()!).screens[0]).toBe("create");
@@ -65,7 +65,7 @@ describe("project resource creation guidance", () => {
   );
 
   test("the guidance does not add unsupported imperative CLI commands", () => {
-    const root = compiledRootCommand();
+    const root = compiledRootCommand(undefined, IMPERATIVE_GLOBAL_CONFIG);
     for (const resource of RESOURCES) {
       const command = root.commands.find((candidate) => candidate.name() === resource.resource);
       expect(command?.commands.some((candidate) => candidate.name() === "create")).toBe(false);
@@ -75,7 +75,7 @@ describe("project resource creation guidance", () => {
   test.each(RESOURCES.filter(({ resource }) => resource !== "gateway"))(
     "$resource keeps project guidance when Gateway mutations are enabled",
     async ({ resource, label, addCommand }) => {
-      const r = renderScreen(`/agentcore/${resource}`, { globalConfig: MUTATION_CONFIG });
+      const r = renderImperativeScreen(`/agentcore/${resource}`, { globalConfig: MUTATION_CONFIG });
       await waitForText(r.lastFrame, "type to choose a command");
       const entries = menuEntries(r.lastFrame()!);
       expect(entries.screens[0]).toBe("create");

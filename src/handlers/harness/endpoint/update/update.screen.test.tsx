@@ -4,7 +4,7 @@ import type {
   HarnessVersionSummary,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   waitForText,
   waitFor,
   cleanupScreens,
@@ -85,7 +85,9 @@ describe("harness endpoint update wizard", () => {
 
   test("repointing at a new version submits only targetVersion", async () => {
     const core = coreForUpdate();
-    const r = renderScreen("/agentcore/harness/endpoint/update/MyHarness-abc123/prod", { core });
+    const r = renderScreen("/agentcore/harness/endpoint/update/MyHarness-abc123/prod", {
+      core,
+    });
 
     // The endpoint's current target (version 1) is preselected; no "latest"
     // option exists in update mode.
@@ -111,7 +113,9 @@ describe("harness endpoint update wizard", () => {
 
   test("keeping the version unchanged submits only the endpoint identity", async () => {
     const core = coreForUpdate();
-    const r = renderScreen("/agentcore/harness/endpoint/update/MyHarness-abc123/prod", { core });
+    const r = renderScreen("/agentcore/harness/endpoint/update/MyHarness-abc123/prod", {
+      core,
+    });
 
     await waitForText(r.lastFrame, "● version 1");
     await r.press("return"); // keep version

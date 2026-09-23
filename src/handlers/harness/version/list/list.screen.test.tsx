@@ -1,7 +1,7 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import type { HarnessVersionSummary } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
-  renderScreen,
+  renderImperativeScreen as renderScreen,
   waitForText,
   waitFor,
   cleanupScreens,
@@ -133,7 +133,9 @@ describe("harness version list screen", () => {
       nextToken: "v2",
     });
     core.harness.setListVersionsResponse({ harnessVersions: [] }, "v2");
-    const laterPage = renderScreen("/agentcore/harness/version/list/MyHarness-abc123", { core });
+    const laterPage = renderScreen("/agentcore/harness/version/list/MyHarness-abc123", {
+      core,
+    });
 
     await waitForText(laterPage.lastFrame, "page 1 · more →");
     await laterPage.write("l");
@@ -170,7 +172,9 @@ describe("harness version list screen", () => {
   test("retries a failed version detail without losing its selectors", async () => {
     const core = new TestCoreClient();
     core.harness.setError(new Error("version unavailable"));
-    const r = renderScreen("/agentcore/harness/version/get/MyHarness-abc123/42", { core });
+    const r = renderScreen("/agentcore/harness/version/get/MyHarness-abc123/42", {
+      core,
+    });
     await waitForText(r.lastFrame, "version unavailable");
     expect(r.lastFrame()).toContain("[r] retry");
 
