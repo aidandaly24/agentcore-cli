@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { CoreClient } from "../../core";
 import { createRootHandler } from "../index";
 import {
+  IMPERATIVE_GLOBAL_CONFIG,
   createSilentLogger,
   expectError,
   fixtureFactories,
@@ -55,9 +56,12 @@ async function run(args: string[]): Promise<string> {
   const core = createFixtureCore();
   const io = testIO();
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
   return io.stdout();

@@ -7,7 +7,12 @@ import {
 import type { BedrockAgentCoreControlClient } from "@aws-sdk/client-bedrock-agentcore-control";
 import { CoreClient } from "../../../../core";
 import { createRootHandler } from "../../../index";
-import { createSilentLogger, TestGlobalConfigAccessor, testIO } from "../../../../testing";
+import {
+  IMPERATIVE_GLOBAL_CONFIG,
+  createSilentLogger,
+  TestGlobalConfigAccessor,
+  testIO,
+} from "../../../../testing";
 
 const ARN = "arn:aws:bedrock-agentcore:us-west-2:123456789012:payment-manager/manager";
 const scope = ["--manager-id", "manager", "--user-id", "user", "--instrument-id", "instrument"];
@@ -42,9 +47,12 @@ function setup(response: object = balance) {
   });
   const io = testIO();
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
   return {
     send,

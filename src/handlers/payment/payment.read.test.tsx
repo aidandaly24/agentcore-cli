@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { CoreClient } from "../../core";
 import { compile, isTuiCommandSupported, ValueContext } from "../../router";
 import {
+  IMPERATIVE_GLOBAL_CONFIG,
   createSilentLogger,
   fixtureFactories,
   matchGolden,
@@ -29,9 +30,12 @@ function setup(resource = "manager", overrides: Partial<ReturnType<typeof fixtur
   });
   const io = testIO();
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
   return {
     core,

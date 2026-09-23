@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { CoreClient } from "../../core";
 import {
+  IMPERATIVE_GLOBAL_CONFIG,
   createSilentLogger,
   fixtureFactories,
   matchGolden,
@@ -47,9 +48,12 @@ function createFixtureCore(): CoreClient {
 async function run(args: string[], region = REGION): Promise<string> {
   const io = testIO();
   const root = createRootHandler(createFixtureCore(), {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
   await root.route(["node", "agentcore", ...args, "--region", region]);
   return io.stdout();

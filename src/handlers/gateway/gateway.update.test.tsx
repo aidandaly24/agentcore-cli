@@ -34,7 +34,11 @@ import { createRootHandler } from "../index";
 import { InputValidationError } from "../../errors";
 import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
 
-const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
+const MUTATION_CONFIG = {
+  ...DEFAULT_GLOBAL_CONFIG,
+  "imperative-mutation-commands": true,
+  "imperative-commands": true,
+};
 
 async function runWithTestCore(args: string[]): Promise<TestCoreClient> {
   const core = new TestCoreClient();

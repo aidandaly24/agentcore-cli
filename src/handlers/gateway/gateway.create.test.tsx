@@ -29,7 +29,11 @@ import { createRootHandler } from "../index";
 import { InputValidationError } from "../../errors";
 import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
 
-const MUTATION_CONFIG = { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true };
+const MUTATION_CONFIG = {
+  ...DEFAULT_GLOBAL_CONFIG,
+  "imperative-mutation-commands": true,
+  "imperative-commands": true,
+};
 const REGION = "us-east-1";
 const GATEWAY_NAME = "agentcore-cli-gateway-create-fixture";
 const HTTP_TARGET_NAME = "http-fixture";

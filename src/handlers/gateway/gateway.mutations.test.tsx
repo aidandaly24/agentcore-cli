@@ -3,6 +3,7 @@ import { DEFAULT_GLOBAL_CONFIG } from "../../globalConfig";
 import { compile, ValueContext } from "../../router";
 import {
   createSilentLogger,
+  IMPERATIVE_GLOBAL_CONFIG,
   TestCoreClient,
   TestGlobalConfigAccessor,
   testIO,
@@ -18,8 +19,12 @@ function setup(enabled?: boolean) {
   const io = testIO();
   const globalConfig =
     enabled === undefined
-      ? undefined
-      : { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": enabled };
+      ? IMPERATIVE_GLOBAL_CONFIG
+      : {
+          ...DEFAULT_GLOBAL_CONFIG,
+          "imperative-mutation-commands": enabled,
+          "imperative-commands": true,
+        };
   const root = createRootHandler(core, {
     io: io.io,
     logger: createSilentLogger(),
@@ -37,6 +42,7 @@ describe("Gateway imperative mutation availability", () => {
       const gateway = createGatewayHandler(new TestCoreClient(), testIO().io, {
         ...DEFAULT_GLOBAL_CONFIG,
         "imperative-mutation-commands": enabled,
+        "imperative-commands": true,
       });
       const names = gateway.children().map((child) => child.name());
       for (const mutation of MUTATIONS) {
@@ -56,7 +62,11 @@ describe("Gateway imperative mutation availability", () => {
       io: testIO().io,
       logger: createSilentLogger(),
       globalConfigAccessor,
-      globalConfig: { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true },
+      globalConfig: {
+        ...DEFAULT_GLOBAL_CONFIG,
+        "imperative-mutation-commands": true,
+        "imperative-commands": true,
+      },
     });
     const gateway = root.children().find((child) => child.name() === "gateway")!;
     expect(gateway.children().map((child) => child.name())).toContain("create");

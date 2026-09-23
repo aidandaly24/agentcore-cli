@@ -3,7 +3,12 @@ import { mkdtempSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { createSilentLogger, TestCoreClient, testIO } from "../../../testing";
+import {
+  IMPERATIVE_GLOBAL_CONFIG,
+  createSilentLogger,
+  TestCoreClient,
+  testIO,
+} from "../../../testing";
 import { TestGlobalConfigAccessor } from "../../../testing/globalConfig";
 import { createRootHandler } from "../../index";
 import type { GetTraceQuery, ListTracesQuery } from "../../../core/observability/index";
@@ -18,9 +23,12 @@ function testTracesCommand() {
   const core = new TestCoreClient();
   const io = testIO();
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
 
   return {

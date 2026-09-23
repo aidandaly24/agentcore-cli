@@ -9,6 +9,7 @@ import type { AppIO } from "../../../io";
 import { ExitCode, InputValidationError, UserCancellationError } from "../../../errors";
 import { runWithExitCode } from "../../../runnable";
 import {
+  IMPERATIVE_GLOBAL_CONFIG,
   createSilentLogger,
   expectError,
   TestCoreClient,
@@ -57,9 +58,12 @@ function captureIO(input?: Uint8Array) {
 
 async function runCommand(core: TestCoreClient, io: AppIO, args: string[]): Promise<void> {
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
 }
@@ -577,9 +581,12 @@ describe("gateway invoke", () => {
     const core = configuredCore();
     const output = captureIO();
     const root = createRootHandler(core, {
+      globalConfig: IMPERATIVE_GLOBAL_CONFIG,
       io: output.io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
+      globalConfigAccessor: new TestGlobalConfigAccessor({
+        initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+      }),
     });
     const gateway = root.children().find((child) => child.name() === "gateway");
     const invoke = gateway?.children().find((child) => child.name() === "invoke");

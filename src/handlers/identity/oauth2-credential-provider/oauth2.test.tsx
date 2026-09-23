@@ -6,6 +6,7 @@ import type {
   UpdateOauth2CredentialProviderResponse,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
+  IMPERATIVE_GLOBAL_CONFIG,
   createSilentLogger,
   expectError,
   TestCoreClient,
@@ -73,9 +74,12 @@ async function run(
 ): Promise<{ core: TestCoreClient; stdout: string }> {
   const io = testIO({ stdin });
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
 
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
@@ -85,9 +89,12 @@ async function run(
 describe("oauth2-credential-provider command hierarchy", () => {
   test("registers the oauth2-credential-provider command hierarchy", () => {
     const root = createRootHandler(new TestCoreClient(), {
+      globalConfig: IMPERATIVE_GLOBAL_CONFIG,
       io: testIO().io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
+      globalConfigAccessor: new TestGlobalConfigAccessor({
+        initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+      }),
     });
     const identity = root.children().find((child) => child.name() === "identity");
     const oauth2 = identity

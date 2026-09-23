@@ -17,6 +17,7 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore";
 import { CoreClient } from "../../core";
 import {
+  IMPERATIVE_GLOBAL_CONFIG,
   createSilentLogger,
   expectError,
   fixtureFactories,
@@ -96,9 +97,12 @@ function createFixtureCore(): CoreClient {
 function testMemoryCommand(core = new TestCoreClient()) {
   const io = testIO();
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
 
   return {
@@ -111,9 +115,12 @@ function testMemoryCommand(core = new TestCoreClient()) {
 async function run(args: string[]): Promise<string> {
   const io = testIO();
   const root = createRootHandler(createFixtureCore(), {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
 
   await root.route(["node", "agentcore", ...args, "--region", REGION]);
@@ -123,9 +130,12 @@ async function run(args: string[]): Promise<string> {
 describe("memory command hierarchy", () => {
   test("registers the Memory read-only command hierarchy", () => {
     const root = createRootHandler(createFixtureCore(), {
+      globalConfig: IMPERATIVE_GLOBAL_CONFIG,
       io: testIO().io,
       logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
+      globalConfigAccessor: new TestGlobalConfigAccessor({
+        initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+      }),
     });
     const memory = root.children().find((child) => child.name() === "memory");
     const event = memory?.children().find((child) => child.name() === "event");

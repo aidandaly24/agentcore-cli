@@ -2,7 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSilentLogger, expectError, TestCoreClient, testIO } from "../../../testing";
+import {
+  IMPERATIVE_GLOBAL_CONFIG,
+  createSilentLogger,
+  expectError,
+  TestCoreClient,
+  testIO,
+} from "../../../testing";
 import { TestGlobalConfigAccessor } from "../../../testing/globalConfig";
 import { createRootHandler } from "../../index";
 import type { LogSource } from "../../../core/observability/index";
@@ -16,9 +22,12 @@ function testLogsCommand() {
   const core = new TestCoreClient();
   const io = testIO();
   const root = createRootHandler(core, {
+    globalConfig: IMPERATIVE_GLOBAL_CONFIG,
     io: io.io,
     logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor(),
+    globalConfigAccessor: new TestGlobalConfigAccessor({
+      initialConfigData: IMPERATIVE_GLOBAL_CONFIG,
+    }),
   });
 
   return {
