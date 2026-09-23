@@ -56,6 +56,36 @@ describe("config", () => {
     expect(JSON.parse(output)).toBe(true);
   });
 
+  test("imperative command families default off for existing and missing config", async () => {
+    expect(JSON.parse(await run(["imperative-commands"]))).toBe(false);
+    await rm(configPath);
+    expect(JSON.parse(await run(["imperative-commands"]))).toBe(false);
+  });
+
+  test("persists the root gate independently of the existing Gateway gate", async () => {
+    await run(["imperative-mutation-commands", "true"]);
+    expect(JSON.parse(await run(["imperative-commands"]))).toBe(false);
+    for (const enabled of [true, false]) {
+      expect(JSON.parse(await run(["imperative-commands", String(enabled)]))).toBe(enabled);
+      expect(JSON.parse(await run(["imperative-commands"]))).toBe(enabled);
+      expect(JSON.parse(await run(["imperative-mutation-commands"]))).toBe(true);
+    }
+  });
+
+  test("rejects invalid root gate values without changing config", async () => {
+    await run(["imperative-commands", "true"]);
+    await expect(run(["imperative-commands", "invalid"])).rejects.toThrow(InputValidationError);
+    expect(JSON.parse(await run(["imperative-commands"]))).toBe(true);
+  });
+
+  test("validates the root gate when reading config from disk", async () => {
+    await writeFile(
+      configPath,
+      JSON.stringify({ ...validConfigOverrides, "imperative-commands": "true" }),
+    );
+    await expect(run([])).rejects.toThrow("Failed to deserialize");
+  });
+
   test("imperative mutations default to false for existing and missing config files", async () => {
     expect(JSON.parse(await run(["imperative-mutation-commands"]))).toBe(false);
     await rm(configPath);
