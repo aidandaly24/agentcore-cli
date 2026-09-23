@@ -195,7 +195,7 @@ command — branch or leaf — is a `Handler`:
   ("global") flags and middleware that apply to everything beneath them. A
   branch can also register a **default handler** (`router.default(...)`) that
   runs when the branch is invoked with no subcommand (e.g. bare `agentcore` or
-  `agentcore harness` — this is how the TUI launches).
+  `agentcore project` — this is how the TUI launches).
 - **Leaf nodes** (built with `createHandler(...)`) do the work. They declare
   their own flags/arguments (validated and coerced via zod schemas) and receive
   a typed object in `handle(ctx, flags, args)`.
