@@ -5,7 +5,7 @@ import {
   cleanupScreens,
   compiledRootCommand,
   IMPERATIVE_GLOBAL_CONFIG,
-  renderImperativeScreen as renderScreen,
+  renderImperativeScreen,
   waitFor,
 } from "../testing";
 
@@ -62,7 +62,7 @@ describe("every command with a screen", () => {
   test.each(SCREENS.map(([path, command]) => [path.join(" "), path, command] as const))(
     "%s opens, and esc returns to a menu above it",
     async (_label, path, command) => {
-      const r = renderScreen("/" + path.join("/"));
+      const r = renderImperativeScreen("/" + path.join("/"));
       // Wide and tall enough that the header never wraps.
       await r.resize(220, 200);
       const menus = ancestorMenuHeaders(path, command);
