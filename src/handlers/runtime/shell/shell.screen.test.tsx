@@ -81,6 +81,30 @@ async function interruptUntilExit(rendering: Promise<void>, stdin: TtyInput): Pr
 }
 
 describe("RuntimeShellScreen", () => {
+  test("renderTuiAt blocks a direct shell before opening a session when disabled", async () => {
+    const value = core();
+    const { streams, stdin } = ttyTestIO();
+    const ctx = ValueContext.EmptyContext()
+      .withValue(CommandKey, compiledRootCommand(value))
+      .withValue(RegionKey, "us-east-1")
+      .withValue(EndpointKey, undefined)
+      .withValue(JsonKey, false)
+      .withValue(DebugKey, false);
+    const rendering = renderTuiAt(
+      "/agentcore/runtime/shell/checkout-AbCdEf1234/prod",
+      ctx,
+      value,
+      streams.io,
+    );
+    try {
+      await waitFor(() => streams.stdout().includes("the platform for production AI agents"));
+      expect(value.runtime.calls).toEqual([]);
+      expect(streams.stderr()).not.toContain("Connected");
+    } finally {
+      await interruptUntilExit(rendering, stdin);
+    }
+  });
+
   test("a direct Runtime route skips the Runtime picker", async () => {
     const screen = renderImperativeScreen("/agentcore/runtime/shell/checkout-AbCdEf1234", {
       core: core(),
