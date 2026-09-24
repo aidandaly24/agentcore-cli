@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
 import { join } from "node:path";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createRootHandler } from "../index";
 import { createSilentLogger, TestCoreClient, testIO } from "../../testing";
@@ -109,6 +109,18 @@ describe("config", () => {
       InputValidationError,
     );
     expect(JSON.parse(await run(["imperative-commands"]))).toBe(false);
+  });
+
+  test("drops the retired flag when saving another setting", async () => {
+    await writeFile(
+      configPath,
+      JSON.stringify({ ...validConfigOverrides, "imperative-mutation-commands": true }),
+    );
+    await run(["imperative-commands", "true"]);
+    const saved = JSON.parse(await readFile(configPath, "utf8"));
+    expect(saved).not.toHaveProperty("imperative-mutation-commands");
+    expect(saved["imperative-commands"]).toBe(true);
+    expect(JSON.parse(await run(["telemetry.endpoint"]))).toBe("https://example.com");
   });
 
   test("prints a nested object when a branch key is passed", async () => {
