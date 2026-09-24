@@ -114,7 +114,7 @@ describe("disabled imperative routes", () => {
     const core = new GateTestCore();
     const screen = renderScreen("/agentcore/harness/create", {
       core,
-      globalConfig: { ...DEFAULT_GLOBAL_CONFIG, "imperative-mutation-commands": true },
+      globalConfig: { ...LEGACY_MUTATION_CONFIG, "imperative-commands": false },
     });
     await waitForText(screen.lastFrame, "the platform for production AI agents");
     expectNoCoreCalls(core);
