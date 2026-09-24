@@ -45,10 +45,10 @@ describe("Gateway mutation menus", () => {
     await screen.press("return");
     await waitForText(screen.lastFrame, "Create an AgentCore Gateway");
     const frame = screen.lastFrame()!;
-    expect(frame).toContain("agentcore project create");
+    expect(frame).toContain("agentcore create");
     expect(frame).toContain("cd <project-directory>");
-    expect(frame).toContain("agentcore project add gateway --name MyGateway");
-    expect(frame).toContain("agentcore project deploy");
+    expect(frame).toContain("agentcore add gateway --name MyGateway");
+    expect(frame).toContain("agentcore deploy");
     expect(frame).not.toContain("agentcore gateway create");
     expect(frame).not.toContain("this command runs from the command line");
     expect(screen.core.gateway.calls).toEqual([]);
@@ -69,7 +69,7 @@ describe("Gateway mutation menus", () => {
       screen.lastFrame,
       enabled ? "this command runs from the command line" : "Create an AgentCore Gateway",
     );
-    expect(screen.lastFrame()?.includes("agentcore project add gateway")).toBe(!enabled);
+    expect(screen.lastFrame()?.includes("agentcore add gateway")).toBe(!enabled);
     expect(screen.lastFrame()?.includes("--authorizer-type")).toBe(enabled);
     await screen.press("escape");
     await waitForText(screen.lastFrame, "manage AgentCore Gateways");
@@ -96,10 +96,10 @@ describe("Gateway mutation menus", () => {
     await waitForText(screen.lastFrame, "Create an AgentCore Gateway");
     await screen.resize(50, 12);
     await screen.write("\u001b[6~");
-    await waitForText(screen.lastFrame, "agentcore project deploy");
+    await waitForText(screen.lastFrame, "agentcore deploy");
     await screen.resize(100, 40);
     await waitForText(screen.lastFrame, "Create an AgentCore Gateway");
-    expect(screen.lastFrame()).toContain("agentcore project deploy");
+    expect(screen.lastFrame()).toContain("agentcore deploy");
     await screen.press("escape");
     await waitForText(screen.lastFrame, "manage AgentCore Gateways");
   });

@@ -43,7 +43,7 @@ function testBuildCommand(options: TestBuildOptions = {}) {
 
   return {
     io,
-    run: (args: string[] = []) => root.route(["node", "agentcore", "project", "build", ...args]),
+    run: (args: string[] = []) => root.route(["node", "agentcore", "build", ...args]),
   };
 }
 

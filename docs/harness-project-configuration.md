@@ -17,7 +17,7 @@
 
 ## Harness Project Files
 
-`project create` (without `--template`) and `project add harness` share the same
+`agentcore create` (without `--template`) and `agentcore add harness` share the same
 scaffolding flow. Each harness has `app/<name>/harness.yaml` and
 `app/<name>/system-prompt.md`:
 
@@ -50,7 +50,7 @@ memory:
   mode: managed
 ```
 
-Edit the file, then run `agentcore project deploy` from the project directory to
+Edit the file, then run `agentcore deploy` from the project directory to
 apply changes. A local edit does not update an already deployed harness.
 The examples below are separate alternatives or sections to add to your file.
 Replace a section when switching modes rather than keeping fields from both.
@@ -151,7 +151,7 @@ systemPrompt: |
 Path-shaped inline values ending in `.md` or `.txt` are rejected by the current
 schema. Use the conventional `system-prompt.md` file instead.
 
-`project add harness --system-prompt "Your instructions"` writes the supplied
+`agentcore add harness --system-prompt "Your instructions"` writes the supplied
 text to `system-prompt.md`, leaving `systemPrompt` out of the generated YAML.
 
 ## Memory
@@ -379,7 +379,7 @@ skills:
 
 For a private repository, store its access token in an AgentCore Identity API-key
 credential provider. The project deployment path resolves `auth.credentialName`
-from the [project credentials](../command.md#agentcore-project-add-credentials) declared in
+from the [project credentials](../command.md#agentcore-add-credentials) declared in
 `agentcore.json`:
 
 ```yaml
@@ -471,7 +471,7 @@ rather than being silently skipped.
 Exporting a Harness to a code-owned Runtime has additional limits: filesystem
 skills are rejected, and bundled AWS skills are omitted with an explanation in
 `EXPORT_NOTES.md`. S3 and Git sources are supported by the exporter. See
-[Export a Harness](../command.md#agentcore-project-export-harness).
+[Export a Harness](../command.md#agentcore-export-harness).
 
 See [Harness skills](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html)
 and the [Agent Skills format](https://agentskills.io/specification) for source
@@ -551,7 +551,7 @@ dockerfile: Dockerfile
 ```
 
 The path is relative to the directory containing `harness.yaml`. If supplied
-through `project add harness --dockerfile`, the CLI copies the file into the
+through `agentcore add harness --dockerfile`, the CLI copies the file into the
 harness directory as `Dockerfile`.
 
 Alternatively, reference a pre-built ECR image:

@@ -29,7 +29,7 @@ export const AgentCoreRegionSchema = z.enum([
 ]);
 
 /**
- * The target `project deploy` uses when --target is omitted. Only this target
+ * The target `agentcore deploy` uses when --target is omitted. Only this target
  * is ever synthesized from the environment when aws-targets.json lacks it;
  * named targets must be defined explicitly so a typo cannot invent one.
  */

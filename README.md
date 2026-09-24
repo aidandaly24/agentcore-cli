@@ -15,7 +15,7 @@ It gives you two ways to work, from the same package:
 
 ```bash
 agentcore                      # launch the interactive TUI
-agentcore project status --json # scriptable, machine-readable output
+agentcore status --json         # scriptable, machine-readable output
 ```
 
 ## What problem does it solve?
@@ -29,45 +29,45 @@ those details so you can create, deploy, and invoke agents from your terminal.
 Create a managed Harness project, deploy it, and send a prompt:
 
 ```bash
-agentcore project create --name MyAssistant
+agentcore create --name MyAssistant
 cd MyAssistant
-agentcore project deploy
-agentcore project invoke harness --prompt "Hey, what can you do for me?"
+agentcore deploy
+agentcore invoke harness --prompt "Hey, what can you do for me?"
 ```
 
 To start with code you own instead, create a Runtime project from a template.
 Run this alternative from outside an existing project:
 
 ```bash
-agentcore project create --name MyAgent --template agent-python-strands
+agentcore create --name MyAgent --template agent-python-strands
 ```
 
 ## Command Surface
 
-`project` commands manage local project specifications and their deployments.
+Project commands manage local project specifications and their deployments.
 `eval` commands evaluate deployed resources without requiring a local project.
 
-| Command    | Purpose                                                                  |
-| ---------- | ------------------------------------------------------------------------ |
-| `project`  | Create, develop, build, deploy, invoke, and inspect a project            |
-| `eval`     | Evaluate agents, manage datasets and configurations, and run experiments |
-| `feedback` | Submit feedback                                                          |
-| `config`   | Read and write global CLI settings                                       |
-| `update`   | Check for and install CLI updates                                        |
+| Command                                                                                            | Purpose                                                                  |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `create`, `add`, `export`, `remove`, `dev`, `deploy`, `invoke`, `log`, `traces`, `status`, `build` | Create, develop, build, deploy, invoke, and inspect a project            |
+| `eval`                                                                                             | Evaluate agents, manage datasets and configurations, and run experiments |
+| `feedback`                                                                                         | Submit feedback                                                          |
+| `config`                                                                                           | Read and write global CLI settings                                       |
+| `update`                                                                                           | Check for and install CLI updates                                        |
 
 Use `--help` for subcommands and flags, or browse the [command reference](command.md):
 
 ```bash
 agentcore --help
-agentcore project --help
-agentcore project invoke --help
+agentcore add --help
+agentcore invoke --help
 ```
 
 Supported bare commands open their interactive flows in a terminal. Operation
 flags select headless behavior for most commands. Project invoke commands can
 use `--name` and `--target` to select a deployed agent for an interactive session.
-Run `agentcore project create` for guided setup. To create a default project
-without the wizard, run `agentcore project create --name MyAssistant`.
+Run `agentcore create` for guided setup. To create a default project without
+the wizard, run `agentcore create --name MyAssistant`.
 
 Global flags (declared at the root, available on every command):
 
@@ -123,14 +123,14 @@ export class AgentCoreStack extends Stack {
 
 For a Harness, use `this.application.harness("<name>")` instead.
 
-Run `agentcore project deploy` to apply your changes. The names passed to
+Run `agentcore deploy` to apply your changes. The names passed to
 `runtime()` or `harness()` must match the names in your project.
 
 If you use an existing execution role through `executionRoleArn`, CDK cannot
 change its permissions. You'll need to add the required permissions to that role
 yourself.
 
-Note that `agentcore project status` reports only the resources `agentcore.json`
+Note that `agentcore status` reports only the resources `agentcore.json`
 declares, not the ones you add in the stack.
 
 ## Documentation

@@ -40,8 +40,8 @@ describe("menus list command-line-only subcommands below a divider", () => {
 
     await waitForText(r.lastFrame, "command line only");
     expect(menuEntries(r.lastFrame()!)).toEqual({
-      screens: ["project", "eval"],
-      cliOnly: ["feedback", "config", "update"],
+      screens: ["create", "add", "remove", "deploy", "invoke", "status", "build", "eval"],
+      cliOnly: ["export", "dev", "log", "traces", "feedback", "config", "update"],
     });
     r.unmount();
   });
@@ -142,7 +142,7 @@ describe("paths without a screen of their own", () => {
 
     await waitForText(() => r.frames.join("\n"), "Usage:");
     const output = r.frames.join("\n");
-    expect(output).toContain("project");
+    expect(output).toMatch(/^\s+create\s+/m);
     expect(output).not.toContain("command line only");
     r.unmount();
   });

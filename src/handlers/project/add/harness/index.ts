@@ -6,7 +6,7 @@ import { parseJsonFlag, parseTags } from "../../../utils";
 import { InputValidationError } from "../../../../errors";
 import { HarnessSpecSchema } from "../../../../projectSchemas/harness";
 
-/** The model a harness runs on when none is configured; `project create`'s
+/** The model a harness runs on when none is configured; `agentcore create`'s
  * harness path shares it so the two entry points cannot drift. */
 export const DEFAULT_HARNESS_MODEL = {
   provider: "bedrock",

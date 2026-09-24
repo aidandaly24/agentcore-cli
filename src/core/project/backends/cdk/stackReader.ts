@@ -34,7 +34,7 @@ function cloudFormationDescriber(
  *
  * This is only the read: interpreting the stack's status and outputs (deployed
  * vs. in-progress vs. failed, which outputs to surface) is left to the caller —
- * e.g. `project status` — which owns that shape.
+ * e.g. `agentcore status` — which owns that shape.
  */
 export async function describeStack(
   region: string,

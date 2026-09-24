@@ -161,16 +161,7 @@ describe(
       const created = parseResult(
         ProjectCreatedSchema,
         await cli.run(
-          [
-            "project",
-            "create",
-            "--name",
-            projectName,
-            "--template",
-            "empty",
-            "--skip-git",
-            "--json",
-          ],
+          ["create", "--name", projectName, "--template", "empty", "--skip-git", "--json"],
           projectRoot,
         ),
       );
@@ -184,16 +175,7 @@ describe(
         const added = parseResult(
           OperationSchema,
           await cli.run(
-            [
-              "project",
-              "add",
-              "runtime",
-              "--name",
-              runtime.name,
-              "--template",
-              runtime.template,
-              "--json",
-            ],
+            ["add", "runtime", "--name", runtime.name, "--template", runtime.template, "--json"],
             projectDir,
           ),
         );
@@ -220,7 +202,7 @@ describe(
       };
 
       beforeAll(() => {
-        dev = cli.start(["project", "dev", "--mode", "headless"], projectDir);
+        dev = cli.start(["dev", "--mode", "headless"], projectDir);
         dev.stdout?.on("data", captureDevOutput);
         dev.stderr?.on("data", captureDevOutput);
         dev.stdout?.resume();
@@ -242,11 +224,11 @@ describe(
           // the server may take a bit to get ready, so we retry on a timeout.
           const response = await retry(async () => {
             if (!dev) {
-              throw new Error(`project dev did not start. \nstdout/stdout = ${pendingOutput}`);
+              throw new Error(`agentcore dev did not start. \nstdout/stdout = ${pendingOutput}`);
             }
             if (dev.exitCode !== null) {
               throw new Error(
-                `project dev exited with code ${dev.exitCode ?? "unknown"}.  \nstdout/stdout = ${pendingOutput}`,
+                `agentcore dev exited with code ${dev.exitCode ?? "unknown"}.  \nstdout/stdout = ${pendingOutput}`,
               );
             }
 
@@ -261,7 +243,6 @@ describe(
               LocalRuntimeInvokeResponseSchema,
               await cli.run(
                 [
-                  "project",
                   "invoke",
                   "runtime",
                   "--local",
@@ -292,7 +273,7 @@ describe(
     test("deploys all runtimes", { timeout: TIMEOUT_MS.PROJECT_DEPLOY }, async () => {
       const deployment = parseResult(
         DeployResponseSchema,
-        await cli.run(["project", "deploy", "--yes", "--json"], projectDir),
+        await cli.run(["deploy", "--yes", "--json"], projectDir),
       );
       expect(deployment.message).toContain("Deployed project");
     });
@@ -306,7 +287,6 @@ describe(
           RuntimeInvokeResponseSchema,
           await cli.run(
             [
-              "project",
               "invoke",
               "runtime",
               "--name",
@@ -335,10 +315,7 @@ describe(
       async (runtime) => {
         const removed = parseResult(
           OperationSchema,
-          await cli.run(
-            ["project", "remove", "runtime", "--name", runtime.name, "--json"],
-            projectDir,
-          ),
+          await cli.run(["remove", "runtime", "--name", runtime.name, "--json"], projectDir),
         );
         expect(removed.operation).toBe("remove");
       },
@@ -350,13 +327,10 @@ describe(
       async () => {
         parseResult(
           JsonObjectSchema,
-          await cli.run(["project", "remove", "all", "--yes", "--json"], projectDir),
+          await cli.run(["remove", "all", "--yes", "--json"], projectDir),
         );
 
-        parseResult(
-          JsonObjectSchema,
-          await cli.run(["project", "deploy", "--yes", "--json"], projectDir),
-        );
+        parseResult(JsonObjectSchema, await cli.run(["deploy", "--yes", "--json"], projectDir));
       },
     );
   },

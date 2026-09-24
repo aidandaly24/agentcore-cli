@@ -28,5 +28,5 @@ def handler(input: EvaluatorInput, context) -> EvaluatorOutput:
     return EvaluatorOutput(value=1.0, label="Pass", explanation="…")
 ```
 
-Then `agentcore project deploy` packages this directory into the evaluator
+Then `agentcore deploy` packages this directory into the evaluator
 Lambda and registers the evaluator.

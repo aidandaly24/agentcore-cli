@@ -13,7 +13,7 @@ session, and streams its response.
   between turns.
 - `model/load.py`: creates the Bedrock chat model with `init_chat_model`.
 - `pyproject.toml`: Python dependencies, managed with
-  [uv](https://docs.astral.sh/uv/). `agentcore project create` has already run
+  [uv](https://docs.astral.sh/uv/). `agentcore create` has already run
   `uv sync` for you (unless you passed `--skip-install`), so `.venv/` is ready.
 
 ## Develop
@@ -21,8 +21,8 @@ session, and streams its response.
 Run the agent locally from the project root:
 
 ```bash
-agentcore project dev
-agentcore project invoke runtime --local --name {{name}} --payload '{"prompt":"What is 2 plus 3?"}'
+agentcore dev
+agentcore invoke runtime --local --name {{name}} --payload '{"prompt":"What is 2 plus 3?"}'
 ```
 
 Environment variables for local development go in `agentcore/.env.local`
@@ -31,8 +31,8 @@ Environment variables for local development go in `agentcore/.env.local`
 ## Deploy
 
 ```bash
-agentcore project deploy
-agentcore project invoke runtime --payload '{"prompt":"Hello!"}'
+agentcore deploy
+agentcore invoke runtime --payload '{"prompt":"Hello!"}'
 ```
 
 Traces are collected automatically: AgentCore Runtime starts the agent under

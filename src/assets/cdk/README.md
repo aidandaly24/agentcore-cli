@@ -17,9 +17,9 @@ the conventional `system-prompt.md` file in the harness directory.
 You normally do not run this app directly:
 
 ```bash
-agentcore project build    # synthesizes the CloudFormation templates into agentcore/cdk/cdk.out
-agentcore project deploy   # synthesizes, then deploys the stack for the selected target
-agentcore project status   # reports the resources agentcore.json declares
+agentcore build    # synthesizes the CloudFormation templates into agentcore/cdk/cdk.out
+agentcore deploy   # synthesizes, then deploys the stack for the selected target
+agentcore status   # reports the resources agentcore.json declares
 ```
 
 `npm run build` compiles the app, and `npx cdk synth` / `npx cdk diff` work from this directory too.
@@ -43,10 +43,10 @@ checkout.addEnvironmentVariable('ORDERS_TABLE', orders.tableName);
 orders.grantReadData(this.application.harness('support')); // any AWS L2 grant works too
 ```
 
-Then run `agentcore project deploy` again. An unknown name fails at synth and lists the names that exist.
+Then run `agentcore deploy` again. An unknown name fails at synth and lists the names that exist.
 
 If a runtime or harness is configured with an `executionRoleArn`, CDK cannot modify that imported role: every grant
 emits a synth-time warning listing the permissions that were not attached, and the role must already carry them.
 
-`agentcore project status` reports only the resources `agentcore.json` declares; resources you add here are visible
+`agentcore status` reports only the resources `agentcore.json` declares; resources you add here are visible
 through CloudFormation (`aws cloudformation describe-stack-resources`).

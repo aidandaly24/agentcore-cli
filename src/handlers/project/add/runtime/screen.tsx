@@ -22,9 +22,9 @@ import {
 } from "../../shortcuts";
 import { toAddRuntimeInput, type RuntimeInput } from "./index";
 
-const BREADCRUMB = ["agentcore", "project", "add", "runtime"];
+const BREADCRUMB = ["agentcore", "add", "runtime"];
 const DESCRIPTION = "add a Runtime to the current project";
-const ADD_MENU = "/agentcore/project/add";
+const ADD_MENU = "/agentcore/add";
 
 const DEFAULT_TEMPLATE: RuntimeTemplateShortcutName = "agent-python-minimal";
 

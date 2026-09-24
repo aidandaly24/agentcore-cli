@@ -23,6 +23,6 @@ export function createProjectInvokeHandler(
           "a Runtime or harness invoke subcommand is required with --json",
         );
       }
-      return renderInvokeTui("/agentcore/project/invoke", ctx, core, io);
+      return renderInvokeTui("/agentcore/invoke", ctx, core, io);
     });
 }

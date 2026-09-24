@@ -76,7 +76,7 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
         config.io.stderr.write(`${line.text}\n`);
       }
       config.io.stderr.write(
-        "Next steps: review the generated code, then `agentcore project build` and `agentcore project deploy`\n",
+        "Next steps: review the generated code, then `agentcore build` and `agentcore deploy`\n",
       );
 
       if (jsonOutput) {

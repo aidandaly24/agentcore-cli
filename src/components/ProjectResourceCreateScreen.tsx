@@ -13,19 +13,19 @@ const RESOURCES: Record<
     label: "Runtime",
     pluralLabel: "Runtimes",
     description: "create an AgentCore Runtime in a project",
-    addCommand: "agentcore project add runtime",
+    addCommand: "agentcore add runtime",
   },
   memory: {
     label: "Memory",
     pluralLabel: "Memories",
     description: "create an AgentCore Memory in a project",
-    addCommand: "agentcore project add memory",
+    addCommand: "agentcore add memory",
   },
   gateway: {
     label: "Gateway",
     pluralLabel: "Gateways",
     description: "create an AgentCore Gateway in a project",
-    addCommand: "agentcore project add gateway --name MyGateway",
+    addCommand: "agentcore add gateway --name MyGateway",
   },
 };
 
@@ -57,10 +57,10 @@ export function ProjectResourceCreateScreen({ resource }: ProjectResourceCreateS
       <Text> </Text>
       <Text>Run these commands from the command line:</Text>
       <Text> </Text>
-      <Text color={darkTheme.colors.primary}>{"  agentcore project create"}</Text>
+      <Text color={darkTheme.colors.primary}>{"  agentcore create"}</Text>
       <Text color={darkTheme.colors.primary}>{"  cd <project-directory>"}</Text>
       <Text color={darkTheme.colors.primary}>{`  ${config.addCommand}`}</Text>
-      <Text color={darkTheme.colors.primary}>{"  agentcore project deploy"}</Text>
+      <Text color={darkTheme.colors.primary}>{"  agentcore deploy"}</Text>
     </CommandInfoScreen>
   );
 }

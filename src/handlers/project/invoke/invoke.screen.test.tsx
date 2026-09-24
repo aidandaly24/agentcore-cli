@@ -112,7 +112,7 @@ function core(
 
 describe("project invoke picker", () => {
   test("lists only resources present in the deployed target", async () => {
-    const screen = renderScreen("/agentcore/project/invoke", {
+    const screen = renderScreen("/agentcore/invoke", {
       core: core([
         {
           resourceType: "harness",
@@ -129,15 +129,15 @@ describe("project invoke picker", () => {
     expect(screen.lastFrame()).not.toContain("checkout");
   });
 
-  test("esc returns to the project command menu", async () => {
-    const screen = renderScreen("/agentcore/project/invoke", {
+  test("esc returns to the root command menu", async () => {
+    const screen = renderScreen("/agentcore/invoke", {
       core: core(),
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
     });
 
     await waitForText(screen.lastFrame, "checkout");
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    await waitForText(screen.lastFrame, "the platform for production AI agents");
     expect(screen.lastFrame()).toContain("invoke");
   });
 
@@ -148,7 +148,7 @@ describe("project invoke picker", () => {
       requested = target;
       return { resources: DEPLOYED_RESOURCES, target: STAGING };
     };
-    const screen = renderScreen("/agentcore/project/invoke", {
+    const screen = renderScreen("/agentcore/invoke", {
       core: value,
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
     });
@@ -174,7 +174,7 @@ describe("project invoke picker", () => {
     value.projectManager.resolveDeployedResources = async () => {
       throw new Error("No deployment targets are configured for project 'orders'.");
     };
-    const screen = renderScreen("/agentcore/project/invoke", {
+    const screen = renderScreen("/agentcore/invoke", {
       core: value,
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
     });
@@ -182,35 +182,35 @@ describe("project invoke picker", () => {
     await waitForText(screen.lastFrame, "No deployment targets are configured");
     expect(screen.lastFrame()).not.toContain("checkout");
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    await waitForText(screen.lastFrame, "the platform for production AI agents");
   });
 
   test("reports the CLI's own guidance outside a project", async () => {
     const { path: directory, cleanup } = await inTempDirectory();
     cleanups.push(cleanup);
-    const screen = renderScreen("/agentcore/project/invoke", { core: core() });
+    const screen = renderScreen("/agentcore/invoke", { core: core() });
 
     await waitForFlatText(screen.lastFrame, "No AgentCore project found");
     const frame = flatFrame(screen.lastFrame);
     expect(frame).toContain(directory);
-    expect(frame).toContain("agentcore project create");
+    expect(frame).toContain("agentcore create");
     expect(frame).not.toContain("Resolving project");
     // esc is a way off the error, not just ctrl+c.
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    await waitForText(screen.lastFrame, "the platform for production AI agents");
   });
 
-  test("resolves the enclosing project when opened from the project menu", async () => {
+  test("resolves the enclosing project when opened from the root menu", async () => {
     const value = core();
     value.projectManager.resolve = async () => project;
-    const screen = renderScreen("/agentcore/project/invoke", { core: value });
+    const screen = renderScreen("/agentcore/invoke", { core: value });
 
     await waitForText(screen.lastFrame, "checkout");
     expect(screen.lastFrame()).toContain("support");
   });
 
   test("lists project Runtime and Harness resources", async () => {
-    const screen = renderScreen("/agentcore/project/invoke", {
+    const screen = renderScreen("/agentcore/invoke", {
       core: core(),
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
     });
@@ -226,7 +226,7 @@ describe("project invoke picker", () => {
 
   test("opens the selected Harness chat in the same TUI", async () => {
     const value = core();
-    const screen = renderScreen("/agentcore/project/invoke", {
+    const screen = renderScreen("/agentcore/invoke", {
       core: value,
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
     });
@@ -245,7 +245,7 @@ describe("project invoke picker", () => {
 
   test("uses the existing Runtime endpoint picker before its JSON console", async () => {
     const value = core();
-    const screen = renderScreen("/agentcore/project/invoke", {
+    const screen = renderScreen("/agentcore/invoke", {
       core: value,
       withContext: (ctx) => ctx.withValue(ProjectKey, project),
     });

@@ -19,8 +19,23 @@ afterEach(() => {
 });
 
 const FAMILIES = ["harness", "identity", "runtime", "memory", "gateway", "payment"] as const;
-const PUBLIC_COMMANDS = ["project", "eval", "feedback", "config", "update"];
-const ALL_COMMANDS = ["project", ...FAMILIES, "eval", "feedback", "config", "update"];
+const PROJECT_COMMANDS = [
+  "create",
+  "add",
+  "export",
+  "remove",
+  "dev",
+  "deploy",
+  "invoke",
+  "log",
+  "traces",
+  "status",
+  "build",
+];
+const PROJECT_SCREENS = ["create", "add", "remove", "deploy", "invoke", "status", "build"];
+const PROJECT_CLI_ONLY = ["export", "dev", "log", "traces"];
+const PUBLIC_COMMANDS = [...PROJECT_COMMANDS, "eval", "feedback", "config", "update"];
+const ALL_COMMANDS = [...PROJECT_COMMANDS, ...FAMILIES, "eval", "feedback", "config", "update"];
 const STATES = [undefined, false, true].flatMap((enabled) =>
   [false, true].map((mutations) => ({ enabled, mutations })),
 );
@@ -91,10 +106,8 @@ describe("imperative command families", () => {
           }
         }
       }
-      const project = command.commands.find((child) => child.name() === "project")!;
-      expect(project.commands.map((child) => child.name())).toContain("invoke");
       expect(
-        project.commands
+        command.commands
           .find((child) => child.name() === "add")
           ?.commands.map((child) => child.name()),
       ).toEqual(expect.arrayContaining(["harness", "runtime", "memory", "gateway"]));
@@ -148,11 +161,11 @@ describe("imperative command menus", () => {
       await waitForText(screen.lastFrame, "type to choose a command");
       expect(menuEntries(screen.lastFrame()!)).toEqual({
         screens: enabled
-          ? ["project", "harness", "identity", "runtime", "memory", "gateway", "eval"]
-          : ["project", "eval"],
+          ? [...PROJECT_SCREENS, "harness", "identity", "runtime", "memory", "gateway", "eval"]
+          : [...PROJECT_SCREENS, "eval"],
         cliOnly: enabled
-          ? ["payment", "feedback", "config", "update"]
-          : ["feedback", "config", "update"],
+          ? [...PROJECT_CLI_ONLY, "payment", "feedback", "config", "update"]
+          : [...PROJECT_CLI_ONLY, "feedback", "config", "update"],
       });
       expectNoCoreCalls();
     },
@@ -168,8 +181,8 @@ describe("imperative command menus", () => {
     const screen = renderScreen(`/agentcore/${path}`, { core });
     await waitForText(screen.lastFrame, "the platform for production AI agents");
     expect(menuEntries(screen.lastFrame()!)).toEqual({
-      screens: ["project", "eval"],
-      cliOnly: ["feedback", "config", "update"],
+      screens: [...PROJECT_SCREENS, "eval"],
+      cliOnly: [...PROJECT_CLI_ONLY, "feedback", "config", "update"],
     });
     expectNoCoreCalls();
   });

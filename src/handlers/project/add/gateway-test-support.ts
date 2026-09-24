@@ -30,7 +30,7 @@ export function createGatewayProjectTestHarness(directoryPrefix: string) {
       globalConfigAccessor: new TestGlobalConfigAccessor(),
       logger: createSilentLogger(),
     });
-    await root.route(["node", "agentcore", "project", ...args]);
+    await root.route(["node", "agentcore", ...args]);
     return io;
   }
 

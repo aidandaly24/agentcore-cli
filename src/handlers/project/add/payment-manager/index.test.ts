@@ -94,7 +94,7 @@ describe("project add payment-manager", () => {
     expect(result.notes).toEqual([
       "Warning: auto-payment is ENABLED for manager 'payments'. Agents can automatically settle " +
         "402 responses without human approval. Use --no-auto-payment to require manual approval.",
-      "Warning: project add payment-manager does not modify runtime source code. " +
+      "Warning: agentcore add payment-manager does not modify runtime source code. " +
         "Configure the Payments SDK or plugin in supported runtimes before invoking payment-enabled agents.",
     ]);
     expect(io.stderr()).not.toContain("auto-payment is ENABLED");

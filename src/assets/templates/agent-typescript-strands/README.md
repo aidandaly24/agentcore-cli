@@ -37,14 +37,14 @@ The `sessionId` is not in the body. It comes from the
 
 If installation was successful, `node_modules/` is already populated with dependencies.
 
-`agentcore project dev` will start a local server using `tsx watch main.ts` for hot reload on 0.0.0.0:8080.
+`agentcore dev` will start a local server using `tsx watch main.ts` for hot reload on 0.0.0.0:8080.
 
 # Deployment
 
-After providing credentials, `agentcore project deploy` will deploy your project into Amazon Bedrock AgentCore.
+After providing credentials, `agentcore deploy` will deploy your project into Amazon Bedrock AgentCore.
 
 Invoke the deployed Runtime with its native payload:
 
 ```bash
-agentcore project invoke runtime --payload '{"prompt":"Hello!","actorId":"user-123"}'
+agentcore invoke runtime --payload '{"prompt":"Hello!","actorId":"user-123"}'
 ```

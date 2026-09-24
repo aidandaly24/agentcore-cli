@@ -12,7 +12,7 @@ import { darkTheme } from "./ui/_core.js";
 const theme = darkTheme;
 
 export interface CliOnlyScreenProps extends ScreenProps {
-  // path is the command's path, e.g. ["agentcore", "project", "dev"].
+  // path is the command's path, e.g. ["agentcore", "dev"].
   path: string[];
 }
 

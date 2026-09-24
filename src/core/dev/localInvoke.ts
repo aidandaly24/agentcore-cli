@@ -79,7 +79,7 @@ export async function invokeLocalRuntime(
     const detail = error instanceof Error ? error.message : String(error);
     throw new InvalidEnvironmentError(
       `Could not reach local dev server on port ${request.port} (${detail}). Start it with: ` +
-        `agentcore project dev --mode headless --agent <name> --port ${request.port}`,
+        `agentcore dev --mode headless --agent <name> --port ${request.port}`,
       { cause: error },
     );
   }

@@ -26,9 +26,9 @@ import {
   type MemoryInput,
 } from "./index";
 
-const BREADCRUMB = ["agentcore", "project", "add", "memory"];
+const BREADCRUMB = ["agentcore", "add", "memory"];
 const DESCRIPTION = "add a Memory to the current project";
-const ADD_MENU = "/agentcore/project/add";
+const ADD_MENU = "/agentcore/add";
 
 const STRATEGY_DESCRIPTIONS: Record<MemoryStrategyType, string> = {
   SEMANTIC: "durable facts about the actor",

@@ -15,8 +15,8 @@ defines an HTTP server that streams tokens from Amazon Bedrock via the Vercel AI
 
 If installation was successful, `node_modules/` is already populated with dependencies.
 
-`agentcore project dev` will start a local server using `tsx watch main.ts` for hot reload on 0.0.0.0:8080.
+`agentcore dev` will start a local server using `tsx watch main.ts` for hot reload on 0.0.0.0:8080.
 
 # Deployment
 
-After providing credentials, `agentcore project deploy` will deploy your project into Amazon Bedrock AgentCore.
+After providing credentials, `agentcore deploy` will deploy your project into Amazon Bedrock AgentCore.

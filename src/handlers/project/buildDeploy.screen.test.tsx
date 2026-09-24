@@ -100,13 +100,13 @@ describe("project build screen", () => {
     const { backend } = fakeBackend();
     const core = new TestCoreClient({ backends: { CDK: backend } });
     await inProject(core);
-    const r = renderScreen("/agentcore/project/build", { core });
+    const r = renderScreen("/agentcore/build", { core });
 
     // Both steps settle to ✓, as the inline TaskList leaves them on the
     // command line; the finished steps' output tails collapse.
     await waitForText(r.lastFrame, "✔ Built project 'orders'");
     const frame = r.lastFrame()!;
-    expect(frame).toContain("agentcore → project → build");
+    expect(frame).toContain("agentcore → build");
     // No frame — not even the first — advertised a question.
     expect(r.frames.some((painted) => painted.includes("(y/N)") || painted.includes("y/n"))).toBe(
       false,
@@ -114,11 +114,11 @@ describe("project build screen", () => {
     expect(frame).toContain("✓ Synthesizing CloudFormation templates");
     expect(frame).toContain("✓ Deploying stack");
     expect(frame).not.toContain("cdk synth");
-    expect(frame).toContain("agentcore project deploy");
+    expect(frame).toContain("agentcore deploy");
 
-    // Enter stays in the TUI: back to the project menu.
+    // Enter stays in the TUI: back to the root menu.
     await r.press("return");
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
     r.unmount();
   });
 
@@ -126,29 +126,29 @@ describe("project build screen", () => {
     const { backend } = fakeBackend({ failure: new Error("synth exploded") });
     const core = new TestCoreClient({ backends: { CDK: backend } });
     await inProject(core);
-    const r = renderScreen("/agentcore/project/build", { core });
+    const r = renderScreen("/agentcore/build", { core });
 
     await waitForText(r.lastFrame, "✗ synth exploded");
     const frame = r.lastFrame()!;
     expect(frame).toContain("✓ Synthesizing CloudFormation templates");
     expect(frame).toContain("✕ Deploying stack");
     expect(frame).toContain("CREATE_IN_PROGRESS | AWS::IAM::Role");
-    // With no confirmation to return to, esc leaves for the project menu
+    // With no confirmation to return to, esc leaves for the root menu
     // rather than running the build again.
     await r.press("escape");
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
     r.unmount();
   });
 
   test("reports the CLI's own guidance outside a project", async () => {
     cleanups.push((await inTempDirectory()).cleanup);
-    const r = renderScreen("/agentcore/project/build");
+    const r = renderScreen("/agentcore/build");
 
     await waitForFlatText(r.lastFrame, "No AgentCore project found");
-    expect(flatFrame(r.lastFrame)).toContain("agentcore project create");
+    expect(flatFrame(r.lastFrame)).toContain("agentcore create");
     // esc is a way off the error, not just ctrl+c.
     await r.press("escape");
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
     r.unmount();
   });
 });
@@ -158,7 +158,7 @@ describe("project deploy screen", () => {
     const { backend, deploys } = fakeBackend();
     const core = new TestCoreClient({ backends: { CDK: backend } });
     await inProject(core);
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     // A project with resources is not asked anything, as on the command line.
     await waitForText(r.lastFrame, "✔ Deployed project 'orders' to target 'default'");
@@ -190,7 +190,7 @@ describe("project deploy screen", () => {
       if (attempts === 1) throw new Error("aws-targets.json is unreadable");
       return listTargets(project);
     };
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     await waitForText(r.lastFrame, "✗ aws-targets.json is unreadable");
     expect(r.lastFrame()).toContain("[r] retry");
@@ -203,17 +203,17 @@ describe("project deploy screen", () => {
     r.unmount();
   });
 
-  test("esc leaves a target-loading failure for the project menu", async () => {
+  test("esc leaves a target-loading failure for the root menu", async () => {
     const core = new TestCoreClient({ backends: { CDK: fakeBackend().backend } });
     await inProject(core);
     core.projectManager.listTargets = async () => {
       throw new Error("aws-targets.json is unreadable");
     };
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     await waitForText(r.lastFrame, "✗ aws-targets.json is unreadable");
     await r.press("escape");
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
     r.unmount();
   });
 
@@ -221,7 +221,7 @@ describe("project deploy screen", () => {
     const { backend, deploys } = fakeBackend();
     const core = new TestCoreClient({ backends: { CDK: backend } });
     await inProject(core, { staging: true });
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     await waitForText(r.lastFrame, "choose a deployment target");
     const picker = flatFrame(r.lastFrame);
@@ -245,12 +245,12 @@ describe("project deploy screen", () => {
         queries: { retry: false, gcTime: Infinity, staleTime: 0 },
       },
     });
-    const r = renderScreen("/agentcore/project/deploy", { core, queryClient });
+    const r = renderScreen("/agentcore/deploy", { core, queryClient });
 
     await waitForText(r.lastFrame, "✔ Deployed project 'orders' to target 'default'");
     expect(deploys).toHaveLength(1);
     await r.press("return");
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
 
     await writeFile(
       join(projectRoot, "agentcore", "aws-targets.json"),
@@ -273,12 +273,12 @@ describe("project deploy screen", () => {
         queries: { retry: false, gcTime: Infinity, staleTime: 0 },
       },
     });
-    const r = renderScreen("/agentcore/project/deploy", { core, queryClient });
+    const r = renderScreen("/agentcore/deploy", { core, queryClient });
 
     await waitForText(r.lastFrame, "✔ Deployed project 'orders' to target 'default'");
     expect(deploys).toHaveLength(1);
     await r.press("return");
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
 
     await writeFile(
       join(projectRoot, "agentcore", "agentcore.json"),
@@ -299,7 +299,7 @@ describe("project deploy screen", () => {
       resolveAccount: async () => "887863153624",
     });
     await inProject(core, { targets: false });
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     await waitForText(r.lastFrame, "✔ Deployed project 'orders' to target 'default'");
     const frame = flatFrame(r.lastFrame);
@@ -313,7 +313,7 @@ describe("project deploy screen", () => {
     const { backend, deploys } = fakeBackend({ result: { outputs: {}, tornDown: true } });
     const core = new TestCoreClient({ backends: { CDK: backend } });
     await inProject(core, { empty: true });
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     await waitForFlatText(r.lastFrame, "declares no resources to deploy");
     // Confirm lays its (y/N) inline, so the question wraps around it.
@@ -334,7 +334,7 @@ describe("project deploy screen", () => {
     const { backend } = fakeBackend({ result: { outputs: {}, tornDown: true } });
     const core = new TestCoreClient({ backends: { CDK: backend } });
     await inProject(core);
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     await waitForText(r.lastFrame, "✔ Removed project 'orders' from target 'default'");
     expect(r.lastFrame()).not.toContain("Deployed project");
@@ -345,7 +345,7 @@ describe("project deploy screen", () => {
     const { backend } = fakeBackend({ failure: new Error("stack rolled back") });
     const core = new TestCoreClient({ backends: { CDK: backend } });
     await inProject(core);
-    const r = renderScreen("/agentcore/project/deploy", { core });
+    const r = renderScreen("/agentcore/deploy", { core });
 
     await waitForText(r.lastFrame, "✗ stack rolled back");
     expect(r.lastFrame()).toContain("✕ Deploying stack");

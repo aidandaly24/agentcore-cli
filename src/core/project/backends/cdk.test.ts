@@ -397,7 +397,7 @@ describe("CdkBackend.build", () => {
 
     await expect(collect(subject.backend.build(input))).rejects.toThrow(
       `Project build cannot resolve credential "${name}" before its first deployment. ` +
-        `Run 'agentcore project deploy' to provision the credential and build the project.`,
+        `Run 'agentcore deploy' to provision the credential and build the project.`,
     );
   });
 });
@@ -760,7 +760,7 @@ describe("CdkBackend.deploy", () => {
   });
 
   test("hands teardown the target and the providers recorded before the deploy overwrote them", async () => {
-    // The `project remove all` shape: the spec declares nothing, so provisioning
+    // The `agentcore remove all` shape: the spec declares nothing, so provisioning
     // returns nothing and rewrites the credentials map to empty before teardown runs.
     // The recorded providers are the only remaining record of what to delete, and
     // the target name is what scopes their provider names.
@@ -1099,7 +1099,7 @@ describe("CdkBackend.resolveDeployedResources", () => {
 
     await expect(
       subject.backend.resolveDeployedResources(input, { target: TARGET }),
-    ).rejects.toThrow(/not deployed.*project deploy --target default/s);
+    ).rejects.toThrow(/not deployed.*agentcore deploy --target default/s);
     expect(subject.stackReads).toEqual([]);
     expect(subject.accountCredentials).toEqual([]);
   });
@@ -1111,7 +1111,7 @@ describe("CdkBackend.resolveDeployedResources", () => {
 
     await expect(
       subject.backend.resolveDeployedResources(input, { target: TARGET }),
-    ).rejects.toThrow(/not deployed.*project deploy --target default/s);
+    ).rejects.toThrow(/not deployed.*agentcore deploy --target default/s);
     expect(subject.stackReads[0]?.stackName).toBe(STACK_ARN);
   });
 

@@ -33,7 +33,7 @@ async function run(args: string[], opts?: { core?: TestCoreClient; isTTY?: boole
     globalConfigAccessor: new TestGlobalConfigAccessor(),
     logger: createSilentLogger(),
   });
-  await root.route(["node", "agentcore", "project", ...args]);
+  await root.route(["node", "agentcore", ...args]);
   return { io, core };
 }
 

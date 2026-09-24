@@ -35,9 +35,9 @@ type Destination =
   | { resourceType: "runtime"; id: string; ctx: Context; qualifier?: string }
   | { resourceType: "harness"; id: string; ctx: Context };
 
-const BREADCRUMB = ["agentcore", "project", "invoke"];
+const BREADCRUMB = ["agentcore", "invoke"];
 const DESCRIPTION = "invoke a Runtime or harness from the current project";
-const PROJECT_MENU = "/agentcore/project";
+const PROJECT_MENU = "/agentcore";
 
 // The project comes from the launch context when a project command opened the
 // TUI, and is resolved from the cwd otherwise — the gate reports the CLI's own

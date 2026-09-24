@@ -413,7 +413,7 @@ function attachIdentityProvider(
       `"${credentialName}" (${apiKeyArn}). A credential entry named "${credentialName}" was ` +
       `added to agentcore.json. Deploy creates a provider for it scoped to the project and ` +
       `target, so add ${envVarName}=<your-key> to agentcore/.env.local before the first ` +
-      `deploy. \`agentcore project dev\` reads the same variable.`,
+      `deploy. \`agentcore dev\` reads the same variable.`,
   });
 }
 
@@ -440,7 +440,7 @@ function resolveMemory(
       category: MEMORY_MANAGED_NOTE_CATEGORY,
       message:
         "The harness used managed memory, which the service provisions and owns. The exported " +
-        "agent has no memory wired. Add a project memory (`agentcore project add memory`) and " +
+        "agent has no memory wired. Add a project memory (`agentcore add memory`) and " +
         "re-run the export, or wire memory/session.py to an existing AgentCore Memory by hand.",
     });
     return {};

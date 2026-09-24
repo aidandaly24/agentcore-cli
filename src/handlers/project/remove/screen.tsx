@@ -148,8 +148,8 @@ const RESOURCE_PICKER_CONFIGS: RemovableResourcePickerConfig[] = [
   },
 ];
 
-const PROJECT_MENU = "/agentcore/project";
-const REMOVE_ROOT = "/agentcore/project/remove";
+const PROJECT_MENU = "/agentcore";
+const REMOVE_ROOT = "/agentcore/remove";
 
 // Nothing to navigate or select on an empty list or the nothing-to-remove message.
 const STATIC_KEY_HINTS = [
@@ -203,7 +203,7 @@ export function ProjectRemoveScreen({ ctx, core }: ScreenProps) {
   return (
     <ProjectGate
       core={core}
-      breadcrumb={["agentcore", "project", "remove"]}
+      breadcrumb={["agentcore", "remove"]}
       seed={ctx.value(ProjectKey)}
       onBack={() => navigate(PROJECT_MENU)}
     >
@@ -252,7 +252,7 @@ function ResourceTypePicker({ project }: { project: Project }) {
 
   return (
     <Layout
-      breadcrumb={["agentcore", "project", "remove"]}
+      breadcrumb={["agentcore", "remove"]}
       description={`choose a resource to remove from project ${project.name}`}
       keyHints={rows.length > 0 ? KEY_HINTS : STATIC_KEY_HINTS}
     >
@@ -303,7 +303,7 @@ function ResourcePicker({
 
   return (
     <Layout
-      breadcrumb={["agentcore", "project", "remove", config.resourceType]}
+      breadcrumb={["agentcore", "remove", config.resourceType]}
       description={`choose a ${config.resourceType} to remove`}
       keyHints={keyHints}
     >
@@ -345,7 +345,7 @@ function RemoveConfirm({
 
   return (
     <ConfirmAction
-      breadcrumb={["agentcore", "project", "remove", config.resourceType, resource.name]}
+      breadcrumb={["agentcore", "remove", config.resourceType, resource.name]}
       title={resource.name}
       rows={rows}
       trigger={{
@@ -399,7 +399,7 @@ function RemoveAllConfirm({ project, core }: { project: Project; core: ScreenPro
   );
   if (nothingToRemove) {
     return (
-      <Layout breadcrumb={["agentcore", "project", "remove", "all"]} keyHints={STATIC_KEY_HINTS}>
+      <Layout breadcrumb={["agentcore", "remove", "all"]} keyHints={STATIC_KEY_HINTS}>
         <Text dimColor>This project has no resources to remove.</Text>
       </Layout>
     );
@@ -411,7 +411,7 @@ function RemoveAllConfirm({ project, core }: { project: Project; core: ScreenPro
 
   return (
     <ConfirmAction
-      breadcrumb={["agentcore", "project", "remove", "all"]}
+      breadcrumb={["agentcore", "remove", "all"]}
       title={project.name}
       rows={summary}
       trigger={{

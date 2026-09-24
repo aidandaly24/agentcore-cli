@@ -22,17 +22,17 @@ def my_tool(param: str) -> str:
 
 ## Developing locally
 
-`agentcore project dev` starts the agent locally on `0.0.0.0:8080`. Post an AG-UI
+`agentcore dev` starts the agent locally on `0.0.0.0:8080`. Post an AG-UI
 `RunAgentInput` body to `http://127.0.0.1:8080/invocations` to invoke it, and check its
 health at `http://127.0.0.1:8080/ping`.
 
 ## Deployment
 
-`agentcore project deploy` deploys the agent into Amazon Bedrock AgentCore. Invoke the deployed
+`agentcore deploy` deploys the agent into Amazon Bedrock AgentCore. Invoke the deployed
 runtime with an AG-UI `RunAgentInput` payload:
 
 ```bash
-agentcore project invoke runtime --name {{ name }} \
+agentcore invoke runtime --name {{ name }} \
   --payload '{"threadId":"t1","runId":"r1","state":{},"messages":[{"id":"m1","role":"user","content":"Hello!"}],"tools":[],"context":[],"forwardedProps":{}}'
 ```
 

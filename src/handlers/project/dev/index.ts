@@ -15,7 +15,7 @@ import {
   UserCancellationError,
 } from "../../../errors";
 import type { AppIO, BrowserOpener, FileWatcher, PortChecker, startHttpServer } from "../../../io";
-import { createHandler, flag, ProjectKey } from "../../../router";
+import { createHandler, flag, ProjectKey, type Middleware } from "../../../router";
 import { JsonRendererKey, type JsonRenderer } from "../../../tui";
 import { JsonKey, RegionKey } from "../../keys";
 import type { Project, ProjectManager } from "../types";
@@ -27,6 +27,7 @@ const UI_DEFAULT_PORT = 8081;
 
 export type DevProjectHandlerConfig = {
   io: AppIO;
+  middlewares?: Middleware[];
   runners: { CodeZip: DevRunner; Container: DevRunner };
   loadDevEnvironment: DevEnvironmentLoader;
   checkPort: PortChecker;
@@ -94,6 +95,7 @@ export const createDevProjectHandler = (config: DevProjectHandlerConfig) =>
   createHandler({
     name: "dev",
     description: "run the project locally for development",
+    middlewares: config.middlewares,
     flags: [
       flag("agent", "Runtime to run", z.string().optional()),
       flag(

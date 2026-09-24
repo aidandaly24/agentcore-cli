@@ -74,7 +74,7 @@ export const createAddPaymentManagerHandler = (config: AddProjectResourceConfig)
       }
       if (project.spec.runtimes.length > 0) {
         notes.push(
-          "Warning: project add payment-manager does not modify runtime source code. " +
+          "Warning: agentcore add payment-manager does not modify runtime source code. " +
             "Configure the Payments SDK or plugin in supported runtimes before invoking payment-enabled agents.",
         );
       }

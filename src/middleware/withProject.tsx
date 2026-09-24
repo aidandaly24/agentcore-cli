@@ -20,7 +20,7 @@ export function projectNotFoundMessage(from: string): string {
   return (
     `No AgentCore project found at ${from} or any parent directory ` +
     `(looked for agentcore/agentcore.json). ` +
-    `Run 'agentcore project create' to scaffold one.`
+    `Run 'agentcore create' to scaffold one.`
   );
 }
 

@@ -34,8 +34,8 @@ function testExportCommand() {
     /** IO captured for the most recent invocation. */
     io: undefined as unknown as ReturnType<typeof testIO>,
     core,
-    project: (args: string[]) => route(["project", ...args]),
-    run: (args: string[] = []) => route(["project", "export", "harness", ...args]),
+    project: (args: string[]) => route(args),
+    run: (args: string[] = []) => route(["export", "harness", ...args]),
   };
   return subject;
 }

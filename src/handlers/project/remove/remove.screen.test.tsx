@@ -166,7 +166,7 @@ describe("project remove screen", () => {
         resourceConfig: { name: "prod", version: 1 },
       },
     ]);
-    const r = render("/agentcore/project/remove", core, project);
+    const r = render("/agentcore/remove", core, project);
 
     await waitForText(r.lastFrame, "choose a resource to remove from project orders");
     const frame = r.lastFrame()!;
@@ -196,7 +196,7 @@ describe("project remove screen", () => {
   test("lists the resource types the project holds plus an all option", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core, POLICY);
-    const r = render("/agentcore/project/remove", core, project);
+    const r = render("/agentcore/remove", core, project);
 
     await waitForText(r.lastFrame, "choose a resource to remove from project orders");
     const frame = r.lastFrame()!;
@@ -211,23 +211,23 @@ describe("project remove screen", () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core);
     process.chdir(project.rootPath); // cd into the project, as a user would; no ProjectKey injected
-    const r = renderScreen("/agentcore/project/remove", { core });
+    const r = renderScreen("/agentcore/remove", { core });
 
     await waitForText(r.lastFrame, "choose a resource to remove from project orders");
     expect(r.lastFrame()).not.toContain("No AgentCore project");
     r.unmount();
   });
 
-  test("esc from the no-project screen returns to the project menu", async () => {
+  test("esc from the no-project screen returns to the root menu", async () => {
     const core = new TestCoreClient();
     const root = await mkdtemp(join(tmpdir(), "agentcore-no-project-"));
     temporaryDirectories.push(root);
     process.chdir(root);
-    const r = renderScreen("/agentcore/project/remove", { core });
+    const r = renderScreen("/agentcore/remove", { core });
 
     await waitForText(r.lastFrame, "No AgentCore project found");
     await r.press("escape");
-    await waitForText(r.lastFrame, "agentcore → project");
+    await waitForText(r.lastFrame, "agentcore");
     r.unmount();
   });
 
@@ -238,7 +238,7 @@ describe("project remove screen", () => {
       resourceType: "runtime",
       name: project.spec.runtimes[0]!.name,
     });
-    const r = render("/agentcore/project/remove", core, empty);
+    const r = render("/agentcore/remove", core, empty);
 
     await waitForText(r.lastFrame, "This project has no resources to remove.");
     expect(r.lastFrame()).not.toContain("all");
@@ -251,7 +251,7 @@ describe("project remove screen", () => {
   test("an empty resource-type list advertises only esc/ctrl+c", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core); // only a scaffolded runtime, no harnesses
-    const r = render("/agentcore/project/remove/harness", core, project);
+    const r = render("/agentcore/remove/harness", core, project);
 
     await waitForText(r.lastFrame, "This project has no harness resources.");
     expect(r.lastFrame()).toContain("esc");
@@ -266,7 +266,7 @@ describe("project remove screen", () => {
       resourceType: "runtime",
       name: project.spec.runtimes[0]!.name,
     });
-    const r = render("/agentcore/project/remove/all", core, empty);
+    const r = render("/agentcore/remove/all", core, empty);
 
     await waitForText(r.lastFrame, "This project has no resources to remove.");
     // Static message screen — only esc/ctrl+c are advertised.
@@ -287,12 +287,12 @@ describe("project remove screen", () => {
       spec: { ...empty.spec, knowledgeBases: [{ name: "kb" }] as ProjectSpec["knowledgeBases"] },
     };
 
-    const picker = render("/agentcore/project/remove", core, withKb);
+    const picker = render("/agentcore/remove", core, withKb);
     await waitForText(picker.lastFrame, "choose a resource to remove from project orders");
     expect(picker.lastFrame()).toContain("all");
     picker.unmount();
 
-    const confirm = render("/agentcore/project/remove/all", core, withKb);
+    const confirm = render("/agentcore/remove/all", core, withKb);
     await waitForText(confirm.lastFrame, "Remove every resource from project orders?");
     expect(confirm.lastFrame()).toContain("knowledge base");
     confirm.unmount();
@@ -306,13 +306,13 @@ describe("project remove screen", () => {
     }));
     const { project } = await createProject(core, memories);
 
-    const many = render("/agentcore/project/remove/memory", core, project);
+    const many = render("/agentcore/remove/memory", core, project);
     await waitForText(many.lastFrame, "choose a memory to remove");
     expect(many.lastFrame()).toContain("page"); // ←→/hl page hint on a paged list
     many.unmount();
 
     // The runtime list has a single entry, so no paging hint.
-    const few = render("/agentcore/project/remove/runtime", core, project);
+    const few = render("/agentcore/remove/runtime", core, project);
     await waitForText(few.lastFrame, "choose a runtime to remove");
     expect(few.lastFrame()).not.toContain("page");
     few.unmount();
@@ -321,7 +321,7 @@ describe("project remove screen", () => {
   test("the all row counts the sum of every resource", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core, POLICY);
-    const r = render("/agentcore/project/remove", core, project);
+    const r = render("/agentcore/remove", core, project);
 
     await waitForText(r.lastFrame, "all");
     // `all` = the sum of the listed rows: 1 runtime + 1 policy-engine + 1 policy.
@@ -332,7 +332,7 @@ describe("project remove screen", () => {
   test("selecting a type lists that type's resources", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core);
-    const r = render("/agentcore/project/remove", core, project);
+    const r = render("/agentcore/remove", core, project);
 
     await waitForText(r.lastFrame, "runtime");
     await r.press("return");
@@ -344,7 +344,7 @@ describe("project remove screen", () => {
   test("esc on the resource list returns to the resource-type list", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core);
-    const r = render("/agentcore/project/remove/runtime", core, project);
+    const r = render("/agentcore/remove/runtime", core, project);
 
     await waitForText(r.lastFrame, "choose a runtime to remove");
     await r.press("escape");
@@ -352,21 +352,21 @@ describe("project remove screen", () => {
     r.unmount();
   });
 
-  test("esc on the resource-type list returns to the project menu", async () => {
+  test("esc on the resource-type list returns to the root menu", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core);
-    const r = render("/agentcore/project/remove", core, project);
+    const r = render("/agentcore/remove", core, project);
 
     await waitForText(r.lastFrame, "choose a resource to remove from project orders");
     await r.press("escape");
-    await waitForText(r.lastFrame, "agentcore → project");
+    await waitForText(r.lastFrame, "agentcore");
     r.unmount();
   });
 
   test("confirming a removal deletes the resource from the spec", async () => {
     const core = new TestCoreClient();
     const { project, specPath } = await createProject(core);
-    const r = render("/agentcore/project/remove/runtime/0", core, project);
+    const r = render("/agentcore/remove/runtime/0", core, project);
 
     await waitForText(r.lastFrame, `Remove runtime '${RUNTIME}' from project orders?`);
     expect(r.lastFrame()).toContain("(y/N)");
@@ -386,7 +386,7 @@ describe("project remove screen", () => {
     const { project } = await createProject(core, POLICY);
     // ProjectKey is set in context (as the command wiring does): useProject uses
     // it as initialData and never refetches, so the removal must update the cache.
-    const r = render("/agentcore/project/remove/runtime/0", core, project);
+    const r = render("/agentcore/remove/runtime/0", core, project);
 
     await waitForText(r.lastFrame, `Remove runtime '${RUNTIME}' from project orders?`);
     await r.write("y");
@@ -408,7 +408,7 @@ describe("project remove screen", () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core, POLICY);
     process.chdir(project.rootPath); // cwd-resolve path, so the selector refreshes from disk
-    const r = renderScreen("/agentcore/project/remove/runtime/0", { core });
+    const r = renderScreen("/agentcore/remove/runtime/0", { core });
 
     await waitForText(r.lastFrame, `Remove runtime '${RUNTIME}' from project orders?`);
     await r.write("y");
@@ -431,7 +431,7 @@ describe("project remove screen", () => {
   test("declining leaves the resource in place", async () => {
     const core = new TestCoreClient();
     const { project, specPath } = await createProject(core);
-    const r = render("/agentcore/project/remove/runtime/0", core, project);
+    const r = render("/agentcore/remove/runtime/0", core, project);
 
     await waitForText(r.lastFrame, `Remove runtime '${RUNTIME}' from project orders?`);
     await r.write("n");
@@ -444,7 +444,7 @@ describe("project remove screen", () => {
   test("lists a nested resource with its parent and removes it", async () => {
     const core = new TestCoreClient();
     const { project, specPath } = await createProject(core, POLICY);
-    const list = render("/agentcore/project/remove/policy", core, project);
+    const list = render("/agentcore/remove/policy", core, project);
 
     await waitForText(list.lastFrame, "choose a policy to remove");
     const frame = list.lastFrame()!;
@@ -453,7 +453,7 @@ describe("project remove screen", () => {
     expect(frame).toContain("denyAll"); // policy name
     list.unmount();
 
-    const confirm = render("/agentcore/project/remove/policy/0", core, project);
+    const confirm = render("/agentcore/remove/policy/0", core, project);
     await waitForText(confirm.lastFrame, "Remove policy 'denyAll' from project orders?");
     expect(confirm.lastFrame()).toContain("guard"); // parent shown in the summary
     await confirm.write("y");
@@ -467,7 +467,7 @@ describe("project remove screen", () => {
   test("the remove-all summary itemizes the resource types being removed", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core, POLICY);
-    const r = render("/agentcore/project/remove/all", core, project);
+    const r = render("/agentcore/remove/all", core, project);
 
     await waitForText(r.lastFrame, "Remove every resource from project orders?");
     const frame = r.lastFrame()!;
@@ -480,7 +480,7 @@ describe("project remove screen", () => {
   test("enter after remove-all refreshes the list when the project is pinned in context", async () => {
     const core = new TestCoreClient();
     const { project } = await createProject(core, POLICY);
-    const r = render("/agentcore/project/remove/all", core, project); // ProjectKey pinned in context
+    const r = render("/agentcore/remove/all", core, project); // ProjectKey pinned in context
 
     await waitForText(r.lastFrame, "Remove every resource from project orders?");
     await r.write("y");
@@ -498,7 +498,7 @@ describe("project remove screen", () => {
   test("removing all empties every resource collection", async () => {
     const core = new TestCoreClient();
     const { project, specPath } = await createProject(core, POLICY);
-    const r = render("/agentcore/project/remove/all", core, project);
+    const r = render("/agentcore/remove/all", core, project);
 
     await waitForText(r.lastFrame, "Remove every resource from project orders?");
     await r.write("y");

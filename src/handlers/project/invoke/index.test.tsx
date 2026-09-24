@@ -168,7 +168,7 @@ async function routedCommand(
     logger: createSilentLogger(),
     globalConfigAccessor: new TestGlobalConfigAccessor(),
   });
-  const route = () => root.route(["node", "agentcore", "project", "invoke", ...args]);
+  const route = () => root.route(["node", "agentcore", "invoke", ...args]);
   return { core, io, resolved, route };
 }
 
@@ -401,7 +401,7 @@ describe("project invoke", () => {
       expect(code).toBe(ExitCode.FAILURE);
       expect(errors.join("\n")).toContain(`Could not reach local dev server on port ${port}`);
       expect(errors.join("\n")).toContain(
-        `agentcore project dev --mode headless --agent <name> --port ${port}`,
+        `agentcore dev --mode headless --agent <name> --port ${port}`,
       );
     } finally {
       errorLog.mockRestore();
@@ -711,6 +711,6 @@ describe("project invoke", () => {
 
     await handler.defaultHandler()!.handle(context(project!), {}, {});
 
-    expect(launches).toEqual(["/agentcore/project/invoke"]);
+    expect(launches).toEqual(["/agentcore/invoke"]);
   });
 });

@@ -246,7 +246,7 @@ export class CdkBackend implements ProjectBackend {
       if (credentialName) {
         throw new ProjectStateError(
           `Project build cannot resolve credential "${credentialName}" before its first deployment. ` +
-            `Run 'agentcore project deploy' to provision the credential and build the project.`,
+            `Run 'agentcore deploy' to provision the credential and build the project.`,
           { cause: error, meta: { credentialName } },
         );
       }
@@ -414,7 +414,7 @@ export class CdkBackend implements ProjectBackend {
       throw new ProjectStateError(
         `Project '${project.name}' declares no resources to deploy, and no stack ` +
           `'${artifact.stackName}' exists in ${target.account}/${target.region} to remove. ` +
-          `Add a resource — for example 'agentcore project add runtime' — before deploying.`,
+          `Add a resource — for example 'agentcore add runtime' — before deploying.`,
       );
     }
 
@@ -436,7 +436,7 @@ export class CdkBackend implements ProjectBackend {
     yield { type: "step", message: `Removing stack ${artifact.stackName}` };
     yield* this.runCdk({ kind: "destroy", stackArtifactId: artifact.id }, options);
     // After the stack, since a resource in it may still be using the provider. The
-    // declared credentials are included because `project remove all` empties the spec
+    // declared credentials are included because `agentcore remove all` empties the spec
     // before the deploy that gets here, so what it recorded is all that names them.
     yield* this.removeCredentials(project, {
       credentials: options.credentials,
@@ -490,7 +490,7 @@ export class CdkBackend implements ProjectBackend {
     if (!stackReference) {
       throw new ProjectStateError(
         `Project '${project.name}' is not deployed to target '${target.name}'. ` +
-          `Run 'agentcore project deploy --target ${target.name}' first.`,
+          `Run 'agentcore deploy --target ${target.name}' first.`,
       );
     }
 
@@ -499,7 +499,7 @@ export class CdkBackend implements ProjectBackend {
     if (!stack) {
       throw new ProjectStateError(
         `Project '${project.name}' is not deployed to target '${target.name}'. ` +
-          `Run 'agentcore project deploy --target ${target.name}' first.`,
+          `Run 'agentcore deploy --target ${target.name}' first.`,
       );
     }
 

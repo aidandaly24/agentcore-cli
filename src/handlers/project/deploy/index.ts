@@ -3,7 +3,13 @@ import z from "zod";
 import { UserCancellationError } from "../../../errors/errors";
 import type { AppIO } from "../../../io";
 import { DEFAULT_TARGET_NAME } from "../../../projectSchemas/aws-targets";
-import { createHandler, flag, GlobalConfigAccessorKey, ProjectKey } from "../../../router";
+import {
+  createHandler,
+  flag,
+  GlobalConfigAccessorKey,
+  ProjectKey,
+  type Middleware,
+} from "../../../router";
 import { JsonRendererKey } from "../../../tui";
 import { runWithProgress } from "../../../tui/progress";
 import { JsonKey, RegionKey } from "../../keys";
@@ -13,6 +19,7 @@ import type { DeployResult, Project, ProjectManager, TeardownConfirmationHandler
 type DeployProjectHandlerConfig = {
   projectManager: ProjectManager;
   io: AppIO;
+  middlewares?: Middleware[];
 };
 
 /** The line both entry points print once a deploy finishes. */
@@ -45,6 +52,7 @@ export const createDeployProjectHandler = (config: DeployProjectHandlerConfig) =
   createHandler({
     name: "deploy",
     description: "deploy the project to AWS",
+    middlewares: config.middlewares,
     flags: [
       flag(
         "target",

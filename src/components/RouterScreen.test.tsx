@@ -1,6 +1,7 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import {
   cleanupScreens,
+  menuEntries,
   renderScreen,
   renderImperativeScreen,
   tick,
@@ -19,10 +20,11 @@ describe("menu rendering", () => {
     await waitForText(r.lastFrame, "type to choose a command");
 
     const frame = r.lastFrame()!;
-    expect(frame).toContain("project");
+    const entries = menuEntries(frame);
+    expect(entries.screens).toContain("create");
     expect(frame).toContain("eval");
     for (const family of ["harness", "identity", "runtime", "memory", "gateway", "payment"]) {
-      expect(frame).not.toMatch(new RegExp(`\\b${family}\\b`));
+      expect([...entries.screens, ...entries.cliOnly]).not.toContain(family);
     }
     expect(frame).toContain("config");
     expect(frame).toContain("read/write global config values");
@@ -49,8 +51,8 @@ describe("menu rendering", () => {
   test("highlights the first option by default", async () => {
     const r = renderScreen("/agentcore");
     await waitForText(r.lastFrame, "type to choose a command");
-    // The focus caret marks the highlighted row; the first option is project.
-    expect(r.lastFrame()).toContain("❯ project");
+    // The focus caret marks the highlighted row; the first option is create.
+    expect(r.lastFrame()).toContain("❯ create");
     r.unmount();
   });
 });
@@ -92,36 +94,33 @@ describe("filtering", () => {
 describe("navigation", () => {
   test("down arrow moves the highlight to the next option", async () => {
     const r = renderScreen("/agentcore");
-    await waitForText(r.lastFrame, "❯ project");
+    await waitForText(r.lastFrame, "❯ create");
 
     await r.press("down");
-    await waitForText(r.lastFrame, "❯ eval");
+    await waitForText(r.lastFrame, "❯ add");
 
     await r.press("down");
-    await waitForText(r.lastFrame, "❯ feedback");
+    await waitForText(r.lastFrame, "❯ remove");
     r.unmount();
   });
 
   test("up arrow does not move past the first option", async () => {
     const r = renderScreen("/agentcore");
-    await waitForText(r.lastFrame, "❯ project");
+    await waitForText(r.lastFrame, "❯ create");
 
     await r.press("up");
     await tick(20);
     // Still on the first option.
-    expect(r.lastFrame()).toContain("❯ project");
+    expect(r.lastFrame()).toContain("❯ create");
     r.unmount();
   });
 
   test("enter navigates into the highlighted subcommand's screen", async () => {
     const r = renderScreen("/agentcore");
-    await waitForText(r.lastFrame, "❯ project");
+    await waitForText(r.lastFrame, "❯ create");
 
-    await r.press("down");
-    await waitForText(r.lastFrame, "❯ eval");
     await r.press("return");
-    await waitForText(r.lastFrame, "agentcore → eval");
-    expect(r.lastFrame()).toContain("evaluator");
+    await waitForText(r.lastFrame, "name your project");
     r.unmount();
   });
 
@@ -132,17 +131,17 @@ describe("navigation", () => {
     await r.press("escape");
     // Back at the root menu (breadcrumb no longer includes harness).
     await waitForText(r.lastFrame, "the platform for production AI agents");
-    expect(r.lastFrame()).toContain("❯ project");
+    expect(r.lastFrame()).toContain("❯ create");
     r.unmount();
   });
 
   test("esc at the root menu is a no-op (no parent to go to)", async () => {
     const r = renderScreen("/agentcore");
-    await waitForText(r.lastFrame, "❯ project");
+    await waitForText(r.lastFrame, "❯ create");
 
     await r.press("escape");
     await tick(20);
-    expect(r.lastFrame()).toContain("❯ project");
+    expect(r.lastFrame()).toContain("❯ create");
     r.unmount();
   });
 });

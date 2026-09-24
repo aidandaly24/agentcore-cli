@@ -103,7 +103,7 @@ function core(
 }
 
 function renderStatus(value: TestCoreClient, seed: Project = RUNTIME_PROJECT) {
-  return renderScreen("/agentcore/project/status", {
+  return renderScreen("/agentcore/status", {
     core: value,
     withContext: (ctx) => ctx.withValue(ProjectKey, seed),
   });
@@ -241,7 +241,7 @@ describe("project status screen", () => {
     await screen.press("return");
 
     await waitForText(screen.lastFrame, "credential svc-key has no detail view.");
-    expect(screen.lastFrame()).toContain("agentcore → project → status");
+    expect(screen.lastFrame()).toContain("agentcore → status");
   });
 
   test("left and right arrows collapse and expand an agent group", async () => {
@@ -255,12 +255,12 @@ describe("project status screen", () => {
     await waitForText(screen.lastFrame, "runtime");
   });
 
-  test("esc returns to the project command menu", async () => {
+  test("esc returns to the root command menu", async () => {
     const screen = renderStatus(core());
 
     await waitForGroup(screen);
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    await waitForText(screen.lastFrame, "the platform for production AI agents");
   });
 
   test("shows resolution errors with the standard treatment", async () => {
@@ -273,7 +273,7 @@ describe("project status screen", () => {
     await waitForText(screen.lastFrame, "No deployment targets are configured");
     expect(screen.lastFrame()).toContain("✗");
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    await waitForText(screen.lastFrame, "the platform for production AI agents");
   });
 
   test("an empty project reports that nothing is declared", async () => {
@@ -338,11 +338,9 @@ describe("project status screen", () => {
     await screen.press("escape");
     await waitForText(screen.lastFrame, "choose a deployment target");
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    await waitForText(screen.lastFrame, "the platform for production AI agents");
     // Past the screen that pinned, the menus and what they open fetch in the
     // launch region again.
-    await screen.press("escape");
-    await waitForText(screen.lastFrame, "❯ project");
     await screen.write("eval");
     await screen.press("return");
     await waitForText(screen.lastFrame, "agentcore → eval");
@@ -358,11 +356,11 @@ describe("project status screen", () => {
 
   test("reports the CLI's own guidance outside a project", async () => {
     cleanups.push((await inTempDirectory()).cleanup);
-    const screen = renderScreen("/agentcore/project/status", { core: core() });
+    const screen = renderScreen("/agentcore/status", { core: core() });
 
     await waitForFlatText(screen.lastFrame, "No AgentCore project found");
-    expect(flatFrame(screen.lastFrame)).toContain("agentcore project create");
+    expect(flatFrame(screen.lastFrame)).toContain("agentcore create");
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "manage an AgentCore project");
+    await waitForText(screen.lastFrame, "the platform for production AI agents");
   });
 });

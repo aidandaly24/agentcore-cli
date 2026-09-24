@@ -9,7 +9,7 @@ import { createPaymentHandler } from "./payment/index.tsx";
 import { createRuntimeHandler } from "./runtime/index.tsx";
 import { DebugKey, JsonKey, RegionKey } from "./keys.tsx";
 import { createConfigHandler } from "./config/";
-import { createProjectHandler } from "./project/index.ts";
+import { createProjectHandlers } from "./project/index.ts";
 import { createUpdateHandler } from "./update/index.tsx";
 import { renderTui } from "../tui";
 import {
@@ -46,7 +46,21 @@ export function createRootHandler(core: Core, config: RootHandlerConfig): Router
   const root = new Router(
     "agentcore",
     "the platform for production AI agents",
-  ).supportedTuiCommands("project", "harness", "identity", "runtime", "memory", "gateway", "eval");
+  ).supportedTuiCommands(
+    "create",
+    "invoke",
+    "build",
+    "deploy",
+    "status",
+    "add",
+    "remove",
+    "harness",
+    "identity",
+    "runtime",
+    "memory",
+    "gateway",
+    "eval",
+  );
 
   // `agentcore --version` prints the build-time package version.
   root.version(PACKAGE_VERSION);
@@ -76,7 +90,9 @@ export function createRootHandler(core: Core, config: RootHandlerConfig): Router
 
   // Install sub handlers. Registration order is menu/help order; project is
   // the primary workflow, so it goes first.
-  root.handler(createProjectHandler({ core, io }));
+  createProjectHandlers(core, io).forEach((handler) => {
+    root.handler(handler);
+  });
   if (globalConfig["imperative-commands"]) {
     root.handler(createHarnessHandler(core, io));
     root.handler(createIdentityHandler(core, io));

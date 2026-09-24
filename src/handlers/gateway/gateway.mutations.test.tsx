@@ -94,8 +94,7 @@ describe("Gateway imperative mutation availability", () => {
     expect(gateway.commands.find((child) => child.name() === "policy")?.commands[0]?.name()).toBe(
       "generate",
     );
-    const project = command.commands.find((child) => child.name() === "project")!;
-    const add = project.commands.find((child) => child.name() === "add")!;
+    const add = command.commands.find((child) => child.name() === "add")!;
     expect(add.commands.map((child) => child.name())).toContain("gateway");
     const harness = command.commands.find((child) => child.name() === "harness")!;
     expect(harness.commands.map((child) => child.name())).toContain("create");

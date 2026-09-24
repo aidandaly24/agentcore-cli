@@ -23,10 +23,10 @@ def my_tool(param: str) -> str:
 
 If installation was successful, a virtual environment is already created with dependencies installed.
 
-`agentcore project dev` starts the server locally on `0.0.0.0:8000`. List and call tools by
+`agentcore dev` starts the server locally on `0.0.0.0:8000`. List and call tools by
 sending JSON-RPC to `http://127.0.0.1:8000/mcp`.
 
 ## Deployment
 
-`agentcore project deploy` deploys the server into Amazon Bedrock AgentCore. Invoke it with
-`agentcore project invoke runtime`, supplying an MCP JSON-RPC payload (e.g. `tools/list`, `tools/call`).
+`agentcore deploy` deploys the server into Amazon Bedrock AgentCore. Invoke it with
+`agentcore invoke runtime`, supplying an MCP JSON-RPC payload (e.g. `tools/list`, `tools/call`).

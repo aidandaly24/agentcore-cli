@@ -58,7 +58,7 @@ function statusCommand(backend: ProjectBackend, io = testIO()) {
   return {
     io,
     json: () => JSON.parse(io.stdout()),
-    run: (args: string[] = []) => root.route(["node", "agentcore", "project", "status", ...args]),
+    run: (args: string[] = []) => root.route(["node", "agentcore", "status", ...args]),
   };
 }
 
@@ -281,7 +281,7 @@ describe("project status handler", () => {
     await inProject({ memories: [memory("shortTerm")] }, []);
 
     await expect(subject.run()).rejects.toThrow(
-      /No deployment targets are configured for project 'orders'\. Please deploy your project using 'agentcore project deploy'\./,
+      /No deployment targets are configured for project 'orders'\. Please deploy your project using 'agentcore deploy'\./,
     );
     expect(subject.targets).toEqual([]);
   });

@@ -227,7 +227,7 @@ export class FsProjectManager implements ProjectManager {
     }
 
     // A harness project scaffolds through the same addResource flow that
-    // `project add harness` uses, so a create-time harness and an added one can
+    // `agentcore add harness` uses, so a create-time harness and an added one can
     // never drift apart.
     if (input.scaffoldHarnessInput) {
       const scaffolded = await this.resolve({ filePath: destination });
@@ -1052,7 +1052,7 @@ export class FsProjectManager implements ProjectManager {
     const label = input.resourceType === "runtime" ? "Runtime" : "Harness";
     throw new ProjectStateError(
       `${label} '${input.name}' is not deployed to target '${input.target}'. ` +
-        `Run 'agentcore project deploy --target ${input.target}' first.`,
+        `Run 'agentcore deploy --target ${input.target}' first.`,
     );
   }
 
@@ -1085,7 +1085,7 @@ export class FsProjectManager implements ProjectManager {
     if (targets.length === 0) {
       throw new ProjectStateError(
         `No deployment targets are configured for project '${project.name}'. ` +
-          `Please deploy your project using 'agentcore project deploy'.`,
+          `Please deploy your project using 'agentcore deploy'.`,
       );
     }
 
@@ -1129,7 +1129,7 @@ export class FsProjectManager implements ProjectManager {
         `Cannot create the default deployment target for project '${project.name}' because ` +
           `the AWS account could not be resolved: ${cause.message}\n` +
           `Check that valid AWS credentials are configured (for example via 'aws configure', ` +
-          `AWS_PROFILE, or environment variables) and re-run 'agentcore project deploy'.`,
+          `AWS_PROFILE, or environment variables) and re-run 'agentcore deploy'.`,
         { cause: error },
       );
     }
@@ -1227,7 +1227,7 @@ export class FsProjectManager implements ProjectManager {
           type: "step",
           message:
             `Warning: could not generate ${lockfile} in ${appDir}. ` +
-            `Run \`${command.join(" ")}\` there before \`agentcore project dev\` or \`deploy\` — ` +
+            `Run \`${command.join(" ")}\` there before \`agentcore dev\` or \`deploy\` — ` +
             "container builds install from it.",
         };
       }

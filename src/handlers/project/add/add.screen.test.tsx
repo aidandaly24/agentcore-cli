@@ -10,12 +10,11 @@ import {
 afterEach(cleanupScreens);
 
 // addSubcommands reads the resources off the compiled Commander tree, so a
-// `project add` resource added later is covered without editing this file.
+// An `add` resource added later is covered without editing this file.
 // `help` is Commander's own, not one of ours.
 function addSubcommands(): string[] {
   const root = compiledRootCommand();
-  const project = root.commands.find((command) => command.name() === "project")!;
-  const add = project.commands.find((command) => command.name() === "add")!;
+  const add = root.commands.find((command) => command.name() === "add")!;
   return add.commands.map((command) => command.name()).filter((name) => name !== "help");
 }
 
@@ -25,7 +24,7 @@ const WITH_SCREENS = ["runtime", "memory"];
 
 describe("project add menu", () => {
   test("lists every add resource", async () => {
-    const r = renderScreen("/agentcore/project/add");
+    const r = renderScreen("/agentcore/add");
 
     await waitForText(r.lastFrame, "add project resources");
     const frame = r.lastFrame()!;
@@ -36,7 +35,7 @@ describe("project add menu", () => {
   });
 
   test("the resources with a wizard are listed above the divider", async () => {
-    const r = renderScreen("/agentcore/project/add");
+    const r = renderScreen("/agentcore/add");
 
     await waitForText(r.lastFrame, "command line only");
     const { screens, cliOnly } = menuEntries(r.lastFrame()!);
@@ -49,25 +48,25 @@ describe("project add menu", () => {
     r.unmount();
   });
 
-  test("is reachable from the project menu", async () => {
-    const r = renderScreen("/agentcore/project");
+  test("is reachable from the root menu", async () => {
+    const r = renderScreen("/agentcore");
 
-    await waitForText(r.lastFrame, "agentcore → project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
     await r.write("add");
     await waitForText(r.lastFrame, "❯ add");
     await r.press("return");
 
-    await waitForText(r.lastFrame, "agentcore → project → add");
+    await waitForText(r.lastFrame, "agentcore → add");
     r.unmount();
   });
 
-  test("esc returns to the project menu", async () => {
-    const r = renderScreen("/agentcore/project/add");
+  test("esc returns to the root menu", async () => {
+    const r = renderScreen("/agentcore/add");
 
-    await waitForText(r.lastFrame, "agentcore → project → add");
+    await waitForText(r.lastFrame, "agentcore → add");
     await r.press("escape");
 
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
     r.unmount();
   });
 });

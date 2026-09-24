@@ -54,7 +54,7 @@ describe("project add memory wizard", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: Infinity } },
     });
-    const r = renderScreen("/agentcore/project/add/memory", { queryClient });
+    const r = renderScreen("/agentcore/add/memory", { queryClient });
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.write("orders_memory");
@@ -104,7 +104,7 @@ describe("project add memory wizard", () => {
 
   test("selecting no strategy adds a memory that only keeps raw events", async () => {
     const projectRoot = await inProject();
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.write("events_only");
@@ -129,7 +129,7 @@ describe("project add memory wizard", () => {
 
   test("the strategies chosen are ordered as the list draws them", async () => {
     const projectRoot = await inProject();
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.write("ordered_memory");
@@ -158,7 +158,7 @@ describe("project add memory wizard", () => {
 
   test("a blank name is refused", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.press("return");
@@ -170,7 +170,7 @@ describe("project add memory wizard", () => {
 
   test("a name that breaks the schema's pattern is rejected as it is typed", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.write("1memory");
@@ -181,7 +181,7 @@ describe("project add memory wizard", () => {
 
   test("retention outside the service's range keeps the step", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.write("short_memory");
@@ -201,7 +201,7 @@ describe("project add memory wizard", () => {
 
   test("retention that is not a number keeps the step", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.write("odd_memory");
@@ -222,7 +222,7 @@ describe("project add memory wizard", () => {
     // The name is taken, so addResource refuses it — the realistic failure, and
     // one the user can fix without starting over.
     await run(["add", "memory", "--name", "orders_memory"]);
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.write("orders_memory");
@@ -245,7 +245,7 @@ describe("project add memory wizard", () => {
 
   test("esc on the first step returns to the add menu", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/memory");
+    const r = renderScreen("/agentcore/add/memory");
 
     await waitForText(r.lastFrame, "what should this Memory be called?");
     await r.press("escape");
@@ -256,7 +256,7 @@ describe("project add memory wizard", () => {
 });
 
 // These drive the real CLI entrypoint rather than mounting the screen, because
-// what they cover is the routing in front of it: a bare `project add memory` has
+// what they cover is the routing in front of it: a bare `agentcore add memory` has
 // to reach the wizard, and everything else has to stay headless.
 describe("project add memory dispatch", () => {
   function buildRoot(io: AppIO) {
@@ -271,7 +271,7 @@ describe("project add memory dispatch", () => {
 
   async function routeError(io: AppIO, args: string[]): Promise<unknown> {
     return buildRoot(io)
-      .route(["node", "agentcore", "project", "add", "memory", ...args])
+      .route(["node", "agentcore", "add", "memory", ...args])
       .then(
         () => undefined,
         (caught: unknown) => caught,
@@ -283,7 +283,7 @@ describe("project add memory dispatch", () => {
     const { streams, stdin } = ttyTestIO();
 
     const outcome = buildRoot(streams.io)
-      .route(["node", "agentcore", "project", "add", "memory"])
+      .route(["node", "agentcore", "add", "memory"])
       .then(
         () => ({ ok: true as const }),
         (error: unknown) => ({ ok: false as const, error }),
@@ -343,7 +343,6 @@ describe("project add memory dispatch", () => {
     await buildRoot(streams.io).route([
       "node",
       "agentcore",
-      "project",
       "add",
       "memory",
       "--name",

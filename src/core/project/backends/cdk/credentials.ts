@@ -29,7 +29,7 @@ export type DeployedCredential = {
   clientSecretArn?: string;
   /**
    * Which kind of provider the ARN belongs to. Recorded so a teardown knows which
-   * providers it owns without the spec that declared them — `project remove all`
+   * providers it owns without the spec that declared them — `agentcore remove all`
    * empties the spec before the deploy that tears the target down.
    */
   authorizerType?: CredentialType;

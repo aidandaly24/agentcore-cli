@@ -5,7 +5,7 @@ export type BrowserOpener = (url: string) => Promise<void>;
 /**
  * Open a URL in the user's default browser, best-effort: failures resolve
  * quietly because the URL is always printed as well, so a machine without a
- * browser association must not fail `project dev`.
+ * browser association must not fail `agentcore dev`.
  */
 export const openBrowser: BrowserOpener = (url) => {
   const [command, args] =

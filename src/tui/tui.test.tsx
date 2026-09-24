@@ -42,8 +42,8 @@ describe("--json short-circuits the TUI", () => {
   test("bare `agentcore --json` prints help rather than opening the TUI", async () => {
     const out = await runRoot([]);
     expect(out).toContain("Usage:");
-    expect(out).toContain("project");
-    expect(out).not.toContain("harness");
+    expect(out).toMatch(/^\s+create\s+/m);
+    expect(out).not.toMatch(/^\s+harness\s+/m);
   });
 
   test("`agentcore harness --json` prints the harness command's help", async () => {

@@ -21,11 +21,11 @@ def my_tool(param: str) -> str:
 
 ## Developing locally
 
-`agentcore project dev` starts the agent locally on `0.0.0.0:9000`. Fetch its agent card at
+`agentcore dev` starts the agent locally on `0.0.0.0:9000`. Fetch its agent card at
 `http://127.0.0.1:9000/.well-known/agent-card.json` and send it messages by posting A2A
 JSON-RPC to `http://127.0.0.1:9000/`.
 
 ## Deployment
 
-`agentcore project deploy` deploys the agent into Amazon Bedrock AgentCore. Invoke it with the
+`agentcore deploy` deploys the agent into Amazon Bedrock AgentCore. Invoke it with the
 AWS CLI (`bedrock-agentcore invoke-agent-runtime`) using an A2A JSON-RPC payload.

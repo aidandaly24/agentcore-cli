@@ -9,7 +9,23 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, "..");
 const DEFAULT_GROUPS = [
   { id: "global-options", title: "Global options", commands: [] },
-  { id: "project", title: "Project commands", commands: ["project"] },
+  {
+    id: "project",
+    title: "Project commands",
+    commands: [
+      "create",
+      "add",
+      "export",
+      "remove",
+      "dev",
+      "deploy",
+      "invoke",
+      "log",
+      "traces",
+      "status",
+      "build",
+    ],
+  },
   { id: "evaluation", title: "Evaluation commands", commands: ["eval"] },
   {
     id: "settings",

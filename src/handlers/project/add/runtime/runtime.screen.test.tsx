@@ -63,7 +63,7 @@ describe("project add runtime wizard", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: Infinity } },
     });
-    const r = renderScreen("/agentcore/project/add/runtime", { queryClient });
+    const r = renderScreen("/agentcore/add/runtime", { queryClient });
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.write("orders_agent");
@@ -107,7 +107,7 @@ describe("project add runtime wizard", () => {
 
   test("scaffolds the template the user picks", async () => {
     const projectRoot = await inProject();
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.write("packing_agent");
@@ -134,7 +134,7 @@ describe("project add runtime wizard", () => {
 
   test("a blank name is refused", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.press("return");
@@ -146,7 +146,7 @@ describe("project add runtime wizard", () => {
 
   test("a name that breaks the schema's pattern is rejected as it is typed", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     // No enter: the name is checked while it is being typed, so the rule is
@@ -159,7 +159,7 @@ describe("project add runtime wizard", () => {
 
   test("accepts a 48-character name", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.write("a".repeat(48));
@@ -171,7 +171,7 @@ describe("project add runtime wizard", () => {
 
   test("rejects a name longer than 48 characters", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.write("a".repeat(49));
@@ -182,7 +182,7 @@ describe("project add runtime wizard", () => {
 
   test("a name that is only valid once trimmed is refused, not silently trimmed", async () => {
     const projectRoot = await inProject();
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.write(" orders_agent ");
@@ -201,7 +201,7 @@ describe("project add runtime wizard", () => {
     // The name is taken, so addResource refuses it — the realistic failure, and
     // one the user can fix without starting over.
     await run(["add", "runtime", "--name", "orders_agent"]);
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.write("orders_agent");
@@ -225,7 +225,7 @@ describe("project add runtime wizard", () => {
 
   test("esc on the first step returns to the add menu", async () => {
     await inProject();
-    const r = renderScreen("/agentcore/project/add/runtime");
+    const r = renderScreen("/agentcore/add/runtime");
 
     await waitForText(r.lastFrame, "what should this runtime be called?");
     await r.press("escape");
@@ -236,7 +236,7 @@ describe("project add runtime wizard", () => {
 });
 
 // These drive the real CLI entrypoint rather than mounting the screen, because
-// what they cover is the routing in front of it: a bare `project add runtime`
+// what they cover is the routing in front of it: a bare `agentcore add runtime`
 // has to reach the wizard, and everything else has to stay headless.
 describe("project add runtime dispatch", () => {
   function buildRoot(io: AppIO) {
@@ -251,7 +251,7 @@ describe("project add runtime dispatch", () => {
 
   async function routeError(io: AppIO, args: string[]): Promise<unknown> {
     return buildRoot(io)
-      .route(["node", "agentcore", "project", "add", "runtime", ...args])
+      .route(["node", "agentcore", "add", "runtime", ...args])
       .then(
         () => undefined,
         (caught: unknown) => caught,
@@ -265,7 +265,7 @@ describe("project add runtime dispatch", () => {
     // outcome never rejects, so a mid-pump failure cannot trip bun's
     // unhandled-rejection detection before the final assertion.
     const outcome = buildRoot(streams.io)
-      .route(["node", "agentcore", "project", "add", "runtime"])
+      .route(["node", "agentcore", "add", "runtime"])
       .then(
         () => ({ ok: true as const }),
         (error: unknown) => ({ ok: false as const, error }),
@@ -296,7 +296,7 @@ describe("project add runtime dispatch", () => {
     const io = testIO();
 
     const error = await buildRoot(io.io)
-      .route(["node", "agentcore", "project", "add"])
+      .route(["node", "agentcore", "add"])
       .then(
         () => undefined,
         (caught: unknown) => caught,
@@ -340,7 +340,6 @@ describe("project add runtime dispatch", () => {
     await buildRoot(streams.io).route([
       "node",
       "agentcore",
-      "project",
       "add",
       "runtime",
       "--name",

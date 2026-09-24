@@ -120,7 +120,7 @@ import { GatewayRuleListScreen } from "../handlers/gateway/rule/list/screen.tsx"
 import { GatewayRuleGetScreen } from "../handlers/gateway/rule/get/screen.tsx";
 import { GatewayInvokeScreen } from "../handlers/gateway/invoke/screen.tsx";
 import { GatewayPolicyGenerateScreen } from "../handlers/gateway/policy/screen.tsx";
-import { ProjectScreen } from "../handlers/project/screen.tsx";
+import { RouterScreen } from "./RouterScreen.tsx";
 import { CommandFallbackScreen } from "./CliOnlyScreen.tsx";
 import { ProjectResourceCreateScreen } from "./ProjectResourceCreateScreen.tsx";
 import { BuildProjectScreen } from "../handlers/project/build/screen.tsx";
@@ -242,7 +242,7 @@ function RouteTable({ ctx, core }: ScreenProps) {
     <Routes>
       <Route path="agentcore" element={<RootScreen ctx={ctx} core={core} />} />
       <Route
-        path="agentcore/project/invoke"
+        path="agentcore/invoke"
         element={<ProjectInvokePickerScreen ctx={ctx} core={core} />}
       />
       <Route path="agentcore/harness" element={<HarnessScreen ctx={ctx} core={core} />} />
@@ -868,41 +868,23 @@ function RouteTable({ ctx, core }: ScreenProps) {
         path="agentcore/identity/oauth2-credential-provider/get/:name/json"
         element={<Oauth2CredentialProviderGetJsonScreen ctx={ctx} core={core} />}
       />
-      <Route path="agentcore/project" element={<ProjectScreen ctx={ctx} core={core} />} />
       <Route
-        path="agentcore/project/build"
-        element={<BuildProjectScreen ctx={ctx} core={core} />}
+        path="agentcore/add"
+        element={<RouterScreen ctx={ctx} core={core} path={["agentcore", "add"]} />}
       />
+      <Route path="agentcore/build" element={<BuildProjectScreen ctx={ctx} core={core} />} />
+      <Route path="agentcore/deploy" element={<DeployProjectScreen ctx={ctx} core={core} />} />
+      <Route path="agentcore/create" element={<ProjectCreateScreen ctx={ctx} core={core} />} />
+      <Route path="agentcore/status" element={<ProjectStatusScreen ctx={ctx} core={core} />} />
+      <Route path="agentcore/add/runtime" element={<AddRuntimeScreen ctx={ctx} core={core} />} />
+      <Route path="agentcore/add/memory" element={<AddMemoryScreen ctx={ctx} core={core} />} />
+      <Route path="agentcore/remove" element={<ProjectRemoveScreen ctx={ctx} core={core} />} />
       <Route
-        path="agentcore/project/deploy"
-        element={<DeployProjectScreen ctx={ctx} core={core} />}
-      />
-      <Route
-        path="agentcore/project/create"
-        element={<ProjectCreateScreen ctx={ctx} core={core} />}
-      />
-      <Route
-        path="agentcore/project/status"
-        element={<ProjectStatusScreen ctx={ctx} core={core} />}
-      />
-      <Route
-        path="agentcore/project/add/runtime"
-        element={<AddRuntimeScreen ctx={ctx} core={core} />}
-      />
-      <Route
-        path="agentcore/project/add/memory"
-        element={<AddMemoryScreen ctx={ctx} core={core} />}
-      />
-      <Route
-        path="agentcore/project/remove"
+        path="agentcore/remove/:resourceType"
         element={<ProjectRemoveScreen ctx={ctx} core={core} />}
       />
       <Route
-        path="agentcore/project/remove/:resourceType"
-        element={<ProjectRemoveScreen ctx={ctx} core={core} />}
-      />
-      <Route
-        path="agentcore/project/remove/:resourceType/:resourceIndex"
+        path="agentcore/remove/:resourceType/:resourceIndex"
         element={<ProjectRemoveScreen ctx={ctx} core={core} />}
       />
       {/* Every known command without a screen of its own: a group opens its

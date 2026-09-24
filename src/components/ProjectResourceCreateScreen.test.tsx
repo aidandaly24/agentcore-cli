@@ -18,19 +18,19 @@ const RESOURCES = [
     resource: "runtime",
     label: "Runtime",
     parentDescription: "inspect AgentCore Runtimes",
-    addCommand: "agentcore project add runtime",
+    addCommand: "agentcore add runtime",
   },
   {
     resource: "memory",
     label: "Memory",
     parentDescription: "inspect AgentCore Memories",
-    addCommand: "agentcore project add memory",
+    addCommand: "agentcore add memory",
   },
   {
     resource: "gateway",
     label: "Gateway",
     parentDescription: "manage AgentCore Gateways",
-    addCommand: "agentcore project add gateway --name MyGateway",
+    addCommand: "agentcore add gateway --name MyGateway",
   },
 ] as const satisfies {
   resource: ProjectCreateResource;
@@ -52,10 +52,10 @@ describe("project resource creation guidance", () => {
       await waitForText(r.lastFrame, `Create an AgentCore ${label}`);
 
       const frame = r.lastFrame()!;
-      expect(frame).toContain("agentcore project create");
+      expect(frame).toContain("agentcore create");
       expect(frame).toContain("cd <project-directory>");
       expect(frame).toContain(addCommand);
-      expect(frame).toContain("agentcore project deploy");
+      expect(frame).toContain("agentcore deploy");
       expect(frame).not.toContain("┌");
 
       await r.press("escape");

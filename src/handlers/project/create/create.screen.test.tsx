@@ -52,7 +52,7 @@ describe("project create wizard", () => {
     cleanups.push(cleanup);
     const core = new TestCoreClient();
     const inputs = spyOnCreate(core);
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("DemoApp");
@@ -92,10 +92,10 @@ describe("project create wizard", () => {
     // Success: next steps point at the new directory and deploy.
     await waitForText(r.lastFrame, "✔ project created in ./DemoApp", 5000);
     expect(r.lastFrame()).toContain("cd DemoApp");
-    expect(r.lastFrame()).toContain("agentcore project deploy");
+    expect(r.lastFrame()).toContain("agentcore deploy");
 
     // The manager received exactly the input the flag-driven handler builds
-    // for `project create --name DemoApp`.
+    // for `agentcore create --name DemoApp`.
     expect(inputs).toEqual([
       {
         name: "DemoApp",
@@ -119,7 +119,7 @@ describe("project create wizard", () => {
     cleanups.push((await inTempDirectory()).cleanup);
     const core = new TestCoreClient();
     const inputs = spyOnCreate(core);
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("TunedApp");
@@ -155,7 +155,7 @@ describe("project create wizard", () => {
     cleanups.push(cleanup);
     const core = new TestCoreClient();
     const inputs = spyOnCreate(core);
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
     const apiKeyArn =
       "arn:aws:bedrock-agentcore:us-east-1:123456789012:token-vault/default/apikeycredentialprovider/OpenAIKey";
 
@@ -217,7 +217,7 @@ describe("project create wizard", () => {
   }, 10000);
 
   test("switching providers preserves each provider's model input", async () => {
-    const r = renderScreen("/agentcore/project/create");
+    const r = renderScreen("/agentcore/create");
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("ProviderApp");
@@ -239,7 +239,7 @@ describe("project create wizard", () => {
   });
 
   test("reveals model fields only after enter and hides them again on escape", async () => {
-    const r = renderScreen("/agentcore/project/create");
+    const r = renderScreen("/agentcore/create");
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("ModelApp");
@@ -265,7 +265,7 @@ describe("project create wizard", () => {
   });
 
   test("the model picker remains readable in an 80x24 terminal", async () => {
-    const r = renderScreen("/agentcore/project/create");
+    const r = renderScreen("/agentcore/create");
     await r.resize(80, 24);
 
     await waitForText(r.lastFrame, "name your project");
@@ -277,7 +277,7 @@ describe("project create wizard", () => {
 
     const frame = r.lastFrame()!;
     const lines = frame.split("\n");
-    expect(lines[0]).toContain("agentcore → project → create");
+    expect(lines[0]).toContain("agentcore → create");
     expect(lines[1]).toBe("─".repeat(80));
     expect(lines[2]).toContain("✓ name");
     expect(frame).toContain("● bedrock");
@@ -297,7 +297,7 @@ describe("project create wizard", () => {
     cleanups.push(cleanup);
     const core = new TestCoreClient();
     const inputs = spyOnCreate(core);
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("StrandsApp");
@@ -348,7 +348,7 @@ describe("project create wizard", () => {
     cleanups.push(cleanup);
     const core = new TestCoreClient();
     const inputs = spyOnCreate(core);
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("HelloApp");
@@ -386,7 +386,7 @@ describe("project create wizard", () => {
     cleanups.push((await inTempDirectory()).cleanup);
     const core = new TestCoreClient();
     const inputs = spyOnCreate(core);
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("LangChainApp");
@@ -424,7 +424,7 @@ describe("project create wizard", () => {
     cleanups.push(cleanup);
     const core = new TestCoreClient();
     const inputs = spyOnCreate(core);
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("EmptyApp");
@@ -450,7 +450,7 @@ describe("project create wizard", () => {
   }, 10000);
 
   test("the name step shows the schema's messages and blocks continuing", async () => {
-    const r = renderScreen("/agentcore/project/create");
+    const r = renderScreen("/agentcore/create");
 
     await waitForText(r.lastFrame, "name your project");
     // Submitting an empty name surfaces the schema's required message.
@@ -467,7 +467,7 @@ describe("project create wizard", () => {
   });
 
   test("a reserved name is rejected with the schema's message", async () => {
-    const r = renderScreen("/agentcore/project/create");
+    const r = renderScreen("/agentcore/create");
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("bedrock");
@@ -478,7 +478,7 @@ describe("project create wizard", () => {
   });
 
   test("a pasted chunk with a trailing return keeps the name clean", async () => {
-    const r = renderScreen("/agentcore/project/create");
+    const r = renderScreen("/agentcore/create");
 
     await waitForText(r.lastFrame, "name your project");
     // A terminal paste (or keystrokes coalesced under load) arrives as one
@@ -497,7 +497,7 @@ describe("project create wizard", () => {
   });
 
   test("esc steps back through the flow and leaves from the first step", async () => {
-    const r = renderScreen("/agentcore/project/create");
+    const r = renderScreen("/agentcore/create");
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("DemoApp");
@@ -505,14 +505,14 @@ describe("project create wizard", () => {
     await waitForText(r.lastFrame, "what kind of agent to start with?");
     await r.press("escape");
     await waitForText(r.lastFrame, "name your project");
-    // Esc on the first step lands on the project menu.
+    // Esc on the first step lands on the root menu.
     await r.press("escape");
-    await waitForText(r.lastFrame, "manage an AgentCore project");
+    await waitForText(r.lastFrame, "the platform for production AI agents");
     r.unmount();
   });
 
-  test("selecting create from the project menu opens the wizard", async () => {
-    const r = renderScreen("/agentcore/project");
+  test("selecting create from the root menu opens the wizard", async () => {
+    const r = renderScreen("/agentcore");
 
     // `create` is the first menu item, so it is already selected.
     await waitForText(r.lastFrame, "❯ create");
@@ -539,7 +539,7 @@ describe("project create wizard", () => {
         throw new Error("stopped");
       })();
     };
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("DemoApp");
@@ -582,7 +582,7 @@ describe("project create wizard", () => {
         throw new Error("'git' was not found on your PATH.");
       })();
     };
-    const r = renderScreen("/agentcore/project/create", { core });
+    const r = renderScreen("/agentcore/create", { core });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("DemoApp");
@@ -624,7 +624,7 @@ describe("project create wizard", () => {
     const deep = join(path, "n".repeat(120));
     await mkdir(deep);
     process.chdir(deep);
-    const r = renderScreen("/agentcore/project/create", { platform: "win32" });
+    const r = renderScreen("/agentcore/create", { platform: "win32" });
 
     await waitForText(r.lastFrame, "name your project");
     await r.write("DemoApp");
@@ -663,7 +663,7 @@ describe("project create dispatch", () => {
 
     // outcome never rejects, so a mid-pump failure cannot trip bun's
     // unhandled-rejection detection before the final assertion.
-    const outcome = root.route(["node", "agentcore", "project", "create"]).then(
+    const outcome = root.route(["node", "agentcore", "create"]).then(
       () => ({ ok: true as const }),
       (error: unknown) => ({ ok: false as const, error }),
     );
@@ -702,7 +702,7 @@ describe("project create dispatch", () => {
       })();
     const root = buildRoot(streams.io, core);
 
-    const outcome = root.route(["node", "agentcore", "project", "create"]);
+    const outcome = root.route(["node", "agentcore", "create"]);
 
     await waitFor(() => streams.stdout().includes("name your project"));
     stdin.write("DemoApp");
@@ -728,7 +728,7 @@ describe("project create dispatch", () => {
     const root = buildRoot(io.io);
 
     const error: unknown = await root
-      .route(["node", "agentcore", "project", "create"])
+      .route(["node", "agentcore", "create"])
       .then(() => undefined)
       .catch((caught: unknown) => caught);
 
@@ -741,7 +741,7 @@ describe("project create dispatch", () => {
     const root = buildRoot(streams.io);
 
     const error: unknown = await root
-      .route(["node", "agentcore", "project", "create", "--skip-git"])
+      .route(["node", "agentcore", "create", "--skip-git"])
       .then(() => undefined)
       .catch((caught: unknown) => caught);
 
@@ -754,7 +754,7 @@ describe("project create dispatch", () => {
     const root = buildRoot(streams.io);
 
     const error: unknown = await root
-      .route(["node", "agentcore", "project", "create", "--json"])
+      .route(["node", "agentcore", "create", "--json"])
       .then(() => undefined)
       .catch((caught: unknown) => caught);
 
@@ -771,7 +771,6 @@ describe("project create dispatch", () => {
     await root.route([
       "node",
       "agentcore",
-      "project",
       "create",
       "--name",
       "FlagApp",

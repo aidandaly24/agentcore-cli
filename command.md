@@ -9,50 +9,49 @@ This reference was generated from `agentcore --help` for version `1.0.0-rc.4`.
 - [Global options](#global-options)
   - [`agentcore`](#agentcore)
 - [Project commands](#project-commands)
-  - [`agentcore project`](#agentcore-project)
-    - [`agentcore project create`](#agentcore-project-create)
-    - [`agentcore project add`](#agentcore-project-add)
-      - [`agentcore project add config-bundle`](#agentcore-project-add-config-bundle)
-      - [`agentcore project add harness`](#agentcore-project-add-harness)
-      - [`agentcore project add memory`](#agentcore-project-add-memory)
-      - [`agentcore project add runtime`](#agentcore-project-add-runtime)
-      - [`agentcore project add online-eval`](#agentcore-project-add-online-eval)
-      - [`agentcore project add online-insight`](#agentcore-project-add-online-insight)
-      - [`agentcore project add evaluator`](#agentcore-project-add-evaluator)
-        - [`agentcore project add evaluator llm-as-a-judge`](#agentcore-project-add-evaluator-llm-as-a-judge)
-        - [`agentcore project add evaluator code-based`](#agentcore-project-add-evaluator-code-based)
-      - [`agentcore project add credentials`](#agentcore-project-add-credentials)
-        - [`agentcore project add credentials api-key`](#agentcore-project-add-credentials-api-key)
-        - [`agentcore project add credentials oauth`](#agentcore-project-add-credentials-oauth)
-        - [`agentcore project add credentials payment`](#agentcore-project-add-credentials-payment)
-      - [`agentcore project add gateway`](#agentcore-project-add-gateway)
-      - [`agentcore project add gateway-target`](#agentcore-project-add-gateway-target)
-      - [`agentcore project add gateway-connector`](#agentcore-project-add-gateway-connector)
-      - [`agentcore project add policy-engine`](#agentcore-project-add-policy-engine)
-      - [`agentcore project add policy`](#agentcore-project-add-policy)
-      - [`agentcore project add payment-manager`](#agentcore-project-add-payment-manager)
-      - [`agentcore project add payment-connector`](#agentcore-project-add-payment-connector)
-      - [`agentcore project add runtime-endpoint`](#agentcore-project-add-runtime-endpoint)
-    - [`agentcore project export`](#agentcore-project-export)
-      - [`agentcore project export harness`](#agentcore-project-export-harness)
-    - [`agentcore project remove`](#agentcore-project-remove)
-    - [`agentcore project dev`](#agentcore-project-dev)
-    - [`agentcore project deploy`](#agentcore-project-deploy)
-    - [`agentcore project invoke`](#agentcore-project-invoke)
-      - [`agentcore project invoke runtime`](#agentcore-project-invoke-runtime)
-      - [`agentcore project invoke harness`](#agentcore-project-invoke-harness)
-    - [`agentcore project log`](#agentcore-project-log)
-      - [`agentcore project log runtime`](#agentcore-project-log-runtime)
-      - [`agentcore project log harness`](#agentcore-project-log-harness)
-    - [`agentcore project traces`](#agentcore-project-traces)
-      - [`agentcore project traces runtime`](#agentcore-project-traces-runtime)
-        - [`agentcore project traces runtime list`](#agentcore-project-traces-runtime-list)
-        - [`agentcore project traces runtime get`](#agentcore-project-traces-runtime-get)
-      - [`agentcore project traces harness`](#agentcore-project-traces-harness)
-        - [`agentcore project traces harness list`](#agentcore-project-traces-harness-list)
-        - [`agentcore project traces harness get`](#agentcore-project-traces-harness-get)
-    - [`agentcore project status`](#agentcore-project-status)
-    - [`agentcore project build`](#agentcore-project-build)
+  - [`agentcore create`](#agentcore-create)
+  - [`agentcore add`](#agentcore-add)
+    - [`agentcore add config-bundle`](#agentcore-add-config-bundle)
+    - [`agentcore add harness`](#agentcore-add-harness)
+    - [`agentcore add memory`](#agentcore-add-memory)
+    - [`agentcore add runtime`](#agentcore-add-runtime)
+    - [`agentcore add online-eval`](#agentcore-add-online-eval)
+    - [`agentcore add online-insight`](#agentcore-add-online-insight)
+    - [`agentcore add evaluator`](#agentcore-add-evaluator)
+      - [`agentcore add evaluator llm-as-a-judge`](#agentcore-add-evaluator-llm-as-a-judge)
+      - [`agentcore add evaluator code-based`](#agentcore-add-evaluator-code-based)
+    - [`agentcore add credentials`](#agentcore-add-credentials)
+      - [`agentcore add credentials api-key`](#agentcore-add-credentials-api-key)
+      - [`agentcore add credentials oauth`](#agentcore-add-credentials-oauth)
+      - [`agentcore add credentials payment`](#agentcore-add-credentials-payment)
+    - [`agentcore add gateway`](#agentcore-add-gateway)
+    - [`agentcore add gateway-target`](#agentcore-add-gateway-target)
+    - [`agentcore add gateway-connector`](#agentcore-add-gateway-connector)
+    - [`agentcore add policy-engine`](#agentcore-add-policy-engine)
+    - [`agentcore add policy`](#agentcore-add-policy)
+    - [`agentcore add payment-manager`](#agentcore-add-payment-manager)
+    - [`agentcore add payment-connector`](#agentcore-add-payment-connector)
+    - [`agentcore add runtime-endpoint`](#agentcore-add-runtime-endpoint)
+  - [`agentcore export`](#agentcore-export)
+    - [`agentcore export harness`](#agentcore-export-harness)
+  - [`agentcore remove`](#agentcore-remove)
+  - [`agentcore dev`](#agentcore-dev)
+  - [`agentcore deploy`](#agentcore-deploy)
+  - [`agentcore invoke`](#agentcore-invoke)
+    - [`agentcore invoke runtime`](#agentcore-invoke-runtime)
+    - [`agentcore invoke harness`](#agentcore-invoke-harness)
+  - [`agentcore log`](#agentcore-log)
+    - [`agentcore log runtime`](#agentcore-log-runtime)
+    - [`agentcore log harness`](#agentcore-log-harness)
+  - [`agentcore traces`](#agentcore-traces)
+    - [`agentcore traces runtime`](#agentcore-traces-runtime)
+      - [`agentcore traces runtime list`](#agentcore-traces-runtime-list)
+      - [`agentcore traces runtime get`](#agentcore-traces-runtime-get)
+    - [`agentcore traces harness`](#agentcore-traces-harness)
+      - [`agentcore traces harness list`](#agentcore-traces-harness-list)
+      - [`agentcore traces harness get`](#agentcore-traces-harness-get)
+  - [`agentcore status`](#agentcore-status)
+  - [`agentcore build`](#agentcore-build)
 - [Evaluation commands](#evaluation-commands)
   - [`agentcore eval`](#agentcore-eval)
     - [`agentcore eval evaluator`](#agentcore-eval-evaluator)
@@ -150,18 +149,10 @@ the platform for production AI agents
 
 ## Project commands
 
-### `agentcore project`
+### `agentcore create`
 
 ```text
-agentcore project [options] [command]
-```
-
-manage an AgentCore project
-
-#### `agentcore project create`
-
-```text
-agentcore project create [options]
+agentcore create [options]
 ```
 
 create a new AgentCore project
@@ -175,18 +166,18 @@ create a new AgentCore project
 - `--skip-install`: skip installing dependencies (npm install, uv sync) (default: false)
 - `--skip-git`: skip initializing a git repository (default: false)
 
-#### `agentcore project add`
+### `agentcore add`
 
 ```text
-agentcore project add [options] [command]
+agentcore add [options] [command]
 ```
 
 add project resources
 
-##### `agentcore project add config-bundle`
+#### `agentcore add config-bundle`
 
 ```text
-agentcore project add config-bundle [options]
+agentcore add config-bundle [options]
 ```
 
 add a configuration bundle to the current project
@@ -200,10 +191,10 @@ add a configuration bundle to the current project
 - `--commit-message <commit-message>`: message describing the initial configuration
 - `--kms-key-arn <kms-key-arn>`: customer managed KMS key ARN for component configurations
 
-##### `agentcore project add harness`
+#### `agentcore add harness`
 
 ```text
-agentcore project add harness [options]
+agentcore add harness [options]
 ```
 
 add a harness to the current project
@@ -235,10 +226,10 @@ add a harness to the current project
 - `--tags <tags...>`: tags as key=value (repeatable) or JSON object
 - `--dockerfile <dockerfile>`: path to local dockerfile to use as the container image for the harness
 
-##### `agentcore project add memory`
+#### `agentcore add memory`
 
 ```text
-agentcore project add memory [options]
+agentcore add memory [options]
 ```
 
 add a Memory to the current project
@@ -255,10 +246,10 @@ add a Memory to the current project
 - `--execution-role-arn <execution-role-arn>`: IAM role the Memory assumes; a default role is created when omitted
 - `--tags <tags>`: tags to apply (JSON object of key/value strings)
 
-##### `agentcore project add runtime`
+#### `agentcore add runtime`
 
 ```text
-agentcore project add runtime [options]
+agentcore add runtime [options]
 ```
 
 add a Runtime to the current project
@@ -286,10 +277,10 @@ add a Runtime to the current project
 - `--filesystem-configurations <filesystem-configurations>`: filesystem mount configurations (JSON)
 - `--tags <tags...>`: tags as key=value (repeatable) or JSON object
 
-##### `agentcore project add online-eval`
+#### `agentcore add online-eval`
 
 ```text
-agentcore project add online-eval [options]
+agentcore add online-eval [options]
 ```
 
 add an online evaluation config to the current project
@@ -307,10 +298,10 @@ add an online evaluation config to the current project
 - `--enable-on-create <enable-on-create>`: enable evaluation immediately after deploy (default true; pass false to add it paused)
 - `--tags <tags>`: tags to apply (JSON object of key/value strings)
 
-##### `agentcore project add online-insight`
+#### `agentcore add online-insight`
 
 ```text
-agentcore project add online-insight [options]
+agentcore add online-insight [options]
 ```
 
 add an online insight config to the current project
@@ -329,18 +320,18 @@ add an online insight config to the current project
 - `--enable-on-create <enable-on-create>`: enable insights immediately after deploy (default true; pass false to add it paused)
 - `--tags <tags>`: tags to apply (JSON object of key/value strings)
 
-##### `agentcore project add evaluator`
+#### `agentcore add evaluator`
 
 ```text
-agentcore project add evaluator [options] [command]
+agentcore add evaluator [options] [command]
 ```
 
 add a custom evaluator to the current project
 
-###### `agentcore project add evaluator llm-as-a-judge`
+##### `agentcore add evaluator llm-as-a-judge`
 
 ```text
-agentcore project add evaluator llm-as-a-judge [options]
+agentcore add evaluator llm-as-a-judge [options]
 ```
 
 add an LLM-as-a-Judge evaluator: another LLM prompted with instructions on how to score a session
@@ -357,10 +348,10 @@ add an LLM-as-a-Judge evaluator: another LLM prompted with instructions on how t
 - `--kms-key-arn <kms-key-arn>`: customer-managed KMS key ARN to encrypt the evaluator
 - `--tags <tags>`: tags to apply (JSON object of key/value strings)
 
-###### `agentcore project add evaluator code-based`
+##### `agentcore add evaluator code-based`
 
 ```text
-agentcore project add evaluator code-based [options]
+agentcore add evaluator code-based [options]
 ```
 
 add a code-based evaluator: scaffold a Python Lambda with custom evaluation logic, or reference an existing Lambda with --lambda-arn
@@ -375,18 +366,18 @@ add a code-based evaluator: scaffold a Python Lambda with custom evaluation logi
 - `--kms-key-arn <kms-key-arn>`: customer-managed KMS key ARN to encrypt the evaluator
 - `--tags <tags>`: tags to apply (JSON object of key/value strings)
 
-##### `agentcore project add credentials`
+#### `agentcore add credentials`
 
 ```text
-agentcore project add credentials [options] [command]
+agentcore add credentials [options] [command]
 ```
 
 add AgentCore Identity credential providers to the current project
 
-###### `agentcore project add credentials api-key`
+##### `agentcore add credentials api-key`
 
 ```text
-agentcore project add credentials api-key [options]
+agentcore add credentials api-key [options]
 ```
 
 add an API key credential provider to the current project
@@ -397,10 +388,10 @@ add an API key credential provider to the current project
 - `--api-key <api-key>`: the API key (file://path or - for stdin; inline values are rejected)
 - `--api-key-secret-reference <api-key-secret-reference>`: external secret reference JSON: {"secretId":"&lt;arn&gt;","jsonKey":"&lt;key&gt;"}
 
-###### `agentcore project add credentials oauth`
+##### `agentcore add credentials oauth`
 
 ```text
-agentcore project add credentials oauth [options]
+agentcore add credentials oauth [options]
 ```
 
 add an OAuth2 credential provider to the current project
@@ -416,10 +407,10 @@ add an OAuth2 credential provider to the current project
 - `--client-secret <client-secret>`: the client secret (file://path or - for stdin; inline values are rejected)
 - `--client-secret-reference <client-secret-reference>`: external secret reference JSON: {"secretId":"&lt;arn&gt;","jsonKey":"&lt;key&gt;"}
 
-###### `agentcore project add credentials payment`
+##### `agentcore add credentials payment`
 
 ```text
-agentcore project add credentials payment [options]
+agentcore add credentials payment [options]
 ```
 
 add a payment credential provider to the current project
@@ -436,10 +427,10 @@ add a payment credential provider to the current project
 - `--authorization-private-key <authorization-private-key>`: Stripe/Privy authorization private key (file://path or - for stdin; inline values are rejected)
 - `--authorization-id <authorization-id>`: Stripe/Privy authorization identifier
 
-##### `agentcore project add gateway`
+#### `agentcore add gateway`
 
 ```text
-agentcore project add gateway [options]
+agentcore add gateway [options]
 ```
 
 add a Gateway to the current project
@@ -458,10 +449,10 @@ add a Gateway to the current project
 - `--exception-level <exception-level>`: exception detail level: debug
 - `--tags <tags...>`: tags as repeated key=value or a JSON object
 
-##### `agentcore project add gateway-target`
+#### `agentcore add gateway-target`
 
 ```text
-agentcore project add gateway-target [options]
+agentcore add gateway-target [options]
 ```
 
 add a Target to a project Gateway
@@ -478,10 +469,10 @@ add a Target to a project Gateway
 - `--credential-name <credential-name>`: name of a compatible credential declared in this project
 - `--scope <scope...>`: OAuth scope
 
-##### `agentcore project add gateway-connector`
+#### `agentcore add gateway-connector`
 
 ```text
-agentcore project add gateway-connector [options]
+agentcore add gateway-connector [options]
 ```
 
 add a connector-backed Target to a project Gateway
@@ -494,10 +485,10 @@ add a connector-backed Target to a project Gateway
 - `--connector-configuration <connector-configuration>`: complete connector agentCoreGateways[].targets[] object (JSON; inline, file://&lt;path&gt;, or - for stdin)
 - `--knowledge-base <knowledge-base>`: external ten-character Knowledge Base ID; only for bedrock-knowledge-bases
 
-##### `agentcore project add policy-engine`
+#### `agentcore add policy-engine`
 
 ```text
-agentcore project add policy-engine [options]
+agentcore add policy-engine [options]
 ```
 
 add a Policy Engine to the current project
@@ -511,10 +502,10 @@ add a Policy Engine to the current project
 - `--attach-to-gateways <attach-to-gateways...>`: names of project Gateways to attach this engine to
 - `--attach-mode <attach-mode>`: attached Gateway enforcement mode: log-only or enforce (default enforce)
 
-##### `agentcore project add policy`
+#### `agentcore add policy`
 
 ```text
-agentcore project add policy [options]
+agentcore add policy [options]
 ```
 
 add a Cedar Policy to a project Policy Engine
@@ -529,10 +520,10 @@ add a Cedar Policy to a project Policy Engine
 - `--enforcement-mode <enforcement-mode>`: enforcement mode: active or log-only
 - `--authorization-phase <authorization-phase>`: authorization phase: initiate or return-output (default inferred from the statement)
 
-##### `agentcore project add payment-manager`
+#### `agentcore add payment-manager`
 
 ```text
-agentcore project add payment-manager [options]
+agentcore add payment-manager [options]
 ```
 
 add a payment manager to the current project
@@ -551,10 +542,10 @@ add a payment manager to the current project
 - `--tool-allowlist <tool-allowlist...>`: tools eligible for automatic payment
 - `--network-preferences <network-preferences...>`: preferred payment networks
 
-##### `agentcore project add payment-connector`
+#### `agentcore add payment-connector`
 
 ```text
-agentcore project add payment-connector [options]
+agentcore add payment-connector [options]
 ```
 
 add a connector to a project payment manager
@@ -566,10 +557,10 @@ add a connector to a project payment manager
 - `--credential <credential>`: an existing payment credential to reuse
 - `--quick-create`: create a CoinbaseCDP connector through Quick Create (default: false)
 
-##### `agentcore project add runtime-endpoint`
+#### `agentcore add runtime-endpoint`
 
 ```text
-agentcore project add runtime-endpoint [options]
+agentcore add runtime-endpoint [options]
 ```
 
 add a named endpoint (version alias) to a runtime
@@ -581,18 +572,18 @@ add a named endpoint (version alias) to a runtime
 - `--version <version>`: the runtime version this endpoint points to (default: 1)
 - `--description <description>`: description of the endpoint
 
-#### `agentcore project export`
+### `agentcore export`
 
 ```text
-agentcore project export [options] [command]
+agentcore export [options] [command]
 ```
 
 convert project resources into editable code you own
 
-##### `agentcore project export harness`
+#### `agentcore export harness`
 
 ```text
-agentcore project export harness [options]
+agentcore export harness [options]
 ```
 
 convert a harness into an editable Strands Runtime agent
@@ -603,10 +594,10 @@ convert a harness into an editable Strands Runtime agent
 - `--arn <arn>`: the ARN of a deployed harness to fetch from the service and export
 - `--target-agent-name <target-agent-name>`: the name of the generated Runtime agent (default &lt;harnessName&gt;Agent)
 
-#### `agentcore project remove`
+### `agentcore remove`
 
 ```text
-agentcore project remove [options] [resource]
+agentcore remove [options] [resource]
 ```
 
 remove a resource from the project
@@ -624,10 +615,10 @@ remove a resource from the project
 - `--runtime <runtime>`: name of the parent runtime for a runtime-endpoint
 - `--yes`: skip the confirmation prompt when removing all resources (default: false)
 
-#### `agentcore project dev`
+### `agentcore dev`
 
 ```text
-agentcore project dev [options]
+agentcore dev [options]
 ```
 
 run the project locally for development
@@ -640,10 +631,10 @@ run the project locally for development
 - `--mode <mode>`: how to run: browser (Agent Inspector web UI) or headless (agents stream to the terminal) (default: "headless")
 - `--ui-port <ui-port>`: port for the Agent Inspector web UI (browser mode)
 
-#### `agentcore project deploy`
+### `agentcore deploy`
 
 ```text
-agentcore project deploy [options]
+agentcore deploy [options]
 ```
 
 deploy the project to AWS
@@ -653,18 +644,18 @@ deploy the project to AWS
 - `--target <target>`: name of the aws-targets.json entry to deploy; the default target is created automatically from your AWS account and region on first deploy (default: "default")
 - `--yes`: confirm removing the target's stack when the project declares nothing to deploy (default: false)
 
-#### `agentcore project invoke`
+### `agentcore invoke`
 
 ```text
-agentcore project invoke [options] [command]
+agentcore invoke [options] [command]
 ```
 
 invoke a Runtime or harness from the current project
 
-##### `agentcore project invoke runtime`
+#### `agentcore invoke runtime`
 
 ```text
-agentcore project invoke runtime [options]
+agentcore invoke runtime [options]
 ```
 
 invoke a Runtime from the current project
@@ -693,10 +684,10 @@ invoke a Runtime from the current project
 - `--baggage <baggage>`: the W3C baggage
 - `--output-file <output-file>`: the response output file
 
-##### `agentcore project invoke harness`
+#### `agentcore invoke harness`
 
 ```text
-agentcore project invoke harness [options]
+agentcore invoke harness [options]
 ```
 
 invoke a harness from the current project
@@ -709,18 +700,18 @@ invoke a harness from the current project
 - `--session-id <session-id>`: the Runtime session ID to continue (33-100 characters)
 - `--qualifier <qualifier>`: the harness endpoint qualifier to invoke (default DEFAULT)
 
-#### `agentcore project log`
+### `agentcore log`
 
 ```text
-agentcore project log [options] [command]
+agentcore log [options] [command]
 ```
 
 inspect logs for resources in the current project
 
-##### `agentcore project log runtime`
+#### `agentcore log runtime`
 
 ```text
-agentcore project log runtime [options]
+agentcore log runtime [options]
 ```
 
 stream or search logs for a Runtime in the current project
@@ -737,10 +728,10 @@ stream or search logs for a Runtime in the current project
 - `--query <query>`: CloudWatch Logs filter pattern
 - `--limit <limit>`: maximum number of log records to return in search mode
 
-##### `agentcore project log harness`
+#### `agentcore log harness`
 
 ```text
-agentcore project log harness [options]
+agentcore log harness [options]
 ```
 
 stream or search logs for a Harness in the current project
@@ -757,26 +748,26 @@ stream or search logs for a Harness in the current project
 - `--query <query>`: CloudWatch Logs filter pattern
 - `--limit <limit>`: maximum number of log records to return in search mode
 
-#### `agentcore project traces`
+### `agentcore traces`
 
 ```text
-agentcore project traces [options] [command]
+agentcore traces [options] [command]
 ```
 
 inspect traces for resources in the current project
 
-##### `agentcore project traces runtime`
+#### `agentcore traces runtime`
 
 ```text
-agentcore project traces runtime [options] [command]
+agentcore traces runtime [options] [command]
 ```
 
 inspect a Runtime's traces
 
-###### `agentcore project traces runtime list`
+##### `agentcore traces runtime list`
 
 ```text
-agentcore project traces runtime list [options]
+agentcore traces runtime list [options]
 ```
 
 list a Runtime's recent traces
@@ -790,10 +781,10 @@ list a Runtime's recent traces
 - `--since <since>`: window start: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default 12h ago)
 - `--until <until>`: window end: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default now)
 
-###### `agentcore project traces runtime get`
+##### `agentcore traces runtime get`
 
 ```text
-agentcore project traces runtime get [options] <trace-id>
+agentcore traces runtime get [options] <trace-id>
 ```
 
 download a trace's log records to a JSON file
@@ -811,18 +802,18 @@ download a trace's log records to a JSON file
 - `--since <since>`: window start: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default 12h ago)
 - `--until <until>`: window end: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default now)
 
-##### `agentcore project traces harness`
+#### `agentcore traces harness`
 
 ```text
-agentcore project traces harness [options] [command]
+agentcore traces harness [options] [command]
 ```
 
 inspect a Harness's traces
 
-###### `agentcore project traces harness list`
+##### `agentcore traces harness list`
 
 ```text
-agentcore project traces harness list [options]
+agentcore traces harness list [options]
 ```
 
 list a Harness's recent traces
@@ -836,10 +827,10 @@ list a Harness's recent traces
 - `--since <since>`: window start: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default 12h ago)
 - `--until <until>`: window end: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default now)
 
-###### `agentcore project traces harness get`
+##### `agentcore traces harness get`
 
 ```text
-agentcore project traces harness get [options] <trace-id>
+agentcore traces harness get [options] <trace-id>
 ```
 
 download a Harness trace's log records to a JSON file
@@ -857,10 +848,10 @@ download a Harness trace's log records to a JSON file
 - `--since <since>`: window start: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default 12h ago)
 - `--until <until>`: window end: "5m", "1h", "2d", ISO 8601, epoch ms, or "now" (default now)
 
-#### `agentcore project status`
+### `agentcore status`
 
 ```text
-agentcore project status [options]
+agentcore status [options]
 ```
 
 show the status of the project's deployed resources
@@ -869,10 +860,10 @@ show the status of the project's deployed resources
 
 - `--target <target>`: name of the aws-targets.json entry to report on (default: "default")
 
-#### `agentcore project build`
+### `agentcore build`
 
 ```text
-agentcore project build [options]
+agentcore build [options]
 ```
 
 build the project's deployable artifacts

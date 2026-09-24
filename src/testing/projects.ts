@@ -8,9 +8,9 @@ import { TestCoreClient } from "./TestCoreClient";
 import { TestGlobalConfigAccessor } from "./globalConfig";
 
 export type InitProjectOptions = {
-  /** Project name passed to `project create`. */
+  /** Project name passed to `agentcore create`. */
   name?: string;
-  /** Extra flags appended to the `project create` command, e.g. `["--template", "empty"]`. */
+  /** Extra flags appended to the `agentcore create` command, e.g. `["--template", "empty"]`. */
   flags?: string[];
   /** Temp directory prefix, for recognizable paths while debugging. */
   prefix?: string;
@@ -25,7 +25,7 @@ export type InitializedProject = {
   cleanup: () => Promise<void>;
 };
 
-/** Scaffolds a project with `project create` and cds into it so withProject resolves it. */
+/** Scaffolds a project with `agentcore create` and cds into it so withProject resolves it. */
 export async function initProject(options: InitProjectOptions = {}): Promise<InitializedProject> {
   const {
     name = "TestProject",
@@ -45,7 +45,6 @@ export async function initProject(options: InitProjectOptions = {}): Promise<Ini
     await root.route([
       "node",
       "agentcore",
-      "project",
       "create",
       "--name",
       name,

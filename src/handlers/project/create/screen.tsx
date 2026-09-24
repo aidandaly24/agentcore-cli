@@ -201,7 +201,7 @@ function providerLabel(provider: HarnessModelProvider): string {
 
 // ─── wizard ───────────────────────────────────────────────────────────────────
 
-// ProjectCreateScreen is the interactive flow behind a bare `agentcore project
+// ProjectCreateScreen is the interactive flow behind a bare `agentcore
 // create`: name → type → (model | template) → review, then the
 // creation itself, streaming the ProjectManager's progress events. It drives
 // core.projectManager.create with the same input the flag-driven handler
@@ -217,11 +217,11 @@ export function ProjectCreateScreen({ ctx, core }: ScreenProps) {
 
   return (
     <Wizard
-      breadcrumb={["agentcore", "project", "create"]}
+      breadcrumb={["agentcore", "create"]}
       description="create a new AgentCore project"
-      // Esc from the first step leaves the wizard for the project menu, the
+      // Esc from the first step leaves the wizard for the root menu, the
       // same place RouterScreen's esc goes.
-      onCancel={() => navigate("/agentcore/project")}
+      onCancel={() => navigate("/agentcore")}
       onSubmit={() => {
         // Both of these throw before anything is written, so the wizard reports
         // them the way it reports a failed create — with the retry still on
@@ -231,7 +231,7 @@ export function ProjectCreateScreen({ ctx, core }: ScreenProps) {
       }}
       runningLabel={`creating ${values.name}…`}
       successLabel={`project created in ./${values.name}`}
-      successNextSteps={[`cd ${values.name}`, "agentcore project deploy"]}
+      successNextSteps={[`cd ${values.name}`, "agentcore deploy"]}
       successHint="enter exits"
       onDone={() => {
         ctx.value(TuiExitMessageKey)?.(`Next step:\n  cd ${values.name}/ && agentcore`);

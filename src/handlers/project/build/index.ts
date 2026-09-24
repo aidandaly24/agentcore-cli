@@ -1,4 +1,4 @@
-import { createHandler, ProjectKey } from "../../../router";
+import { createHandler, ProjectKey, type Middleware } from "../../../router";
 import type { AppIO } from "../../../io";
 import { runWithProgress } from "../../../tui/progress";
 import { JsonKey } from "../../keys";
@@ -8,6 +8,7 @@ import type { Project, ProjectManager } from "../types";
 type BuildProjectHandlerConfig = {
   projectManager: ProjectManager;
   io: AppIO;
+  middlewares?: Middleware[];
 };
 
 /** The line both entry points print once a build finishes. */
@@ -19,6 +20,7 @@ export const createBuildProjectHandler = (config: BuildProjectHandlerConfig) =>
   createHandler({
     name: "build",
     description: "build the project's deployable artifacts",
+    middlewares: config.middlewares,
     handle: async (ctx) => {
       // withProject has already resolved the enclosing project.
       const project = ctx.require(ProjectKey);

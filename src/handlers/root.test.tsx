@@ -11,7 +11,17 @@ describe("createRootHandler", () => {
     });
     expect(root.name()).toBe("agentcore");
     expect(root.children().map((c) => c.name())).toEqual([
-      "project",
+      "create",
+      "add",
+      "export",
+      "remove",
+      "dev",
+      "deploy",
+      "invoke",
+      "log",
+      "traces",
+      "status",
+      "build",
       "eval",
       "feedback",
       "config",

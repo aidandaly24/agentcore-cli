@@ -33,7 +33,7 @@ Use --endpoint for an external MCP server or --runtime for a project Runtime.
 For every complete project Target shape, pass targetType and its configuration here.
 Supported targetType values: mcpServer, httpRuntime, apiGateway, openApiSchema,
 smithyModel, lambdaFunctionArn, connector, and passthrough.
-Use project add gateway-connector for curated Connector shortcuts.`,
+Use agentcore add gateway-connector for curated Connector shortcuts.`,
         },
       ),
       flag(

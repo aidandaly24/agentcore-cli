@@ -28,7 +28,7 @@ async function run(
     logger: createSilentLogger(),
     platform: opts?.platform,
   });
-  await root.route(["node", "agentcore", "project", ...args]);
+  await root.route(["node", "agentcore", ...args]);
   return { io, core };
 }
 
@@ -223,7 +223,7 @@ describe("project create", () => {
     expect(io.stderr()).toContain("Syncing Python dependencies with uv");
     expect(io.stderr()).toContain("Initializing git repository");
     expect(io.stderr()).toContain("Created project 'MyAgent' in ./MyAgent");
-    expect(io.stderr()).toContain("Next steps:\n  cd MyAgent\n  agentcore project deploy");
+    expect(io.stderr()).toContain("Next steps:\n  cd MyAgent\n  agentcore deploy");
   });
 
   test("--skip-install and --skip-git run no commands", async () => {

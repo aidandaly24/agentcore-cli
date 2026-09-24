@@ -9,9 +9,9 @@ import { ProjectGate } from "../ProjectGate";
 import type { Project } from "../types";
 import { declaresNothingDeployable, deployedMessage, teardownQuestion } from "./index";
 
-const BREADCRUMB = ["agentcore", "project", "deploy"];
+const BREADCRUMB = ["agentcore", "deploy"];
 const DESCRIPTION = "deploy the project to AWS";
-const PROJECT_MENU = "/agentcore/project";
+const PROJECT_MENU = "/agentcore";
 
 // DeployProjectScreen runs the same projectManager.deploy generator the command
 // runs; ConfirmAction renders its steps through the same TaskList. With several

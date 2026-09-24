@@ -116,7 +116,7 @@ function testDeployCommand(
   return {
     ...fake,
     io,
-    run: (args: string[] = []) => root.route(["node", "agentcore", "project", "deploy", ...args]),
+    run: (args: string[] = []) => root.route(["node", "agentcore", "deploy", ...args]),
   };
 }
 

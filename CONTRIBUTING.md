@@ -85,7 +85,7 @@ npm i -g "./$TARBALL"
 - **The CLI looks frozen in a PowerShell window**: legacy conhost pauses all
   output while text is selected (the title bar shows `Select`). Press `Esc`.
   Windows Terminal does not do this.
-- **`project create` refuses a long path**: Windows caps paths at 260 characters
+- **`agentcore create` refuses a long path**: Windows caps paths at 260 characters
   unless `LongPathsEnabled` is set, and the CDK app's `node_modules` puts its
   deepest file 155 characters below the project root (aws-cdk-lib's own shipped
   fixtures), so the project root must be at most 104 characters. Create the
@@ -195,7 +195,7 @@ command — branch or leaf — is a `Handler`:
   ("global") flags and middleware that apply to everything beneath them. A
   branch can also register a **default handler** (`router.default(...)`) that
   runs when the branch is invoked with no subcommand (e.g. bare `agentcore` or
-  `agentcore project` — this is how the TUI launches).
+  `agentcore add` — this is how the TUI launches).
 - **Leaf nodes** (built with `createHandler(...)`) do the work. They declare
   their own flags/arguments (validated and coerced via zod schemas) and receive
   a typed object in `handle(ctx, flags, args)`.
