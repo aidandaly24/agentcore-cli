@@ -137,15 +137,18 @@ describe("every command-line-only command opens on screen", () => {
 });
 
 describe("paths without a screen of their own", () => {
-  test("an unknown path retains the standard help fallback", async () => {
-    const r = renderScreen("/agentcore/gateway/no-such-command");
+  test.each(["/agentcore/gateway/no-such-command", "/agentcore/payment"])(
+    "%s retains the standard help fallback",
+    async (path) => {
+      const r = renderScreen(path);
 
-    await waitForText(() => r.frames.join("\n"), "Usage:");
-    const output = r.frames.join("\n");
-    expect(output).toMatch(/^\s+create\s+/m);
-    expect(output).not.toContain("command line only");
-    r.unmount();
-  });
+      await waitForText(() => r.frames.join("\n"), "Usage:");
+      const output = r.frames.join("\n");
+      expect(output).toMatch(/^\s+create\s+/m);
+      expect(output).not.toContain("command line only");
+      r.unmount();
+    },
+  );
 
   test("a group drills down to a leaf's help and back", async () => {
     const r = renderScreen("/agentcore/gateway", { globalConfig: MUTATION_CONFIG });

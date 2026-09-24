@@ -31,6 +31,18 @@ describe("menu rendering", () => {
     r.unmount();
   });
 
+  test("lists standalone commands in the root menu when enabled", async () => {
+    const r = renderImperativeScreen("/agentcore");
+    await waitForText(r.lastFrame, "type to choose a command");
+
+    const entries = menuEntries(r.lastFrame()!);
+    expect(entries.screens).toEqual(
+      expect.arrayContaining(["harness", "identity", "runtime", "memory", "gateway"]),
+    );
+    expect(entries.cliOnly).toContain("payment");
+    r.unmount();
+  });
+
   test("shows the command description in the header", async () => {
     const r = renderScreen("/agentcore");
     await waitForText(r.lastFrame, "the platform for production AI agents");
@@ -92,6 +104,20 @@ describe("filtering", () => {
 });
 
 describe("navigation", () => {
+  test.each(["harness", "runtime/endpoint"])(
+    "an unavailable %s menu redirects to a working root menu",
+    async (path) => {
+      const r = renderScreen(`/agentcore/${path}`);
+      await waitForText(r.lastFrame, "the platform for production AI agents");
+
+      await r.write("eval");
+      await r.press("return");
+      await waitForText(r.lastFrame, "agentcore → eval");
+      expect(r.lastFrame()).toContain("evaluator");
+      r.unmount();
+    },
+  );
+
   test("down arrow moves the highlight to the next option", async () => {
     const r = renderScreen("/agentcore");
     await waitForText(r.lastFrame, "❯ create");
