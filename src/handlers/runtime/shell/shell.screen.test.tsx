@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { renderTuiAt } from "../../../tui";
 import { DebugKey, EndpointKey, JsonKey, RegionKey } from "../../keys";
-import { ValueContext } from "../../../router";
+import { CommandKey, ValueContext } from "../../../router";
 import type { RuntimeShellSession } from "../types";
 import {
   cleanupScreens,
+  compiledRootCommand,
+  IMPERATIVE_GLOBAL_CONFIG,
   renderImperativeScreen,
   TestCoreClient,
   tick,
@@ -102,6 +104,7 @@ describe("RuntimeShellScreen", () => {
     value.runtime.setShellSession(failedSession);
     const { streams, stdin } = ttyTestIO();
     const ctx = ValueContext.EmptyContext()
+      .withValue(CommandKey, compiledRootCommand(value, IMPERATIVE_GLOBAL_CONFIG))
       .withValue(RegionKey, "us-east-1")
       .withValue(EndpointKey, undefined)
       .withValue(JsonKey, false)
@@ -134,6 +137,7 @@ describe("RuntimeShellScreen", () => {
     const value = core();
     const { streams } = ttyTestIO();
     const ctx = ValueContext.EmptyContext()
+      .withValue(CommandKey, compiledRootCommand(value, IMPERATIVE_GLOBAL_CONFIG))
       .withValue(RegionKey, "us-east-1")
       .withValue(EndpointKey, undefined)
       .withValue(JsonKey, false)
@@ -150,6 +154,7 @@ describe("RuntimeShellScreen", () => {
     value.runtime.setError(new Error("shell lookup failed"));
     const { streams } = ttyTestIO();
     const ctx = ValueContext.EmptyContext()
+      .withValue(CommandKey, compiledRootCommand(value, IMPERATIVE_GLOBAL_CONFIG))
       .withValue(RegionKey, "us-east-1")
       .withValue(EndpointKey, undefined)
       .withValue(JsonKey, false)
@@ -164,6 +169,7 @@ describe("RuntimeShellScreen", () => {
     const value = core();
     const { streams, stdin } = ttyTestIO();
     const ctx = ValueContext.EmptyContext()
+      .withValue(CommandKey, compiledRootCommand(value, IMPERATIVE_GLOBAL_CONFIG))
       .withValue(RegionKey, "us-east-1")
       .withValue(EndpointKey, undefined)
       .withValue(JsonKey, false)
