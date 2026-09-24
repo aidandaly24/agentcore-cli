@@ -7,12 +7,19 @@ import type {
 import type { AwsDeploymentTarget } from "../../../projectSchemas/aws-targets";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
 import { ProjectKey } from "../../../router";
+import { DEFAULT_GLOBAL_CONFIG } from "../../../globalConfig";
+import { createRootHandler } from "../../index";
 import {
   cleanupScreens,
+  createSilentLogger,
   flatFrame,
   inTempDirectory,
   renderScreen,
   TestCoreClient,
+  TestGlobalConfigAccessor,
+  tick,
+  ttyTestIO,
+  waitFor,
   waitForFlatText,
   waitForText,
 } from "../../../testing";
@@ -111,6 +118,52 @@ function core(
 }
 
 describe("project invoke picker", () => {
+  test.each(["harness", "runtime"] as const)(
+    "the public %s CLI command opens and invokes through the TUI with the flag off",
+    async (family) => {
+      const value = core();
+      value.projectManager.resolve = async () => project;
+      const { streams, stdin } = ttyTestIO();
+      const root = createRootHandler(value, {
+        io: streams.io,
+        logger: createSilentLogger(),
+        globalConfigAccessor: new TestGlobalConfigAccessor({
+          initialConfigData: DEFAULT_GLOBAL_CONFIG,
+        }),
+        globalConfig: DEFAULT_GLOBAL_CONFIG,
+      });
+      const rendering = root.route([
+        "node",
+        "agentcore",
+        "invoke",
+        family,
+        "--name",
+        family === "runtime" ? "checkout" : "support",
+        "--qualifier",
+        "DEFAULT",
+        "--region",
+        TARGET.region,
+      ]);
+      try {
+        await waitFor(() =>
+          streams.stdout().includes(family === "harness" ? "send a message" : "Enter JSON payload"),
+        );
+        expect(streams.stdout()).not.toContain("exec mode");
+        stdin.write(family === "harness" ? "hello" : '{"prompt":"hello"}');
+        await tick();
+        stdin.write("\r");
+        const method = family === "harness" ? "invokeHarness" : "invokeRuntime";
+        await waitFor(() => value[family].calls.some((call) => call.method === method));
+        expect(
+          value.harness.calls.some((call) => call.method === "invokeAgentRuntimeCommand"),
+        ).toBe(false);
+      } finally {
+        stdin.write("\x03");
+        await rendering;
+      }
+    },
+  );
+
   test("lists only resources present in the deployed target", async () => {
     const screen = renderScreen("/agentcore/invoke", {
       core: core([
