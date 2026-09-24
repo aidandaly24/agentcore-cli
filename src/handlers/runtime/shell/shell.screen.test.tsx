@@ -5,7 +5,7 @@ import { ValueContext } from "../../../router";
 import type { RuntimeShellSession } from "../types";
 import {
   cleanupScreens,
-  renderImperativeScreen as renderScreen,
+  renderImperativeScreen,
   TestCoreClient,
   tick,
   type TtyInput,
@@ -80,7 +80,7 @@ async function interruptUntilExit(rendering: Promise<void>, stdin: TtyInput): Pr
 
 describe("RuntimeShellScreen", () => {
   test("a direct Runtime route skips the Runtime picker", async () => {
-    const screen = renderScreen("/agentcore/runtime/shell/checkout-AbCdEf1234", {
+    const screen = renderImperativeScreen("/agentcore/runtime/shell/checkout-AbCdEf1234", {
       core: core(),
     });
 
