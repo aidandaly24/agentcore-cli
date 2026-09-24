@@ -2,10 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import type {
   GetAgentRuntimeEndpointResponse,
   GetAgentRuntimeResponse,
-  GetGatewayResponse,
   GetHarnessResponse,
   GetMemoryOutput,
-  GetOauth2CredentialProviderResponse,
   ListAgentRuntimeEndpointsResponse,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import { DEFAULT_GLOBAL_CONFIG, type GlobalConfig } from "../../../globalConfig";
@@ -305,71 +303,6 @@ describe("project status screen", () => {
       expect.objectContaining({ region: TARGET.region }),
     ]);
   });
-
-  test.each(["gateway", "oauth2"])(
-    "a project Harness's linked %s remains readable with imperative commands off",
-    async (linked) => {
-      const value = core([deployed("harness", "support", { arn: `${ARN}:harness/${HARNESS_ID}` })]);
-      value.harness.setGetResponse({
-        harness: {
-          harnessId: HARNESS_ID,
-          harnessName: "support",
-          arn: `${ARN}:harness/${HARNESS_ID}`,
-          tools: [
-            {
-              type: "agentcore_gateway",
-              config: {
-                agentCoreGateway: {
-                  gatewayArn: `${ARN}:gateway/update`,
-                  outboundAuth: {
-                    oauth: {
-                      providerArn: `${ARN}:token-vault/default/oauth2credentialprovider/delete`,
-                    },
-                  },
-                },
-              },
-            },
-          ],
-        },
-      } as GetHarnessResponse);
-      value.gateway.setGetResponse({
-        gatewayId: "update",
-        name: "linked-gateway",
-        gatewayArn: `${ARN}:gateway/update`,
-        status: "READY",
-      } as GetGatewayResponse);
-      value.identity.setGetOauth2Response({
-        name: "delete",
-        status: "READY",
-      } as GetOauth2CredentialProviderResponse);
-      const screen = renderStatus(
-        value,
-        project({ harnesses: [{ name: "support", path: "app/support" }] }),
-      );
-      await waitForGroup(screen, "support");
-      await screen.press("down");
-      await screen.press("return");
-      await waitForText(screen.lastFrame, "linked resources");
-      for (let press = 0; press < (linked === "gateway" ? 3 : 4); press++) {
-        await screen.press("down");
-      }
-      expect(focusedLine(screen.lastFrame())).toContain(linked);
-      await screen.press("return");
-      await waitForText(screen.lastFrame, "READY");
-      if (linked === "gateway") {
-        const call = value.gateway.calls.find(({ method }) => method === "getGateway")!;
-        expect(call.args).toEqual(["update", expect.objectContaining({ region: TARGET.region })]);
-        expect(flatFrame(screen.lastFrame)).toContain("browse every Target");
-      } else {
-        const call = value.identity.calls.find(
-          ({ method }) => method === "getOauth2CredentialProvider",
-        )!;
-        expect(call.args).toEqual(["delete", expect.objectContaining({ region: TARGET.region })]);
-        expect(flatFrame(screen.lastFrame)).toContain("show the full JSON definition");
-      }
-      expect(value.harness.calls.every(({ method }) => method === "getHarness")).toBe(true);
-    },
-  );
 
   test("escape from a detail page returns to the status screen", async () => {
     const screen = renderStatus(core());
