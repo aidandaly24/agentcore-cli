@@ -296,7 +296,7 @@ describe("project invoke picker", () => {
     });
   });
 
-  test("uses the existing Runtime endpoint picker before its JSON console", async () => {
+  test("project Runtime invocation keeps target switching within the selected resource", async () => {
     const value = core();
     const screen = renderScreen("/agentcore/invoke", {
       core: value,
@@ -316,5 +316,16 @@ describe("project invoke picker", () => {
       endpointUrl: undefined,
       credentials: TARGET_CREDENTIALS,
     });
+    await screen.write("\x14");
+    await waitForText(screen.lastFrame, "choose another endpoint");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "Enter JSON payload");
+    await screen.write("{}");
+    await screen.press("return");
+    await waitFor(() => value.runtime.calls.some((call) => call.method === "invokeRuntime"));
+    expect(
+      value.runtime.calls.find((call) => call.method === "invokeRuntime")!.args[0],
+    ).toMatchObject({ runtimeId: "runtime-123", qualifier: "DEFAULT" });
+    expect(value.runtime.calls.some((call) => call.method === "listRuntimes")).toBe(false);
   });
 });
