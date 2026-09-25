@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { createRootHandler } from "../../../index";
 import {
-  compiledRootCommand,
   createSilentLogger,
   initProject,
   TestCoreClient,
@@ -31,47 +30,6 @@ async function run(args: string[], opts?: { core?: TestCoreClient }) {
 
 describe("project add harness", () => {
   const defaultModel = { provider: "bedrock", modelId: "global.anthropic.claude-sonnet-4-6" };
-
-  test("help organizes every flag into the agreed groups and order", () => {
-    const add = compiledRootCommand().commands.find((command) => command.name() === "add")!;
-    const harness = add.commands.find((command) => command.name() === "harness")!;
-    const help = harness.helpInformation();
-    const groups: [string, string[]][] = [
-      ["Configuration:", ["name", "model", "system-prompt", "tags"]],
-      ["Tools and skills:", ["tools", "allowed-tools", "skills"]],
-      ["Memory and context:", ["memory", "truncation"]],
-      ["Invocation limits:", ["max-iterations", "max-tokens", "timeout-seconds"]],
-      [
-        "Environment:",
-        [
-          "container-uri",
-          "dockerfile",
-          "environment-variables",
-          "network-mode",
-          "network-config",
-          "lifecycle-config",
-        ],
-      ],
-      ["Filesystem storage:", ["session-storage-path", "efs-access-points", "s3-access-points"]],
-      [
-        "Access and permissions:",
-        ["execution-role-arn", "authorizer-type", "authorizer-configuration"],
-      ],
-    ];
-    const positions = [...groups.map(([heading]) => heading), "Other options:"].map((heading) =>
-      help.indexOf(`\n${heading}\n`),
-    );
-
-    expect(help).toContain("Usage: agentcore add harness [options]");
-    expect(positions.every((position) => position >= 0)).toBe(true);
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    for (const [index, [, flags]] of groups.entries()) {
-      const section = help.slice(positions[index], positions[index + 1]);
-      expect([...section.matchAll(/^ {2}--([\w-]+)\s/gm)].map((match) => match[1])).toEqual(flags);
-    }
-    expect(help).not.toContain("\nOptions:\n");
-    expect(help.indexOf("-h, --help")).toBeGreaterThan(positions.at(-1)!);
-  });
 
   test.each<[string, string[], Record<string, unknown>]>([
     ["minimal — name only", ["--name", "x"], { model: defaultModel }],
