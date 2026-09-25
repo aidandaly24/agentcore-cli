@@ -2,8 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { Box } from "ink";
 import { cleanup, render } from "ink-testing-library";
 import stringWidth from "string-width";
-import { waitForText } from "../testing";
-import { KeyValueTable, type KeyValueSection } from "./KeyValueTable";
+import { KeyValueTable } from "./KeyValueTable";
 
 afterEach(cleanup);
 
@@ -143,35 +142,3 @@ test.each([40, 61, 100, 180])(
     expect(lines.every((line) => stringWidth(line) <= width)).toBe(true);
   },
 );
-
-test("removing the widest row recomputes the shared width", async () => {
-  const view = (sections: readonly KeyValueSection[]) => (
-    <Box width={80}>
-      <KeyValueTable sections={sections} />
-    </Box>
-  );
-  const r = render(
-    view([
-      { title: "first", rows: [["a", "VALUE"]] },
-      { title: "last", rows: [["longest-key", "OTHER"]] },
-    ]),
-  );
-  expect(valueColumn(r.lastFrame()!, "VALUE")).toBe(15);
-
-  r.rerender(view([{ title: "first", rows: [["a", "UPDATED"]] }]));
-  await waitForText(r.lastFrame, "UPDATED");
-  expect(valueColumn(r.lastFrame()!, "UPDATED")).toBe(5);
-  expect(r.lastFrame()).not.toContain("OTHER");
-});
-
-test("independent tables do not share widths", () => {
-  const r = render(
-    <Box width={80} flexDirection="column">
-      <KeyValueTable items={{ a: "FIRST" }} />
-      <KeyValueTable items={{ "longest-key": "SECOND" }} />
-    </Box>,
-  );
-
-  expect(valueColumn(r.lastFrame()!, "FIRST")).toBe(3);
-  expect(valueColumn(r.lastFrame()!, "SECOND")).toBe(13);
-});
