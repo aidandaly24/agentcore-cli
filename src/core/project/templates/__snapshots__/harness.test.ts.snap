@@ -5,33 +5,25 @@ exports[`scaffolds valid YAML with inactive examples and a resolvable prompt 1`]
 
 name: assistant
 
+# Choose one model configuration.
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessModelConfiguration.html
 model:
-  provider: bedrock # open_ai, gemini, lite_llm
-  modelId: global.anthropic.claude-sonnet-4-6
-  # temperature: 0.2
-  # topP: 0.9
-  # maxTokens: 4096
-  # apiFormat: converse_stream
-  # apiKeyArn: YOUR_API_KEY_PROVIDER_ARN
+  bedrockModelConfig:
+    modelId: global.anthropic.claude-sonnet-4-6
+    # temperature: 0.2
+    # topP: 0.9
+    # maxTokens: 4096
+    # apiFormat: converse_stream
 
-# Edit system-prompt.md next to this file, or set inline instructions below to override it.
-# systemPrompt: |
-#   You are a helpful assistant.
-#   Ask for clarification when a request is ambiguous.
-
-# Remove this block or set mode to disabled to turn memory off.
-# For existing memory, set mode to existing and add arn or name (for a memory in this project).
-# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessMemoryConfiguration.html
-memory:
-  mode: managed
-  # strategies: [SEMANTIC, SUMMARIZATION, USER_PREFERENCE, EPISODIC]
-  # eventExpiryDuration: 30 # Days.
+# Edit system-prompt.md next to this file, or set an inline content block:
+# systemPrompt:
+#   - text: |
+#       You are a helpful assistant.
 
 # Add tools alongside the harness's built-in shell and file operations.
-# Choose a unique name for each entry.
-# For Remote MCP, Gateway, Browser, Code Interpreter, and other tool configurations, see:
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTool.html
+tools: []
+# To add a remote MCP tool, replace [] with:
 # tools:
 #   - name: research
 #     type: remote_mcp
@@ -39,76 +31,80 @@ memory:
 #       remoteMcp:
 #         url: https://mcp.example.com/mcp
 
-# Limit which available tools the agent can use. "*" allows all available tools.
-# Restrict with patterns such as "@builtin".
+# "*" permits all available tools, including built-in tools.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-tools.html
 allowedTools: ["*"]
 
-# Load skills from S3 (s3Uri), Git (gitUrl), container files (path), or bundled AWS skills (awsSkills).
+# Load skills from S3, Git, container files, or bundled AWS skills.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-skills.html
 skills: []
+# To add an AWS skill, replace [] with:
+# skills:
+#   - awsSkills:
+#       paths: [core-skills/aws-serverless]
 
-# Controls how conversation history is kept within the model's context window.
-# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTruncationConfiguration.html
+# For existing memory, use agentCoreMemoryConfiguration with an arn or
+# a project memory name. Use memory: { disabled: {} } to turn memory off.
+# https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessMemoryConfiguration.html
+memory:
+  managedMemoryConfiguration: {}
+# To tune managed memory, replace {} with strategies and/or eventExpiryDuration.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html
+
+# Context policy and limits for one invocation.
 truncation:
   strategy: sliding_window
   # config:
   #   slidingWindow:
   #     messagesCount: 40
-
-# Limits for one invocation, across all model calls.
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
 # maxIterations: 15
 # maxTokens: 20000
 # timeoutSeconds: 300
 
-# Values must be strings. Put quotes around numbers and booleans.
-# Environment values are stored in plaintext.
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html
+# Values must be strings. Environment values are stored in plaintext.
 environmentVariables: {}
 
-# Use a local Dockerfile or an ECR image. Omit both to use the service-provided environment.
-# Dockerfile paths are relative to this file's directory.
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html#harness-custom-container
-# dockerfile: Dockerfile
-# containerUri: 123456789012.dkr.ecr.us-west-2.amazonaws.com/my-harness:latest
+# Omit both to use the service-provided environment.
+# environmentArtifact:
+#   containerConfiguration:
+#     containerUri: 123456789012.dkr.ecr.us-west-2.amazonaws.com/my-harness:latest
 
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-security.html#harness-network-config
-# To use the VPC example below, change networkMode to VPC and replace the resource IDs.
-# vpcId is required for Dockerfile builds in VPC mode.
-networkMode: PUBLIC
-# networkConfig:
-#   vpcId: vpc-0123456789abcdef0
-#   subnets: [subnet-0123456789abcdef0]
-#   securityGroups: [sg-0123456789abcdef0]
+# Service runtime settings. For VPC mode, replace the resource IDs.
+# EFS and S3 Files mounts require VPC mode; mount paths must be unique.
+# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html
+# environment:
+#   agentCoreRuntimeEnvironment:
+#     networkConfiguration:
+#       networkMode: VPC
+#       networkModeConfig:
+#         subnets: [subnet-0123456789abcdef0]
+#         securityGroups: [sg-0123456789abcdef0]
+#     lifecycleConfiguration:
+#       idleRuntimeSessionTimeout: 900
+#       maxLifetime: 28800
+#     filesystemConfigurations:
+#       - sessionStorage:
+#           mountPath: /mnt/session
+#       - efsAccessPoint:
+#           accessPointArn: arn:aws:elasticfilesystem:us-west-2:123456789012:access-point/fsap-0123456789abcdef0
+#           mountPath: /mnt/data
+#       - s3FilesAccessPoint:
+#           accessPointArn: arn:aws:s3files:us-west-2:123456789012:file-system/fs-0123456789abcdef0/access-point/fsap-0123456789abcdef0
+#           mountPath: /mnt/files
 
-# Caller authentication, separate from the credentials used to call models or tools.
+# Omit authorizerConfiguration to use AWS IAM caller authorization.
 # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-security.html
-# To use JWT, change authorizerType to CUSTOM_JWT and configure your identity provider below.
-authorizerType: AWS_IAM
 # authorizerConfiguration:
-#   customJwtAuthorizer:
+#   customJWTAuthorizer:
 #     discoveryUrl: https://id.example.com/.well-known/openid-configuration
 #     allowedAudience: [my-harness-app]
 
-# Deployment will create an execution role when omitted. Manage permissions yourself for a supplied role.
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-security.html#harness-execution-role-policy
+# The project creates an execution role when this field is absent.
 # executionRoleArn: arn:aws:iam::123456789012:role/MyHarnessRole
-
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits
-# lifecycleConfig:
-#   idleRuntimeSessionTimeout: 900
-#   maxLifetime: 28800
-
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-environment.html
-# sessionStoragePath: /mnt/session
-
-# EFS and S3 Files mounts require VPC mode. Each entry contains an accessPointArn and mountPath.
-# Mount paths must be under /mnt and must be unique across all filesystem types.
-efsAccessPoints: []
-s3AccessPoints: []
-
-# https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html
 tags: {}
+
+# CLI project build settings are not CreateHarness properties.
+# dockerfile: Dockerfile
+# For VPC Dockerfile builds, also supply networkConfig.vpcId.
 "
 `;

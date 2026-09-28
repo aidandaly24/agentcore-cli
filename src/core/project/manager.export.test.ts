@@ -336,7 +336,7 @@ describe("FsProjectManager.exportHarness side effects", () => {
         source === "file" ? prompt : "Conventional prompt loses.",
       );
       if (source === "file") delete config.systemPrompt;
-      else config.systemPrompt = prompt;
+      else config.systemPrompt = [{ text: prompt }];
       config.truncation = {
         strategy: "summarization",
         config: { summarization: { summarizationSystemPrompt: "  Keep the decisions.\n" } },
@@ -364,6 +364,26 @@ describe("FsProjectManager.exportHarness side effects", () => {
       /Invalid harness.yaml.*maxIterations/s,
     );
     expect(existsSync(join(project.rootPath, "app", "assistantAgent"))).toBe(false);
+  });
+
+  test("continues exporting a legacy flat harness file", async () => {
+    const { manager: subject } = manager();
+    const project = await projectWithHarness(subject);
+    const configPath = join(project.rootPath, "app", "assistant", "harness.yaml");
+    const prompt = await Bun.file(
+      join(project.rootPath, "app", "assistant", "system-prompt.md"),
+    ).text();
+    await Bun.write(
+      configPath,
+      stringify({
+        name: "assistant",
+        model: { provider: "bedrock", modelId: "global.anthropic.claude-sonnet-4-6" },
+        memory: { mode: "managed" },
+      }),
+    );
+
+    const result = await drain(subject.exportHarness(project, exportInput()));
+    expect(await Bun.file(join(result.agentPath, "main.py")).text()).toContain(prompt);
   });
 
   test("writes MCP header secrets to .env.local and registers their credentials", async () => {

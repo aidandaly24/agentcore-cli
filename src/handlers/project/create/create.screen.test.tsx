@@ -208,11 +208,9 @@ describe("project create wizard", () => {
     expect(spec.credentials).toEqual([]);
     const harness = parse(await Bun.file(join(root, "app", "OpenAIApp", "harness.yaml")).text());
     expect(harness.model).toEqual({
-      provider: "open_ai",
-      modelId: "gpt-5",
-      apiKeyArn,
+      openAiModelConfig: { modelId: "gpt-5", apiKeyArn },
     });
-    expect(harness.memory).toEqual({ mode: "managed" });
+    expect(harness.memory).toEqual({ managedMemoryConfiguration: {} });
     expect(harness.systemPrompt).toBeUndefined();
     r.unmount();
   }, 10000);

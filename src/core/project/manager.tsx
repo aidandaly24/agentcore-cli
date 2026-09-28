@@ -49,6 +49,7 @@ import {
   mapHarnessToExportPlan,
 } from "./templates/export";
 import { HarnessSpecSchema } from "../../projectSchemas/harness";
+import { parseHarnessProjectSpec } from "../../projectSchemas/harnessProject";
 import { FsTreeNode } from "./templates/fsTree";
 import { getEvaluatorTemplateResolver } from "./templates/evaluator";
 import { ProjectSpecSchema, type ManagedBy } from "../../projectSchemas/project";
@@ -791,14 +792,15 @@ export class FsProjectManager implements ProjectManager {
         message: `Reading harness configuration from '${join(entry.path, "harness.yaml")}'`,
       };
       const harnessPath = join(harnessDir, "harness.yaml");
-      const parsed = HarnessSpecSchema.safeParse(await readYamlFile(harnessPath));
-      if (!parsed.success) {
+      try {
+        spec = parseHarnessProjectSpec(await readYamlFile(harnessPath));
+      } catch (error) {
+        if (!(error instanceof z.ZodError)) throw error;
         throw new InputValidationError(
-          `Invalid harness.yaml at '${harnessPath}': ${z.prettifyError(parsed.error)}`,
-          { cause: parsed.error },
+          `Invalid harness.yaml at '${harnessPath}': ${z.prettifyError(error)}`,
+          { cause: error },
         );
       }
-      spec = parsed.data;
       systemPrompt = spec.systemPrompt ?? DEFAULT_EXPORT_SYSTEM_PROMPT;
       if (spec.systemPrompt === undefined) {
         const promptPath = join(harnessDir, "system-prompt.md");

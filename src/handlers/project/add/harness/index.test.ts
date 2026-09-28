@@ -12,6 +12,7 @@ import {
 } from "../../../../testing";
 import { DeserializationError, InputValidationError } from "../../../../errors";
 import { FsReadWriteJson, type ReadWriteJson } from "../../../../io";
+import { parseHarnessProjectSpec } from "../../../../projectSchemas/harnessProject";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(() => Promise.all(cleanups.splice(0).map((cleanup) => cleanup())));
@@ -417,7 +418,8 @@ describe("project add harness", () => {
     await run(["add", "harness", ...flags]);
 
     const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
-    expect(harnessYaml).toMatchObject(expected);
+    expect(harnessYaml.model).not.toHaveProperty("provider");
+    expect(parseHarnessProjectSpec(harnessYaml)).toMatchObject(expected);
 
     const agentcoreJson = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     expect(agentcoreJson.harnesses).toContainEqual({
@@ -436,8 +438,8 @@ describe("project add harness", () => {
 
     const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
     expect(harnessYaml.systemPrompt).toBeUndefined();
-    expect(harnessYaml.memory).toEqual({ mode: "managed" });
-    expect(harnessYaml.tools).toBeUndefined();
+    expect(harnessYaml.memory).toEqual({ managedMemoryConfiguration: {} });
+    expect(harnessYaml.tools).toEqual([]);
     expect(harnessYaml.skills).toEqual([]);
     expect(existsSync(join(projectRoot, "app", "x", "harness.json"))).toBe(false);
   });
@@ -479,7 +481,7 @@ describe("project add harness", () => {
     ]);
 
     const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
-    expect(harnessYaml).toMatchObject({
+    expect(parseHarnessProjectSpec(harnessYaml)).toMatchObject({
       dockerfile: "Dockerfile",
       networkMode: "VPC",
       networkConfig: {

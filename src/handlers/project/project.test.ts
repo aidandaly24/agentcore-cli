@@ -81,12 +81,11 @@ describe("project create", () => {
       await Bun.file(join(projectRoot, "app", "MyAgent", "harness.yaml")).text(),
     );
     expect(harness.model).toEqual({
-      provider: "bedrock",
-      modelId: "global.anthropic.claude-sonnet-5",
+      bedrockModelConfig: { modelId: "global.anthropic.claude-sonnet-5" },
     });
-    expect(harness.memory).toEqual({ mode: "managed" });
+    expect(harness.memory).toEqual({ managedMemoryConfiguration: {} });
     expect(harness.systemPrompt).toBeUndefined();
-    expect(harness.tools).toBeUndefined();
+    expect(harness.tools).toEqual([]);
     expect(harness.skills).toEqual([]);
     expect(existsSync(join(projectRoot, "app", "MyAgent", "harness.json"))).toBe(false);
     expect(await Bun.file(join(projectRoot, "app", "MyAgent", "system-prompt.md")).exists()).toBe(

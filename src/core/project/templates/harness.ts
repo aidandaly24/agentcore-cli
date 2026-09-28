@@ -1,11 +1,8 @@
 import { existsSync } from "node:fs";
-import { Scalar, stringify } from "yaml";
+import { stringify } from "yaml";
 import { ZodError, z } from "zod";
-import {
-  HarnessModelProviderSchema,
-  HarnessSpecSchema,
-  type HarnessSpec,
-} from "../../../projectSchemas/harness";
+import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
+import { toApiShapedHarnessSpec } from "../../../projectSchemas/harnessProject";
 import { FsTreeNode } from "./fsTree";
 import { InputValidationError, ResourceNotFoundError } from "../../../errors/errors";
 import type { TemplateRenderer, TemplateResolver } from "./types";
@@ -24,17 +21,12 @@ const TEMPLATE_FIELDS = new Set([
   "timeoutSeconds",
   "truncation",
   "dockerfile",
-  "containerUri",
+  "environmentArtifact",
+  "environment",
   "environmentVariables",
   "executionRoleArn",
-  "networkMode",
   "networkConfig",
-  "authorizerType",
   "authorizerConfiguration",
-  "lifecycleConfig",
-  "sessionStoragePath",
-  "efsAccessPoints",
-  "s3AccessPoints",
   "connections",
   "tags",
 ]);
@@ -86,12 +78,9 @@ export function getHarnessTemplateResolver(
 }
 
 function buildTemplateContext(spec: HarnessSpec) {
-  const provider = new Scalar(spec.model.provider);
-  provider.comment = ` ${HarnessModelProviderSchema.options
-    .filter((value) => value !== spec.model.provider)
-    .join(", ")}`;
+  const projectFile = toApiShapedHarnessSpec(spec);
   const yaml = Object.fromEntries(
-    Object.entries({ ...spec, model: { ...spec.model, provider } })
+    Object.entries(projectFile)
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [
         key,
@@ -103,12 +92,7 @@ function buildTemplateContext(spec: HarnessSpec) {
     ...spec,
     yaml,
     modelMaxTokensExample: !("maxTokens" in spec.model),
-    memoryExamples: Object.fromEntries(
-      ["strategies", "eventExpiryDuration", "name", "arn"].map((key) => [
-        key,
-        !(key in (spec.memory ?? {})),
-      ]),
-    ),
+    managedMemoryEmpty: spec.memory?.mode === "managed" && Object.keys(spec.memory).length === 1,
     additionalSettings: Object.entries(yaml)
       .filter(([key]) => !TEMPLATE_FIELDS.has(key))
       .map(([, value]) => value),
