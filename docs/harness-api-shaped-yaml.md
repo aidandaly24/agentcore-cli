@@ -8,7 +8,7 @@ New Harness projects write `app/<name>/harness.yaml` using the Harness API's mod
 name: assistant
 model:
   bedrockModelConfig:
-    modelId: global.anthropic.claude-sonnet-4-6
+    modelId: global.anthropic.claude-sonnet-5
 tools: []
 allowedTools: ["*"]
 skills: []
