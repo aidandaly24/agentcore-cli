@@ -12,7 +12,7 @@ through the `@aws/agentcore-cdk` constructs. It is two files:
 Harness settings are read from `harness.yaml`. New projects use the Harness API's model,
 memory, tool, and runtime-environment shapes. Inline `systemPrompt` uses one
 `[{ text: "..." }]` content block and overrides the conventional `system-prompt.md`.
-Existing flat harness files are still accepted.
+The Harness configuration schema is API-shaped throughout the CLI and CDK. Flat harness files are not accepted.
 
 ## The CLI runs it for you
 

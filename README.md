@@ -136,5 +136,5 @@ declares, not the ones you add in the stack.
 ## Documentation
 
 - [Amazon Bedrock AgentCore documentation](https://docs.aws.amazon.com/bedrock-agentcore/): service guides and API references.
-- [Harness project configuration](docs/harness-api-shaped-yaml.md): API-shaped Harness YAML, prompts, tools, skills, and environment settings.
+- [Harness project configuration](docs/harness-project-configuration.md): Harness YAML, prompts, tools, skills, and environment settings.
 - [Contributing](CONTRIBUTING.md): development, builds, architecture, and testing.
