@@ -4,7 +4,14 @@ import { z } from 'zod';
 // Feature Constants (shared across all schemas)
 // ============================================================================
 
-export const SDKFrameworkSchema = z.enum(['Strands', 'LangChain_LangGraph', 'GoogleADK', 'OpenAIAgents', 'VercelAI']);
+export const SDKFrameworkSchema = z.enum([
+  'Strands',
+  'LangChain_LangGraph',
+  'GoogleADK',
+  'OpenAIAgents',
+  'VercelAI',
+  'BedrockManagedAgents',
+]);
 export type SDKFramework = z.infer<typeof SDKFrameworkSchema>;
 
 export const TargetLanguageSchema = z.enum(['Python', 'TypeScript', 'Other']);
@@ -23,6 +30,16 @@ export const CREDENTIAL_PROVIDERS = ['Gemini', 'OpenAI', 'Anthropic', 'LiteLLM']
 export function matchEnumValue(schema: { options: readonly string[] }, input: string): string | undefined {
   const lower = input.toLowerCase();
   return schema.options.find(v => v.toLowerCase() === lower);
+}
+
+/** Short names that --framework also accepts. */
+const SDK_FRAMEWORK_ALIASES: Readonly<Record<string, SDKFramework>> = { bma: 'BedrockManagedAgents' };
+
+/** Case-insensitively match a --framework value, including its short names. */
+export function matchSdkFramework(input: string): SDKFramework | undefined {
+  const lower = input.toLowerCase();
+  if (Object.hasOwn(SDK_FRAMEWORK_ALIASES, lower)) return SDK_FRAMEWORK_ALIASES[lower];
+  return matchEnumValue(SDKFrameworkSchema, input) as SDKFramework | undefined;
 }
 
 /**
@@ -51,6 +68,8 @@ export const SDK_MODEL_PROVIDER_MATRIX: Record<SDKFramework, readonly ModelProvi
   GoogleADK: ['Gemini'] as const,
   OpenAIAgents: ['OpenAI'] as const,
   VercelAI: ['Bedrock', 'Anthropic', 'OpenAI', 'Gemini'] as const,
+  // BMA runs no model in the runtime: Bedrock Managed Agents (Mantle) runs Codex and calls in.
+  BedrockManagedAgents: ['Bedrock'] as const,
 };
 
 /**
@@ -228,7 +247,7 @@ export type ProtocolMode = z.infer<typeof ProtocolModeSchema>;
  * MCP is a standalone tool server with no framework.
  */
 export const PROTOCOL_FRAMEWORK_MATRIX: Record<ProtocolMode, readonly SDKFramework[]> = {
-  HTTP: ['Strands', 'LangChain_LangGraph', 'GoogleADK', 'OpenAIAgents', 'VercelAI'] as const,
+  HTTP: ['Strands', 'LangChain_LangGraph', 'GoogleADK', 'OpenAIAgents', 'VercelAI', 'BedrockManagedAgents'] as const,
   MCP: [] as const,
   A2A: ['Strands', 'GoogleADK', 'LangChain_LangGraph'] as const,
   AGUI: ['Strands', 'LangChain_LangGraph', 'GoogleADK'] as const,
@@ -255,7 +274,7 @@ export function isFrameworkSupportedForProtocol(protocol: ProtocolMode, framewor
  * actually exist under `assets/<language>/...`.
  */
 export const LANGUAGE_FRAMEWORK_MATRIX = {
-  Python: ['Strands', 'LangChain_LangGraph', 'GoogleADK', 'OpenAIAgents'],
+  Python: ['Strands', 'LangChain_LangGraph', 'GoogleADK', 'OpenAIAgents', 'BedrockManagedAgents'],
   TypeScript: ['Strands', 'VercelAI'],
 } as const satisfies Record<string, readonly SDKFramework[]>;
 

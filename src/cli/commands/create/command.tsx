@@ -322,7 +322,13 @@ async function handleCreateCLI(options: CreateOptions): Promise<void> {
       }
       process.exit(1);
     }
-    const result = getDryRunInfo({ name: name!, projectName, cwd, language: options.language });
+    const result = getDryRunInfo({
+      name: name!,
+      projectName,
+      cwd,
+      language: options.language,
+      framework: options.framework,
+    });
     if (options.json) {
       console.log(JSON.stringify(serializeResult(result)));
     } else if (result.success) {
@@ -334,7 +340,8 @@ async function handleCreateCLI(options: CreateOptions): Promise<void> {
     process.exit(0);
   }
 
-  const knownAttrs = {
+  // Validation normalizes and fills in options, so build the attributes again on success.
+  const buildAttrs = () => ({
     agent_environment: 'runtime' as const,
     agent_language: standardize(AgentLanguage, options.language),
     agent_framework: standardize(AgentFramework, options.framework),
@@ -348,7 +355,8 @@ async function handleCreateCLI(options: CreateOptions): Promise<void> {
     has_capacity_provider: !!options.capacityProvider,
     capacity_provider_by_arn: !!options.capacityProvider && isCapacityProviderArn(options.capacityProvider),
     cp_volume_mount_count: options.cpVolumeName?.length ?? 0,
-  };
+  });
+  const knownAttrs = buildAttrs();
 
   await runCliCommand(
     'create',
@@ -358,6 +366,8 @@ async function handleCreateCLI(options: CreateOptions): Promise<void> {
       if (!validation.valid) {
         throw new ValidationError(validation.error!);
       }
+      // A failure after this point records the options that validation filled in.
+      Object.assign(knownAttrs, buildAttrs());
       const green = '\x1b[32m';
       const reset = '\x1b[0m';
 
@@ -473,7 +483,7 @@ async function handleCreateCLI(options: CreateOptions): Promise<void> {
         }
       }
 
-      return knownAttrs;
+      return buildAttrs();
     },
     knownAttrs
   );
@@ -494,7 +504,7 @@ export const registerCreate = (program: Command) => {
     .option('--language <language>', 'Target language: Python or TypeScript (default: Python) [non-interactive]')
     .option(
       '--framework <framework>',
-      'Agent framework (Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents, VercelAI) [non-interactive]'
+      'Agent framework (Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents, VercelAI, BedrockManagedAgents) [non-interactive]'
     )
     .option('--model-provider <provider>', 'Model provider (Bedrock, Anthropic, OpenAI, Gemini) [non-interactive]')
     .option('--api-key <key>', 'API key for non-Bedrock providers [non-interactive]')

@@ -62,12 +62,13 @@ agentcore invoke
 
 ## Supported Frameworks
 
-| Framework           | Notes                                               |
-| ------------------- | --------------------------------------------------- |
-| Strands Agents      | AWS-native, streaming support (Python + TypeScript) |
-| LangChain/LangGraph | Graph-based workflows                               |
-| Google ADK          | Gemini models only                                  |
-| OpenAI Agents       | OpenAI models only                                  |
+| Framework              | Notes                                                                       |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Strands Agents         | AWS-native, streaming support (Python + TypeScript)                         |
+| LangChain/LangGraph    | Graph-based workflows                                                       |
+| Google ADK             | Gemini models only                                                          |
+| OpenAI Agents          | OpenAI models only                                                          |
+| Bedrock Managed Agents | Runtime environment for Bedrock Managed Agents sessions (Python, Container) |
 
 ## Supported Model Providers
 

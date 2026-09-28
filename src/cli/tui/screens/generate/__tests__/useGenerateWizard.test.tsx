@@ -88,6 +88,57 @@ describe('useGenerateWizard — advanced config gate', () => {
       const frame = lastFrame()!;
       expect(frame).toMatch(/memory,advanced/);
     });
+
+    it('BedrockManagedAgents skips modelProvider and memory and uses a Container build', () => {
+      const { ref, lastFrame } = setup();
+      act(() => {
+        ref.current!.wizard.setProjectName('Test');
+        ref.current!.wizard.setLanguage('Python');
+        ref.current!.wizard.setBuildType('CodeZip');
+        ref.current!.wizard.setProtocol('HTTP');
+        ref.current!.wizard.setSdk('BedrockManagedAgents');
+      });
+      const frame = lastFrame()!;
+      expect(frame).toContain('step:advanced');
+      expect(frame).toMatch(/sdk,advanced,confirm/);
+      expect(ref.current!.wizard.config).toMatchObject({
+        buildType: 'Container',
+        modelProvider: 'Bedrock',
+        memory: 'none',
+      });
+    });
+
+    it('clears BedrockManagedAgents when the protocol changes to MCP', () => {
+      const { ref } = setup();
+      act(() => {
+        ref.current!.wizard.setProjectName('Test');
+        ref.current!.wizard.setLanguage('Python');
+        ref.current!.wizard.setBuildType('CodeZip');
+        ref.current!.wizard.setProtocol('HTTP');
+        ref.current!.wizard.setSdk('BedrockManagedAgents');
+      });
+      act(() => {
+        ref.current!.wizard.setProtocol('MCP');
+      });
+      expect(ref.current!.wizard.config.sdk).toBe('Strands');
+      expect(ref.current!.wizard.config.buildType).toBe('CodeZip');
+    });
+
+    it('restores the chosen build type when the framework changes from BedrockManagedAgents', () => {
+      const { ref } = setup();
+      act(() => {
+        ref.current!.wizard.setProjectName('Test');
+        ref.current!.wizard.setLanguage('Python');
+        ref.current!.wizard.setBuildType('CodeZip');
+        ref.current!.wizard.setProtocol('HTTP');
+        ref.current!.wizard.setSdk('BedrockManagedAgents');
+      });
+      expect(ref.current!.wizard.config.buildType).toBe('Container');
+      act(() => {
+        ref.current!.wizard.setSdk('Strands');
+      });
+      expect(ref.current!.wizard.config.buildType).toBe('CodeZip');
+    });
   });
 
   describe('setAdvanced routing', () => {

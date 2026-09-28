@@ -7,6 +7,7 @@ import {
   writeAgentToProject,
 } from '../../../operations/agent/generate';
 import { createRenderer } from '../../../templates';
+import { templateNeedsPythonVenv } from '../../../templates/profiles';
 import type { Step } from '../../components';
 import { useProject } from '../../hooks';
 import type { GenerateConfig } from './types';
@@ -44,7 +45,7 @@ export function useGenerateFlow(): GenerateFlowState {
   };
 
   const startGenerate = useCallback((cfg: GenerateConfig) => {
-    const isPython = cfg.language === 'Python';
+    const isPython = cfg.language === 'Python' && templateNeedsPythonVenv(cfg.sdk);
     setConfig(cfg);
     setSteps(getSteps(isPython));
     setPhase('running');
@@ -54,7 +55,7 @@ export function useGenerateFlow(): GenerateFlowState {
     if (phase !== 'running' || !config) return;
 
     const run = async () => {
-      const isPython = config.language === 'Python';
+      const isPython = config.language === 'Python' && templateNeedsPythonVenv(config.sdk);
 
       // Check project availability (from useProject hook)
       if (!project) {

@@ -612,7 +612,7 @@ export async function handleDeploy(options: ValidatedDeployOptions): Promise<Dep
 
       // After deploying the empty spec, destroy the stack entirely
       startStep('Tear down stack');
-      const teardown = await performStackTeardown(target.name);
+      const teardown = await performStackTeardown(target.name, toolkitWrapper);
       if (!teardown.success) {
         endStep('error', teardown.error.message);
         return fail(teardown.error);

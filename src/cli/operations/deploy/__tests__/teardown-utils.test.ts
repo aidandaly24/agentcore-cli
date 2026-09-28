@@ -1,4 +1,10 @@
-import { type DeployedTarget, destroyTarget, discoverDeployedTargets, getCdkProjectDir } from '../teardown.js';
+import {
+  type DeployedTarget,
+  type DestroyTargetOptions,
+  destroyTarget,
+  discoverDeployedTargets,
+  getCdkProjectDir,
+} from '../teardown.js';
 import { join } from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +17,7 @@ const {
   mockExistsSync,
   mockInitialize,
   mockDestroy,
+  mockDispose,
 } = vi.hoisted(() => ({
   mockReadProjectSpec: vi.fn(),
   mockReadAWSDeploymentTargets: vi.fn(),
@@ -20,6 +27,7 @@ const {
   mockExistsSync: vi.fn(),
   mockInitialize: vi.fn(),
   mockDestroy: vi.fn(),
+  mockDispose: vi.fn(),
 }));
 
 vi.mock('../../../../lib/index.js', () => ({
@@ -45,6 +53,7 @@ vi.mock('../../../cdk/toolkit-lib/index.js', () => ({
   CdkToolkitWrapper: class {
     initialize = mockInitialize;
     destroy = mockDestroy;
+    dispose = mockDispose;
   },
   silentIoHost: {},
 }));
@@ -157,6 +166,37 @@ describe('destroyTarget', () => {
       })
     );
     expect(mockWriteDeployedState).toHaveBeenCalledWith({ targets: {} });
+    expect(mockDispose).toHaveBeenCalled();
+  });
+
+  it('destroys with the given toolkit and leaves its disposal to the caller', async () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReadDeployedState.mockResolvedValue({ targets: {} });
+    const given = { initialize: vi.fn(), destroy: vi.fn().mockResolvedValue(undefined), dispose: vi.fn() };
+
+    await destroyTarget({
+      target: makeTarget('tgt-1', 'stack-tgt-1'),
+      cdkProjectDir: '/project/agentcore/cdk',
+      toolkit: given as unknown as DestroyTargetOptions['toolkit'],
+    });
+
+    expect(given.destroy).toHaveBeenCalledWith({
+      stacks: { strategy: 'PATTERN_MUST_MATCH', patterns: ['stack-tgt-1'] },
+    });
+    expect(given.initialize).not.toHaveBeenCalled();
+    expect(given.dispose).not.toHaveBeenCalled();
+    expect(mockDestroy).not.toHaveBeenCalled();
+  });
+
+  it('disposes its own toolkit when the destroy fails', async () => {
+    mockExistsSync.mockReturnValue(true);
+    mockInitialize.mockResolvedValue(undefined);
+    mockDestroy.mockRejectedValue(new Error('destroy failed'));
+
+    await expect(
+      destroyTarget({ target: makeTarget('tgt-1', 'stack-1'), cdkProjectDir: '/project/agentcore/cdk' })
+    ).rejects.toThrow('destroy failed');
+    expect(mockDispose).toHaveBeenCalled();
   });
 
   it('ignores errors reading deployed state after destroy', async () => {

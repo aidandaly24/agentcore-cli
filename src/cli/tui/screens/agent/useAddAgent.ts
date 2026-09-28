@@ -39,6 +39,7 @@ import {
   standardize,
 } from '../../../telemetry/schemas/common-shapes.js';
 import { createRenderer } from '../../../templates';
+import { templateNeedsPythonVenv } from '../../../templates/profiles';
 import type { GenerateConfig } from '../generate/types';
 import type { AddAgentConfig } from './types';
 import { DescribeSubnetsCommand, EC2Client } from '@aws-sdk/client-ec2';
@@ -363,7 +364,7 @@ async function handleCreatePath(
 
   // Set up Python environment if applicable
   let pythonSetupResult: PythonSetupResult | undefined;
-  if (config.language === 'Python') {
+  if (config.language === 'Python' && templateNeedsPythonVenv(config.framework)) {
     pythonSetupResult = await setupPythonProject({ projectDir: agentPath });
   }
 

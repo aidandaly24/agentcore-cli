@@ -227,6 +227,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     label: 'Persist deployment state',
     status: 'pending',
   });
+  const [teardownStep, setTeardownStep] = useState<Step>({ label: 'Tear down stack', status: 'pending' });
   // Whether the hydrate-KB step needs to run for this deploy. False (the
   // common case) when every KB had its `dataSources[]` already populated by
   // the per-DS CFN outputs the L3 emits since #234 — the persist step did
@@ -274,6 +275,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     setPublishAssetsStep({ label: 'Publish assets', status: 'pending' });
     setDeployStep({ label: 'Deploy to AWS', status: 'pending' });
     setPersistStateStep({ label: 'Persist deployment state', status: 'pending' });
+    setTeardownStep({ label: 'Tear down stack', status: 'pending' });
     setHydrateKbStep({ label: 'Hydrate knowledge base data sources', status: 'pending' });
     setNeedsKbHydration(false);
     setAutoIngestStep({ label: 'Auto-ingest knowledge bases', status: 'pending' });
@@ -913,10 +915,26 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
               // Best-effort: continue with teardown even if credential cleanup fails
             }
 
-            const teardown = await performStackTeardown(targetName);
+            // The destroy reuses the deploy toolkit, so stop showing its CDK messages as deploy progress.
+            // The teardown step stays open until the destroy ends, so the screen does not exit and
+            // dispose the toolkit while the destroy still uses it.
+            switchableIoHost?.setVerbose(false);
+            switchableIoHost?.setOnMessage(null);
+            setTeardownStep(prev => ({ ...prev, status: 'running' }));
+            logger.startStep('Tear down stack');
+            const teardown = await performStackTeardown(targetName, cdkToolkitWrapper);
             if (!teardown.success) {
-              throw new Error(`Stack teardown failed: ${teardown.error.message}`);
+              logger.endStep('error', teardown.error.message);
+              logger.finalize(false);
+              setTeardownStep(prev => ({
+                ...prev,
+                status: 'error',
+                error: logger.getFailureMessage('Tear down stack'),
+              }));
+              return { success: false, error: teardown.error } as const;
             }
+            logger.endStep('success');
+            setTeardownStep(prev => ({ ...prev, status: 'success' }));
           }
         } else {
           // Deploy succeeded - persist state
@@ -1166,7 +1184,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     const isTeardown = projectSpec ? !!context?.isTeardownDeploy : false;
 
     const postDeploySteps: Step[] = isTeardown
-      ? []
+      ? [teardownStep]
       : [
           persistStateStep,
           ...(hasKnowledgeBases && needsKbHydration ? [hydrateKbStep] : []),
@@ -1182,6 +1200,7 @@ export function useDeployFlow(options: DeployFlowOptions = {}): DeployFlowState 
     publishAssetsStep,
     deployStep,
     persistStateStep,
+    teardownStep,
     hydrateKbStep,
     autoIngestStep,
     datasetSyncStep,

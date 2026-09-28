@@ -22,8 +22,10 @@ import {
   isFrameworkSupportedForLanguage,
   isValidKmsKeyArn,
   matchEnumValue,
+  matchSdkFramework,
   validateApiFormat,
 } from '../../../schema';
+import { applyTemplateOptionDefaults, validateTemplateOptions } from '../../templates/profiles';
 import { ARN_VALIDATION_MESSAGE, isValidArn } from '../shared/arn-utils';
 import { validateHeaderAllowlist } from '../shared/header-utils';
 import { MAX_INDEXED_KEYS, parseIndexedKeyArg } from '../shared/indexed-key-parser';
@@ -89,9 +91,7 @@ export function validateAddAgentOptions(options: AddAgentOptions): ValidationRes
   if (options.protocol)
     options.protocol =
       (matchEnumValue(ProtocolModeSchema, options.protocol) as typeof options.protocol) ?? options.protocol;
-  if (options.framework)
-    options.framework =
-      (matchEnumValue(SDKFrameworkSchema, options.framework) as typeof options.framework) ?? options.framework;
+  if (options.framework) options.framework = matchSdkFramework(options.framework) ?? options.framework;
   if (options.modelProvider)
     options.modelProvider =
       (matchEnumValue(ModelProviderSchema, options.modelProvider) as typeof options.modelProvider) ??
@@ -100,6 +100,13 @@ export function validateAddAgentOptions(options: AddAgentOptions): ValidationRes
     options.language =
       (matchEnumValue(TargetLanguageSchema, options.language) as typeof options.language) ?? options.language;
   if (options.build) options.build = matchEnumValue(BuildTypeSchema, options.build) ?? options.build;
+
+  // The framework template can need some options and give defaults for others.
+  applyTemplateOptionDefaults(options.framework, options);
+  const templateError = validateTemplateOptions(options.framework, options);
+  if (templateError) {
+    return { valid: false, error: templateError };
+  }
 
   // Session storage is not supported for TypeScript agents — reject early before any path-specific returns
   if (options.sessionStorageMountPath && options.language === 'TypeScript') {

@@ -176,6 +176,11 @@ export const SDK_OPTIONS = [
   { id: 'GoogleADK', title: 'Google ADK', description: 'Google Agent Development Kit' },
   { id: 'OpenAIAgents', title: 'OpenAI Agents', description: 'OpenAI native agent SDK' },
   { id: 'VercelAI', title: 'Vercel AI SDK', description: 'Vercel AI SDK for TypeScript agents' },
+  {
+    id: 'BedrockManagedAgents',
+    title: 'Bedrock Managed Agents',
+    description: 'Runtime environment for Bedrock Managed Agents sessions',
+  },
 ] as const;
 
 /**

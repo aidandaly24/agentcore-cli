@@ -17,6 +17,7 @@ import {
 import { parseAndNormalizeHeaders, validateHeaderAllowlist } from '../../../commands/shared/header-utils';
 import { validateSecurityGroupIds, validateSubnetIds, validateVpcId } from '../../../commands/shared/vpc-utils';
 import { computeDefaultCredentialEnvVarName } from '../../../primitives/credential-utils';
+import { getTemplateProfile, templateUsesModel } from '../../../templates/profiles';
 import {
   ApiKeySecretInput,
   Panel,
@@ -148,7 +149,9 @@ export function GenerateWizardUI({
   // Advanced multi-select items — filter out options not applicable to current config
   const advancedItems: SelectableItem[] = ADVANCED_SETTING_OPTIONS.filter(
     o =>
-      (o.id !== 'dockerfile' || wizard.config.buildType === 'Container') &&
+      // A framework template that gives its own Dockerfile has no custom Dockerfile option.
+      (o.id !== 'dockerfile' ||
+        (wizard.config.buildType === 'Container' && !getTemplateProfile(wizard.config.sdk)?.runtime?.dockerfile)) &&
       (o.id !== 'filesystem' || wizard.config.language !== 'TypeScript')
   ).map(o => ({ id: o.id, title: o.title, description: o.description }));
 
@@ -720,12 +723,14 @@ function ConfirmView({ config, credentialProjectName }: { config: GenerateConfig
               <Text dimColor>Framework: </Text>
               <Text>{config.sdk}</Text>
             </Text>
-            <Text>
-              <Text dimColor>Model Provider: </Text>
+            {templateUsesModel(config.sdk) && (
               <Text>
-                {config.modelProvider} ({DEFAULT_MODEL_IDS[config.modelProvider]})
+                <Text dimColor>Model Provider: </Text>
+                <Text>
+                  {config.modelProvider} ({DEFAULT_MODEL_IDS[config.modelProvider]})
+                </Text>
               </Text>
-            </Text>
+            )}
             {config.modelProvider !== 'Bedrock' && (
               <Text>
                 <Text dimColor>API Key: </Text>

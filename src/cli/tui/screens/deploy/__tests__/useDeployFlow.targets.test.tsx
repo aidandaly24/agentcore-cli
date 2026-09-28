@@ -37,9 +37,10 @@ const fakeIoHost = {
 
 // Hoisted so the vi.mock factory below (hoisted above module init) can reference it, while the
 // test bodies keep a handle to assert the persist path polls the SELECTED target's stack/region.
-const { getStackOutputsSpy, useCdkPreflightSpy } = vi.hoisted(() => ({
+const { getStackOutputsSpy, useCdkPreflightSpy, performStackTeardownSpy } = vi.hoisted(() => ({
   getStackOutputsSpy: vi.fn().mockRejectedValue(new Error('test: skip persist')),
   useCdkPreflightSpy: vi.fn(),
+  performStackTeardownSpy: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 // preflightState is mutated per-test before render so the same mock can vary phase/context.
@@ -78,6 +79,7 @@ vi.mock('../../../../operations/deploy', async () => {
     ...actual,
     hasManagedMemoryHarness: vi.fn().mockResolvedValue(false),
     setupTransactionSearch: vi.fn().mockResolvedValue({ success: true }),
+    performStackTeardown: performStackTeardownSpy,
   };
 });
 
@@ -87,7 +89,12 @@ const TARGET_A = { name: 'prod-east', account: '111111111111', region: 'us-east-
 const TARGET_B = { name: 'prod-west', account: '222222222222', region: 'us-west-2' as const };
 const PROJECT_NAME = 'myproj';
 
-function makePreflight(opts: { awsTargets: any[]; projectName?: string; isFirstDeploy?: boolean }) {
+function makePreflight(opts: {
+  awsTargets: any[];
+  projectName?: string;
+  isFirstDeploy?: boolean;
+  isTeardownDeploy?: boolean;
+}) {
   const stackNames = opts.awsTargets.map(t => toStackName(opts.projectName ?? PROJECT_NAME, t.name));
   return {
     phase: 'complete',
@@ -95,7 +102,7 @@ function makePreflight(opts: { awsTargets: any[]; projectName?: string; isFirstD
     context: {
       projectSpec: { name: opts.projectName ?? PROJECT_NAME, runtimes: [] },
       awsTargets: opts.awsTargets,
-      isTeardownDeploy: false,
+      isTeardownDeploy: opts.isTeardownDeploy ?? false,
       // First-deploy skips the pre-deploy diff branch; flip it off to exercise diff scoping.
       isFirstDeploy: opts.isFirstDeploy ?? true,
     },
@@ -149,6 +156,7 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
     getStackOutputsSpy.mockClear();
     getStackOutputsSpy.mockRejectedValue(new Error('test: skip persist'));
     useCdkPreflightSpy.mockClear();
+    performStackTeardownSpy.mockClear();
   });
   afterEach(() => {
     vi.clearAllTimers();
@@ -172,6 +180,51 @@ describe('useDeployFlow target scoping (issue #1267)', () => {
 
     // Regression: selecting B must never produce a pattern for A.
     expect(arg.stacks.patterns).not.toContain(toStackName(PROJECT_NAME, TARGET_A.name));
+  });
+
+  it('tears down with the synthesized toolkit so the destroy does not synthesize into a locked cdk.out', async () => {
+    preflightState = makePreflight({ awsTargets: [TARGET_A], isTeardownDeploy: true });
+
+    const { unmount } = render(<Harness selectedTargets={[TARGET_A]} />);
+    await flush();
+    unmount();
+
+    expect(performStackTeardownSpy).toHaveBeenCalledWith(TARGET_A.name, fakeWrapper);
+  });
+
+  it('keeps the flow incomplete until the teardown ends, so the screen does not exit and dispose the toolkit', async () => {
+    preflightState = makePreflight({ awsTargets: [TARGET_A], isTeardownDeploy: true });
+    let finishTeardown: (result: { success: true }) => void = () => undefined;
+    performStackTeardownSpy.mockImplementationOnce(() => new Promise(resolve => (finishTeardown = resolve)));
+    let latest: any;
+
+    const { unmount } = render(<Harness selectedTargets={[TARGET_A]} onState={s => (latest = s)} />);
+    await flush();
+
+    expect(latest.steps.find((s: any) => s.label === 'Deploy to AWS').status).toBe('success');
+    expect(latest.steps.find((s: any) => s.label === 'Tear down stack').status).toBe('running');
+    expect(latest.isComplete).toBe(false);
+
+    finishTeardown({ success: true });
+    await flush();
+    unmount();
+
+    expect(latest.steps.find((s: any) => s.label === 'Tear down stack').status).toBe('success');
+    expect(latest.isComplete).toBe(true);
+  });
+
+  it('marks only the teardown step as failed when the destroy fails', async () => {
+    preflightState = makePreflight({ awsTargets: [TARGET_A], isTeardownDeploy: true });
+    performStackTeardownSpy.mockResolvedValueOnce({ success: false, error: new Error('destroy failed') });
+    let latest: any;
+
+    const { unmount } = render(<Harness selectedTargets={[TARGET_A]} onState={s => (latest = s)} />);
+    await flush();
+    unmount();
+
+    expect(latest.steps.find((s: any) => s.label === 'Deploy to AWS').status).toBe('success');
+    expect(latest.steps.find((s: any) => s.label === 'Tear down stack').status).toBe('error');
+    expect(latest.hasError).toBe(true);
   });
 
   it('passes the first selected target to preflight validation', async () => {

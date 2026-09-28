@@ -1,10 +1,11 @@
 import type { NetworkMode, RuntimeAuthorizerType } from '../../../../schema';
-import { ProjectNameSchema, SessionStorageSchema } from '../../../../schema';
+import { ProjectNameSchema, SessionStorageSchema, isFrameworkSupportedForProtocol } from '../../../../schema';
 import type { JwtConfigOptions } from '../../../primitives/auth-utils';
+import { getTemplateProfile, templateUsesModel } from '../../../templates/profiles';
 import { useFilesystemMountState } from '../../hooks/useFilesystemMountState';
 import type { AdvancedSettingId, BuildType, GenerateConfig, GenerateStep, MemoryOption, ProtocolMode } from './types';
 import { BASE_GENERATE_STEPS, getModelProviderOptionsForSdk } from './types';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 function getDefaultConfig(): GenerateConfig {
   return {
@@ -33,6 +34,9 @@ export function useGenerateWizard(options?: UseGenerateWizardOptions) {
     ...(options?.initialName ? { projectName: options.initialName } : {}),
   }));
   const [error, setError] = useState<string | null>(null);
+  // The build type the user chose. A framework template can force a build type, so this restores the
+  // choice when the user leaves that framework.
+  const chosenBuildType = useRef<BuildType>(config.buildType);
 
   // Track if user has selected a framework (moved past sdk step)
   const [sdkSelected, setSdkSelected] = useState(false);
@@ -56,6 +60,10 @@ export function useGenerateWizard(options?: UseGenerateWizardOptions) {
     } else {
       if (config.modelProvider === 'Bedrock') {
         filtered = filtered.filter(s => s !== 'apiKey');
+      }
+      // The runtime of this framework template runs no model, so there is nothing to choose.
+      if (sdkSelected && !templateUsesModel(config.sdk)) {
+        filtered = filtered.filter(s => s !== 'modelProvider' && s !== 'apiKey');
       }
       if (sdkSelected && config.sdk === 'Strands') {
         const advancedIndex = filtered.indexOf('advanced');
@@ -163,12 +171,23 @@ export function useGenerateWizard(options?: UseGenerateWizardOptions) {
   }, []);
 
   const setBuildType = useCallback((buildType: BuildType) => {
+    chosenBuildType.current = buildType;
     setConfig(c => ({ ...c, buildType, dockerfile: undefined }));
     setStep('protocol');
   }, []);
 
   const setProtocol = useCallback((protocol: ProtocolMode) => {
-    setConfig(c => ({ ...c, protocol, memory: protocol === 'MCP' ? 'none' : c.memory }));
+    setConfig(c => ({
+      ...c,
+      protocol,
+      memory: protocol === 'MCP' ? 'none' : c.memory,
+      // A protocol that the framework template does not support clears the template and its options.
+      ...(getTemplateProfile(c.sdk) &&
+        !isFrameworkSupportedForProtocol(protocol, c.sdk) && {
+          sdk: getDefaultConfig().sdk,
+          buildType: chosenBuildType.current,
+        }),
+    }));
     if (protocol === 'MCP') {
       setStep('advanced');
     } else {
@@ -183,11 +202,15 @@ export function useGenerateWizard(options?: UseGenerateWizardOptions) {
       const supportedProviders = getModelProviderOptionsForSdk(sdk);
       const isCurrentProviderSupported = supportedProviders.some(p => p.id === c.modelProvider);
       const newModelProvider = isCurrentProviderSupported ? c.modelProvider : (supportedProviders[0]?.id ?? 'Bedrock');
-      // Reset memory to 'none' for non-Strands SDKs
-      const newMemory = sdk === 'Strands' ? c.memory : 'none';
-      return { ...c, sdk, modelProvider: newModelProvider, memory: newMemory };
+      // Reset memory to 'none' for non-Strands SDKs, unless the framework template needs a value
+      const newMemory =
+        (getTemplateProfile(sdk)?.requiredOptions?.memory as MemoryOption | undefined) ??
+        (sdk === 'Strands' ? c.memory : 'none');
+      // The framework template can force a build type.
+      const newBuildType = getTemplateProfile(sdk)?.requiredOptions?.build ?? chosenBuildType.current;
+      return { ...c, sdk, modelProvider: newModelProvider, memory: newMemory, buildType: newBuildType };
     });
-    setStep('modelProvider');
+    setStep(templateUsesModel(sdk) ? 'modelProvider' : 'advanced');
   }, []);
 
   const setModelProvider = useCallback(
@@ -587,6 +610,7 @@ export function useGenerateWizard(options?: UseGenerateWizardOptions) {
   const reset = useCallback(() => {
     setStep('projectName');
     setConfig(getDefaultConfig());
+    chosenBuildType.current = getDefaultConfig().buildType;
     setError(null);
     setSdkSelected(false);
     setAdvancedSettings(new Set());

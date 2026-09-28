@@ -39,6 +39,7 @@ import {
   standardize,
 } from '../../../telemetry/schemas/common-shapes.js';
 import { CDKRenderer, createRenderer } from '../../../templates';
+import { templateNeedsPythonVenv } from '../../../templates/profiles';
 import { type Step, areStepsComplete, hasStepError } from '../../components';
 import { withMinDuration } from '../../utils';
 import { mapAddAgentConfigToGenerateConfig, mapByoConfigToAgent } from '../agent';
@@ -95,7 +96,11 @@ function getCreateSteps(
 
   if (agentConfig) {
     steps.push({ label: 'Add agent to project', status: 'pending' });
-    if (agentConfig.language === 'Python' && agentConfig.agentType === 'create') {
+    if (
+      agentConfig.language === 'Python' &&
+      agentConfig.agentType === 'create' &&
+      templateNeedsPythonVenv(agentConfig.framework)
+    ) {
       steps.push({ label: 'Set up Python environment', status: 'pending' });
     }
     if (agentConfig.language === 'TypeScript' && agentConfig.agentType === 'create') {
@@ -553,7 +558,11 @@ export function useCreateFlow(cwd: string): CreateFlowState {
           }
 
           // Step: Set up Python environment (if Python and create path)
-          if (addAgentConfig.language === 'Python' && addAgentConfig.agentType === 'create') {
+          if (
+            addAgentConfig.language === 'Python' &&
+            addAgentConfig.agentType === 'create' &&
+            templateNeedsPythonVenv(addAgentConfig.framework)
+          ) {
             logger.startStep('Set up Python environment');
             updateStep(stepIndex, { status: 'running' });
             // Agent is in app/<agentName>/ directory

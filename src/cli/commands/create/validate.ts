@@ -14,8 +14,10 @@ import {
   getSupportedModelProviders,
   isFrameworkSupportedForLanguage,
   matchEnumValue,
+  matchSdkFramework,
 } from '../../../schema';
 import type { ProtocolMode } from '../../../schema';
+import { applyTemplateOptionDefaults, validateTemplateOptions } from '../../templates/profiles';
 import {
   validateAccessPointMounts,
   validateEfsAccessPointArn,
@@ -100,10 +102,17 @@ export function validateCreateOptions(options: CreateOptions, cwd?: string): Val
   // Normalize enum flag values (case-insensitive matching)
   if (options.protocol) options.protocol = matchEnumValue(ProtocolModeSchema, options.protocol) ?? options.protocol;
   if (options.language) options.language = matchEnumValue(TargetLanguageSchema, options.language) ?? options.language;
-  if (options.framework) options.framework = matchEnumValue(SDKFrameworkSchema, options.framework) ?? options.framework;
+  if (options.framework) options.framework = matchSdkFramework(options.framework) ?? options.framework;
   if (options.modelProvider)
     options.modelProvider = matchEnumValue(ModelProviderSchema, options.modelProvider) ?? options.modelProvider;
   if (options.build) options.build = matchEnumValue(BuildTypeSchema, options.build) ?? options.build;
+
+  // The framework template can need some options and give defaults for others.
+  applyTemplateOptionDefaults(options.framework, options);
+  const templateError = validateTemplateOptions(options.framework, options);
+  if (templateError) {
+    return { valid: false, error: templateError };
+  }
 
   // Validate protocol if provided
   let protocol: ProtocolMode = 'HTTP';

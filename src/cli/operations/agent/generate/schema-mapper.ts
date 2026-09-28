@@ -14,6 +14,7 @@ import {
   DEFAULT_EPISODIC_REFLECTION_NAMESPACE_TEMPLATES,
   DEFAULT_RUNTIME_BY_LANGUAGE,
   DEFAULT_STRATEGY_NAMESPACE_TEMPLATES,
+  isFrameworkSupportedForProtocol,
 } from '../../../../schema';
 import { buildFilesystemConfigurations } from '../../../commands/shared/filesystem-utils';
 import { GatewayPrimitive } from '../../../primitives/GatewayPrimitive';
@@ -22,6 +23,7 @@ import {
   computeDefaultCredentialEnvVarName,
   computeManagedOAuthCredentialName,
 } from '../../../primitives/credential-utils';
+import { type TemplateRuntimeProfile, getTemplateProfile } from '../../../templates/profiles';
 import type {
   AgentRenderConfig,
   GatewayProviderRenderConfig,
@@ -110,12 +112,44 @@ export function mapModelProviderToCredentials(modelProvider: ModelProvider, proj
   ];
 }
 
+/** The runtime settings of the framework template. Only a protocol that supports the framework gets them. */
+function templateRuntime(config: GenerateConfig): TemplateRuntimeProfile | undefined {
+  if (!isFrameworkSupportedForProtocol(config.protocol ?? 'HTTP', config.sdk)) return undefined;
+  return getTemplateProfile(config.sdk)?.runtime;
+}
+
+/** Applies the runtime settings that the framework template needs. User-supplied values win. */
+export function applyTemplateRuntimeDefaults(config: GenerateConfig): GenerateConfig {
+  const runtime = templateRuntime(config);
+  if (!runtime) return config;
+  // The idle timeout cannot be longer than the maximum lifetime. A user value wins, so a template default moves.
+  const maxLifetime = config.maxLifetime ?? Math.max(runtime.maxLifetime, config.idleRuntimeSessionTimeout ?? 0);
+  return {
+    ...config,
+    buildType: getTemplateProfile(config.sdk)?.requiredOptions?.build ?? config.buildType,
+    dockerfile: config.dockerfile ?? runtime.dockerfile,
+    idleRuntimeSessionTimeout:
+      config.idleRuntimeSessionTimeout ?? Math.min(runtime.idleRuntimeSessionTimeout, maxLifetime),
+    maxLifetime,
+  };
+}
+
+function templateRuntimeFields(config: GenerateConfig): Pick<AgentEnvSpec, 'additionalPolicies' | 'tags'> {
+  const runtime = templateRuntime(config);
+  if (!runtime) return {};
+  return {
+    ...(runtime.additionalPolicies && { additionalPolicies: runtime.additionalPolicies }),
+    ...(runtime.tags && { tags: runtime.tags }),
+  };
+}
+
 /**
  * Maps GenerateConfig to v2 AgentEnvSpec resource.
  */
 const ACTOR_ID_HEADER = 'X-Amzn-Bedrock-AgentCore-Runtime-Custom-Actor-Id';
 
-export function mapGenerateConfigToAgent(config: GenerateConfig): AgentEnvSpec {
+export function mapGenerateConfigToAgent(generateConfig: GenerateConfig): AgentEnvSpec {
+  const config = applyTemplateRuntimeDefaults(generateConfig);
   const codeLocation = `${APP_DIR}/${config.projectName}/`;
   const protocol = config.protocol ?? 'HTTP';
   // A capacity provider supplies its own network topology, so a CP-attached runtime carries no
@@ -179,6 +213,7 @@ export function mapGenerateConfigToAgent(config: GenerateConfig): AgentEnvSpec {
       config.capacityProviderVolumes
     ),
     ...(protocol === 'MCP' && { instrumentation: { enableOtel: false } }),
+    ...templateRuntimeFields(config),
   };
 }
 
@@ -286,9 +321,10 @@ async function mapGatewaysToGatewayProviders(): Promise<GatewayProviderRenderCon
  * @param identityProviders - Identity providers to include (caller controls credential naming)
  */
 export async function mapGenerateConfigToRenderConfig(
-  config: GenerateConfig,
+  generateConfig: GenerateConfig,
   identityProviders: IdentityProviderRenderConfig[]
 ): Promise<AgentRenderConfig> {
+  const config = applyTemplateRuntimeDefaults(generateConfig);
   const isMcp = config.protocol === 'MCP';
   const gatewayProviders = isMcp ? [] : await mapGatewaysToGatewayProviders();
   const enableOtel = !isMcp && config.language !== 'TypeScript';

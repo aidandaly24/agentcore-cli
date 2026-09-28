@@ -2,6 +2,7 @@ import { DEFAULT_MODEL_IDS, ProjectNameSchema } from '../../../../schema';
 import { validateFolderNotExists } from '../../../commands/create/validate';
 import { VPC_ENDPOINT_WARNING } from '../../../commands/shared/vpc-utils';
 import { computeDefaultCredentialEnvVarName } from '../../../primitives/credential-utils';
+import { templateUsesModel } from '../../../templates/profiles';
 import {
   LogLink,
   type NextStep,
@@ -62,8 +63,10 @@ function buildExitMessage(
     const maxPathLen = Math.max(agentPath.length, agentcorePath.length);
     lines.push(`    ${agentPath.padEnd(maxPathLen)}  \x1b[2m${agentConfig.language} agent (${frameworkLabel})\x1b[0m`);
     lines.push(`    ${agentcorePath.padEnd(maxPathLen)}  \x1b[2mConfig and CDK project\x1b[0m`);
-    lines.push('');
-    lines.push(`\x1b[2mModel:\x1b[0m ${modelName} \x1b[2mvia ${agentConfig.modelProvider}\x1b[0m`);
+    if (templateUsesModel(agentConfig.framework)) {
+      lines.push('');
+      lines.push(`\x1b[2mModel:\x1b[0m ${modelName} \x1b[2mvia ${agentConfig.modelProvider}\x1b[0m`);
+    }
   } else if (agentConfig?.agentType === 'byo') {
     const agentPath = agentConfig.codeLocation;
     const agentcorePath = 'agentcore/';
@@ -217,7 +220,7 @@ function CreatedSummary({
           </Text>
         </Box>
       </Box>
-      {isCreate && agentConfig && (
+      {isCreate && agentConfig && templateUsesModel(agentConfig.framework) && (
         <Box marginTop={1}>
           <Text dimColor>Model: </Text>
           <Text>{DEFAULT_MODEL_IDS[agentConfig.modelProvider]}</Text>

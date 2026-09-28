@@ -16,13 +16,14 @@ framework is restricted to `Strands` or `VercelAI`; other values are rejected. S
 
 ## Available Frameworks
 
-| Framework               | Supported Model Providers          |
-| ----------------------- | ---------------------------------- |
-| **Strands Agents**      | Bedrock, Anthropic, OpenAI, Gemini |
-| **LangChain_LangGraph** | Bedrock, Anthropic, OpenAI, Gemini |
-| **GoogleADK**           | Gemini only                        |
-| **OpenAIAgents**        | OpenAI only                        |
-| **VercelAI**            | Bedrock, Anthropic, OpenAI, Gemini |
+| Framework                | Supported Model Providers                               |
+| ------------------------ | ------------------------------------------------------- |
+| **Strands Agents**       | Bedrock, Anthropic, OpenAI, Gemini                      |
+| **LangChain_LangGraph**  | Bedrock, Anthropic, OpenAI, Gemini                      |
+| **GoogleADK**            | Gemini only                                             |
+| **OpenAIAgents**         | OpenAI only                                             |
+| **VercelAI**             | Bedrock, Anthropic, OpenAI, Gemini                      |
+| **BedrockManagedAgents** | Bedrock only (the model runs in Bedrock Managed Agents) |
 
 ## Runtime Input Validation
 
@@ -119,6 +120,27 @@ agentcore create --framework VercelAI --model-provider Bedrock
 agentcore create --framework VercelAI --model-provider Bedrock --language TypeScript
 ```
 
+### Bedrock Managed Agents
+
+A Runtime environment for Amazon Bedrock Managed Agents (BMA). BMA runs the agent loop (Codex) in the service and sends
+the session's commands to this Runtime. The Runtime runs no model code.
+
+**Best for:**
+
+- Running BMA sessions in your account, with your execution role and VPC
+
+**Model providers:** Bedrock only
+
+**Languages:** Python (Container build only, no memory)
+
+`BMA` is a short name for the framework. The template sets an idle timeout of 1800 seconds, a maximum lifetime of 28800
+seconds, and a policy that lets the Runtime connect to BMA. It adds no session storage, so the same project deploys to a
+microVM Runtime and to a capacity provider.
+
+```bash
+agentcore create --name MyManagedAgent --framework BedrockManagedAgents
+```
+
 ## Import from Bedrock Agents
 
 If you have an existing Bedrock Agent, you can import its configuration and translate it into runnable Strands or
@@ -205,8 +227,8 @@ agentcore add agent \
 
 Not all frameworks support all protocol modes. MCP protocol is a standalone tool server with no framework.
 
-| Protocol | Supported Frameworks                                            |
-| -------- | --------------------------------------------------------------- |
-| **HTTP** | Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents, VercelAI |
-| **MCP**  | None (standalone tool server)                                   |
-| **A2A**  | Strands, GoogleADK, LangChain_LangGraph                         |
+| Protocol | Supported Frameworks                                                                  |
+| -------- | ------------------------------------------------------------------------------------- |
+| **HTTP** | Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents, VercelAI, BedrockManagedAgents |
+| **MCP**  | None (standalone tool server)                                                         |
+| **A2A**  | Strands, GoogleADK, LangChain_LangGraph                                               |

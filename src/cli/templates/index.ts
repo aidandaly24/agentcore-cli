@@ -1,4 +1,5 @@
 import type { BaseRenderer } from './BaseRenderer';
+import { BmaRenderer } from './BmaRenderer';
 import { GoogleADKRenderer } from './GoogleADKRenderer';
 import { LangGraphRenderer } from './LangGraphRenderer';
 import { McpRenderer } from './McpRenderer';
@@ -8,6 +9,7 @@ import { VercelAIRenderer } from './VercelAIRenderer';
 import type { AgentRenderConfig } from './types';
 
 export { BaseRenderer, type RendererContext } from './BaseRenderer';
+export { BmaRenderer } from './BmaRenderer';
 export { CDKRenderer, type CDKRendererContext } from './CDKRenderer';
 export { renderGatewayTargetTemplate } from './GatewayTargetRenderer';
 export { GoogleADKRenderer } from './GoogleADKRenderer';
@@ -38,6 +40,8 @@ export function createRenderer(config: AgentRenderConfig): BaseRenderer {
       return new OpenAIAgentsRenderer(config);
     case 'VercelAI':
       return new VercelAIRenderer(config);
+    case 'BedrockManagedAgents':
+      return new BmaRenderer(config);
     default: {
       const _exhaustive: never = config.sdkFramework;
       throw new Error(`Unsupported SDK framework: ${String(_exhaustive)}`);

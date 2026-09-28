@@ -48,6 +48,11 @@ export async function discoverDeployedTargets(configBaseDir?: string): Promise<D
 export interface DestroyTargetOptions {
   target: DeployedTarget;
   cdkProjectDir: string;
+  /**
+   * A toolkit that has already synthesized the project. The destroy reuses its assembly, so it does
+   * not synthesize again into cdk.out while the toolkit holds its lock. The caller disposes it.
+   */
+  toolkit?: CdkToolkitWrapper;
 }
 
 /**
@@ -60,25 +65,35 @@ export async function destroyTarget(options: DestroyTargetOptions): Promise<void
     throw new Error('CDK project not found. Cannot destroy without CDK project.');
   }
 
-  const toolkit = new CdkToolkitWrapper({
-    projectDir: cdkProjectDir,
-    ioHost: silentIoHost,
-    region: target.target.region,
-  });
+  const toolkit =
+    options.toolkit ??
+    new CdkToolkitWrapper({
+      projectDir: cdkProjectDir,
+      ioHost: silentIoHost,
+      region: target.target.region,
+    });
 
   // aws-targets.json is authoritative for the destroy region; promote it onto
   // the env so CDK toolkit-lib's internal SDK clients hit the right region even
   // when AWS_REGION / AWS_DEFAULT_REGION are unset.
   // See https://github.com/aws/agentcore-cli/issues/924.
-  await withTargetRegion(target.target.region, async () => {
-    await toolkit.initialize();
-    await toolkit.destroy({
-      stacks: {
-        strategy: StackSelectionStrategy.PATTERN_MUST_MATCH,
-        patterns: [target.stack.stackName],
-      },
+  try {
+    await withTargetRegion(target.target.region, async () => {
+      if (!options.toolkit) {
+        await toolkit.initialize();
+      }
+      await toolkit.destroy({
+        stacks: {
+          strategy: StackSelectionStrategy.PATTERN_MUST_MATCH,
+          patterns: [target.stack.stackName],
+        },
+      });
     });
-  });
+  } finally {
+    if (!options.toolkit) {
+      await toolkit.dispose();
+    }
+  }
 
   // Clean up deployed-state.json after successful destroy
   const configIO = new ConfigIO();
@@ -105,7 +120,7 @@ export function getCdkProjectDir(cwd?: string): string {
  * Perform full stack teardown for a target: destroy CloudFormation stack,
  * remove deployed-state entry, and remove the target from aws-targets.json.
  */
-export async function performStackTeardown(targetName: string): Promise<Result> {
+export async function performStackTeardown(targetName: string, toolkit?: CdkToolkitWrapper): Promise<Result> {
   const cdkProjectDir = getCdkProjectDir();
   const configIO = new ConfigIO();
 
@@ -178,7 +193,7 @@ export async function performStackTeardown(targetName: string): Promise<Result> 
   }
 
   if (deployedTarget) {
-    await destroyTarget({ target: deployedTarget, cdkProjectDir });
+    await destroyTarget({ target: deployedTarget, cdkProjectDir, toolkit });
   }
 
   // Clean up deployed-state.json first (it validates against aws-targets.json),

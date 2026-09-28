@@ -33,6 +33,7 @@ import { executeImportAgent } from '../../operations/agent/import';
 import { credentialPrimitive } from '../../primitives/registry';
 import { createDefaultProjectSpec } from '../../project';
 import { CDKRenderer, createRenderer } from '../../templates';
+import { getTemplateProfile, templateNeedsPythonVenv } from '../../templates/profiles';
 import type { CreateResult } from './types';
 import { mkdir } from 'fs/promises';
 import { join } from 'path';
@@ -343,7 +344,7 @@ export async function createProjectWithAgent(options: CreateWithAgentOptions): P
     }
 
     // Set up Python environment if needed (unless skipped)
-    if (language === 'Python' && !skipPythonSetup && !skipInstall) {
+    if (language === 'Python' && templateNeedsPythonVenv(resolvedFramework) && !skipPythonSetup && !skipInstall) {
       onProgress?.('Set up Python environment', 'start');
       const agentDir = join(projectRoot, APP_DIR, name);
       await setupPythonProject({ projectDir: agentDir });
@@ -383,6 +384,7 @@ export function getDryRunInfo(options: {
   name: string;
   cwd: string;
   language?: string;
+  framework?: string;
   projectName?: string;
 }): CreateResult {
   const { name, cwd, language } = options;
@@ -400,7 +402,7 @@ export function getDryRunInfo(options: {
 
   if (language === 'Python') {
     wouldCreate.push(`${projectRoot}/app/${name}/`);
-    wouldCreate.push(`${projectRoot}/app/${name}/main.py`);
+    wouldCreate.push(`${projectRoot}/app/${name}/${getTemplateProfile(options.framework)?.entrypoint ?? 'main.py'}`);
     wouldCreate.push(`${projectRoot}/app/${name}/pyproject.toml`);
   } else if (language === 'TypeScript') {
     wouldCreate.push(`${projectRoot}/app/${name}/`);

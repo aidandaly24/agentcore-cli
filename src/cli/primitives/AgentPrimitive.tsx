@@ -74,6 +74,7 @@ import {
   standardize,
 } from '../telemetry/schemas/common-shapes.js';
 import { createRenderer } from '../templates';
+import { templateNeedsPythonVenv } from '../templates/profiles';
 import { requireTTY } from '../tui/guards/tty';
 import type { AddFlowExitSummary } from '../tui/screens/add/AddFlow';
 import type { GenerateConfig, MemoryOption } from '../tui/screens/generate/types';
@@ -281,7 +282,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
       .option('--language <lang>', 'Language: Python (create), or Python/TypeScript/Other (BYO) [non-interactive]')
       .option(
         '--framework <fw>',
-        'Framework: Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents, VercelAI [non-interactive]'
+        'Framework: Strands, LangChain_LangGraph, GoogleADK, OpenAIAgents, VercelAI, BedrockManagedAgents [non-interactive]'
       )
       .option('--model-provider <provider>', 'Model provider: Bedrock, Anthropic, OpenAI, Gemini [non-interactive]')
       .option('--api-key <key>', 'API key for non-Bedrock providers [non-interactive]')
@@ -696,7 +697,7 @@ export class AgentPrimitive extends BasePrimitive<AddAgentOptions, RemovableReso
       await writeAgentToProject(generateConfig, { configBaseDir });
     }
 
-    if (options.language === 'Python') {
+    if (options.language === 'Python' && templateNeedsPythonVenv(options.framework)) {
       await setupPythonProject({ projectDir: agentPath });
     }
 

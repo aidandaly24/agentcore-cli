@@ -1,6 +1,7 @@
 import { DEFAULT_MODEL_IDS } from '../../../../schema';
 import { VPC_ENDPOINT_WARNING } from '../../../commands/shared/vpc-utils';
 import { computeDefaultCredentialEnvVarName } from '../../../primitives/credential-utils';
+import { templateUsesModel } from '../../../templates/profiles';
 import { ErrorPrompt } from '../../components';
 import { useAvailableAgents } from '../../hooks/useCreateMcp';
 import { AddAgentFlow } from '../agent/AddAgentFlow';
@@ -127,11 +128,13 @@ function AgentAddedSummary({
           </Text>
         )}
       </Box>
-      <Box marginTop={1}>
-        <Text dimColor>Model: </Text>
-        <Text>{DEFAULT_MODEL_IDS[config.modelProvider]}</Text>
-        <Text dimColor> via {config.modelProvider}</Text>
-      </Box>
+      {templateUsesModel(config.framework) && (
+        <Box marginTop={1}>
+          <Text dimColor>Model: </Text>
+          <Text>{DEFAULT_MODEL_IDS[config.modelProvider]}</Text>
+          <Text dimColor> via {config.modelProvider}</Text>
+        </Box>
+      )}
       {showEnvVarReminder && envVarName && (
         <Box flexDirection="column" marginTop={1}>
           <Text color="yellow">Note: API key not configured.</Text>
