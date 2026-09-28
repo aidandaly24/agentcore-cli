@@ -110,7 +110,7 @@ describe("Runtime invoke routing", () => {
       .setListResponse({ agentRuntimes: [runtime()] })
       .setListEndpointsResponse({ runtimeEndpoints: [endpoint()] })
       .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse);
-    const screen = renderScreen("/agentcore", { core });
+    const screen = renderImperativeScreen("/agentcore", { core });
 
     await screen.write("runtime");
     await screen.press("return");
@@ -137,7 +137,7 @@ describe("Runtime invoke routing", () => {
   test("Esc backs out of a direct console launch without prior router history", async () => {
     const core = new TestCoreClient();
     core.runtime.setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse);
-    const screen = renderScreen(CONSOLE_PATH, { core });
+    const screen = renderImperativeScreen(CONSOLE_PATH, { core });
 
     await waitForText(screen.lastFrame, "Enter JSON payload");
     await screen.press("escape");
@@ -158,7 +158,7 @@ describe("Runtime invoke routing", () => {
         agentRuntimeArn: RUNTIME_ARN,
         status: "READY",
       } as GetAgentRuntimeResponse);
-    const screen = renderScreen("/agentcore/runtime/list", { core });
+    const screen = renderImperativeScreen("/agentcore/runtime/list", { core });
 
     await waitForText(screen.lastFrame, RUNTIME_ID);
     await screen.press("return");
@@ -193,7 +193,7 @@ describe("Runtime invoke routing", () => {
     core.runtime
       .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
       .setListResponse({ agentRuntimes: [runtime()] });
-    const screen = renderScreen(CONSOLE_PATH, { core });
+    const screen = renderImperativeScreen(CONSOLE_PATH, { core });
 
     await waitForText(screen.lastFrame, "Ready · Session ID:");
     const sessionId = displayedSessionId(screen.lastFrame());
@@ -288,7 +288,7 @@ describe("Runtime invoke routing", () => {
       .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
       .setListEndpointsResponse({ runtimeEndpoints: [endpoint()] })
       .setListResponse({ agentRuntimes: [runtime()] });
-    const screen = renderScreen(CONSOLE_PATH, {
+    const screen = renderImperativeScreen(CONSOLE_PATH, {
       core,
       withContext: (ctx) =>
         ctx.withValue(RuntimeInvokeLaunchContextKey, {
