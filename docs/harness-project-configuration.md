@@ -1,4 +1,8 @@
-# Harness Project Configuration
+# Legacy Harness Project Configuration
+
+This guide covers existing flat `harness.yaml` files. New Harness projects use the
+[API-shaped project format](harness-api-shaped-yaml.md). Existing files remain readable;
+you do not need to regenerate a project to use the new CLI.
 
 [Back to README](../README.md) | [Command reference](../command.md)
 
