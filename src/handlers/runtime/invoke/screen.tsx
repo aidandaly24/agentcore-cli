@@ -28,6 +28,7 @@ type TargetPickerState = { stage: "runtime" } | { stage: "endpoint"; runtimeId: 
 
 type RuntimeInvokeLocationState = {
   returnOnEscape?: boolean;
+  resetLaunchSession?: boolean;
 };
 
 type ErrorDetails = {
@@ -97,8 +98,15 @@ export function RuntimeInvokeScreen(props: ScreenProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const launchContext = props.ctx.value(RuntimeInvokeLaunchContextKey);
-  const initialContext = launchContext?.runtimeId === runtimeId ? launchContext : undefined;
-  const returnOnEscape = (location.state as RuntimeInvokeLocationState | null)?.returnOnEscape;
+  const locationState = location.state as RuntimeInvokeLocationState | null;
+  const initialContext =
+    launchContext !== undefined && launchContext.runtimeId === runtimeId
+      ? locationState?.resetLaunchSession
+        ? { ...launchContext, runtimeSessionId: undefined }
+        : launchContext
+      : undefined;
+  const returnOnEscape = locationState?.returnOnEscape;
+  const resetState = locationState?.resetLaunchSession ? { resetLaunchSession: true } : undefined;
 
   if (!runtimeId) {
     return (
@@ -106,7 +114,7 @@ export function RuntimeInvokeScreen(props: ScreenProps) {
         {...props}
         breadcrumb={["agentcore", "runtime", "invoke"]}
         description="choose a Runtime to invoke"
-        onSelect={(id) => navigate(invokePath(id))}
+        onSelect={(id) => navigate(invokePath(id), { state: resetState })}
       />
     );
   }
@@ -121,10 +129,13 @@ export function RuntimeInvokeScreen(props: ScreenProps) {
         onSelect={(selected) =>
           navigate(invokePath(runtimeId, selected), {
             replace: returnOnEscape === true,
-            state: returnOnEscape ? { returnOnEscape } : undefined,
+            state: locationState ?? undefined,
           })
         }
-        onEscape={() => (returnOnEscape ? navigate(-1) : navigate(invokePath()))}
+        onEscape={() => {
+          if (returnOnEscape) navigate(-1);
+          else navigate(invokePath(), { state: resetState });
+        }}
       />
     );
   }
@@ -311,7 +322,11 @@ export function RuntimeInvokeConsole({
         if (abortRef.current) abortRef.current.abort();
         else if (onBack) onBack();
         else if (returnOnEscape) navigate(-1);
-        else setTargetPicker({ stage: "endpoint", runtimeId: target.runtimeId });
+        else
+          navigate(invokePath(target.runtimeId), {
+            replace: true,
+            state: { resetLaunchSession: true },
+          });
         return;
       }
       const view = scrollRef.current;

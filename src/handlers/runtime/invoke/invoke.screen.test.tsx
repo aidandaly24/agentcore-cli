@@ -104,6 +104,76 @@ describe("Runtime invoke routing", () => {
     await waitForText(screen.lastFrame, "Enter JSON payload");
   });
 
+  test("Esc backs out from a menu-launched console through the pickers to home", async () => {
+    const core = new TestCoreClient();
+    core.runtime
+      .setListResponse({ agentRuntimes: [runtime()] })
+      .setListEndpointsResponse({ runtimeEndpoints: [endpoint()] })
+      .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse);
+    const screen = renderScreen("/agentcore", { core });
+
+    await screen.write("runtime");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "agentcore → runtime → inspect AgentCore Runtimes");
+    await screen.write("invoke");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, RUNTIME_ID);
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "choose an endpoint to invoke");
+    await waitForText(screen.lastFrame, QUALIFIER);
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "Enter JSON payload");
+
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "choose an endpoint to invoke");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "choose a Runtime to invoke");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "agentcore → runtime → inspect AgentCore Runtimes");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "agentcore → the platform for production AI agents");
+  });
+
+  test("Esc backs out of a direct console launch without prior router history", async () => {
+    const core = new TestCoreClient();
+    core.runtime.setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse);
+    const screen = renderScreen(CONSOLE_PATH, { core });
+
+    await waitForText(screen.lastFrame, "Enter JSON payload");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "choose an endpoint to invoke");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "choose a Runtime to invoke");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "agentcore → runtime → inspect AgentCore Runtimes");
+  });
+
+  test("Esc from a Runtime detail invoke returns to the detail", async () => {
+    const core = new TestCoreClient();
+    core.runtime
+      .setListResponse({ agentRuntimes: [runtime()] })
+      .setListEndpointsResponse({ runtimeEndpoints: [endpoint()] })
+      .setGetResponse({
+        agentRuntimeId: RUNTIME_ID,
+        agentRuntimeArn: RUNTIME_ARN,
+        status: "READY",
+      } as GetAgentRuntimeResponse);
+    const screen = renderScreen("/agentcore/runtime/list", { core });
+
+    await waitForText(screen.lastFrame, RUNTIME_ID);
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "invoke this Runtime");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, QUALIFIER);
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "Enter JSON payload");
+
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, `agentcore → runtime → get → ${RUNTIME_ID}`);
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "agentcore → runtime → list");
+  });
+
   test("esc from an initial endpoint picker returns to the Runtime picker", async () => {
     const core = new TestCoreClient();
     core.runtime.setListEndpointsResponse({ runtimeEndpoints: [endpoint()] }).setListResponse({
@@ -116,6 +186,23 @@ describe("Runtime invoke routing", () => {
 
     await waitForText(screen.lastFrame, "back-to-runtime-picker");
     expect(screen.lastFrame()).toContain("agentcore → runtime → invoke");
+  });
+
+  test("Esc cancels the Ctrl+T target switch without leaving the console", async () => {
+    const core = new TestCoreClient();
+    core.runtime
+      .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
+      .setListResponse({ agentRuntimes: [runtime()] });
+    const screen = renderScreen(CONSOLE_PATH, { core });
+
+    await waitForText(screen.lastFrame, "Ready · Session ID:");
+    const sessionId = displayedSessionId(screen.lastFrame());
+    await screen.write("\x14");
+    await waitForText(screen.lastFrame, "choose another Runtime");
+    await screen.press("escape");
+
+    await waitForText(screen.lastFrame, "Enter JSON payload");
+    expect(displayedSessionId(screen.lastFrame())).toBe(sessionId);
   });
 
   test("keeps a CLI-selected session while choosing an endpoint", async () => {
@@ -140,11 +227,15 @@ describe("Runtime invoke routing", () => {
     expect(screen.lastFrame()).not.toContain("MCP session ID");
   });
 
-  test("escape switches endpoints without restoring the launch session", async () => {
+  test("backing out keeps launch authentication but starts a new session", async () => {
     const nextQualifier = "back-endpoint";
     const core = new TestCoreClient();
     core.runtime
-      .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
+      .setGetResponse({
+        agentRuntimeArn: RUNTIME_ARN,
+        authorizerConfiguration: { customJWTAuthorizer: {} },
+        requestHeaderConfiguration: { requestHeaderAllowlist: ["X-Tenant"] },
+      } as GetAgentRuntimeResponse)
       .setListEndpointsResponse({
         runtimeEndpoints: [endpoint({ name: nextQualifier, id: nextQualifier })],
       })
@@ -159,25 +250,67 @@ describe("Runtime invoke routing", () => {
         ctx.withValue(RuntimeInvokeLaunchContextKey, {
           runtimeId: RUNTIME_ID,
           runtimeSessionId: "cli-selected-session",
+          runtimeUserId: "user-123",
+          applicationHeaders: [["X-Tenant", "retail"]],
+          bearerToken: "secret-token",
         }),
     });
 
     await waitForText(screen.lastFrame, "Session ID: cli-selected-session");
     await screen.press("escape");
     await waitForText(screen.lastFrame, nextQualifier);
+    await waitForText(screen.lastFrame, "choose an endpoint to invoke");
     await screen.press("return");
     await waitForText(
       screen.lastFrame,
       `agentcore → runtime → invoke → ${RUNTIME_ID} → ${nextQualifier}`,
     );
+    await waitForText(screen.lastFrame, "Ready · Session ID:");
     const nextSessionId = displayedSessionId(screen.lastFrame());
     expect(nextSessionId).toMatch(UUID_PATTERN);
     expect(nextSessionId).not.toBe("cli-selected-session");
+    expect(screen.lastFrame()).toContain("Context user/JWT/1h");
 
     await screen.write("{}");
     await screen.press("return");
     await waitFor(() => invokeRequests(core).length === 1);
-    expect(invokeRequests(core)[0]!.runtimeSessionId).toBe(nextSessionId);
+    expect(invokeRequests(core)[0]).toMatchObject({
+      runtimeSessionId: nextSessionId,
+      runtimeUserId: "user-123",
+      applicationHeaders: [["X-Tenant", "retail"]],
+      bearerToken: "secret-token",
+    });
+  });
+
+  test("backing through both pickers does not restore the launch session", async () => {
+    const core = new TestCoreClient();
+    core.runtime
+      .setGetResponse({ agentRuntimeArn: RUNTIME_ARN } as GetAgentRuntimeResponse)
+      .setListEndpointsResponse({ runtimeEndpoints: [endpoint()] })
+      .setListResponse({ agentRuntimes: [runtime()] });
+    const screen = renderScreen(CONSOLE_PATH, {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(RuntimeInvokeLaunchContextKey, {
+          runtimeId: RUNTIME_ID,
+          runtimeSessionId: "cli-selected-session",
+        }),
+    });
+
+    await waitForText(screen.lastFrame, "Session ID: cli-selected-session");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "choose an endpoint to invoke");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "choose a Runtime to invoke");
+    await waitForText(screen.lastFrame, RUNTIME_ID);
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "choose an endpoint to invoke");
+    await waitForText(screen.lastFrame, QUALIFIER);
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "Enter JSON payload");
+
+    expect(displayedSessionId(screen.lastFrame())).toMatch(UUID_PATTERN);
+    expect(displayedSessionId(screen.lastFrame())).not.toBe("cli-selected-session");
   });
 
   test("shows the full Runtime lookup error", async () => {
