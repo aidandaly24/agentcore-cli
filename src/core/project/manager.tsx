@@ -49,7 +49,6 @@ import {
   mapHarnessToExportPlan,
 } from "./templates/export";
 import { HarnessSpecSchema } from "../../projectSchemas/harness";
-import { parseHarnessProjectSpec } from "../../projectSchemas/harnessProject";
 import { FsTreeNode } from "./templates/fsTree";
 import { getEvaluatorTemplateResolver } from "./templates/evaluator";
 import { ProjectSpecSchema, type ManagedBy } from "../../projectSchemas/project";
@@ -773,9 +772,11 @@ export class FsProjectManager implements ProjectManager {
     if (input.prefetched) {
       spec = input.prefetched.spec;
       harnessName = spec.name;
-      const prompt = input.prefetched.systemPrompt?.trim();
-      systemPrompt =
-        prompt && prompt.length > 0 ? prompt : (spec.systemPrompt ?? DEFAULT_EXPORT_SYSTEM_PROMPT);
+      const prompt = input.prefetched.systemPrompt;
+      systemPrompt = prompt?.trim()
+        ? prompt
+        : (spec.systemPrompt?.map((block) => block.text).join("\n") ??
+          DEFAULT_EXPORT_SYSTEM_PROMPT);
     } else {
       harnessName = input.harnessName!;
       const entry = projectSpec.harnesses.find((candidate) => candidate.name === harnessName);
@@ -793,7 +794,7 @@ export class FsProjectManager implements ProjectManager {
       };
       const harnessPath = join(harnessDir, "harness.yaml");
       try {
-        spec = parseHarnessProjectSpec(await readYamlFile(harnessPath));
+        spec = HarnessSpecSchema.parse(await readYamlFile(harnessPath));
       } catch (error) {
         if (!(error instanceof z.ZodError)) throw error;
         throw new InputValidationError(
@@ -801,7 +802,8 @@ export class FsProjectManager implements ProjectManager {
           { cause: error },
         );
       }
-      systemPrompt = spec.systemPrompt ?? DEFAULT_EXPORT_SYSTEM_PROMPT;
+      systemPrompt =
+        spec.systemPrompt?.map((block) => block.text).join("\n") ?? DEFAULT_EXPORT_SYSTEM_PROMPT;
       if (spec.systemPrompt === undefined) {
         const promptPath = join(harnessDir, "system-prompt.md");
         try {

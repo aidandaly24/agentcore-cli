@@ -81,8 +81,8 @@ describe("project remove screen", () => {
         resourceType: "harness",
         resourceConfig: {
           name: "assistant",
-          model: { provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0" },
-          systemPrompt: "You are terse.",
+          model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
+          systemPrompt: [{ text: "You are terse." }],
         },
       },
       {

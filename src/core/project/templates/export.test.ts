@@ -30,7 +30,7 @@ import {
 function harness(spec: Record<string, unknown>): HarnessSpec {
   return HarnessSpecSchema.parse({
     name: "assistant",
-    model: { provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0" },
+    model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
     ...spec,
   });
 }
@@ -64,11 +64,12 @@ describe("mapHarnessToExportPlan model mapping", () => {
     const result = plan({
       spec: harness({
         model: {
-          provider: "bedrock",
-          modelId: "us.amazon.nova-lite-v1:0",
-          temperature: 0.2,
-          topP: 0.9,
-          maxTokens: 512,
+          bedrockModelConfig: {
+            modelId: "us.amazon.nova-lite-v1:0",
+            temperature: 0.2,
+            topP: 0.9,
+            maxTokens: 512,
+          },
         },
         maxIterations: 5,
         maxTokens: 2048,
@@ -93,7 +94,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
   test("keeps a legal temperature of 0 truthy for the template", () => {
     const result = plan({
       spec: harness({
-        model: { provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0", temperature: 0 },
+        model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0", temperature: 0 } },
       }),
     });
     expect(result.context.modelTemperature).toBe("0");
@@ -102,7 +103,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
   test("routes an OpenAI-compatible bedrock model through the Mantle branch with its IAM policy", () => {
     const result = plan({
       spec: harness({
-        model: { provider: "bedrock", modelId: "openai.gpt-oss-120b", apiFormat: "responses" },
+        model: { bedrockModelConfig: { modelId: "openai.gpt-oss-120b", apiFormat: "responses" } },
       }),
     });
 
@@ -117,14 +118,15 @@ describe("mapHarnessToExportPlan model mapping", () => {
     const result = plan({
       spec: harness({
         model: {
-          provider: "open_ai",
-          modelId: "gpt-4.1",
-          apiFormat: "responses",
-          maxTokens: 768,
-          temperature: 0.2,
-          topP: 0.8,
-          apiKeyArn:
-            "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/MyOpenAiKey",
+          openAiModelConfig: {
+            modelId: "gpt-4.1",
+            apiFormat: "responses",
+            maxTokens: 768,
+            temperature: 0.2,
+            topP: 0.8,
+            apiKeyArn:
+              "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/MyOpenAiKey",
+          },
         },
       }),
     });
@@ -149,10 +151,11 @@ describe("mapHarnessToExportPlan model mapping", () => {
     const result = plan({
       spec: harness({
         model: {
-          provider: "gemini",
-          modelId: "gemini-2.5-flash",
-          apiKeyArn:
-            "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GemKey",
+          geminiModelConfig: {
+            modelId: "gemini-2.5-flash",
+            apiKeyArn:
+              "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GemKey",
+          },
         },
       }),
       projectSpec: projectSpec({
@@ -169,13 +172,14 @@ describe("mapHarnessToExportPlan model mapping", () => {
     const result = plan({
       spec: harness({
         model: {
-          provider: "lite_llm",
-          modelId: "bedrock/us.amazon.nova-lite-v1:0",
-          apiBase: "https://litellm.example",
-          maxTokens: 300,
-          temperature: 0.1,
-          topP: 0.7,
-          additionalParams: { max_retries: 2 },
+          liteLlmModelConfig: {
+            modelId: "bedrock/us.amazon.nova-lite-v1:0",
+            apiBase: "https://litellm.example",
+            maxTokens: 300,
+            temperature: 0.1,
+            topP: 0.7,
+            additionalParams: { max_retries: 2 },
+          },
         },
       }),
     });
@@ -192,7 +196,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
 
   test("warns when a keyless LiteLLM model is not Bedrock-backed", () => {
     const result = plan({
-      spec: harness({ model: { provider: "lite_llm", modelId: "openai/gpt-4.1" } }),
+      spec: harness({ model: { liteLlmModelConfig: { modelId: "openai/gpt-4.1" } } }),
     });
     expect(categories(result)).toEqual([LITELLM_NO_API_KEY_NOTE_CATEGORY]);
   });
@@ -400,7 +404,9 @@ describe("matchesAllowedTools", () => {
 describe("mapHarnessToExportPlan memory", () => {
   test("wires an in-project memory by name with its strategies", () => {
     const result = plan({
-      spec: harness({ memory: { mode: "existing", name: "chat_history", actorId: "actor-1" } }),
+      spec: harness({
+        memory: { agentCoreMemoryConfiguration: { name: "chat_history", actorId: "actor-1" } },
+      }),
       projectSpec: projectSpec({
         memories: [
           { name: "chat_history", eventExpiryDuration: 30, strategies: [{ type: "SEMANTIC" }] },
@@ -419,10 +425,11 @@ describe("mapHarnessToExportPlan memory", () => {
     const result = plan({
       spec: harness({
         memory: {
-          mode: "existing",
-          name: "chat_history",
-          messagesCount: 12,
-          retrievalConfig: { topK: 7, relevanceScore: 0 },
+          agentCoreMemoryConfiguration: {
+            name: "chat_history",
+            messagesCount: 12,
+            retrievalConfig: { topK: 7, relevanceScore: 0 },
+          },
         },
       }),
       projectSpec: projectSpec({
@@ -439,7 +446,7 @@ describe("mapHarnessToExportPlan memory", () => {
 
   test("notes a by-name memory that is not in the project", () => {
     const result = plan({
-      spec: harness({ memory: { mode: "existing", name: "missing" } }),
+      spec: harness({ memory: { agentCoreMemoryConfiguration: { name: "missing" } } }),
     });
     expect(result.hasMemory).toBe(false);
     expect(categories(result)).toEqual([MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY]);
@@ -449,8 +456,9 @@ describe("mapHarnessToExportPlan memory", () => {
     const result = plan({
       spec: harness({
         memory: {
-          mode: "existing",
-          arn: "arn:aws:bedrock-agentcore:us-east-1:111122223333:memory/m-1",
+          agentCoreMemoryConfiguration: {
+            arn: "arn:aws:bedrock-agentcore:us-east-1:111122223333:memory/m-1",
+          },
         },
       }),
     });
@@ -460,10 +468,10 @@ describe("mapHarnessToExportPlan memory", () => {
   });
 
   test("notes managed harness memory and disables none", () => {
-    expect(categories(plan({ spec: harness({ memory: { mode: "managed" } }) }))).toEqual([
-      MEMORY_MANAGED_NOTE_CATEGORY,
-    ]);
-    const disabled = plan({ spec: harness({ memory: { mode: "disabled" } }) });
+    expect(
+      categories(plan({ spec: harness({ memory: { managedMemoryConfiguration: {} } }) })),
+    ).toEqual([MEMORY_MANAGED_NOTE_CATEGORY]);
+    const disabled = plan({ spec: harness({ memory: { disabled: {} } }) });
     expect(disabled.hasMemory).toBe(false);
     expect(disabled.notes).toEqual([]);
   });
@@ -473,10 +481,9 @@ describe("mapHarnessToExportPlan skills", () => {
   test("maps s3 and git skills and generates the S3 read policy", () => {
     const result = plan({
       spec: harness({
-        build: undefined,
         skills: [
-          { s3Uri: "s3://skills-bucket/team/" },
-          { gitUrl: "https://github.com/example/skills.git", path: "subdir" },
+          { s3: { uri: "s3://skills-bucket/team/" } },
+          { git: { url: "https://github.com/example/skills.git", path: "subdir" } },
         ],
       }),
     });
@@ -503,7 +510,7 @@ describe("mapHarnessToExportPlan skills", () => {
   });
 
   test("notes a malformed s3 URI instead of generating IAM for it", () => {
-    const result = plan({ spec: harness({ skills: [{ s3Uri: "s3://" }] }) });
+    const result = plan({ spec: harness({ skills: [{ s3: { uri: "s3://" } }] }) });
     expect(categories(result)).toEqual([MALFORMED_S3_SKILL_NOTE_CATEGORY]);
     expect(result.policyFiles).toEqual({});
   });
@@ -513,10 +520,12 @@ describe("mapHarnessToExportPlan skills", () => {
       spec: harness({
         skills: [
           {
-            gitUrl: "https://github.com/example/private.git",
-            auth: {
-              credentialArn:
-                "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GitPat",
+            git: {
+              url: "https://github.com/example/private.git",
+              auth: {
+                credentialArn:
+                  "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GitPat",
+              },
             },
           },
           { awsSkills: { paths: ["aws/foo"] } },
@@ -533,6 +542,38 @@ describe("mapHarnessToExportPlan skills", () => {
         "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GitPat",
     });
     expect(categories(result)).toEqual([GIT_SKILLS_AUTH_NOTE_CATEGORY, AWS_SKILLS_NOTE_CATEGORY]);
+  });
+
+  test("preserves a by-name git credential with its username and subdirectory", () => {
+    const result = plan({
+      spec: harness({
+        skills: [
+          {
+            git: {
+              url: "https://github.com/example/private.git",
+              path: "skills",
+              auth: { credentialName: "GitPat", username: "bot" },
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result.context.gitSkills).toEqual([
+      {
+        url: "https://github.com/example/private.git",
+        path: "skills",
+        credentialArn: "GitPat",
+        username: "bot",
+      },
+    ]);
+    expect(result.credentials).toEqual([
+      {
+        authorizerType: "ApiKeyCredentialProvider",
+        name: "GitPat",
+      },
+    ]);
+    expect(categories(result)).toEqual([GIT_SKILLS_AUTH_NOTE_CATEGORY]);
   });
 });
 
@@ -582,7 +623,11 @@ describe("mapHarnessToExportPlan always exports a CodeZip runtime", () => {
   });
 
   test("a containerUri harness still exports as CodeZip, with a note that the image was dropped", () => {
-    const result = plan({ spec: harness({ containerUri: CONTAINER_URI }) });
+    const result = plan({
+      spec: harness({
+        environmentArtifact: { containerConfiguration: { containerUri: CONTAINER_URI } },
+      }),
+    });
     expect(result.runtime.build).toBe("CodeZip");
     expect(result.runtime.dockerfile).toBeUndefined();
     expect(categories(result)).toEqual([CONTAINER_IMAGE_NOTE_CATEGORY]);
@@ -599,9 +644,15 @@ describe("mapHarnessToExportPlan always exports a CodeZip runtime", () => {
   test("a VPC harness keeps its subnets and security groups and needs no vpcId", () => {
     const result = plan({
       spec: harness({
-        containerUri: CONTAINER_URI,
-        networkMode: "VPC",
-        networkConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
+        environmentArtifact: { containerConfiguration: { containerUri: CONTAINER_URI } },
+        environment: {
+          agentCoreRuntimeEnvironment: {
+            networkConfiguration: {
+              networkMode: "VPC",
+              networkModeConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
+            },
+          },
+        },
       }),
     });
     expect(result.runtime.build).toBe("CodeZip");
@@ -623,17 +674,39 @@ describe("mapHarnessToExportPlan runtime spec entry", () => {
     const result = plan({
       spec: harness({
         environmentVariables: { LOG_LEVEL: "debug" },
-        lifecycleConfig: { idleRuntimeSessionTimeout: 900 },
-        networkMode: "VPC",
-        networkConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
-        sessionStoragePath: "/mnt/session",
-        efsAccessPoints: [
-          {
-            accessPointArn:
-              "arn:aws:elasticfilesystem:us-east-1:111122223333:access-point/fsap-0123456789abcdef0",
-            mountPath: "/mnt/tools",
+        environment: {
+          agentCoreRuntimeEnvironment: {
+            lifecycleConfiguration: { idleRuntimeSessionTimeout: 900 },
+            networkConfiguration: {
+              networkMode: "VPC",
+              networkModeConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
+            },
+            filesystemConfigurations: [
+              { sessionStorage: { mountPath: "/mnt/session" } },
+              {
+                efsAccessPoint: {
+                  accessPointArn:
+                    "arn:aws:elasticfilesystem:us-east-1:111122223333:access-point/fsap-0123456789abcdef0",
+                  mountPath: "/mnt/tools",
+                },
+              },
+              {
+                s3FilesAccessPoint: {
+                  accessPointArn:
+                    "arn:aws:s3files:us-east-1:111122223333:file-system/fs-0123456789abcdef0/access-point/fsap-0123456789abcdef0",
+                  mountPath: "/mnt/data",
+                },
+              },
+            ],
           },
-        ],
+        },
+        networkConfig: { vpcId: "vpc-12345678" },
+        authorizerConfiguration: {
+          customJWTAuthorizer: {
+            discoveryUrl: "https://example.com/.well-known/openid-configuration",
+            allowedClients: ["client-id"],
+          },
+        },
         tags: { team: "search" },
         executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
       }),
@@ -649,6 +722,13 @@ describe("mapHarnessToExportPlan runtime spec entry", () => {
       envVars: [{ name: "LOG_LEVEL", value: "debug" }],
       networkMode: "VPC",
       networkConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
+      authorizerType: "CUSTOM_JWT",
+      authorizerConfiguration: {
+        customJwtAuthorizer: {
+          discoveryUrl: "https://example.com/.well-known/openid-configuration",
+          allowedClients: ["client-id"],
+        },
+      },
       lifecycleConfiguration: { idleRuntimeSessionTimeout: 900 },
       filesystemConfigurations: [
         { sessionStorage: { mountPath: "/mnt/session" } },
@@ -659,11 +739,23 @@ describe("mapHarnessToExportPlan runtime spec entry", () => {
             mountPath: "/mnt/tools",
           },
         },
+        {
+          s3FilesAccessPoint: {
+            accessPointArn:
+              "arn:aws:s3files:us-east-1:111122223333:file-system/fs-0123456789abcdef0/access-point/fsap-0123456789abcdef0",
+            mountPath: "/mnt/data",
+          },
+        },
       ],
       tags: { team: "search" },
     });
     // The harness role must never leak onto the new runtime.
     expect(result.runtime.executionRoleArn).toBeUndefined();
+    expect(result.context.sessionStorageMountPath).toBe("/mnt/session");
+    expect(result.context.efsMounts).toEqual([{ mountPath: "/mnt/tools" }]);
+    expect(result.context.s3Mounts).toEqual([{ mountPath: "/mnt/data" }]);
+    expect(result.context.needsOs).toBe(true);
+    expect(() => projectSpec({ runtimes: [result.runtime] })).not.toThrow();
   });
 
   test("the produced entry validates inside a project spec", () => {
@@ -671,6 +763,8 @@ describe("mapHarnessToExportPlan runtime spec entry", () => {
     const spec = projectSpec();
     spec.runtimes.push(result.runtime);
     expect(() => ProjectSpecSchema.parse(spec)).not.toThrow(z.ZodError);
+    expect(result.runtime.authorizerType).toBe("AWS_IAM");
+    expect(result.runtime.authorizerConfiguration).toBeUndefined();
   });
 });
 

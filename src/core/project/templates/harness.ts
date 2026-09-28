@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { stringify } from "yaml";
 import { ZodError, z } from "zod";
 import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
-import { toApiShapedHarnessSpec } from "../../../projectSchemas/harnessProject";
 import { FsTreeNode } from "./fsTree";
 import { InputValidationError, ResourceNotFoundError } from "../../../errors/errors";
 import type { TemplateRenderer, TemplateResolver } from "./types";
@@ -12,6 +11,7 @@ const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant";
 const TEMPLATE_FIELDS = new Set([
   "name",
   "model",
+  "systemPrompt",
   "tools",
   "allowedTools",
   "skills",
@@ -46,11 +46,12 @@ export function getHarnessTemplateResolver(
 
       const parsed = parseHarnessSpec({
         ...spec,
-        memory: spec.memory === undefined ? { mode: "managed" } : spec.memory,
+        memory: spec.memory === undefined ? { managedMemoryConfiguration: {} } : spec.memory,
         dockerfile: spec.dockerfile ? "Dockerfile" : undefined,
       });
       const { systemPrompt, ...settings } = parsed;
-      const context = buildTemplateContext(settings);
+      const inlinePrompt = (systemPrompt?.length ?? 0) > 1;
+      const context = buildTemplateContext(inlinePrompt ? parsed : settings);
       const tree = await FsTreeNode.fromAssetSource(
         { assetSource: config.assetSource },
         { assetDir: "templates/harness" },
@@ -60,10 +61,14 @@ export function getHarnessTemplateResolver(
         },
       );
       tree.children.push(
-        FsTreeNode.createFile(
-          "system-prompt.md",
-          async () => systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-        ),
+        ...(inlinePrompt
+          ? []
+          : [
+              FsTreeNode.createFile(
+                "system-prompt.md",
+                async () => systemPrompt?.[0]?.text ?? DEFAULT_SYSTEM_PROMPT,
+              ),
+            ]),
         ...(spec.dockerfile ? [FsTreeNode.fromTextFile("Dockerfile", spec.dockerfile)] : []),
       );
 
@@ -78,9 +83,8 @@ export function getHarnessTemplateResolver(
 }
 
 function buildTemplateContext(spec: HarnessSpec) {
-  const projectFile = toApiShapedHarnessSpec(spec);
   const yaml = Object.fromEntries(
-    Object.entries(projectFile)
+    Object.entries(spec)
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [
         key,
@@ -88,11 +92,30 @@ function buildTemplateContext(spec: HarnessSpec) {
         stringify({ [key]: value }, { blockQuote: false }).slice(0, -1),
       ]),
   );
+  const modelConfig =
+    "bedrockModelConfig" in spec.model
+      ? spec.model.bedrockModelConfig
+      : "openAiModelConfig" in spec.model
+        ? spec.model.openAiModelConfig
+        : "geminiModelConfig" in spec.model
+          ? spec.model.geminiModelConfig
+          : spec.model.liteLlmModelConfig;
   return {
     ...spec,
     yaml,
-    modelMaxTokensExample: !("maxTokens" in spec.model),
-    managedMemoryEmpty: spec.memory?.mode === "managed" && Object.keys(spec.memory).length === 1,
+    modelConfig,
+    apiFormatExample:
+      "bedrockModelConfig" in spec.model
+        ? "converse_stream"
+        : "openAiModelConfig" in spec.model
+          ? "responses"
+          : undefined,
+    modelMaxTokensExample: modelConfig.maxTokens === undefined,
+    apiKeyExample: "liteLlmModelConfig" in spec.model && !spec.model.liteLlmModelConfig.apiKeyArn,
+    managedMemoryEmpty:
+      spec.memory &&
+      "managedMemoryConfiguration" in spec.memory &&
+      Object.keys(spec.memory.managedMemoryConfiguration).length === 0,
     additionalSettings: Object.entries(yaml)
       .filter(([key]) => !TEMPLATE_FIELDS.has(key))
       .map(([, value]) => value),

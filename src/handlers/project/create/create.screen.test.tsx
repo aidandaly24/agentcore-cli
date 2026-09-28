@@ -104,7 +104,7 @@ describe("project create wizard", () => {
         skipGit: false,
         scaffoldHarnessInput: {
           name: "DemoApp",
-          model: { provider: "bedrock", modelId: DEFAULT_MODEL_ID },
+          model: { bedrockModelConfig: { modelId: DEFAULT_MODEL_ID } },
         },
       },
     ]);
@@ -145,7 +145,7 @@ describe("project create wizard", () => {
       skipGit: false,
       scaffoldHarnessInput: {
         name: "TunedApp",
-        model: { provider: "bedrock", modelId: `${DEFAULT_MODEL_ID}-test` },
+        model: { bedrockModelConfig: { modelId: `${DEFAULT_MODEL_ID}-test` } },
       },
     });
     r.unmount();
@@ -196,9 +196,7 @@ describe("project create wizard", () => {
       scaffoldHarnessInput: {
         name: "OpenAIApp",
         model: {
-          provider: "open_ai",
-          modelId: "gpt-5",
-          apiKeyArn,
+          openAiModelConfig: { modelId: "gpt-5", apiKeyArn },
         },
       },
     });

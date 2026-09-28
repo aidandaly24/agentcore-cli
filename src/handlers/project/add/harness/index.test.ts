@@ -12,7 +12,6 @@ import {
 } from "../../../../testing";
 import { DeserializationError, InputValidationError } from "../../../../errors";
 import { FsReadWriteJson, type ReadWriteJson } from "../../../../io";
-import { parseHarnessProjectSpec } from "../../../../projectSchemas/harnessProject";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(() => Promise.all(cleanups.splice(0).map((cleanup) => cleanup())));
@@ -30,7 +29,19 @@ async function run(args: string[], opts?: { core?: TestCoreClient }) {
 }
 
 describe("project add harness", () => {
-  const defaultModel = { provider: "bedrock", modelId: "global.anthropic.claude-sonnet-5" };
+  const defaultModel = {
+    bedrockModelConfig: { modelId: "global.anthropic.claude-sonnet-5" },
+  };
+  const defaultSettings = {
+    model: defaultModel,
+    tools: [],
+    allowedTools: ["*"],
+    skills: [],
+    memory: { managedMemoryConfiguration: {} },
+    truncation: { strategy: "sliding_window" },
+    environmentVariables: {},
+    tags: {},
+  };
 
   test.each<[string, string[], Record<string, unknown>]>([
     ["minimal — name only", ["--name", "x"], { model: defaultModel }],
@@ -40,9 +51,11 @@ describe("project add harness", () => {
         "--name",
         "x",
         "--model",
-        '{"provider":"bedrock","modelId":"us.anthropic.claude-sonnet-4-5-20250929-v1:0"}',
+        '{"bedrockModelConfig":{"modelId":"us.anthropic.claude-sonnet-4-5-20250929-v1:0"}}',
       ],
-      { model: { provider: "bedrock", modelId: "us.anthropic.claude-sonnet-4-5-20250929-v1:0" } },
+      {
+        model: { bedrockModelConfig: { modelId: "us.anthropic.claude-sonnet-4-5-20250929-v1:0" } },
+      },
     ],
     [
       "model — openai",
@@ -50,13 +63,14 @@ describe("project add harness", () => {
         "--name",
         "x",
         "--model",
-        '{"provider":"open_ai","modelId":"gpt-4","apiKeyArn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k"}',
+        '{"openAiModelConfig":{"modelId":"gpt-4","apiKeyArn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k"}}',
       ],
       {
         model: {
-          provider: "open_ai",
-          modelId: "gpt-4",
-          apiKeyArn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k",
+          openAiModelConfig: {
+            modelId: "gpt-4",
+            apiKeyArn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k",
+          },
         },
       },
     ],
@@ -66,20 +80,21 @@ describe("project add harness", () => {
         "--name",
         "x",
         "--model",
-        '{"provider":"gemini","modelId":"gemini-pro","apiKeyArn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k"}',
+        '{"geminiModelConfig":{"modelId":"gemini-pro","apiKeyArn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k"}}',
       ],
       {
         model: {
-          provider: "gemini",
-          modelId: "gemini-pro",
-          apiKeyArn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k",
+          geminiModelConfig: {
+            modelId: "gemini-pro",
+            apiKeyArn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:api-key/k",
+          },
         },
       },
     ],
     [
       "model — litellm",
-      ["--name", "x", "--model", '{"provider":"lite_llm","modelId":"anthropic/claude-3"}'],
-      { model: { provider: "lite_llm", modelId: "anthropic/claude-3" } },
+      ["--name", "x", "--model", '{"liteLlmModelConfig":{"modelId":"anthropic/claude-3"}}'],
+      { model: { liteLlmModelConfig: { modelId: "anthropic/claude-3" } } },
     ],
     [
       "tools — remote_mcp",
@@ -208,8 +223,8 @@ describe("project add harness", () => {
     ],
     [
       "skills — s3",
-      ["--name", "x", "--skills", '[{"s3Uri":"s3://bucket/skill/"}]'],
-      { skills: [{ s3Uri: "s3://bucket/skill/" }] },
+      ["--name", "x", "--skills", '[{"s3":{"uri":"s3://bucket/skill/"}}]'],
+      { skills: [{ s3: { uri: "s3://bucket/skill/" } }] },
     ],
     [
       "skills — git",
@@ -217,16 +232,18 @@ describe("project add harness", () => {
         "--name",
         "x",
         "--skills",
-        '[{"gitUrl":"https://github.com/org/repo","path":"skills/","auth":{"credentialArn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:credential/c","username":"oauth2"}}]',
+        '[{"git":{"url":"https://github.com/org/repo","path":"skills/","auth":{"credentialArn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:credential/c","username":"oauth2"}}}]',
       ],
       {
         skills: [
           {
-            gitUrl: "https://github.com/org/repo",
-            path: "skills/",
-            auth: {
-              credentialArn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:credential/c",
-              username: "oauth2",
+            git: {
+              url: "https://github.com/org/repo",
+              path: "skills/",
+              auth: {
+                credentialArn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:credential/c",
+                username: "oauth2",
+              },
             },
           },
         ],
@@ -243,9 +260,13 @@ describe("project add harness", () => {
         "--name",
         "x",
         "--memory",
-        '{"mode":"managed","strategies":["SEMANTIC"],"eventExpiryDuration":30}',
+        '{"managedMemoryConfiguration":{"strategies":["SEMANTIC"],"eventExpiryDuration":30}}',
       ],
-      { memory: { mode: "managed", strategies: ["SEMANTIC"], eventExpiryDuration: 30 } },
+      {
+        memory: {
+          managedMemoryConfiguration: { strategies: ["SEMANTIC"], eventExpiryDuration: 30 },
+        },
+      },
     ],
     [
       "memory — existing",
@@ -253,19 +274,20 @@ describe("project add harness", () => {
         "--name",
         "x",
         "--memory",
-        '{"mode":"existing","arn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:memory/m"}',
+        '{"agentCoreMemoryConfiguration":{"arn":"arn:aws:bedrock-agentcore:us-east-1:123456789012:memory/m"}}',
       ],
       {
         memory: {
-          mode: "existing",
-          arn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:memory/m",
+          agentCoreMemoryConfiguration: {
+            arn: "arn:aws:bedrock-agentcore:us-east-1:123456789012:memory/m",
+          },
         },
       },
     ],
     [
       "memory — disabled",
-      ["--name", "x", "--memory", '{"mode":"disabled"}'],
-      { memory: { mode: "disabled" } },
+      ["--name", "x", "--memory", '{"disabled":{}}'],
+      { memory: { disabled: {} } },
     ],
     [
       "truncation — sliding_window",
@@ -310,15 +332,65 @@ describe("project add harness", () => {
         "--authorizer-type",
         "CUSTOM_JWT",
         "--authorizer-configuration",
-        '{"customJwtAuthorizer":{"discoveryUrl":"https://idp.example.com/.well-known/openid-configuration","allowedAudience":["my-app"]}}',
+        '{"customJWTAuthorizer":{"discoveryUrl":"https://idp.example.com/.well-known/openid-configuration","allowedAudience":["my-app"]}}',
       ],
       {
-        authorizerType: "CUSTOM_JWT",
         authorizerConfiguration: {
-          customJwtAuthorizer: {
+          customJWTAuthorizer: {
             discoveryUrl: "https://idp.example.com/.well-known/openid-configuration",
             allowedAudience: ["my-app"],
           },
+        },
+      },
+    ],
+    [
+      "authorizer - JWT inferred from native configuration",
+      [
+        "--name",
+        "x",
+        "--authorizer-configuration",
+        '{"customJWTAuthorizer":{"discoveryUrl":"https://idp.example.com/.well-known/openid-configuration","allowedAudience":["my-app"]}}',
+      ],
+      {
+        authorizerConfiguration: {
+          customJWTAuthorizer: {
+            discoveryUrl: "https://idp.example.com/.well-known/openid-configuration",
+            allowedAudience: ["my-app"],
+          },
+        },
+      },
+    ],
+    [
+      "authorizer - IAM is absence of configuration",
+      ["--name", "x", "--authorizer-type", "AWS_IAM"],
+      {},
+    ],
+    [
+      "environment - PUBLIC",
+      ["--name", "x", "--network-mode", "PUBLIC"],
+      {
+        environment: {
+          agentCoreRuntimeEnvironment: { networkConfiguration: { networkMode: "PUBLIC" } },
+        },
+      },
+    ],
+    [
+      "environment - session storage without a network override",
+      ["--name", "x", "--session-storage-path", "/mnt/data"],
+      {
+        environment: {
+          agentCoreRuntimeEnvironment: {
+            filesystemConfigurations: [{ sessionStorage: { mountPath: "/mnt/data" } }],
+          },
+        },
+      },
+    ],
+    [
+      "environment - lifecycle without a network override",
+      ["--name", "x", "--lifecycle-config", '{"maxLifetime":900}'],
+      {
+        environment: {
+          agentCoreRuntimeEnvironment: { lifecycleConfiguration: { maxLifetime: 900 } },
         },
       },
     ],
@@ -337,12 +409,23 @@ describe("project add harness", () => {
         "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-agent:latest",
       ],
       {
-        networkMode: "VPC",
-        networkConfig: {
-          subnets: ["subnet-0123456789abcdef0"],
-          securityGroups: ["sg-0123456789abcdef0"],
+        environment: {
+          agentCoreRuntimeEnvironment: {
+            networkConfiguration: {
+              networkMode: "VPC",
+              networkModeConfig: {
+                subnets: ["subnet-0123456789abcdef0"],
+                securityGroups: ["sg-0123456789abcdef0"],
+              },
+            },
+            lifecycleConfiguration: { idleRuntimeSessionTimeout: 900, maxLifetime: 28800 },
+          },
         },
-        lifecycleConfig: { idleRuntimeSessionTimeout: 900, maxLifetime: 28800 },
+        environmentArtifact: {
+          containerConfiguration: {
+            containerUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-agent:latest",
+          },
+        },
       },
     ],
     [
@@ -364,26 +447,39 @@ describe("project add harness", () => {
         "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-agent:latest",
       ],
       {
-        networkMode: "VPC",
-        networkConfig: {
-          subnets: ["subnet-0123456789abcdef0"],
-          securityGroups: ["sg-0123456789abcdef0"],
+        environment: {
+          agentCoreRuntimeEnvironment: {
+            networkConfiguration: {
+              networkMode: "VPC",
+              networkModeConfig: {
+                subnets: ["subnet-0123456789abcdef0"],
+                securityGroups: ["sg-0123456789abcdef0"],
+              },
+            },
+            filesystemConfigurations: [
+              { sessionStorage: { mountPath: "/mnt/data" } },
+              {
+                efsAccessPoint: {
+                  accessPointArn:
+                    "arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-0123456789abcdef0",
+                  mountPath: "/mnt/efs",
+                },
+              },
+              {
+                s3FilesAccessPoint: {
+                  accessPointArn:
+                    "arn:aws:s3files:us-east-1:123456789012:file-system/fs-0123456789abcdef01/access-point/fsap-0123456789abcdef01",
+                  mountPath: "/mnt/s3",
+                },
+              },
+            ],
+          },
         },
-        sessionStoragePath: "/mnt/data",
-        efsAccessPoints: [
-          {
-            accessPointArn:
-              "arn:aws:elasticfilesystem:us-east-1:123456789012:access-point/fsap-0123456789abcdef0",
-            mountPath: "/mnt/efs",
+        environmentArtifact: {
+          containerConfiguration: {
+            containerUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-agent:latest",
           },
-        ],
-        s3AccessPoints: [
-          {
-            accessPointArn:
-              "arn:aws:s3files:us-east-1:123456789012:file-system/fs-0123456789abcdef01/access-point/fsap-0123456789abcdef01",
-            mountPath: "/mnt/s3",
-          },
-        ],
+        },
       },
     ],
     [
@@ -394,7 +490,13 @@ describe("project add harness", () => {
         "--container-uri",
         "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-agent:latest",
       ],
-      { containerUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-agent:latest" },
+      {
+        environmentArtifact: {
+          containerConfiguration: {
+            containerUri: "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-agent:latest",
+          },
+        },
+      },
     ],
     [
       "environment-variables",
@@ -418,8 +520,7 @@ describe("project add harness", () => {
     await run(["add", "harness", ...flags]);
 
     const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
-    expect(harnessYaml.model).not.toHaveProperty("provider");
-    expect(parseHarnessProjectSpec(harnessYaml)).toMatchObject(expected);
+    expect(harnessYaml).toEqual({ name: "x", ...defaultSettings, ...expected });
 
     const agentcoreJson = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     expect(agentcoreJson.harnesses).toContainEqual({
@@ -481,12 +582,22 @@ describe("project add harness", () => {
     ]);
 
     const harnessYaml = parse(await Bun.file(join(projectRoot, "app", "x", "harness.yaml")).text());
-    expect(parseHarnessProjectSpec(harnessYaml)).toMatchObject({
+    expect(harnessYaml).toEqual({
+      name: "x",
+      ...defaultSettings,
       dockerfile: "Dockerfile",
-      networkMode: "VPC",
+      environment: {
+        agentCoreRuntimeEnvironment: {
+          networkConfiguration: {
+            networkMode: "VPC",
+            networkModeConfig: {
+              subnets: ["subnet-0123456789abcdef0"],
+              securityGroups: ["sg-0123456789abcdef0"],
+            },
+          },
+        },
+      },
       networkConfig: {
-        subnets: ["subnet-0123456789abcdef0"],
-        securityGroups: ["sg-0123456789abcdef0"],
         vpcId: "vpc-0123456789abcdef0",
       },
     });
@@ -559,32 +670,54 @@ describe("project add harness", () => {
   });
 
   test.each<[string, string[], (string | typeof InputValidationError)?]>([
-    ["missing --name", ["--model", '{"provider":"bedrock","modelId":"x"}']],
+    ["missing --name", ["--model", '{"bedrockModelConfig":{"modelId":"x"}}']],
+    ["null model is not defaulted", ["--name", "x", "--model", "null"]],
+    ["flat model is rejected", ["--name", "x", "--model", '{"provider":"bedrock","modelId":"x"}']],
+    ["flat memory is rejected", ["--name", "x", "--memory", '{"mode":"managed"}']],
+    ["string skills are rejected", ["--name", "x", "--skills", '["./skills"]']],
+    [
+      "flat S3 skills are rejected",
+      ["--name", "x", "--skills", '[{"s3Uri":"s3://bucket/skills"}]'],
+    ],
+    [
+      "flat Git skills are rejected",
+      ["--name", "x", "--skills", '[{"gitUrl":"https://example.com/repo"}]'],
+    ],
+    ["blank system prompt", ["--name", "x", "--system-prompt", " \n"]],
+    ["JWT requires a configuration", ["--name", "x", "--authorizer-type", "CUSTOM_JWT"]],
+    ["invalid authorizer type", ["--name", "x", "--authorizer-type", "UNKNOWN"]],
+    ["invalid network mode", ["--name", "x", "--network-mode", "UNKNOWN"]],
+    ["VPC requires network configuration", ["--name", "x", "--network-mode", "VPC"]],
+    ["null network configuration", ["--name", "x", "--network-config", "null"]],
+    ["null filesystem list", ["--name", "x", "--efs-access-points", "null"]],
+    ["malformed filesystem list", ["--name", "x", "--s3-access-points", "{}"]],
     [
       "deployed name over the 40-character service limit",
       ["--name", `h${"x".repeat(20)}`],
       `Harness deployed name 'TestProject_default_h${"x".repeat(20)}' is 41 characters. The maximum is 40.`,
     ],
-    ["model without modelId", ["--name", "x", "--model", '{"provider":"bedrock"}']],
+    ["model without modelId", ["--name", "x", "--model", '{"bedrockModelConfig":{}}']],
     [
       "unrecognized model provider",
-      ["--name", "x", "--model", '{"provider":"unknown","modelId":"x"}'],
+      ["--name", "x", "--model", '{"unknownModelConfig":{"modelId":"x"}}'],
     ],
     ["tool without type", ["--name", "x", "--tools", '[{"name":"t1"}]']],
     ["tool without name", ["--name", "x", "--tools", '[{"type":"remote_mcp"}]']],
     ["unrecognized skill variant", ["--name", "x", "--skills", '[{"unknown":true}]']],
-    ["unrecognized memory variant", ["--name", "x", "--memory", '{"mode":"unknown"}']],
+    ["unrecognized memory variant", ["--name", "x", "--memory", '{"unknown":{}}']],
     [
       "missing truncation strategy",
       ["--name", "x", "--truncation", '{"config":{"slidingWindow":{"messagesCount":10}}}'],
     ],
     [
-      "authorizer config without matching type",
+      "authorizer config with explicit IAM",
       [
         "--name",
         "x",
+        "--authorizer-type",
+        "AWS_IAM",
         "--authorizer-configuration",
-        '{"customJwtAuthorizer":{"discoveryUrl":"https://idp.example.com/.well-known/openid-configuration","allowedAudience":["a"]}}',
+        '{"customJWTAuthorizer":{"discoveryUrl":"https://idp.example.com/.well-known/openid-configuration","allowedAudience":["a"]}}',
       ],
     ],
     [
@@ -595,7 +728,7 @@ describe("project add harness", () => {
         "--authorizer-type",
         "CUSTOM_JWT",
         "--authorizer-configuration",
-        '{"customJwtAuthorizer":{"allowedAudience":["a"]}}',
+        '{"customJWTAuthorizer":{"allowedAudience":["a"]}}',
       ],
     ],
     [

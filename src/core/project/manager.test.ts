@@ -291,7 +291,7 @@ describe("FsProjectManager.create", () => {
         skipGit: true,
         scaffoldHarnessInput: {
           name: "example",
-          model: { provider: "bedrock", modelId: "global.anthropic.claude-sonnet-4-6" },
+          model: { bedrockModelConfig: { modelId: "global.anthropic.claude-sonnet-4-6" } },
           dockerfile,
         },
       }),
@@ -367,7 +367,7 @@ describe("FsProjectManager.create", () => {
       name: "harness",
       scaffoldHarnessInput: {
         name: "harness",
-        model: { provider: "bedrock", modelId: "global.anthropic.claude-sonnet-4-6" },
+        model: { bedrockModelConfig: { modelId: "global.anthropic.claude-sonnet-4-6" } },
       },
     });
     expect(harness.checkedTools).toEqual(["npm", "git"]);

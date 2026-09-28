@@ -1,6 +1,5 @@
 import { test, expect, describe, afterEach } from "bun:test";
 import type { CreateHarnessResponse } from "@aws-sdk/client-bedrock-agentcore-control";
-import { DEFAULT_HARNESS_MODEL } from "../../../projectSchemas/harness";
 import {
   renderImperativeScreen,
   waitForText,
@@ -17,7 +16,7 @@ afterEach(cleanupScreens);
 
 // Bedrock is preselected with the shared default model ID filled in.
 const DEFAULT_MODEL = {
-  bedrockModelConfig: { modelId: DEFAULT_HARNESS_MODEL.modelId },
+  bedrockModelConfig: { modelId: "global.anthropic.claude-sonnet-5" },
 };
 
 // The browser tool is enabled by default in the wizard, so an untouched tools
@@ -56,7 +55,7 @@ describe("harness create wizard", () => {
     expect(r.lastFrame()).not.toContain("keep current");
     expect(r.lastFrame()).not.toContain("(recommended)");
     await r.press("return"); // focus the model id field
-    await waitForText(r.lastFrame, DEFAULT_HARNESS_MODEL.modelId);
+    await waitForText(r.lastFrame, DEFAULT_MODEL.bedrockModelConfig.modelId);
     await r.press("return");
 
     // Step: memory — managed is preselected; keep it.
@@ -282,13 +281,13 @@ describe("harness create wizard", () => {
     await waitForText(r.lastFrame, "● gemini");
     await r.press("return"); // focus the model id field
     await waitForText(r.lastFrame, "model ID");
-    expect(r.lastFrame()).not.toContain(DEFAULT_HARNESS_MODEL.modelId);
+    expect(r.lastFrame()).not.toContain(DEFAULT_MODEL.bedrockModelConfig.modelId);
     await r.press("escape");
 
     await r.press("up"); // back to bedrock restores its default
     await waitForText(r.lastFrame, "● bedrock");
     await r.press("return");
-    await waitForText(r.lastFrame, DEFAULT_HARNESS_MODEL.modelId);
+    await waitForText(r.lastFrame, DEFAULT_MODEL.bedrockModelConfig.modelId);
     r.unmount();
   });
 

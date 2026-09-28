@@ -40,13 +40,20 @@ const ModelProviderFlagSchema = z.enum([...HarnessModelProviderSchema.options, "
 type ModelProviderFlag = z.infer<typeof ModelProviderFlagSchema>;
 
 export const HARNESS_DEFAULT_MODEL_IDS: Record<HarnessModelProvider, string> = {
-  bedrock: DEFAULT_HARNESS_MODEL.modelId,
+  bedrock: DEFAULT_HARNESS_MODEL.bedrockModelConfig.modelId,
   open_ai: "gpt-5",
   gemini: "gemini-2.5-flash",
-  lite_llm: `bedrock/${DEFAULT_HARNESS_MODEL.modelId}`,
+  lite_llm: `bedrock/${DEFAULT_HARNESS_MODEL.bedrockModelConfig.modelId}`,
 };
 
 export const DEFAULT_CREATE_RUNTIME_NAME = "agent";
+
+const HARNESS_MODEL_CONFIG_KEYS = {
+  bedrock: "bedrockModelConfig",
+  open_ai: "openAiModelConfig",
+  gemini: "geminiModelConfig",
+  lite_llm: "liteLlmModelConfig",
+} as const satisfies Record<HarnessModelProvider, string>;
 
 export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =>
   createHandler({
@@ -167,20 +174,21 @@ type HarnessPathFlagValues = {
 export function resolveScaffoldHarnessInput(flags: HarnessPathFlagValues): ScaffoldHarnessInput {
   const provider = resolveHarnessModelProvider(flags["model-provider"]);
 
-  const input: ScaffoldHarnessInput = {
+  const input = {
     name: defaultHarnessNameFor(flags["name"]),
     model: {
-      provider,
-      modelId: flags["model-id"] ?? HARNESS_DEFAULT_MODEL_IDS[provider],
-      apiKeyArn: flags["api-key-arn"],
-      apiBase: flags["api-base"],
+      [HARNESS_MODEL_CONFIG_KEYS[provider]]: {
+        modelId: flags["model-id"] ?? HARNESS_DEFAULT_MODEL_IDS[provider],
+        ...(flags["api-key-arn"] !== undefined && { apiKeyArn: flags["api-key-arn"] }),
+        ...(flags["api-base"] !== undefined && { apiBase: flags["api-base"] }),
+      },
     },
   };
 
   const result = HarnessSpecSchema.safeParse(input);
   if (!result.success)
     throw new InputValidationError(z.prettifyError(result.error), { cause: result.error });
-  return input;
+  return { name: result.data.name, model: result.data.model };
 }
 
 /**

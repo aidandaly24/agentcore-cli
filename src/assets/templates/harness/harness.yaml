@@ -5,34 +5,32 @@
 # Choose one model configuration.
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessModelConfiguration.html
 {{yaml.model}}
-{{#unless model.temperature includeZero=true}}
+{{#unless modelConfig.temperature includeZero=true}}
     # temperature: 0.2
 {{/unless}}
-{{#unless model.topP includeZero=true}}
+{{#unless modelConfig.topP includeZero=true}}
     # topP: 0.9
 {{/unless}}
 {{#if modelMaxTokensExample}}
     # maxTokens: 4096
 {{/if}}
-{{#if (or (eq model.provider "bedrock") (eq model.provider "open_ai"))}}
-{{#unless model.apiFormat}}
-{{#if (eq model.provider "bedrock")}}
-    # apiFormat: converse_stream
-{{else}}
-    # apiFormat: responses
-{{/if}}
+{{#if apiFormatExample}}
+{{#unless modelConfig.apiFormat}}
+    # apiFormat: {{apiFormatExample}}
 {{/unless}}
 {{/if}}
-{{#unless model.apiKeyArn}}
-{{#unless (eq model.provider "bedrock")}}
+{{#if apiKeyExample}}
     # apiKeyArn: YOUR_API_KEY_PROVIDER_ARN
-{{/unless}}
-{{/unless}}
+{{/if}}
 
+{{#if yaml.systemPrompt}}
+{{yaml.systemPrompt}}
+{{else}}
 # Edit system-prompt.md next to this file, or set an inline content block:
 # systemPrompt:
 #   - text: |
 #       You are a helpful assistant.
+{{/if}}
 
 # Add tools alongside the harness's built-in shell and file operations.
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessTool.html
