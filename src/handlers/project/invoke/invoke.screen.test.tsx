@@ -294,6 +294,8 @@ describe("project invoke picker", () => {
     await screen.press("return");
     await waitForText(screen.lastFrame, "Enter JSON payload");
     expect(screen.lastFrame()).not.toContain("Enter prompt");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "choose a project resource to invoke");
     expect(
       value.runtime.calls.find(({ method }) => method === "listRuntimeEndpoints")?.args[3],
     ).toEqual({
