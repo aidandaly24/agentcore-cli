@@ -1,21 +1,25 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import type { InvokeAgentRuntimeCommandStreamOutput } from "@aws-sdk/client-bedrock-agentcore";
-import { AccessDeniedException } from "@aws-sdk/client-bedrock-agentcore";
-import type { GetAgentRuntimeResponse } from "@aws-sdk/client-bedrock-agentcore-control";
-import { createRootHandler } from "../../index";
-import { DEFAULT_GLOBAL_CONFIG } from "../../../globalConfig";
+import {
+  AccessDeniedException,
+  type InvokeAgentRuntimeCommandStreamOutput,
+} from "@aws-sdk/client-bedrock-agentcore";
+import type {
+  GetAgentRuntimeResponse,
+  GetHarnessResponse,
+} from "@aws-sdk/client-bedrock-agentcore-control";
+import { createRootHandler } from "./index";
+import { DEFAULT_GLOBAL_CONFIG } from "../globalConfig";
 import {
   IMPERATIVE_GLOBAL_CONFIG,
   createSilentLogger,
   TestCoreClient,
   TestGlobalConfigAccessor,
   testIO,
-} from "../../../testing";
-import * as tui from "../../../tui";
-import { RuntimeExecLaunchContextKey } from "./launchContext";
+} from "../testing";
+import * as tui from "../tui";
+import { RuntimeExecLaunchContextKey } from "./runtime/exec/launchContext";
 
 const ID = "checkout-AbCdEf1234";
-const ARN = `arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/${ID}`;
 const SESSION = "session-012345678901234567890123456789";
 const EVENTS: InvokeAgentRuntimeCommandStreamOutput[] = [
   { chunk: { contentDelta: { stdout: "hello\n" } } },
@@ -23,37 +27,35 @@ const EVENTS: InvokeAgentRuntimeCommandStreamOutput[] = [
   { chunk: { contentStop: { status: "COMPLETED", exitCode: 0 } } },
 ];
 
-function setup(imperative = true) {
-  const core = new TestCoreClient();
-  core.runtime
-    .setGetResponse({ agentRuntimeArn: ARN } as GetAgentRuntimeResponse)
-    .setExecEvents(...EVENTS);
-  const io = testIO();
-  const globalConfig = imperative ? IMPERATIVE_GLOBAL_CONFIG : DEFAULT_GLOBAL_CONFIG;
-  const root = createRootHandler(core, {
-    io: io.io,
-    globalConfig,
-    logger: createSilentLogger(),
-    globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: globalConfig }),
-  });
-  return {
-    core,
-    stdout: io.stdout,
-    run: (args: string[]) =>
-      root.route(["node", "agentcore", "runtime", "exec", ...args, "--region", "us-west-2"]),
-  };
-}
+describe.each(["harness", "runtime"] as const)("%s exec command", (kind) => {
+  const ARN = `arn:aws:bedrock-agentcore:us-west-2:123456789012:${kind}/${ID}`;
+  function setup(imperative = true) {
+    const core = new TestCoreClient();
+    core.runtime.setGetResponse({ agentRuntimeArn: ARN } as GetAgentRuntimeResponse);
+    core.harness.setGetResponse({ harness: { arn: ARN } } as GetHarnessResponse);
+    const client = core[kind];
+    client.setExecEvents(...EVENTS);
+    const io = testIO();
+    const globalConfig = imperative ? IMPERATIVE_GLOBAL_CONFIG : DEFAULT_GLOBAL_CONFIG;
+    const root = createRootHandler(core, {
+      io: io.io,
+      globalConfig,
+      logger: createSilentLogger(),
+      globalConfigAccessor: new TestGlobalConfigAccessor({ initialConfigData: globalConfig }),
+    });
+    return {
+      core,
+      client,
+      stdout: io.stdout,
+      run: (args: string[]) =>
+        root.route(["node", "agentcore", kind, "exec", ...args, "--region", "us-west-2"]),
+    };
+  }
 
-describe("runtime exec", () => {
-  test("executes against the Runtime ARN and emits the Harness-compatible result", async () => {
-    const { run, core, stdout } = setup();
+  test("uses the resource's own ARN and emits the shared command result", async () => {
+    const { run, core, client, stdout } = setup();
     await run(["--id", ID, "--command", "printf hello"]);
-    expect(core.runtime.calls.map(({ method }) => method)).toEqual([
-      "getRuntime",
-      "invokeAgentRuntimeCommand",
-    ]);
-    expect(core.harness.calls).toEqual([]);
-    expect(core.runtime.calls[1]!.args.slice(0, 2)).toEqual([
+    expect(client.calls[1]!.args.slice(0, 2)).toEqual([
       {
         agentRuntimeArn: ARN,
         qualifier: "DEFAULT",
@@ -62,6 +64,7 @@ describe("runtime exec", () => {
       },
       { region: "us-west-2" },
     ]);
+    expect(core[kind === "runtime" ? "harness" : "runtime"].calls).toEqual([]);
     expect(JSON.parse(stdout())).toEqual({
       command: "printf hello",
       exitCode: 0,
@@ -70,8 +73,8 @@ describe("runtime exec", () => {
     });
   });
 
-  test("passes the qualifier, session, timeout, and region", async () => {
-    const { run, core, stdout } = setup();
+  test("passes qualifier, session, timeout, and region", async () => {
+    const { run, client, stdout } = setup();
     await run([
       "--id",
       ID,
@@ -85,7 +88,7 @@ describe("runtime exec", () => {
       "60",
       "--json",
     ]);
-    expect(core.runtime.calls[1]!.args.slice(0, 2)).toEqual([
+    expect(client.calls[1]!.args.slice(0, 2)).toEqual([
       {
         agentRuntimeArn: ARN,
         qualifier: "prod",
@@ -98,8 +101,8 @@ describe("runtime exec", () => {
   });
 
   test("returns a service-generated session ID", async () => {
-    const { run, core, stdout } = setup();
-    core.runtime.invokeAgentRuntimeCommand = async () => ({
+    const { run, client, stdout } = setup();
+    client.invokeAgentRuntimeCommand = async () => ({
       statusCode: 200,
       contentType: "application/json",
       runtimeSessionId: SESSION,
@@ -143,8 +146,8 @@ describe("runtime exec", () => {
   ] satisfies [string, InvokeAgentRuntimeCommandStreamOutput[], object][])(
     "reports %s",
     async (_name, events, expected) => {
-      const { run, core, stdout } = setup();
-      core.runtime.setExecEvents(...events);
+      const { run, client, stdout } = setup();
+      client.setExecEvents(...events);
       await run(["--id", ID, "--command", "ls"]);
       expect(JSON.parse(stdout())).toMatchObject({ status: "error", ...expected });
     },
@@ -162,27 +165,20 @@ describe("runtime exec", () => {
     ["fractional timeout", ["--id", ID, "--command", "ls", "--timeout", "1.5"]],
     ["empty qualifier", ["--id", ID, "--command", "ls", "--qualifier", ""]],
   ])("rejects %s before calling Core", async (_name, args) => {
-    const { run, core } = setup();
+    const { run, client } = setup();
     await expect(run(args!)).rejects.toMatchObject({ exitCode: 2 });
-    expect(core.runtime.calls).toEqual([]);
+    expect(client.calls).toEqual([]);
   });
 
   test("requires the imperative-command gate", async () => {
-    const { run, core } = setup(false);
+    const { run, client } = setup(false);
     await expect(run([])).rejects.toThrow("unknown command");
-    expect(core.runtime.calls).toEqual([]);
-  });
-
-  test("rejects a Runtime without an ARN", async () => {
-    const { run, core } = setup();
-    core.runtime.setGetResponse({} as GetAgentRuntimeResponse);
-    await expect(run(["--id", ID, "--command", "ls"])).rejects.toThrow("Runtime returned no ARN");
-    expect(core.runtime.calls).toHaveLength(1);
+    expect(client.calls).toEqual([]);
   });
 
   test("preserves transport failures", async () => {
-    const { run, core } = setup();
-    core.runtime.queueExecStream(
+    const { run, client } = setup();
+    client.queueExecStream(
       (async function* () {
         yield { chunk: { contentDelta: { stdout: "partial" } } };
         throw new Error("connection lost");
@@ -191,30 +187,55 @@ describe("runtime exec", () => {
     await expect(run(["--id", ID, "--command", "ls"])).rejects.toThrow("connection lost");
   });
 
-  test("opens the bare Runtime picker through the TUI middleware", async () => {
-    const { run, core } = setup();
+  test("opens the bare picker through TUI middleware", async () => {
+    const { run, client } = setup();
     await expect(run([])).rejects.toThrow("interactive mode requires a TTY");
-    expect(core.runtime.calls).toEqual([]);
+    expect(client.calls).toEqual([]);
   });
 
-  test("deep-links the TUI and retains the session and timeout through endpoint selection", async () => {
-    const { run, core } = setup();
+  test("passes session and timeout to its TUI route", async () => {
+    const { run, client } = setup();
     const render = spyOn(tui, "renderTuiAt").mockResolvedValue(undefined);
     try {
-      await run(["--id", "runtime/blue one", "--session-id", SESSION, "--timeout", "60"]);
-      await run(["--id", ID, "--qualifier", "prod/green one"]);
-      expect(render.mock.calls.map(([path]) => path)).toEqual([
-        "/agentcore/runtime/exec/runtime%2Fblue%20one",
-        `/agentcore/runtime/exec/${ID}/prod%2Fgreen%20one`,
-      ]);
-      expect(render.mock.calls[0]![1].value(RuntimeExecLaunchContextKey)).toEqual({
-        runtimeId: "runtime/blue one",
-        runtimeSessionId: SESSION,
-        timeout: 60,
-      });
-      expect(core.runtime.calls).toEqual([]);
+      await run(["--id", ID, "--session-id", SESSION, "--timeout", "60", "--qualifier", "prod"]);
+      const [path, ctx] = render.mock.calls[0]!;
+      if (kind === "runtime") {
+        expect(path).toBe(`/agentcore/runtime/exec/${ID}/prod`);
+        expect(ctx.value(RuntimeExecLaunchContextKey)).toEqual({
+          runtimeId: ID,
+          runtimeSessionId: SESSION,
+          timeout: 60,
+        });
+      } else {
+        expect(path).toBe(`/agentcore/harness/exec/${ID}/${SESSION}?qualifier=prod&timeout=60`);
+      }
+      expect(client.calls).toEqual([]);
     } finally {
       render.mockRestore();
     }
   });
+
+  if (kind === "runtime") {
+    test("rejects a Runtime without an ARN", async () => {
+      const { run, core } = setup();
+      core.runtime.setGetResponse({} as GetAgentRuntimeResponse);
+      await expect(run(["--id", ID, "--command", "ls"])).rejects.toThrow("Runtime returned no ARN");
+      expect(core.runtime.calls).toHaveLength(1);
+    });
+
+    test("encodes Runtime and endpoint path segments", async () => {
+      const { run } = setup();
+      const render = spyOn(tui, "renderTuiAt").mockResolvedValue(undefined);
+      try {
+        await run(["--id", "runtime/blue one"]);
+        await run(["--id", ID, "--qualifier", "prod/green one"]);
+        expect(render.mock.calls.map(([path]) => path)).toEqual([
+          "/agentcore/runtime/exec/runtime%2Fblue%20one",
+          `/agentcore/runtime/exec/${ID}/prod%2Fgreen%20one`,
+        ]);
+      } finally {
+        render.mockRestore();
+      }
+    });
+  }
 });

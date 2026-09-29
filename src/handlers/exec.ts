@@ -1,4 +1,60 @@
-import type { InvokeAgentRuntimeCommandStreamOutput } from "@aws-sdk/client-bedrock-agentcore";
+import z from "zod";
+import type {
+  InvokeAgentRuntimeCommandRequest,
+  InvokeAgentRuntimeCommandResponse,
+  InvokeAgentRuntimeCommandStreamOutput,
+} from "@aws-sdk/client-bedrock-agentcore";
+import { flag } from "../router";
+
+export type ExecuteCommand = (
+  request: InvokeAgentRuntimeCommandRequest,
+  signal?: AbortSignal,
+) => Promise<InvokeAgentRuntimeCommandResponse>;
+
+export const execFlags = [
+  flag(
+    "command",
+    "the shell command to run",
+    z
+      .string()
+      .refine((value) => value.trim().length > 0, "command must not be empty")
+      .optional(),
+  ),
+  flag("qualifier", "the endpoint qualifier (default DEFAULT)", z.string().min(1).optional()),
+  flag(
+    "session-id",
+    "the Runtime session ID to run in (33-100 characters)",
+    z.string().min(33).max(100).optional(),
+  ),
+  flag(
+    "timeout",
+    "seconds to wait for the command (1-3600)",
+    z.number().int().min(1).max(3600).optional(),
+  ),
+] as const;
+
+export async function executeCommand(
+  execute: ExecuteCommand,
+  arn: string | undefined,
+  input: { command: string; qualifier?: string; "session-id"?: string; timeout?: number },
+) {
+  const response = await execute({
+    agentRuntimeArn: arn,
+    qualifier: input.qualifier ?? "DEFAULT",
+    runtimeSessionId: input["session-id"],
+    body: { command: input.command, timeout: input.timeout },
+  });
+  const item = newExecItem(input.command);
+  for await (const event of response.stream ?? []) applyExecEvent(item, event);
+  finishExec(item);
+  return {
+    sessionId: response.runtimeSessionId,
+    command: item.command,
+    exitCode: item.exitCode,
+    status: item.status,
+    output: item.output,
+  };
+}
 
 export type ExecItem = {
   kind: "exec";
