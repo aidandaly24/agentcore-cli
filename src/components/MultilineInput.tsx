@@ -1,6 +1,5 @@
 import { useState } from "react";
 import cliTruncate from "cli-truncate";
-import stringWidth from "string-width";
 import { Box, Text, useInput, useWindowSize } from "ink";
 import { darkTheme } from "./ui/_core.js";
 
@@ -12,7 +11,6 @@ export interface MultilineInputProps {
   onChange: (value: string) => void;
   onSubmit: () => void;
   placeholder?: string;
-  prompt?: string;
   submitDisabled?: boolean;
   focus?: boolean;
 }
@@ -30,12 +28,10 @@ export function MultilineInput({
   onChange,
   onSubmit,
   placeholder = "Enter text",
-  prompt = "",
   submitDisabled = false,
   focus = true,
 }: MultilineInputProps) {
-  const { columns: terminalColumns } = useWindowSize();
-  const columns = Math.max(1, terminalColumns - stringWidth(prompt));
+  const { columns } = useWindowSize();
   const [rawCursor, setRawCursor] = useState(value.length);
   const cursor = Math.min(rawCursor, value.length);
 
@@ -79,7 +75,6 @@ export function MultilineInput({
   if (value === "") {
     return (
       <Box>
-        <Text color={theme.colors.border}>{prompt}</Text>
         <Cursor character={placeholder[0] ?? " "} />
         <Text color={theme.colors.muted}>{placeholder.slice(1)}</Text>
       </Box>
@@ -95,40 +90,37 @@ export function MultilineInput({
   const visible = lines.slice(start, start + PREVIEW_LINES);
 
   return (
-    <Box>
-      <Text color={theme.colors.border}>{prompt}</Text>
-      <Box flexDirection="column">
-        {visible.map((line, index) => {
-          const lineIndex = start + index;
-          const prefix = index === 0 && start > 0 ? "… " : "";
-          if (lineIndex !== cursorLine) {
-            return (
-              <Box key={lineIndex} width={columns}>
-                <Text wrap="truncate-end">{cliTruncate(`${prefix}${line || " "}`, columns)}</Text>
-              </Box>
-            );
-          }
-
-          const horizontalMarker = cursorColumn >= columns - prefix.length ? "… " : "";
-          const available = Math.max(1, columns - prefix.length - horizontalMarker.length);
-          const offset = Math.max(0, cursorColumn - available + 1);
-          const before = line.slice(offset, cursorColumn);
-          const at = line[cursorColumn] ?? " ";
-          const after = line.slice(
-            cursorColumn + 1,
-            cursorColumn + 1 + Math.max(0, available - before.length - 1),
-          );
+    <Box flexDirection="column">
+      {visible.map((line, index) => {
+        const lineIndex = start + index;
+        const prefix = index === 0 && start > 0 ? "… " : "";
+        if (lineIndex !== cursorLine) {
           return (
             <Box key={lineIndex} width={columns}>
-              <Text color={theme.colors.border}>{prefix}</Text>
-              <Text color={theme.colors.border}>{horizontalMarker}</Text>
-              {before ? <Text>{before}</Text> : null}
-              <Cursor character={at} />
-              {after ? <Text>{after}</Text> : null}
+              <Text wrap="truncate-end">{cliTruncate(`${prefix}${line || " "}`, columns)}</Text>
             </Box>
           );
-        })}
-      </Box>
+        }
+
+        const horizontalMarker = cursorColumn >= columns - prefix.length ? "… " : "";
+        const available = Math.max(1, columns - prefix.length - horizontalMarker.length);
+        const offset = Math.max(0, cursorColumn - available + 1);
+        const before = line.slice(offset, cursorColumn);
+        const at = line[cursorColumn] ?? " ";
+        const after = line.slice(
+          cursorColumn + 1,
+          cursorColumn + 1 + Math.max(0, available - before.length - 1),
+        );
+        return (
+          <Box key={lineIndex} width={columns}>
+            <Text color={theme.colors.border}>{prefix}</Text>
+            <Text color={theme.colors.border}>{horizontalMarker}</Text>
+            {before ? <Text>{before}</Text> : null}
+            <Cursor character={at} />
+            {after ? <Text>{after}</Text> : null}
+          </Box>
+        );
+      })}
     </Box>
   );
 }
