@@ -290,7 +290,8 @@ describe("project status screen", () => {
     await screen.press("down");
     await screen.press("return");
     await waitForText(screen.lastFrame, "READY");
-    // detail → invoke → shell → endpoints.
+    // detail → invoke → shell → exec → endpoints.
+    await screen.press("down");
     await screen.press("down");
     await screen.press("down");
     await screen.press("down");
@@ -302,6 +303,48 @@ describe("project status screen", () => {
     );
     const call = value.runtime.calls.find(({ method }) => method === "listRuntimeEndpoints")!;
     expect(call.args[3]).toMatchObject({ region: TARGET.region });
+  });
+
+  test("Runtime exec is reachable from project status and uses the deployment region", async () => {
+    const value = core();
+    value.runtime.setListEndpointsResponse({
+      runtimeEndpoints: [
+        {
+          name: "DEFAULT",
+          id: "DEFAULT",
+          agentRuntimeArn: `${ARN}:runtime/${RUNTIME_ID}`,
+          agentRuntimeEndpointArn: `${ARN}:runtime/${RUNTIME_ID}/runtime-endpoint/DEFAULT`,
+          status: "READY",
+          liveVersion: "1",
+          createdAt: new Date(),
+          lastUpdatedAt: new Date(),
+        },
+      ],
+    });
+    value.runtime.setExecEvents(
+      { chunk: { contentDelta: { stdout: "project-exec\n" } } },
+      { chunk: { contentStop: { status: "COMPLETED", exitCode: 0 } } },
+    );
+    const screen = renderStatus(value);
+    await waitForGroup(screen);
+    await screen.press("down");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "run a shell command");
+    for (let i = 0; i < 3; i++) await screen.press("down");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "DEFAULT");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "run a command...");
+    await screen.write("pwd");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "project-exec");
+    const call = value.runtime.calls.find(({ method }) => method === "invokeAgentRuntimeCommand")!;
+    expect(call.args[0]).toMatchObject({ agentRuntimeArn: `${ARN}:runtime/${RUNTIME_ID}` });
+    expect(call.args[1]).toMatchObject({ region: TARGET.region });
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "show the full JSON definition");
+    await screen.press("escape");
+    await waitForGroup(screen);
   });
 
   test("several targets: asks which, keeps the choice and its region across a detail page, esc returns to the choice, and a menu unpins", async () => {

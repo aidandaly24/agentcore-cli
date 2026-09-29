@@ -24,6 +24,12 @@ const ACTIONS = [
     returnsToDetails: true,
   },
   {
+    name: "exec",
+    description: "run a shell command",
+    to: (id: string) => `/agentcore/runtime/exec/${encodeURIComponent(id)}`,
+    returnsToDetails: true,
+  },
+  {
     name: "endpoints",
     description: "list this Runtime's endpoints",
     to: (id: string) => `/agentcore/runtime/endpoint/list/${encodeURIComponent(id)}`,
