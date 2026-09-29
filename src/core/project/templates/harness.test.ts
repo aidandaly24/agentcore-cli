@@ -82,7 +82,7 @@ test.each([
   { mode: "managed", strategies: ["EPISODIC"], eventExpiryDuration: 365 },
 ] as const)("preserves explicit memory: %j", async (memory) => {
   const { data, yaml } = await scaffold({ memory });
-  expect(HarnessYamlSchema.parse(data).memory).toEqual(memory);
+  expect<unknown>(HarnessYamlSchema.parse(data).memory).toEqual(memory);
   if (memory.mode !== "managed") {
     expect(yaml).not.toContain("# Managed memory is created for this harness.");
     expect(yaml).not.toContain("# strategies:");
@@ -214,7 +214,7 @@ test("renders supplied deployment settings once in their sections", async () => 
     },
   });
   expect(data.networkConfig).toEqual({ vpcId: overrides.networkConfig!.vpcId });
-  expect(HarnessYamlSchema.parse(data)).toEqual({
+  expect<unknown>(HarnessYamlSchema.parse(data)).toEqual({
     name: "assistant",
     model,
     tools: [],
