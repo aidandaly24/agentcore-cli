@@ -10,6 +10,7 @@ name: assistant
 model:
   bedrockModelConfig:
     modelId: global.anthropic.claude-sonnet-4-6
+# Optional tuning fields depend on the selected model; omit unsupported parameters.
     # temperature: 0.2
     # topP: 0.9
     # maxTokens: 4096

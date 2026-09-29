@@ -5,6 +5,7 @@
 # Choose one model configuration.
 # https://docs.aws.amazon.com/bedrock-agentcore-control/latest/APIReference/API_HarnessModelConfiguration.html
 {{yaml.model}}
+# Optional tuning fields depend on the selected model; omit unsupported parameters.
 {{#unless modelConfig.temperature includeZero=true}}
     # temperature: 0.2
 {{/unless}}

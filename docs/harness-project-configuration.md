@@ -77,8 +77,10 @@ raw API key or a Secrets Manager secret ARN. The execution role needs permission
 to retrieve that credential. Only use an `apiBase` endpoint you trust with the
 provider credential.
 
-All providers accept `temperature` (0-2), `topP` (0-1), and a positive integer
-`maxTokens`. The selected model can impose narrower limits.
+Provider configurations support `temperature` (0-2), `topP` (0-1), and a positive
+integer `maxTokens`, but individual models can reject optional fields entirely.
+For example, Claude Sonnet 5 rejects `temperature`; leave it unset for that model.
+Check the selected model's parameter support before enabling tuning fields.
 `maxTokens` inside the selected model configuration limits output for each model call. The top-level `maxTokens`
 field applies across the invocation, which can make several model calls.
 
