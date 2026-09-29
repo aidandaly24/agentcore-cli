@@ -334,7 +334,7 @@ describe("project status screen", () => {
     await screen.press("return");
     await waitForText(screen.lastFrame, "DEFAULT");
     await screen.press("return");
-    await waitForText(screen.lastFrame, "run a command...");
+    await waitForText(screen.lastFrame, "run a command");
     await screen.write("pwd");
     await screen.press("return");
     await waitForText(screen.lastFrame, "project-exec");

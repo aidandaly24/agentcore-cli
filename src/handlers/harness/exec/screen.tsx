@@ -29,6 +29,7 @@ export function HarnessExecScreen(props: ScreenProps) {
       harnessId={harnessId}
       initialSessionId={sessionId}
       initialQualifier={search.get("qualifier") ?? undefined}
+      timeout={search.has("timeout") ? Number(search.get("timeout")) : undefined}
       variant="exec"
     />
   );
