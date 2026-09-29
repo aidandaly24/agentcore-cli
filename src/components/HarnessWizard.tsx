@@ -69,7 +69,7 @@ export function emptyHarnessForm(): HarnessFormValues {
 
 // defaultModelId is the model ID a provider starts with in the create flow.
 function defaultModelId(kind: ModelKind): string {
-  return kind === "bedrock" ? DEFAULT_HARNESS_MODEL.bedrockModelConfig.modelId : "";
+  return kind === DEFAULT_HARNESS_MODEL.provider ? DEFAULT_HARNESS_MODEL.modelId : "";
 }
 
 // newHarnessForm is where the create flow starts: the shared default harness
@@ -595,7 +595,7 @@ const MODEL_PROVIDERS: {
         key: "modelId",
         name: "model ID",
         helpText: "a Bedrock model or inference profile ID",
-        placeholder: DEFAULT_HARNESS_MODEL.bedrockModelConfig.modelId,
+        placeholder: DEFAULT_HARNESS_MODEL.modelId,
         required: true,
         requiredError: "enter a Bedrock model or inference profile ID",
       },

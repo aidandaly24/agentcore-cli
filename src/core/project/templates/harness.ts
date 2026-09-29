@@ -11,7 +11,6 @@ const DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant";
 const TEMPLATE_FIELDS = new Set([
   "name",
   "model",
-  "systemPrompt",
   "tools",
   "allowedTools",
   "skills",
@@ -46,12 +45,11 @@ export function getHarnessTemplateResolver(
 
       const parsed = parseHarnessSpec({
         ...spec,
-        memory: spec.memory === undefined ? { managedMemoryConfiguration: {} } : spec.memory,
+        memory: spec.memory === undefined ? { mode: "managed" } : spec.memory,
         dockerfile: spec.dockerfile ? "Dockerfile" : undefined,
       });
       const { systemPrompt, ...settings } = parsed;
-      const inlinePrompt = (systemPrompt?.length ?? 0) > 1;
-      const context = buildTemplateContext(inlinePrompt ? parsed : settings);
+      const context = buildTemplateContext(settings);
       const tree = await FsTreeNode.fromAssetSource(
         { assetSource: config.assetSource },
         { assetDir: "templates/harness" },
@@ -61,14 +59,10 @@ export function getHarnessTemplateResolver(
         },
       );
       tree.children.push(
-        ...(inlinePrompt
-          ? []
-          : [
-              FsTreeNode.createFile(
-                "system-prompt.md",
-                async () => systemPrompt?.[0]?.text ?? DEFAULT_SYSTEM_PROMPT,
-              ),
-            ]),
+        FsTreeNode.createFile(
+          "system-prompt.md",
+          async () => systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+        ),
         ...(spec.dockerfile ? [FsTreeNode.fromTextFile("Dockerfile", spec.dockerfile)] : []),
       );
 
@@ -83,8 +77,78 @@ export function getHarnessTemplateResolver(
 }
 
 function buildTemplateContext(spec: HarnessSpec) {
+  const {
+    model,
+    memory,
+    skills,
+    containerUri,
+    networkMode,
+    networkConfig,
+    lifecycleConfig,
+    sessionStoragePath,
+    efsAccessPoints,
+    s3AccessPoints,
+    authorizerType: _authorizerType,
+    authorizerConfiguration,
+    ...settings
+  } = spec;
+  const { provider, ...modelConfig } = model;
+  const modelKey = {
+    bedrock: "bedrockModelConfig",
+    open_ai: "openAiModelConfig",
+    gemini: "geminiModelConfig",
+    lite_llm: "liteLlmModelConfig",
+  }[provider];
+  const { mode, ...memoryConfig } = memory ?? {};
+  const memoryKey =
+    mode &&
+    {
+      managed: "managedMemoryConfiguration",
+      existing: "agentCoreMemoryConfiguration",
+      disabled: "disabled",
+    }[mode];
+  const mounts = [
+    ...(sessionStoragePath ? [{ sessionStorage: { mountPath: sessionStoragePath } }] : []),
+    ...(efsAccessPoints ?? []).map((efsAccessPoint) => ({ efsAccessPoint })),
+    ...(s3AccessPoints ?? []).map((s3FilesAccessPoint) => ({ s3FilesAccessPoint })),
+  ];
+  const runtime = Object.fromEntries(
+    Object.entries({
+      networkConfiguration: networkMode
+        ? {
+            networkMode,
+            networkModeConfig: networkConfig && {
+              subnets: networkConfig.subnets,
+              securityGroups: networkConfig.securityGroups,
+            },
+          }
+        : undefined,
+      lifecycleConfiguration: lifecycleConfig,
+      filesystemConfigurations: mounts.length ? mounts : undefined,
+    }).filter(([, value]) => value !== undefined),
+  );
   const yaml = Object.fromEntries(
-    Object.entries(spec)
+    Object.entries({
+      ...settings,
+      model: { [modelKey]: modelConfig },
+      memory: memoryKey ? { [memoryKey]: memoryConfig } : undefined,
+      skills: skills.map((skill) => {
+        if ("s3Uri" in skill) return { s3: { uri: skill.s3Uri } };
+        if ("gitUrl" in skill) {
+          const { gitUrl, ...git } = skill;
+          return { git: { url: gitUrl, ...git } };
+        }
+        return skill;
+      }),
+      environmentArtifact: containerUri ? { containerConfiguration: { containerUri } } : undefined,
+      environment: Object.keys(runtime).length
+        ? { agentCoreRuntimeEnvironment: runtime }
+        : undefined,
+      networkConfig: networkConfig?.vpcId ? { vpcId: networkConfig.vpcId } : undefined,
+      authorizerConfiguration: authorizerConfiguration && {
+        customJWTAuthorizer: authorizerConfiguration.customJwtAuthorizer,
+      },
+    })
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [
         key,
@@ -92,30 +156,15 @@ function buildTemplateContext(spec: HarnessSpec) {
         stringify({ [key]: value }, { blockQuote: false }).slice(0, -1),
       ]),
   );
-  const modelConfig =
-    "bedrockModelConfig" in spec.model
-      ? spec.model.bedrockModelConfig
-      : "openAiModelConfig" in spec.model
-        ? spec.model.openAiModelConfig
-        : "geminiModelConfig" in spec.model
-          ? spec.model.geminiModelConfig
-          : spec.model.liteLlmModelConfig;
   return {
     ...spec,
     yaml,
     modelConfig,
     apiFormatExample:
-      "bedrockModelConfig" in spec.model
-        ? "converse_stream"
-        : "openAiModelConfig" in spec.model
-          ? "responses"
-          : undefined,
-    modelMaxTokensExample: modelConfig.maxTokens === undefined,
-    apiKeyExample: "liteLlmModelConfig" in spec.model && !spec.model.liteLlmModelConfig.apiKeyArn,
-    managedMemoryEmpty:
-      spec.memory &&
-      "managedMemoryConfiguration" in spec.memory &&
-      Object.keys(spec.memory.managedMemoryConfiguration).length === 0,
+      provider === "bedrock" ? "converse_stream" : provider === "open_ai" ? "responses" : undefined,
+    apiKeyExample: provider !== "bedrock" && !model.apiKeyArn,
+    modelMaxTokensExample: !("maxTokens" in spec.model),
+    managedMemoryEmpty: mode === "managed" && Object.keys(memoryConfig).length === 0,
     additionalSettings: Object.entries(yaml)
       .filter(([key]) => !TEMPLATE_FIELDS.has(key))
       .map(([, value]) => value),

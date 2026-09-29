@@ -47,9 +47,9 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
         if (!response.harness) {
           throw new ResourceNotFoundError(`no harness exists for '${flags.arn}'`);
         }
-        const { spec, notes } = mapServiceHarnessToSpec(response.harness);
+        const { spec, systemPrompt, notes } = mapServiceHarnessToSpec(response.harness);
         input = {
-          prefetched: { spec, notes },
+          prefetched: { spec, systemPrompt, notes },
           targetAgentName: resolveTargetAgentName(flags["target-agent-name"], spec.name),
         };
       } else {

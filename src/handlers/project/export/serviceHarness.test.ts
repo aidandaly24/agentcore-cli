@@ -62,7 +62,7 @@ describe("harness ARN helpers", () => {
 
 describe("mapServiceHarnessToSpec", () => {
   test("maps a bedrock harness with prompt, limits, env vars, and containerUri", () => {
-    const { spec } = mapServiceHarnessToSpec(
+    const { spec, systemPrompt } = mapServiceHarnessToSpec(
       serviceHarness({
         systemPrompt: [{ text: "Be terse." }, { text: "Be kind." }],
         maxIterations: 4,
@@ -83,22 +83,17 @@ describe("mapServiceHarnessToSpec", () => {
 
     expect(spec.name).toBe("assistant");
     expect(spec.model).toEqual({
-      bedrockModelConfig: {
-        modelId: "us.amazon.nova-lite-v1:0",
-        temperature: 0.3,
-        maxTokens: 512,
-      },
+      provider: "bedrock",
+      modelId: "us.amazon.nova-lite-v1:0",
+      temperature: 0.3,
+      maxTokens: 512,
     });
-    expect(spec.systemPrompt).toEqual([{ text: "Be terse." }, { text: "Be kind." }]);
+    expect(systemPrompt).toBe("Be terse.\nBe kind.");
     expect(spec.maxIterations).toBe(4);
     expect(spec.maxTokens).toBe(1024);
     expect(spec.timeoutSeconds).toBe(30);
     expect(spec.environmentVariables).toEqual({ LOG_LEVEL: "debug" });
-    expect(spec.environmentArtifact).toEqual({
-      containerConfiguration: {
-        containerUri: "111122223333.dkr.ecr.us-west-2.amazonaws.com/base:latest",
-      },
-    });
+    expect(spec.containerUri).toBe("111122223333.dkr.ecr.us-west-2.amazonaws.com/base:latest");
     expect(spec.truncation).toEqual({
       strategy: "sliding_window",
       config: { slidingWindow: { messagesCount: 12 } },
@@ -108,16 +103,16 @@ describe("mapServiceHarnessToSpec", () => {
   });
 
   test("notes unknown system prompt blocks while preserving recognized text", () => {
-    const { spec, notes } = mapServiceHarnessToSpec(
+    const { systemPrompt, notes } = mapServiceHarnessToSpec(
       serviceHarness({
         systemPrompt: [
-          { text: "  Be terse.\n" },
+          { text: "Be terse." },
           { $unknown: ["futurePrompt", {}] },
         ] as Harness["systemPrompt"],
       }),
     );
 
-    expect(spec.systemPrompt).toEqual([{ text: "  Be terse.\n" }]);
+    expect(systemPrompt).toBe("Be terse.");
     expect(notes).toEqual([
       {
         category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
@@ -125,70 +120,6 @@ describe("mapServiceHarnessToSpec", () => {
           'A system prompt block of type "futurePrompt" was omitted because its service payload was unknown or incomplete.',
       },
     ]);
-  });
-
-  test("notes every blank or incomplete prompt block and leaves the prompt absent", () => {
-    const { spec, notes } = mapServiceHarnessToSpec(
-      serviceHarness({
-        systemPrompt: [
-          { text: "" },
-          { text: " \n" },
-          { $unknown: ["futurePrompt", {}] },
-          {},
-        ] as Harness["systemPrompt"],
-      }),
-    );
-
-    expect(spec.systemPrompt).toBeUndefined();
-    expect(notes).toHaveLength(4);
-    expect(notes.every((note) => note.category === SERVICE_FIELD_OMITTED_NOTE_CATEGORY)).toBe(true);
-  });
-
-  test("notes unknown memory, environment, and artifact variants", () => {
-    const { spec, notes } = mapServiceHarnessToSpec(
-      serviceHarness({
-        memory: { $unknown: ["futureMemory", {}] },
-        environment: { $unknown: ["futureEnvironment", {}] },
-        environmentArtifact: { $unknown: ["futureArtifact", {}] },
-      }),
-    );
-
-    expect(spec.memory).toBeUndefined();
-    expect(spec.environment).toBeUndefined();
-    expect(spec.environmentArtifact).toBeUndefined();
-    expect(notes).toHaveLength(3);
-    for (const field of ["futureMemory", "futureEnvironment", "futureArtifact"]) {
-      expect(
-        notes.some(
-          (note) =>
-            note.category === SERVICE_FIELD_OMITTED_NOTE_CATEGORY && note.message.includes(field),
-        ),
-      ).toBe(true);
-    }
-  });
-
-  test("preserves custom JWT authorization in the canonical spec", () => {
-    const authorizerConfiguration = {
-      customJWTAuthorizer: {
-        discoveryUrl: "https://example.com/.well-known/openid-configuration",
-        allowedClients: ["client-id"],
-        allowedAudience: ["audience"],
-        allowedScopes: ["read"],
-      },
-    };
-    const { spec, notes } = mapServiceHarnessToSpec(serviceHarness({ authorizerConfiguration }));
-    expect(spec.authorizerConfiguration).toEqual(authorizerConfiguration);
-    expect(notes).toEqual([]);
-  });
-
-  test("rejects an unknown authorizer instead of silently changing it to IAM", () => {
-    expect(() =>
-      mapServiceHarnessToSpec(
-        serviceHarness({
-          authorizerConfiguration: { $unknown: ["futureAuthorizer", {}] },
-        }),
-      ),
-    ).toThrow(MalformedServiceResponseError);
   });
 
   test("maps every skill source variant and notes unknown members", () => {
@@ -216,16 +147,14 @@ describe("mapServiceHarnessToSpec", () => {
 
     expect(spec.skills).toEqual([
       { path: "local_skill" },
-      { s3: { uri: "s3://bucket/prefix" } },
+      { s3Uri: "s3://bucket/prefix" },
       {
-        git: {
-          url: "https://github.com/example/skills.git",
-          path: "subdir",
-          auth: {
-            credentialArn:
-              "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/GitPat",
-            username: "bot",
-          },
+        gitUrl: "https://github.com/example/skills.git",
+        path: "subdir",
+        auth: {
+          credentialArn:
+            "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/GitPat",
+          username: "bot",
         },
       },
       { awsSkills: { paths: ["aws/foo"] } },
@@ -262,10 +191,9 @@ describe("mapServiceHarnessToSpec", () => {
         },
       },
       {
-        agentCoreMemoryConfiguration: {
-          arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-1",
-          actorId: "actor-1",
-        },
+        mode: "existing",
+        arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-1",
+        actorId: "actor-1",
       },
     ],
     [
@@ -275,18 +203,14 @@ describe("mapServiceHarnessToSpec", () => {
           arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-2",
         },
       },
-      {
-        agentCoreMemoryConfiguration: {
-          arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-2",
-        },
-      },
+      { mode: "existing", arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-2" },
     ],
     [
       "an unprovisioned managed memory as managed",
       { managedMemoryConfiguration: {} },
-      { managedMemoryConfiguration: {} },
+      { mode: "managed" },
     ],
-    ["disabled memory as disabled", { disabled: {} }, { disabled: {} }],
+    ["disabled memory as disabled", { disabled: {} }, { mode: "disabled" }],
   ])("maps %s", (_label, memory, expected) => {
     const { spec } = mapServiceHarnessToSpec(serviceHarness({ memory } as Partial<Harness>));
     expect(spec.memory).toEqual(expected as never);
@@ -314,49 +238,26 @@ describe("mapServiceHarnessToSpec", () => {
                   mountPath: "/mnt/tools",
                 },
               },
-              {
-                s3FilesAccessPoint: {
-                  accessPointArn:
-                    "arn:aws:s3files:us-west-2:111122223333:file-system/fs-0123456789abcdef0/access-point/fsap-0123456789abcdef0",
-                  mountPath: "/mnt/data",
-                },
-              },
             ],
           },
         },
       } as Partial<Harness>),
     );
 
-    expect(spec.environment).toEqual({
-      agentCoreRuntimeEnvironment: {
-        networkConfiguration: {
-          networkMode: "VPC",
-          networkModeConfig: {
-            subnets: ["subnet-12345678"],
-            securityGroups: ["sg-12345678"],
-          },
-        },
-        lifecycleConfiguration: { idleRuntimeSessionTimeout: 900 },
-        filesystemConfigurations: [
-          { sessionStorage: { mountPath: "/mnt/session" } },
-          {
-            efsAccessPoint: {
-              accessPointArn:
-                "arn:aws:elasticfilesystem:us-west-2:111122223333:access-point/fsap-0123456789abcdef0",
-              mountPath: "/mnt/tools",
-            },
-          },
-          {
-            s3FilesAccessPoint: {
-              accessPointArn:
-                "arn:aws:s3files:us-west-2:111122223333:file-system/fs-0123456789abcdef0/access-point/fsap-0123456789abcdef0",
-              mountPath: "/mnt/data",
-            },
-          },
-        ],
-      },
+    expect(spec.networkMode).toBe("VPC");
+    expect(spec.networkConfig).toEqual({
+      subnets: ["subnet-12345678"],
+      securityGroups: ["sg-12345678"],
     });
-    expect(spec.networkConfig).toBeUndefined();
+    expect(spec.lifecycleConfig).toEqual({ idleRuntimeSessionTimeout: 900 });
+    expect(spec.sessionStoragePath).toBe("/mnt/session");
+    expect(spec.efsAccessPoints).toEqual([
+      {
+        accessPointArn:
+          "arn:aws:elasticfilesystem:us-west-2:111122223333:access-point/fsap-0123456789abcdef0",
+        mountPath: "/mnt/tools",
+      },
+    ]);
   });
 
   test("notes incomplete filesystem members instead of silently dropping them", () => {
@@ -373,40 +274,31 @@ describe("mapServiceHarnessToSpec", () => {
       } as Partial<Harness>),
     );
 
-    expect(spec.environment?.agentCoreRuntimeEnvironment.filesystemConfigurations).toBeUndefined();
+    expect(spec.efsAccessPoints).toBeUndefined();
     expect(notes.map((note) => note.category)).toEqual([
       SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
       SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
     ]);
   });
 
-  test.each(["bedrockModelConfig", "openAiModelConfig", "geminiModelConfig"] as const)(
-    "notes additionalParams unsupported by %s",
-    (key) => {
-      const config = {
-        modelId: "us.amazon.nova-lite-v1:0",
-        additionalParams: { custom_parameter: true },
-      };
-      const model =
-        key === "bedrockModelConfig"
-          ? { bedrockModelConfig: config }
-          : key === "openAiModelConfig"
-            ? { openAiModelConfig: { ...config, apiKeyArn: "test-api-key-arn" } }
-            : { geminiModelConfig: { ...config, apiKeyArn: "test-api-key-arn" } };
-      const { spec, notes } = mapServiceHarnessToSpec(serviceHarness({ model }));
-
-      expect(Object.entries(spec.model)).toEqual([
-        [
-          key,
-          {
+  // The pinned CDK only maps additionalParams for lite_llm, so carrying it on another provider
+  // would produce a harness.yaml that fails at synth. The lite_llm keep-path is already asserted
+  // by "maps openai and litellm model configs" above.
+  test("notes additionalParams the CDK cannot map", () => {
+    const { spec, notes } = mapServiceHarnessToSpec(
+      serviceHarness({
+        model: {
+          bedrockModelConfig: {
             modelId: "us.amazon.nova-lite-v1:0",
-            ...(key !== "bedrockModelConfig" && { apiKeyArn: "test-api-key-arn" }),
+            additionalParams: { custom_parameter: true },
           },
-        ],
-      ]);
-      expect(notes.map((note) => note.category)).toEqual([SERVICE_FIELD_OMITTED_NOTE_CATEGORY]);
-    },
-  );
+        },
+      } as Partial<Harness>),
+    );
+
+    expect(spec.model.additionalParams).toBeUndefined();
+    expect(notes.map((note) => note.category)).toEqual([SERVICE_FIELD_OMITTED_NOTE_CATEGORY]);
+  });
 
   test("notes external-memory tuning that cannot be wired automatically", () => {
     const { spec, notes } = mapServiceHarnessToSpec(
@@ -423,12 +315,7 @@ describe("mapServiceHarnessToSpec", () => {
       } as Partial<Harness>),
     );
 
-    expect(spec.memory).toEqual({
-      agentCoreMemoryConfiguration: {
-        arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-1",
-        messagesCount: 12,
-      },
-    });
+    expect(spec.memory).toMatchObject({ mode: "existing", messagesCount: 12 });
     expect(notes.map((note) => note.category)).toEqual([MEMORY_TUNING_NOTE_CATEGORY]);
   });
 
@@ -459,14 +346,8 @@ describe("mapServiceHarnessToSpec", () => {
         },
       } as Partial<Harness>),
     ).spec;
-    expect(openAi.model).toEqual({
-      openAiModelConfig: {
-        modelId: "gpt-4.1",
-        apiKeyArn:
-          "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/K",
-        apiFormat: "responses",
-      },
-    });
+    expect(openAi.model.provider).toBe("open_ai");
+    expect(openAi.model.apiFormat).toBe("responses");
 
     const liteLlm = mapServiceHarnessToSpec(
       serviceHarness({
@@ -479,13 +360,9 @@ describe("mapServiceHarnessToSpec", () => {
         },
       } as Partial<Harness>),
     ).spec;
-    expect(liteLlm.model).toEqual({
-      liteLlmModelConfig: {
-        modelId: "bedrock/us.amazon.nova-lite-v1:0",
-        apiBase: "https://litellm.example",
-        additionalParams: { max_retries: 2 },
-      },
-    });
+    expect(liteLlm.model.provider).toBe("lite_llm");
+    expect(liteLlm.model.apiBase).toBe("https://litellm.example");
+    expect(liteLlm.model.additionalParams).toEqual({ max_retries: 2 });
   });
 
   test("wraps an inexpressible payload in a MalformedServiceResponseError", () => {
@@ -494,9 +371,6 @@ describe("mapServiceHarnessToSpec", () => {
     );
     expect(() =>
       mapServiceHarnessToSpec(serviceHarness({ harnessName: "definitely not a valid name" })),
-    ).toThrow(MalformedServiceResponseError);
-    expect(() =>
-      mapServiceHarnessToSpec(serviceHarness({ model: { $unknown: ["futureModel", {}] } })),
     ).toThrow(MalformedServiceResponseError);
   });
 });

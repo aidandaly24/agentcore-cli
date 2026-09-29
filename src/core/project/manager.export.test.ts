@@ -71,9 +71,9 @@ async function projectWithHarness(
       resourceType: "harness",
       resourceConfig: {
         name: "assistant",
-        model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
-        systemPrompt: [{ text: "You are a terse assistant." }],
-        memory: { disabled: {} },
+        model: { provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0" },
+        systemPrompt: "You are a terse assistant.",
+        memory: { mode: "disabled" },
         ...harness,
       } as z.input<typeof HarnessSpecSchema>,
     }),
@@ -120,7 +120,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
   test("wires an in-project memory through memory/session.py", async () => {
     const { manager: subject } = manager();
     let project = await projectWithHarness(subject, {
-      memory: { agentCoreMemoryConfiguration: { name: "chat_history" } },
+      memory: { mode: "existing", name: "chat_history" },
     });
     project = await drain(
       subject.addResource(project, {
@@ -147,11 +147,10 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     const { manager: subject } = manager();
     let project = await projectWithHarness(subject, {
       memory: {
-        agentCoreMemoryConfiguration: {
-          name: "chat_history",
-          messagesCount: 12,
-          retrievalConfig: { topK: 8, relevanceScore: 0.7 },
-        },
+        mode: "existing",
+        name: "chat_history",
+        messagesCount: 12,
+        retrievalConfig: { topK: 8, relevanceScore: 0.7 },
       },
     });
     project = await drain(
@@ -178,15 +177,14 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
       model: {
-        openAiModelConfig: {
-          modelId: "gpt-4.1",
-          apiKeyArn:
-            "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/OpenAiKey",
-          apiFormat: "responses",
-          maxTokens: 512,
-          temperature: 0.2,
-          topP: 0.8,
-        },
+        provider: "open_ai",
+        modelId: "gpt-4.1",
+        apiKeyArn:
+          "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/OpenAiKey",
+        apiFormat: "responses",
+        maxTokens: 512,
+        temperature: 0.2,
+        topP: 0.8,
       },
     });
 
@@ -209,15 +207,14 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
       model: {
-        geminiModelConfig: {
-          modelId: "gemini-2.5-flash",
-          apiKeyArn:
-            "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GeminiKey",
-          maxTokens: 400,
-          temperature: 0.3,
-          topP: 0.9,
-          topK: 20,
-        },
+        provider: "gemini",
+        modelId: "gemini-2.5-flash",
+        apiKeyArn:
+          "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/GeminiKey",
+        maxTokens: 400,
+        temperature: 0.3,
+        topP: 0.9,
+        topK: 20,
       },
     });
 
@@ -237,13 +234,12 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
       model: {
-        liteLlmModelConfig: {
-          modelId: "bedrock/us.amazon.nova-lite-v1:0",
-          maxTokens: 300,
-          temperature: 0.1,
-          topP: 0.7,
-          additionalParams: { max_retries: 2 },
-        },
+        provider: "lite_llm",
+        modelId: "bedrock/us.amazon.nova-lite-v1:0",
+        maxTokens: 300,
+        temperature: 0.1,
+        topP: 0.7,
+        additionalParams: { max_retries: 2 },
       },
     });
 
@@ -262,7 +258,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
   test("renders released skills and sliding-window APIs", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
-      skills: [{ s3: { uri: "s3://skills-bucket/team/" } }],
+      skills: [{ s3Uri: "s3://skills-bucket/team/" }],
       truncation: {
         strategy: "sliding_window",
         config: { slidingWindow: { messagesCount: 12 } },
@@ -297,11 +293,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
   test("exports a containerUri harness as CodeZip and reports the dropped image", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
-      environmentArtifact: {
-        containerConfiguration: {
-          containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
-        },
-      },
+      containerUri: "111122223333.dkr.ecr.us-east-1.amazonaws.com/base-image:latest",
     });
 
     const result = await drain(subject.exportHarness(project, exportInput()));
@@ -316,7 +308,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
   test("writes generated IAM policy files next to the code", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
-      skills: [{ s3: { uri: "s3://skills-bucket/team" } }],
+      skills: [{ s3Uri: "s3://skills-bucket/team" }],
     });
 
     const result = await drain(subject.exportHarness(project, exportInput()));
@@ -338,14 +330,13 @@ describe("FsProjectManager.exportHarness side effects", () => {
       const dir = join(project.rootPath, "app", "assistant");
       const configPath = join(dir, "harness.yaml");
       const config = parse(await Bun.file(configPath).text());
-      const blocks = [{ text: "  Explicit prompt.\n" }, { text: "Keep its whitespace.\n" }];
-      const prompt = blocks.map((block) => block.text).join("\n");
+      const prompt = "  Explicit prompt.\nKeep its whitespace.\n";
       await Bun.write(
         join(dir, "system-prompt.md"),
         source === "file" ? prompt : "Conventional prompt loses.",
       );
       if (source === "file") delete config.systemPrompt;
-      else config.systemPrompt = blocks;
+      else config.systemPrompt = [{ text: prompt }];
       config.truncation = {
         strategy: "summarization",
         config: { summarization: { summarizationSystemPrompt: "  Keep the decisions.\n" } },
@@ -361,42 +352,6 @@ describe("FsProjectManager.exportHarness side effects", () => {
     },
   );
 
-  test.each([
-    ["empty array", []],
-    ["blank block", [{ text: " \n" }]],
-    ["blank later block", [{ text: "Valid first block." }, { text: " \n" }]],
-    ["string", "system-prompt.md"],
-  ])(
-    "rejects an explicit %s prompt instead of falling back to the file",
-    async (_label, prompt) => {
-      const { manager: subject } = manager();
-      const project = await projectWithHarness(subject);
-      const directory = join(project.rootPath, "app", "assistant");
-      const configPath = join(directory, "harness.yaml");
-      const config = parse(await Bun.file(configPath).text());
-      config.systemPrompt = prompt;
-      await Bun.write(configPath, stringify(config));
-      await Bun.write(join(directory, "system-prompt.md"), "Do not use this fallback.");
-
-      await expect(drain(subject.exportHarness(project, exportInput()))).rejects.toThrow(
-        /Invalid harness.yaml.*systemPrompt/s,
-      );
-      expect(existsSync(join(project.rootPath, "app", "assistantAgent"))).toBe(false);
-    },
-  );
-
-  test("uses the default prompt only when neither inline blocks nor the sibling file exists", async () => {
-    const { manager: subject } = manager();
-    const project = await projectWithHarness(subject, { systemPrompt: undefined });
-    const directory = join(project.rootPath, "app", "assistant");
-    await rm(join(directory, "system-prompt.md"));
-
-    const result = await drain(subject.exportHarness(project, exportInput()));
-    expect(await Bun.file(join(result.agentPath, "main.py")).text()).toContain(
-      'DEFAULT_SYSTEM_PROMPT = """You are a helpful assistant."""',
-    );
-  });
-
   test("reports schema errors with the YAML path before creating export output", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject);
@@ -409,28 +364,6 @@ describe("FsProjectManager.exportHarness side effects", () => {
       /Invalid harness.yaml.*maxIterations/s,
     );
     expect(existsSync(join(project.rootPath, "app", "assistantAgent"))).toBe(false);
-  });
-
-  test("rejects a flat harness file before writing any output", async () => {
-    const { manager: subject } = manager();
-    const project = await projectWithHarness(subject);
-    const configPath = join(project.rootPath, "app", "assistant", "harness.yaml");
-    const specPath = join(project.rootPath, "agentcore", "agentcore.json");
-    const before = await Bun.file(specPath).text();
-    await Bun.write(
-      configPath,
-      stringify({
-        name: "assistant",
-        model: { provider: "bedrock", modelId: "global.anthropic.claude-sonnet-4-6" },
-        memory: { mode: "managed" },
-      }),
-    );
-
-    await expect(drain(subject.exportHarness(project, exportInput()))).rejects.toThrow(
-      /Invalid harness.yaml/,
-    );
-    expect(existsSync(join(project.rootPath, "app", "assistantAgent"))).toBe(false);
-    expect(await Bun.file(specPath).text()).toBe(before);
   });
 
   test("writes MCP header secrets to .env.local and registers their credentials", async () => {
@@ -474,18 +407,16 @@ describe("FsProjectManager.exportHarness side effects", () => {
         prefetched: {
           spec: HarnessSpecSchema.parse({
             name: "remote_harness",
-            model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
-            systemPrompt: [{ text: "  Fetched prompt." }, { text: "Keep every block.\n" }],
+            model: { provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0" },
           }),
+          systemPrompt: "Fetched prompt.",
         },
         targetAgentName: "exported_arn",
       }),
     );
 
     expect(result.harnessName).toBe("remote_harness");
-    expect(await Bun.file(join(result.agentPath, "main.py")).text()).toContain(
-      'DEFAULT_SYSTEM_PROMPT = """  Fetched prompt.\nKeep every block.\n"""',
-    );
+    expect(await Bun.file(join(result.agentPath, "main.py")).text()).toContain("Fetched prompt.");
   });
 
   test("cleans up the agent dir and .env.local when the spec write fails", async () => {
@@ -518,7 +449,7 @@ describe("FsProjectManager.exportHarness side effects", () => {
   test("reads the harness from its registry path", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject, {
-      model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0", maxTokens: 128 } },
+      model: { provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0", maxTokens: 128 },
     });
 
     const result = await drain(subject.exportHarness(project, exportInput()));

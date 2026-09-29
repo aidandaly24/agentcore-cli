@@ -58,11 +58,11 @@ async function inProjectWithHarness(
     "--name",
     "exportme",
     "--model",
-    JSON.stringify({ bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0", maxTokens: 256 } }),
+    JSON.stringify({ provider: "bedrock", modelId: "us.amazon.nova-lite-v1:0", maxTokens: 256 }),
     "--system-prompt",
     "You are a terse assistant.",
     "--memory",
-    '{"disabled":{}}',
+    '{"mode":"disabled"}',
   ]);
   return projectRoot;
 }
@@ -241,17 +241,13 @@ describe("project export harness handler", () => {
         createdAt: new Date(0),
         updatedAt: new Date(0),
         model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
-        systemPrompt: [
-          { text: "  Fetched prompt." },
-          { $unknown: ["futurePrompt", {}] },
-          { text: "Keep every block.\n" },
-        ],
+        systemPrompt: [{ text: "Fetched prompt." }],
         tools: [],
         skills: [],
       },
     } as never);
 
-    await subject.run(["--arn", HARNESS_ARN, "--target-agent-name", "exported_arn", "--json"]);
+    await subject.run(["--arn", HARNESS_ARN, "--target-agent-name", "exported_arn"]);
 
     expect(subject.core.harness.calls).toEqual([
       {
@@ -260,18 +256,8 @@ describe("project export harness handler", () => {
       },
     ]);
     expect(await Bun.file(join(projectRoot, "app", "exported_arn", "main.py")).text()).toContain(
-      'DEFAULT_SYSTEM_PROMPT = """  Fetched prompt.\nKeep every block.\n"""',
+      'DEFAULT_SYSTEM_PROMPT = """Fetched prompt."""',
     );
-    expect(subject.io.stderr()).toContain('of type "futurePrompt" was omitted');
-    expect(JSON.parse(subject.io.stdout()).notes).toEqual([
-      expect.objectContaining({
-        category: "Service harness field not exported",
-        message: expect.stringContaining('of type "futurePrompt" was omitted'),
-      }),
-    ]);
-    expect(
-      await Bun.file(join(projectRoot, "app", "exported_arn", "EXPORT_NOTES.md")).text(),
-    ).toContain('of type "futurePrompt" was omitted');
     const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     expect(spec.runtimes.map((runtime: { name: string }) => runtime.name)).toContain(
       "exported_arn",

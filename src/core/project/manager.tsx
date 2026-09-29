@@ -48,7 +48,7 @@ import {
   buildExportNotesMarkdown,
   mapHarnessToExportPlan,
 } from "./templates/export";
-import { HarnessSpecSchema } from "../../projectSchemas/harness";
+import { HarnessSpecSchema, HarnessYamlSchema } from "../../projectSchemas/harness";
 import { FsTreeNode } from "./templates/fsTree";
 import { getEvaluatorTemplateResolver } from "./templates/evaluator";
 import { ProjectSpecSchema, type ManagedBy } from "../../projectSchemas/project";
@@ -772,11 +772,9 @@ export class FsProjectManager implements ProjectManager {
     if (input.prefetched) {
       spec = input.prefetched.spec;
       harnessName = spec.name;
-      const prompt = input.prefetched.systemPrompt;
-      systemPrompt = prompt?.trim()
-        ? prompt
-        : (spec.systemPrompt?.map((block) => block.text).join("\n") ??
-          DEFAULT_EXPORT_SYSTEM_PROMPT);
+      const prompt = input.prefetched.systemPrompt?.trim();
+      systemPrompt =
+        prompt && prompt.length > 0 ? prompt : (spec.systemPrompt ?? DEFAULT_EXPORT_SYSTEM_PROMPT);
     } else {
       harnessName = input.harnessName!;
       const entry = projectSpec.harnesses.find((candidate) => candidate.name === harnessName);
@@ -793,17 +791,15 @@ export class FsProjectManager implements ProjectManager {
         message: `Reading harness configuration from '${join(entry.path, "harness.yaml")}'`,
       };
       const harnessPath = join(harnessDir, "harness.yaml");
-      try {
-        spec = HarnessSpecSchema.parse(await readYamlFile(harnessPath));
-      } catch (error) {
-        if (!(error instanceof z.ZodError)) throw error;
+      const parsed = HarnessYamlSchema.safeParse(await readYamlFile(harnessPath));
+      if (!parsed.success) {
         throw new InputValidationError(
-          `Invalid harness.yaml at '${harnessPath}': ${z.prettifyError(error)}`,
-          { cause: error },
+          `Invalid harness.yaml at '${harnessPath}': ${z.prettifyError(parsed.error)}`,
+          { cause: parsed.error },
         );
       }
-      systemPrompt =
-        spec.systemPrompt?.map((block) => block.text).join("\n") ?? DEFAULT_EXPORT_SYSTEM_PROMPT;
+      spec = parsed.data;
+      systemPrompt = spec.systemPrompt ?? DEFAULT_EXPORT_SYSTEM_PROMPT;
       if (spec.systemPrompt === undefined) {
         const promptPath = join(harnessDir, "system-prompt.md");
         try {

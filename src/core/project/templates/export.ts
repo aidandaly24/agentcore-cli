@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { z } from "zod";
 import type { ProjectRuntime } from "../../../projectSchemas/runtime";
 import type {
+  HarnessMemoryRef,
   HarnessMemoryRetrievalConfig,
   HarnessSkill,
   HarnessSkillGitSource,
@@ -109,10 +110,9 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
   // Export always emits a CodeZip runtime. The generated agent is a self-contained Strands
   // application whose dependencies come from its own pyproject.toml, so it needs no image build
   // and never reaches CodeBuild. A source image or Dockerfile is reported rather than rebuilt.
-  const containerUri = spec.environmentArtifact?.containerConfiguration.containerUri;
-  if (containerUri || spec.dockerfile) {
-    const what = containerUri
-      ? `a pre-built container image (${containerUri})`
+  if (spec.containerUri || spec.dockerfile) {
+    const what = spec.containerUri
+      ? `a pre-built container image (${spec.containerUri})`
       : `a custom Dockerfile (${spec.dockerfile})`;
     notes.push({
       category: CONTAINER_IMAGE_NOTE_CATEGORY,
@@ -125,9 +125,8 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     });
   }
 
-  const environment = spec.environment?.agentCoreRuntimeEnvironment;
-  const network = environment?.networkConfiguration;
-  const networkConfig = network?.networkMode === "VPC" ? network.networkModeConfig : undefined;
+  const networkConfig =
+    spec.networkMode === "VPC" && spec.networkConfig ? spec.networkConfig : undefined;
 
   const allowedToolPatterns = spec.allowedTools ?? ["*"];
   if (!(allowedToolPatterns.length === 1 && allowedToolPatterns[0] === "*")) {
@@ -160,7 +159,7 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     spec.maxTokens !== undefined ||
     spec.timeoutSeconds !== undefined;
 
-  const filesystemConfigurations = environment?.filesystemConfigurations ?? [];
+  const filesystemConfigurations = buildFilesystemConfigurations(spec);
   const envVars = Object.entries(spec.environmentVariables ?? {}).map(([name, value]) => ({
     name,
     value,
@@ -171,7 +170,7 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     isExportHarness: true,
     entrypoint: "main",
     enableOtel: true,
-    isVpc: network?.networkMode === "VPC",
+    isVpc: spec.networkMode === "VPC",
     protocol: "HTTP",
     // Model
     ...model.context,
@@ -211,15 +210,13 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
       spec.truncation?.strategy === "none" ? undefined : spec.truncation?.strategy,
     truncationConfig: resolveTruncationConfig(spec.truncation),
     // Filesystem mounts (informational for the template; tools are harness builtins)
-    sessionStorageMountPath: filesystemConfigurations.find((fs) => "sessionStorage" in fs)
-      ?.sessionStorage.mountPath,
-    efsMounts: filesystemConfigurations.flatMap((fs) =>
-      "efsAccessPoint" in fs ? [{ mountPath: fs.efsAccessPoint.mountPath }] : [],
-    ),
-    s3Mounts: filesystemConfigurations.flatMap((fs) =>
-      "s3FilesAccessPoint" in fs ? [{ mountPath: fs.s3FilesAccessPoint.mountPath }] : [],
-    ),
-    needsOs: filesystemConfigurations.length > 0,
+    sessionStorageMountPath: spec.sessionStoragePath,
+    efsMounts: (spec.efsAccessPoints ?? []).map(({ mountPath }) => ({ mountPath })),
+    s3Mounts: (spec.s3AccessPoints ?? []).map(({ mountPath }) => ({ mountPath })),
+    needsOs:
+      !!spec.sessionStoragePath ||
+      (spec.efsAccessPoints?.length ?? 0) > 0 ||
+      (spec.s3AccessPoints?.length ?? 0) > 0,
   };
 
   const runtime: ProjectRuntime = {
@@ -230,17 +227,13 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
     protocol: "HTTP",
     runtimeVersion: "PYTHON_3_14",
     ...(envVars.length > 0 && { envVars }),
-    networkMode: network?.networkMode ?? "PUBLIC",
+    ...(spec.networkMode && { networkMode: spec.networkMode }),
     ...(networkConfig && { networkConfig }),
-    authorizerType: spec.authorizerConfiguration ? "CUSTOM_JWT" : "AWS_IAM",
+    ...(spec.authorizerType && { authorizerType: spec.authorizerType }),
     ...(spec.authorizerConfiguration && {
-      authorizerConfiguration: {
-        customJwtAuthorizer: spec.authorizerConfiguration.customJWTAuthorizer,
-      },
+      authorizerConfiguration: spec.authorizerConfiguration,
     }),
-    ...(environment?.lifecycleConfiguration && {
-      lifecycleConfiguration: environment.lifecycleConfiguration,
-    }),
+    ...(spec.lifecycleConfig && { lifecycleConfiguration: spec.lifecycleConfig }),
     ...(filesystemConfigurations.length > 0 && { filesystemConfigurations }),
     ...(additionalPolicies.length > 0 && { additionalPolicies }),
     ...(spec.connections?.length && { connections: spec.connections }),
@@ -270,6 +263,14 @@ interface ModelResolution {
   policyFile?: { name: string; doc: unknown };
 }
 
+/** A Bedrock model whose apiFormat routes it through the OpenAI-compatible Mantle endpoint. */
+function isBedrockMantleModel(spec: HarnessSpec): boolean {
+  return (
+    spec.model.provider === "bedrock" &&
+    (spec.model.apiFormat === "responses" || spec.model.apiFormat === "chat_completions")
+  );
+}
+
 /**
  * Proprietary OpenAI models (e.g. openai.gpt-5.x) are served on the Bedrock
  * Mantle `/openai/v1` path; open-source ones (openai.gpt-oss-*) use `/v1`.
@@ -284,109 +285,100 @@ function resolveModel(
   credentials: Credential[],
   notes: ExportNote[],
 ): ModelResolution {
-  const model =
-    "bedrockModelConfig" in spec.model
-      ? spec.model.bedrockModelConfig
-      : "openAiModelConfig" in spec.model
-        ? spec.model.openAiModelConfig
-        : "geminiModelConfig" in spec.model
-          ? spec.model.geminiModelConfig
-          : spec.model.liteLlmModelConfig;
+  const model = spec.model;
   const context: Record<string, unknown> = {
     modelId: model.modelId,
-    modelApiFormat: "apiFormat" in model ? model.apiFormat : undefined,
+    modelApiFormat: model.apiFormat,
     // Stringified so a legal 0 (temperature/topP) stays truthy for {{#if}}.
     modelMaxTokens: model.maxTokens !== undefined ? String(model.maxTokens) : undefined,
     modelTemperature: model.temperature !== undefined ? String(model.temperature) : undefined,
     modelTopP: model.topP !== undefined ? String(model.topP) : undefined,
-    modelTopK: "topK" in model && model.topK !== undefined ? String(model.topK) : undefined,
+    modelTopK: model.topK !== undefined ? String(model.topK) : undefined,
     hasIdentity: false,
     identityProviders: [] as { name: string; envVarName: string }[],
   };
 
-  if ("bedrockModelConfig" in spec.model) {
-    const model = spec.model.bedrockModelConfig;
-    context.modelProvider = "Bedrock";
-    if (model.apiFormat === "responses" || model.apiFormat === "chat_completions") {
-      context.bedrockMantle = true;
-      context.strandsExtras = "openai";
-      context.mantleApiFormat = model.apiFormat;
-      context.mantleProprietary = isProprietaryOpenAiModel(model.modelId);
-      // Mantle is invoked via the bedrock-mantle service, not bedrock:InvokeModel,
-      // so the runtime role's default Bedrock grant is insufficient.
-      return {
-        context,
-        policyFile: {
-          name: "bedrock-mantle-policy.json",
-          doc: {
-            Version: "2012-10-17",
-            Statement: [
-              {
-                Effect: "Allow",
-                Action: "bedrock-mantle:CreateInference",
-                Resource: "arn:aws:bedrock-mantle:*:*:project/default",
-              },
-              {
-                Effect: "Allow",
-                Action: "bedrock-mantle:CallWithBearerToken",
-                Resource: "*",
-              },
-            ],
+  switch (model.provider) {
+    case "bedrock": {
+      context.modelProvider = "Bedrock";
+      if (isBedrockMantleModel(spec)) {
+        context.bedrockMantle = true;
+        context.strandsExtras = "openai";
+        context.mantleApiFormat = model.apiFormat;
+        context.mantleProprietary = isProprietaryOpenAiModel(model.modelId);
+        // Mantle is invoked via the bedrock-mantle service, not bedrock:InvokeModel,
+        // so the runtime role's default Bedrock grant is insufficient.
+        return {
+          context,
+          policyFile: {
+            name: "bedrock-mantle-policy.json",
+            doc: {
+              Version: "2012-10-17",
+              Statement: [
+                {
+                  Effect: "Allow",
+                  Action: "bedrock-mantle:CreateInference",
+                  Resource: "arn:aws:bedrock-mantle:*:*:project/default",
+                },
+                {
+                  Effect: "Allow",
+                  Action: "bedrock-mantle:CallWithBearerToken",
+                  Resource: "*",
+                },
+              ],
+            },
           },
-        },
-      };
+        };
+      }
+      return { context };
     }
-    return { context };
+    case "open_ai":
+    case "gemini": {
+      context.modelProvider = model.provider === "open_ai" ? "OpenAI" : "Gemini";
+      context.strandsExtras = model.provider === "open_ai" ? "openai" : "gemini";
+      // The schema guarantees apiKeyArn for these providers.
+      attachIdentityProvider(
+        context,
+        model.apiKeyArn!,
+        model.provider,
+        projectSpec,
+        credentials,
+        notes,
+      );
+      return { context };
+    }
+    case "lite_llm": {
+      context.modelProvider = "LiteLLM";
+      context.strandsExtras = "litellm";
+      if (model.apiBase) context.litellmApiBase = model.apiBase;
+      if (model.additionalParams && Object.keys(model.additionalParams).length > 0) {
+        context.litellmAdditionalParams = model.additionalParams;
+      }
+      if (model.apiKeyArn) {
+        attachIdentityProvider(
+          context,
+          model.apiKeyArn,
+          model.provider,
+          projectSpec,
+          credentials,
+          notes,
+        );
+      } else if (!model.modelId.startsWith("bedrock/")) {
+        // A bedrock/... LiteLLM model authenticates via the execution role; any
+        // other keyless provider prefix typically fails at first invocation.
+        notes.push({
+          category: LITELLM_NO_API_KEY_NOTE_CATEGORY,
+          message:
+            `The LiteLLM model "${model.modelId}" is not a Bedrock-backed (bedrock/...) model, but ` +
+            `the harness has no apiKeyArn. The exported agent constructs LiteLLMModel without an ` +
+            `API key and will fail at first invocation if the provider requires one. Add an ` +
+            `API-key credential to the harness (model apiKeyArn), or use a bedrock/ model id ` +
+            `(which authenticates via the execution role).`,
+        });
+      }
+      return { context };
+    }
   }
-  if ("openAiModelConfig" in spec.model) {
-    context.modelProvider = "OpenAI";
-    context.strandsExtras = "openai";
-    attachIdentityProvider(
-      context,
-      spec.model.openAiModelConfig.apiKeyArn,
-      "open_ai",
-      projectSpec,
-      credentials,
-      notes,
-    );
-    return { context };
-  }
-  if ("geminiModelConfig" in spec.model) {
-    context.modelProvider = "Gemini";
-    context.strandsExtras = "gemini";
-    attachIdentityProvider(
-      context,
-      spec.model.geminiModelConfig.apiKeyArn,
-      "gemini",
-      projectSpec,
-      credentials,
-      notes,
-    );
-    return { context };
-  }
-  const liteLlm = spec.model.liteLlmModelConfig;
-  context.modelProvider = "LiteLLM";
-  context.strandsExtras = "litellm";
-  if (liteLlm.apiBase) context.litellmApiBase = liteLlm.apiBase;
-  if (liteLlm.additionalParams && Object.keys(liteLlm.additionalParams).length > 0) {
-    context.litellmAdditionalParams = liteLlm.additionalParams;
-  }
-  if (liteLlm.apiKeyArn) {
-    attachIdentityProvider(context, liteLlm.apiKeyArn, "lite_llm", projectSpec, credentials, notes);
-  } else if (!model.modelId.startsWith("bedrock/")) {
-    // A bedrock/... LiteLLM model authenticates via the execution role; any
-    // other keyless provider prefix typically fails at first invocation.
-    notes.push({
-      category: LITELLM_NO_API_KEY_NOTE_CATEGORY,
-      message:
-        `The LiteLLM model "${model.modelId}" is not a Bedrock-backed (bedrock/...) model, but ` +
-        `the harness has no apiKeyArn. The exported agent constructs LiteLLMModel without an ` +
-        `API key and will fail at first invocation if the provider requires one. Add an ` +
-        `API-key credential to the harness (model.liteLlmModelConfig.apiKeyArn), or use a bedrock/ model id ` +
-        `(which authenticates via the execution role).`,
-    });
-  }
-  return { context };
 }
 
 /**
@@ -440,9 +432,10 @@ function resolveMemory(
   projectSpec: ProjectSpec,
   notes: ExportNote[],
 ): MemoryResolution {
-  if (!spec.memory || "disabled" in spec.memory) return {};
+  const memory: HarnessMemoryRef | undefined = spec.memory;
+  if (!memory || memory.mode === "disabled") return {};
 
-  if ("managedMemoryConfiguration" in spec.memory) {
+  if (memory.mode === "managed") {
     notes.push({
       category: MEMORY_MANAGED_NOTE_CATEGORY,
       message:
@@ -453,7 +446,7 @@ function resolveMemory(
     return {};
   }
 
-  const memory = spec.memory.agentCoreMemoryConfiguration;
+  // mode === "existing"
   if (memory.name) {
     const entry: Memory | undefined = projectSpec.memories.find((m) => m.name === memory.name);
     if (!entry) {
@@ -697,15 +690,15 @@ interface SkillsResolution {
 }
 
 export function isPathSkill(skill: HarnessSkill): skill is HarnessSkillPathSource {
-  return "path" in skill;
+  return "path" in skill && !("gitUrl" in skill);
 }
 
 function isS3Skill(skill: HarnessSkill): skill is HarnessSkillS3Source {
-  return "s3" in skill;
+  return "s3Uri" in skill;
 }
 
 function isGitSkill(skill: HarnessSkill): skill is HarnessSkillGitSource {
-  return "git" in skill;
+  return "gitUrl" in skill;
 }
 
 function isAwsSkill(skill: HarnessSkill): skill is HarnessSkillAwsSkillsSource {
@@ -718,8 +711,8 @@ function resolveSkills(
   notes: ExportNote[],
 ): SkillsResolution {
   const pathSkills = spec.skills.filter(isPathSkill).map((s) => s.path);
-  const s3SkillSources = spec.skills.filter(isS3Skill).map((skill) => skill.s3);
-  const gitSkillSources = spec.skills.filter(isGitSkill).map((skill) => skill.git);
+  const s3SkillSources = spec.skills.filter(isS3Skill);
+  const gitSkillSources = spec.skills.filter(isGitSkill);
   const awsSkills = spec.skills.filter(isAwsSkill);
   const policyFiles: Record<string, unknown> = {};
 
@@ -739,10 +732,10 @@ function resolveSkills(
     const malformedUris: string[] = [];
     const objectResources: string[] = [];
     const bucketResources: string[] = [];
-    for (const { uri } of s3SkillSources) {
-      const parsed = parseS3SkillArns(uri);
+    for (const { s3Uri } of s3SkillSources) {
+      const parsed = parseS3SkillArns(s3Uri);
       if (!parsed) {
-        malformedUris.push(uri);
+        malformedUris.push(s3Uri);
         continue;
       }
       if (!objectResources.includes(parsed.objectArn)) objectResources.push(parsed.objectArn);
@@ -755,8 +748,8 @@ function resolveSkills(
           `These S3 skill URIs could not be parsed into a bucket, so no S3 read permission was ` +
           `generated for them: ${malformedUris.map((u) => `"${u}"`).join(", ")}. The exported ` +
           `agent still attempts to fetch these skills at runtime and will fail with S3 ` +
-          `AccessDenied. Fix the skills[].s3.uri values (expected \`s3://<bucket>/<prefix>\`) ` +
-          `in the source harness.yaml and re-export.`,
+          `AccessDenied. Fix the s3Uri values (expected \`s3://<bucket>/<prefix>\`) on this ` +
+          `agent in agentcore/agentcore.json and re-deploy.`,
       });
     }
     if (objectResources.length > 0) {
@@ -785,7 +778,7 @@ function resolveSkills(
     notes.push({
       category: GIT_SKILLS_AUTH_NOTE_CATEGORY,
       message:
-        `The git skill ${skill.url} clones with the AgentCore Identity credential provider ` +
+        `The git skill ${skill.gitUrl} clones with the AgentCore Identity credential provider ` +
         `"${name}". A credential entry referencing it was added to agentcore.json so the ` +
         `deployed agent can fetch the token. The provider itself must already exist in ` +
         `AgentCore Identity.`,
@@ -808,9 +801,9 @@ function resolveSkills(
     hasSkillsFetcher: spec.skills.length > 0,
     hasFetchedSkills: s3SkillSources.length > 0 || gitSkillSources.length > 0,
     pathSkills,
-    s3Skills: s3SkillSources.map((s) => s.uri),
+    s3Skills: s3SkillSources.map((s) => s.s3Uri),
     gitSkills: gitSkillSources.map((s) => ({
-      url: s.url,
+      url: s.gitUrl,
       ...(s.path && { path: s.path }),
       ...((s.auth?.credentialArn ?? s.auth?.credentialName) && {
         credentialArn: s.auth!.credentialArn ?? s.auth!.credentialName,
@@ -835,6 +828,22 @@ export function parseS3SkillArns(
   const prefix = prefixParts.join("/").replace(/\/+$/, "");
   const objectArn = prefix ? `${bucketArn}/${prefix}/*` : `${bucketArn}/*`;
   return { bucket, bucketArn, objectArn };
+}
+
+// ============================================================================
+// Filesystem mounts
+// ============================================================================
+
+function buildFilesystemConfigurations(
+  spec: HarnessSpec,
+): NonNullable<ProjectRuntime["filesystemConfigurations"]> {
+  return [
+    ...(spec.sessionStoragePath
+      ? [{ sessionStorage: { mountPath: spec.sessionStoragePath } }]
+      : []),
+    ...(spec.efsAccessPoints ?? []).map((efsAccessPoint) => ({ efsAccessPoint })),
+    ...(spec.s3AccessPoints ?? []).map((s3FilesAccessPoint) => ({ s3FilesAccessPoint })),
+  ];
 }
 
 // ============================================================================

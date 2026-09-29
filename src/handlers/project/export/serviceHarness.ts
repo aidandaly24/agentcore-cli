@@ -43,15 +43,18 @@ export function regionFromHarnessArn(arn: string): string {
  */
 export function mapServiceHarnessToSpec(harness: Harness): {
   spec: HarnessSpec;
+  systemPrompt?: string;
   notes: ExportNote[];
 } {
   const notes: ExportNote[] = [];
-  const promptBlocks: { text: string }[] = [];
-  for (const block of harness.systemPrompt ?? []) {
-    if ("text" in block && typeof block.text === "string" && block.text.trim().length > 0) {
-      promptBlocks.push({ text: block.text });
-      continue;
-    }
+  const promptBlocks = harness.systemPrompt ?? [];
+  const joinedPrompt = promptBlocks
+    .map((block) => ("text" in block ? block.text : undefined))
+    .filter((text): text is string => typeof text === "string" && text.length > 0)
+    .join("\n");
+  const systemPrompt = joinedPrompt.length > 0 ? joinedPrompt : undefined;
+  for (const block of promptBlocks) {
+    if ("text" in block && typeof block.text === "string" && block.text.length > 0) continue;
     const unknown = unknownMemberName(block);
     notes.push({
       category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
@@ -64,7 +67,6 @@ export function mapServiceHarnessToSpec(harness: Harness): {
   const candidate = clean({
     name: harness.harnessName,
     model: mapModel(harness.model, notes),
-    systemPrompt: promptBlocks.length ? promptBlocks : undefined,
     tools: (harness.tools ?? []).map((tool) =>
       clean({
         type: tool.type,
@@ -81,12 +83,11 @@ export function mapServiceHarnessToSpec(harness: Harness): {
     maxTokens: harness.maxTokens ?? undefined,
     timeoutSeconds: harness.timeoutSeconds ?? undefined,
     truncation: harness.truncation,
-    environmentArtifact: mapEnvironmentArtifact(harness.environmentArtifact, notes),
+    containerUri: mapContainerUri(harness.environmentArtifact, notes),
     environmentVariables: harness.environmentVariables,
     // The harness's executionRoleArn is deliberately NOT carried: the exported
     // agent is a new runtime that gets its own CDK-managed execution role.
-    environment: mapRuntimeEnvironment(harness, notes),
-    authorizerConfiguration: harness.authorizerConfiguration,
+    ...mapRuntimeEnvironment(harness, notes),
   });
 
   const parsed = HarnessSpecSchema.safeParse(candidate);
@@ -96,62 +97,103 @@ export function mapServiceHarnessToSpec(harness: Harness): {
       { cause: parsed.error },
     );
   }
-  return { spec: parsed.data, notes };
+  return { spec: parsed.data, systemPrompt, notes };
 }
 
 function mapModel(model: Harness["model"], notes: ExportNote[]): Record<string, unknown> {
-  for (const key of [
-    "bedrockModelConfig",
-    "openAiModelConfig",
-    "geminiModelConfig",
-    "liteLlmModelConfig",
-  ] as const) {
-    const c = model?.[key];
-    if (!c) continue;
-    const config = clean({
+  if (model?.bedrockModelConfig) {
+    const c = model.bedrockModelConfig;
+    return clean({
+      provider: "bedrock",
       modelId: c.modelId,
-      apiKeyArn: "apiKeyArn" in c ? c.apiKeyArn : undefined,
-      apiFormat: "apiFormat" in c ? c.apiFormat : undefined,
-      apiBase: "apiBase" in c ? c.apiBase : undefined,
+      apiFormat: c.apiFormat,
       temperature: c.temperature,
       topP: c.topP,
-      topK: "topK" in c ? c.topK : undefined,
       maxTokens: c.maxTokens,
-      additionalParams: key === "liteLlmModelConfig" ? c.additionalParams : undefined,
+      additionalParams: omitUnsupportedAdditionalParams("bedrock", c.additionalParams, notes),
     });
-    if (key !== "liteLlmModelConfig" && c.additionalParams !== undefined) {
-      notes.push({
-        category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
-        message:
-          `The harness model's additionalParams were omitted because they are only supported for ` +
-          `liteLlmModelConfig (this harness uses ${key}). Set the equivalent options ` +
-          `directly in the generated model/load.py if the exported agent needs them.`,
-      });
-    }
-    return { [key]: config };
+  }
+  if (model?.openAiModelConfig) {
+    const c = model.openAiModelConfig;
+    return clean({
+      provider: "open_ai",
+      modelId: c.modelId,
+      apiKeyArn: c.apiKeyArn,
+      apiFormat: c.apiFormat,
+      temperature: c.temperature,
+      topP: c.topP,
+      maxTokens: c.maxTokens,
+      additionalParams: omitUnsupportedAdditionalParams("open_ai", c.additionalParams, notes),
+    });
+  }
+  if (model?.geminiModelConfig) {
+    const c = model.geminiModelConfig;
+    return clean({
+      provider: "gemini",
+      modelId: c.modelId,
+      apiKeyArn: c.apiKeyArn,
+      temperature: c.temperature,
+      topP: c.topP,
+      topK: c.topK,
+      maxTokens: c.maxTokens,
+      additionalParams: omitUnsupportedAdditionalParams("gemini", c.additionalParams, notes),
+    });
+  }
+  if (model?.liteLlmModelConfig) {
+    const c = model.liteLlmModelConfig;
+    return clean({
+      provider: "lite_llm",
+      modelId: c.modelId,
+      apiKeyArn: c.apiKeyArn,
+      apiBase: c.apiBase,
+      temperature: c.temperature,
+      topP: c.topP,
+      maxTokens: c.maxTokens,
+      additionalParams: c.additionalParams,
+    });
   }
   throw new MalformedServiceResponseError(
     "The fetched harness has no recognized model configuration.",
   );
 }
 
+/**
+ * Only lite_llm carries additionalParams through to CFN — the CDK's harness schema rejects the
+ * field on every other provider, so mapping it verbatim would produce a spec that fails at synth.
+ * Drop it with a note instead of writing an undeployable harness.
+ */
+function omitUnsupportedAdditionalParams(
+  provider: "bedrock" | "open_ai" | "gemini",
+  value: unknown,
+  notes: ExportNote[],
+): undefined {
+  if (value === undefined) return undefined;
+  notes.push({
+    category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+    message:
+      `The harness model's additionalParams were omitted because they are only supported for ` +
+      `the "lite_llm" provider (this harness uses "${provider}"). Set the equivalent options ` +
+      `directly in the generated model/load.py if the exported agent needs them.`,
+  });
+  return undefined;
+}
+
+/** Service skill union -> the flat local skill shape. */
 function mapSkill(
   skill: ApiHarnessSkill,
   notes: ExportNote[],
 ): Record<string, unknown> | undefined {
   if ("path" in skill && skill.path) return { path: skill.path };
-  if ("s3" in skill && skill.s3?.uri) return { s3: { uri: skill.s3.uri } };
+  if ("s3" in skill && skill.s3?.uri) return { s3Uri: skill.s3.uri };
   if ("git" in skill && skill.git?.url) {
     const { url, path, auth } = skill.git;
-    return {
-      git: clean({
-        url,
-        path,
-        auth: auth?.credentialArn
-          ? clean({ credentialArn: auth.credentialArn, username: auth.username })
-          : undefined,
-      }),
-    };
+    return clean({
+      gitUrl: url,
+      path,
+      auth: auth?.credentialArn
+        ? clean({ credentialArn: auth.credentialArn, username: auth.username })
+        : undefined,
+    });
   }
   if ("awsSkills" in skill && skill.awsSkills) {
     return { awsSkills: clean({ paths: skill.awsSkills.paths }) };
@@ -188,14 +230,14 @@ function mapMemory(
           "The exported runtime cannot apply those settings until the external memory is wired manually.",
       });
     }
-    return { agentCoreMemoryConfiguration: clean({ arn, actorId, messagesCount }) };
+    return clean({ mode: "existing", arn, actorId, messagesCount });
   }
   if ("managedMemoryConfiguration" in memory && memory.managedMemoryConfiguration) {
     const arn = memory.managedMemoryConfiguration.arn;
-    if (arn) return { agentCoreMemoryConfiguration: { arn } };
-    return { managedMemoryConfiguration: {} };
+    if (arn) return { mode: "existing", arn };
+    return { mode: "managed" };
   }
-  if ("disabled" in memory && memory.disabled) return { disabled: {} };
+  if ("disabled" in memory && memory.disabled) return { mode: "disabled" };
   const unknown = unknownMemberName(memory);
   notes.push({
     category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
@@ -207,14 +249,12 @@ function mapMemory(
 }
 
 /**
- * A VPC harness without explicit subnets/security groups
+ * Runtime-environment block -> networkMode/networkConfig, lifecycleConfig, and
+ * filesystem mounts. A VPC harness without explicit subnets/security groups
  * cannot be expressed locally; fail here — before anything is written — with a
  * clear message instead of a downstream schema error.
  */
-function mapRuntimeEnvironment(
-  harness: Harness,
-  notes: ExportNote[],
-): Record<string, unknown> | undefined {
+function mapRuntimeEnvironment(harness: Harness, notes: ExportNote[]): Record<string, unknown> {
   if (harness.environment && !("agentCoreRuntimeEnvironment" in harness.environment)) {
     const unknown = unknownMemberName(harness.environment);
     notes.push({
@@ -223,10 +263,10 @@ function mapRuntimeEnvironment(
         `The harness environment${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
         "the service payload is not an AgentCore Runtime environment.",
     });
-    return undefined;
+    return {};
   }
   const env = harness.environment?.agentCoreRuntimeEnvironment;
-  if (!env) return undefined;
+  if (!env) return {};
   const out: Record<string, unknown> = {};
 
   const net = env.networkConfiguration;
@@ -240,47 +280,40 @@ function mapRuntimeEnvironment(
           "explicit VPC subnets and security groups, or export a non-VPC harness.",
       );
     }
-    out.networkConfiguration = {
-      networkMode: "VPC",
-      networkModeConfig: { subnets, securityGroups },
-    };
-  } else if (net) {
-    out.networkConfiguration = { networkMode: net.networkMode };
+    out.networkMode = "VPC";
+    out.networkConfig = { subnets, securityGroups };
   }
 
   const lifecycle = env.lifecycleConfiguration;
   if (lifecycle && (lifecycle.idleRuntimeSessionTimeout != null || lifecycle.maxLifetime != null)) {
-    out.lifecycleConfiguration = clean({
+    out.lifecycleConfig = clean({
       idleRuntimeSessionTimeout: lifecycle.idleRuntimeSessionTimeout ?? undefined,
       maxLifetime: lifecycle.maxLifetime ?? undefined,
     });
   }
 
-  const mounts: Record<string, unknown>[] = [];
+  const efs: { accessPointArn: string; mountPath: string }[] = [];
+  const s3: { accessPointArn: string; mountPath: string }[] = [];
   for (const fs of env.filesystemConfigurations ?? []) {
     if ("sessionStorage" in fs && fs.sessionStorage?.mountPath) {
-      mounts.push({ sessionStorage: { mountPath: fs.sessionStorage.mountPath } });
+      out.sessionStoragePath = fs.sessionStorage.mountPath;
     } else if (
       "efsAccessPoint" in fs &&
       fs.efsAccessPoint?.accessPointArn &&
       fs.efsAccessPoint.mountPath
     ) {
-      mounts.push({
-        efsAccessPoint: {
-          accessPointArn: fs.efsAccessPoint.accessPointArn,
-          mountPath: fs.efsAccessPoint.mountPath,
-        },
+      efs.push({
+        accessPointArn: fs.efsAccessPoint.accessPointArn,
+        mountPath: fs.efsAccessPoint.mountPath,
       });
     } else if (
       "s3FilesAccessPoint" in fs &&
       fs.s3FilesAccessPoint?.accessPointArn &&
       fs.s3FilesAccessPoint.mountPath
     ) {
-      mounts.push({
-        s3FilesAccessPoint: {
-          accessPointArn: fs.s3FilesAccessPoint.accessPointArn,
-          mountPath: fs.s3FilesAccessPoint.mountPath,
-        },
+      s3.push({
+        accessPointArn: fs.s3FilesAccessPoint.accessPointArn,
+        mountPath: fs.s3FilesAccessPoint.mountPath,
       });
     } else {
       const unknown = unknownMemberName(fs);
@@ -292,26 +325,26 @@ function mapRuntimeEnvironment(
       });
     }
   }
-  if (mounts.length) out.filesystemConfigurations = mounts;
+  if (efs.length) out.efsAccessPoints = efs;
+  if (s3.length) out.s3AccessPoints = s3;
 
-  return { agentCoreRuntimeEnvironment: out };
+  return out;
 }
 
-function mapEnvironmentArtifact(
+function mapContainerUri(
   artifact: Harness["environmentArtifact"],
   notes: ExportNote[],
-): Record<string, unknown> | undefined {
+): string | undefined {
   if (!artifact) return undefined;
   if ("containerConfiguration" in artifact) {
-    const containerUri = artifact.containerConfiguration?.containerUri;
-    if (containerUri) return { containerConfiguration: { containerUri } };
+    return artifact.containerConfiguration?.containerUri;
   }
   const unknown = unknownMemberName(artifact);
   notes.push({
     category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
     message:
       `The harness environment artifact${unknown ? ` of type "${unknown}"` : ""} was omitted because ` +
-      "its service payload was unknown or incomplete.",
+      "the service payload is not a container configuration.",
   });
   return undefined;
 }

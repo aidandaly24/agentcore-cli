@@ -23,15 +23,12 @@ const HARNESS_TEST_CASES: HarnessTestCase[] = [
   },
   {
     name: "disabled_memory",
-    addFlags: ["--memory", JSON.stringify({ disabled: {} })],
+    addFlags: ["--memory", JSON.stringify({ mode: "disabled" })],
     invokeFlags: ["--prompt", "Reply with a short greeting."],
   },
   {
     name: "semantic_memory",
-    addFlags: [
-      "--memory",
-      JSON.stringify({ managedMemoryConfiguration: { strategies: ["SEMANTIC"] } }),
-    ],
+    addFlags: ["--memory", JSON.stringify({ mode: "managed", strategies: ["SEMANTIC"] })],
     invokeFlags: ["--prompt", "Reply with a short greeting."],
   },
   {
