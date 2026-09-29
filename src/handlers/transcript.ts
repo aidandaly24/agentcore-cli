@@ -2,7 +2,7 @@ import type {
   HarnessTokenUsage,
   InvokeHarnessStreamOutput,
 } from "@aws-sdk/client-bedrock-agentcore";
-import type { ExecItem } from "../../exec";
+import type { ExecItem } from "./exec";
 
 // The transcript reducer folds a harness invocation's stream events into a flat
 // list of display items. It is pure data-in/data-out (no React, no IO), so the

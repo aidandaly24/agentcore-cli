@@ -23,7 +23,7 @@ import {
   turnSummary,
   type TranscriptItem,
   type Turn,
-} from "../handlers/harness/invoke/transcript";
+} from "../handlers/transcript";
 
 const theme = darkTheme;
 

@@ -1,6 +1,12 @@
 import type { CoreOptions } from "../../../core/types";
 import type { CoreHarnessClient } from "../types";
-import { applyEvent, finishTurn, newSessionId, newTurn, type TranscriptItem } from "./transcript";
+import {
+  applyEvent,
+  finishTurn,
+  newSessionId,
+  newTurn,
+  type TranscriptItem,
+} from "../../transcript";
 
 export type HarnessInvokeResult = {
   sessionId: string;
