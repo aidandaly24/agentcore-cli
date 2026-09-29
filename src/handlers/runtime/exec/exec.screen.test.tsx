@@ -1,25 +1,29 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { InvokeAgentRuntimeCommandRequest } from "@aws-sdk/client-bedrock-agentcore";
+import type {
+  InvokeAgentRuntimeCommandRequest,
+  InvokeAgentRuntimeCommandStreamOutput,
+} from "@aws-sdk/client-bedrock-agentcore";
 import type { GetAgentRuntimeResponse } from "@aws-sdk/client-bedrock-agentcore-control";
 import {
   cleanupScreens,
-  renderImperativeScreen,
+  renderScreen,
+  StreamController,
   TestCoreClient,
+  waitFor,
   waitForText,
 } from "../../../testing";
-import { RuntimeExecLaunchContextKey } from "./launchContext";
 
 afterEach(cleanupScreens);
 const ID = "checkout-AbCdEf1234";
 const ARN = `arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/${ID}`;
 const PATH = `/agentcore/runtime/exec/${ID}`;
+const SESSION = "12345678-1234-1234-1234-123456789012";
 
 function core() {
   const value = new TestCoreClient();
   value.runtime.setGetResponse({
     agentRuntimeId: ID,
     agentRuntimeArn: ARN,
-    status: "READY",
   } as GetAgentRuntimeResponse);
   value.runtime.setListResponse({
     agentRuntimes: [
@@ -52,72 +56,105 @@ function core() {
   );
   return value;
 }
+const calls = (value: TestCoreClient) =>
+  value.runtime.calls.filter(({ method }) => method === "invokeAgentRuntimeCommand");
+async function run(screen: ReturnType<typeof renderScreen>, command: string) {
+  await screen.write(command);
+  await screen.press("return");
+}
 
-describe("Runtime exec routing", () => {
-  test("selects a Runtime and endpoint before opening the shared exec-only console", async () => {
-    const screen = renderImperativeScreen("/agentcore/runtime/exec", { core: core() });
-    await waitForText(screen.lastFrame, ID);
+describe("Runtime exec TUI", () => {
+  test("opens from Runtime details without the standalone gate, reuses its session, and returns", async () => {
+    const value = core();
+    const screen = renderScreen(`/agentcore/runtime/get/${ID}`, { core: value });
+    await waitForText(screen.lastFrame, "run a shell command");
+    for (let i = 0; i < 5; i++) await screen.press("down");
     await screen.press("return");
     await waitForText(screen.lastFrame, "DEFAULT");
     await screen.press("return");
     await waitForText(screen.lastFrame, "run a command");
-    await screen.write("\x05");
-    expect(screen.lastFrame()).not.toContain("chat mode");
-    expect(screen.lastFrame()).toContain("run a command");
+    await run(screen, "pwd");
+    await waitForText(screen.lastFrame, "hello");
+    value.runtime.setExecEvents({ chunk: { contentStop: { status: "COMPLETED", exitCode: 2 } } });
+    await run(screen, "false");
+    await waitForText(screen.lastFrame, "exit 2");
+    const [first, second] = calls(value).map(
+      ({ args }) => args[0] as InvokeAgentRuntimeCommandRequest,
+    );
+    expect(first).toMatchObject({
+      agentRuntimeArn: ARN,
+      qualifier: "DEFAULT",
+      body: { command: "pwd" },
+    });
+    expect(second!.runtimeSessionId).toBe(first!.runtimeSessionId);
+    expect(value.harness.calls).toEqual([]);
     await screen.press("escape");
-    await waitForText(screen.lastFrame, "choose an endpoint");
-    await screen.press("escape");
-    await waitForText(screen.lastFrame, "choose a Runtime");
+    await waitForText(screen.lastFrame, "show the full JSON definition");
   });
 
-  test("retains CLI session and timeout through endpoint selection", async () => {
+  test("keeps CLI session and timeout through endpoint selection and starts fresh on endpoint changes", async () => {
     const value = core();
-    const session = "session-012345678901234567890123456789";
-    const screen = renderImperativeScreen(PATH, {
-      core: value,
-      withContext: (ctx) =>
-        ctx.withValue(RuntimeExecLaunchContextKey, {
-          runtimeId: ID,
-          runtimeSessionId: session,
-          timeout: 60,
-        }),
-    });
-    await waitForText(screen.lastFrame, "prod");
-    await screen.press("down");
+    const screen = renderScreen(`${PATH}?session-id=${SESSION}&timeout=60`, { core: value });
+    await waitForText(screen.lastFrame, "DEFAULT");
     await screen.press("return");
-    await waitForText(screen.lastFrame, `session: ${session}`);
-    await screen.write("pwd");
-    await screen.press("return");
+    await waitForText(screen.lastFrame, `session: ${SESSION}`);
+    await run(screen, "pwd");
     await waitForText(screen.lastFrame, "hello");
-    const call = value.runtime.calls.find(({ method }) => method === "invokeAgentRuntimeCommand")!;
-    expect(call.args[0]).toMatchObject({
-      runtimeSessionId: session,
-      qualifier: "prod",
+    expect(calls(value)[0]!.args[0]).toMatchObject({
+      runtimeSessionId: SESSION,
       body: { command: "pwd", timeout: 60 },
     });
-    expect(value.runtime.calls.some(({ method }) => method === "listRuntimes")).toBe(false);
-  });
-
-  test("switching endpoints starts a fresh session and clears the transcript", async () => {
-    const value = core();
-    const screen = renderImperativeScreen(`${PATH}/DEFAULT`, { core: value });
-    await waitForText(screen.lastFrame, "run a command");
-    await screen.write("ls");
-    await screen.press("return");
-    await waitForText(screen.lastFrame, "hello");
+    await screen.write("\x14");
+    await waitForText(screen.lastFrame, "prod");
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "$ pwd");
     await screen.write("\x14");
     await waitForText(screen.lastFrame, "prod");
     await screen.press("down");
     await screen.press("return");
     await waitForText(screen.lastFrame, "qualifier: prod");
-    expect(screen.lastFrame()).not.toContain("$ ls");
-    await screen.write("pwd");
-    await screen.press("return");
+    expect(screen.lastFrame()).not.toContain("$ pwd");
+    await run(screen, "ls");
     await waitForText(screen.lastFrame, "hello");
-    const [first, second] = value.runtime.calls
-      .filter(({ method }) => method === "invokeAgentRuntimeCommand")
-      .map(({ args }) => args[0] as InvokeAgentRuntimeCommandRequest);
-    expect(second!.qualifier).toBe("prod");
-    expect(second!.runtimeSessionId).not.toBe(first!.runtimeSessionId);
+    expect(calls(value)[1]!.args[0]).toMatchObject({ qualifier: "prod" });
+    expect(
+      (calls(value)[1]!.args[0] as InvokeAgentRuntimeCommandRequest).runtimeSessionId,
+    ).not.toBe(SESSION);
+  });
+
+  test("interrupts streamed commands, preserves the next draft, and aborts on unmount", async () => {
+    const value = core();
+    const stream = new StreamController<InvokeAgentRuntimeCommandStreamOutput>();
+    value.runtime.queueExecStream(stream);
+    const screen = renderScreen(`${PATH}/DEFAULT`, { core: value });
+    await waitForText(screen.lastFrame, "run a command");
+    await run(screen, "sleep 99");
+    await waitForText(screen.lastFrame, "working");
+    stream.emit({ chunk: { contentDelta: { stdout: "partial" } } });
+    await waitForText(screen.lastFrame, "partial");
+    await run(screen, "pwd");
+    expect(calls(value)).toHaveLength(1);
+    await screen.press("escape");
+    await waitForText(screen.lastFrame, "interrupted");
+    expect((calls(value)[0]!.args[2] as AbortSignal).aborted).toBe(true);
+    value.runtime.queueExecStream(new StreamController<InvokeAgentRuntimeCommandStreamOutput>());
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "working");
+    screen.unmount();
+    await waitFor(() => (calls(value)[1]!.args[2] as AbortSignal).aborted);
+  });
+
+  test("selects a Runtime and keeps long commands editable in a narrow terminal", async () => {
+    const screen = renderScreen("/agentcore/runtime/exec", { core: core() });
+    await waitForText(screen.lastFrame, ID);
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "DEFAULT");
+    await screen.press("return");
+    await waitForText(screen.lastFrame, "run a command");
+    await screen.resize(60, 20);
+    await screen.write(`printf '${"long-command-".repeat(12)}visible-tail'`);
+    expect(screen.lastFrame()).toContain("visible-tail'");
+    expect(screen.lastFrame()).toContain("session:");
+    expect(screen.lastFrame()!.split("\n")).toHaveLength(20);
   });
 });

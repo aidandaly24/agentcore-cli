@@ -24,12 +24,6 @@ const ACTIONS = [
     returnsToDetails: true,
   },
   {
-    name: "exec",
-    description: "run a shell command",
-    to: (id: string) => `/agentcore/runtime/exec/${encodeURIComponent(id)}`,
-    returnsToDetails: true,
-  },
-  {
     name: "endpoints",
     description: "list this Runtime's endpoints",
     to: (id: string) => `/agentcore/runtime/endpoint/list/${encodeURIComponent(id)}`,
@@ -38,6 +32,12 @@ const ACTIONS = [
     name: "versions",
     description: "list immutable Runtime versions",
     to: (id: string) => `/agentcore/runtime/version/list/${encodeURIComponent(id)}`,
+  },
+  {
+    name: "exec",
+    description: "run a shell command",
+    to: (id: string) => `/agentcore/runtime/exec/${encodeURIComponent(id)}`,
+    returnsToDetails: true,
   },
 ] as const;
 
