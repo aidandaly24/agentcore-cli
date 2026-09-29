@@ -4,11 +4,22 @@ import {
   DEFAULT_AUTO_PAYMENT,
   DEFAULT_SPEND_LIMIT,
   PaymentAuthorizerTypeSchema,
+  PaymentManagerSchema,
   PaymentSpendLimitSchema,
 } from "../../../../projectSchemas/payment";
 import { createHandler, flag, ProjectKey } from "../../../../router";
+import type { AddResourceInput } from "../../types";
 import type { AddProjectResourceConfig } from "../types";
 import { addProjectResource } from "../shared";
+
+export function toAddPaymentManagerInput(
+  input: z.input<typeof PaymentManagerSchema>,
+): AddResourceInput {
+  const result = PaymentManagerSchema.safeParse(input);
+  if (!result.success)
+    throw new InputValidationError(z.prettifyError(result.error), { cause: result.error });
+  return { resourceType: "payment-manager", resourceConfig: result.data };
+}
 
 export const createAddPaymentManagerHandler = (config: AddProjectResourceConfig) =>
   createHandler({
@@ -83,30 +94,27 @@ export const createAddPaymentManagerHandler = (config: AddProjectResourceConfig)
         ctx,
         config,
         project,
-        {
-          resourceType: "payment-manager",
-          resourceConfig: {
-            name: flags.name,
-            authorizerType: flags["authorizer-type"],
-            authorizerConfiguration:
-              flags["authorizer-type"] === "CUSTOM_JWT"
-                ? {
-                    customJWTAuthorizer: {
-                      discoveryUrl: flags["discovery-url"]!,
-                      allowedClients: flags["allowed-clients"],
-                      allowedAudience: flags["allowed-audience"],
-                      allowedScopes: flags["allowed-scopes"],
-                    },
-                  }
-                : undefined,
-            connectors: [],
-            description: flags.description,
-            autoPayment: flags["auto-payment"],
-            defaultSpendLimit: flags["default-spend-limit"],
-            paymentToolAllowlist: flags["tool-allowlist"],
-            networkPreferences: flags["network-preferences"],
-          },
-        },
+        toAddPaymentManagerInput({
+          name: flags.name,
+          authorizerType: flags["authorizer-type"],
+          authorizerConfiguration:
+            flags["authorizer-type"] === "CUSTOM_JWT"
+              ? {
+                  customJWTAuthorizer: {
+                    discoveryUrl: flags["discovery-url"]!,
+                    allowedClients: flags["allowed-clients"],
+                    allowedAudience: flags["allowed-audience"],
+                    allowedScopes: flags["allowed-scopes"],
+                  },
+                }
+              : undefined,
+          connectors: [],
+          description: flags.description,
+          autoPayment: flags["auto-payment"],
+          defaultSpendLimit: flags["default-spend-limit"],
+          paymentToolAllowlist: flags["tool-allowlist"],
+          networkPreferences: flags["network-preferences"],
+        }),
         `added payment manager '${flags.name}' to '${project.name}'`,
         { notes },
       );
