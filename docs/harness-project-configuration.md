@@ -525,7 +525,8 @@ timeoutSeconds: 300
 `maxIterations` limits agent-loop iterations, `maxTokens` limits total output
 tokens, and `timeoutSeconds` limits invocation duration in seconds. Each is a
 positive integer. Omitting one sends no override, not a promise of unlimited
-execution. These limits are separate from `model.maxTokens` and session lifetime.
+execution. These limits are separate from `maxTokens` inside the selected model
+configuration and from session lifetime.
 See [Harness limits](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/harness-operations.html#harness-limits)
 for service defaults and quotas.
 
