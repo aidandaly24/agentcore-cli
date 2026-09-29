@@ -85,6 +85,9 @@ From `agentcore status`, select a deployed Runtime and choose **exec** to run sh
 commands in its container. This is a command-by-command console, not a PTY; use
 **shell** for an interactive terminal.
 
+Runtime and Harness share the command console and execution behavior. Harness
+also supports switching between commands and agent chat within the same session.
+
 For direct CLI access, enable standalone resource commands:
 
 ```bash
