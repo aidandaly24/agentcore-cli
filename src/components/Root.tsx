@@ -42,6 +42,7 @@ import { MemoryScreen } from "../handlers/memory/screen.tsx";
 import { MemoryGetJsonScreen, MemoryGetScreen } from "../handlers/memory/get/screen.tsx";
 import { MemoryListScreen } from "../handlers/memory/list/screen.tsx";
 import { RuntimeInvokeScreen } from "../handlers/runtime/invoke/screen.tsx";
+import { RuntimeInvokeLaunchSessionContext } from "../handlers/runtime/invoke/launchContext.ts";
 import { RuntimeShellScreen } from "../handlers/runtime/shell/screen.tsx";
 import { EvalScreen } from "../handlers/eval/screen.tsx";
 import { EvaluatorScreen } from "../handlers/eval/evaluator/screen.tsx";
@@ -158,15 +159,23 @@ export function Root({ path, ctx, core, queryClient }: RootProps) {
   // across re-renders (a fresh client would drop the cache and refetch). An
   // injected client (tests) takes precedence.
   const [defaultQueryClient] = useState(() => new QueryClient());
+  const [launchSessionConsumed, setLaunchSessionConsumed] = useState(false);
   const client = queryClient ?? defaultQueryClient;
 
   return (
     <QueryClientProvider client={client}>
-      {/* initialEntries seeds the in-memory history with the CLI command path,
-          then leaves navigation to the router so screens can useNavigate. */}
-      <MemoryRouter initialEntries={[path]}>
-        <PinnedRegion ctx={ctx} core={core} />
-      </MemoryRouter>
+      <RuntimeInvokeLaunchSessionContext.Provider
+        value={{
+          consumed: launchSessionConsumed,
+          consume: () => setLaunchSessionConsumed(true),
+        }}
+      >
+        {/* initialEntries seeds the in-memory history with the CLI command path,
+            then leaves navigation to the router so screens can useNavigate. */}
+        <MemoryRouter initialEntries={[path]}>
+          <PinnedRegion ctx={ctx} core={core} />
+        </MemoryRouter>
+      </RuntimeInvokeLaunchSessionContext.Provider>
     </QueryClientProvider>
   );
 }
