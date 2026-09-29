@@ -6,7 +6,7 @@ import { coreOptsFromCtx } from "../../utils.tsx";
 import { JsonKey } from "../../keys.tsx";
 import { JsonRendererKey, renderTuiAt } from "../../../tui";
 import { InputValidationError } from "../../../errors";
-import { applyExecEvent, finishExec, newExecItem } from "../invoke/transcript.tsx";
+import { applyExecEvent, finishExec, newExecItem } from "../../exec";
 
 export const createExecHarnessHandler = (core: Core, io: AppIO) =>
   createHandler({

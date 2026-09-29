@@ -7,6 +7,8 @@ import type { ScreenProps } from "../../types";
 import { coreOptsFromCtx } from "../../utils";
 import { HarnessPicker } from "../../../components/HarnessPicker";
 import { HarnessEndpointPicker } from "../../../components/HarnessEndpointPicker";
+import { ExecOutput } from "../../../components/ExecOutput";
+import { applyExecEvent, finishExec, newExecItem } from "../../exec";
 import { Layout } from "../../../components/Layout";
 import { Divider } from "../../../components/ui/divider";
 import { Markdown } from "../../../components/ui/markdown";
@@ -16,10 +18,7 @@ import { TextInput } from "../../../components/ui/text-input";
 import { darkTheme, glyphs } from "../../../components/ui/_core.js";
 import {
   applyEvent,
-  applyExecEvent,
-  finishExec,
   finishTurn,
-  newExecItem,
   newSessionId,
   newTurn,
   turnSummary,
@@ -459,29 +458,7 @@ function ItemView({ item, width }: { item: TranscriptItem; width: number }) {
       );
     }
     case "exec":
-      return (
-        <Box flexDirection="column">
-          <Box>
-            <Text color={theme.colors.text}>$ </Text>
-            <Box width={width - 4}>
-              <Text color={theme.colors.text}>{item.command}</Text>
-            </Box>
-          </Box>
-          {item.output !== "" || item.status === "running" ? (
-            <Box paddingLeft={2} width={width - 2}>
-              <Text color={item.status === "error" ? theme.colors.error : theme.colors.muted}>
-                {item.output.trimEnd()}
-                {item.status === "running" ? "▌" : ""}
-              </Text>
-            </Box>
-          ) : null}
-          {item.status === "error" && item.exitCode !== undefined && item.exitCode !== 0 ? (
-            <Box paddingLeft={2}>
-              <Text color={theme.colors.error}>exit {item.exitCode}</Text>
-            </Box>
-          ) : null}
-        </Box>
-      );
+      return <ExecOutput item={item} width={width} />;
     case "error":
       return (
         <Text color={theme.colors.error}>

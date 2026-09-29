@@ -1,8 +1,8 @@
 import type {
   HarnessTokenUsage,
-  InvokeAgentRuntimeCommandStreamOutput,
   InvokeHarnessStreamOutput,
 } from "@aws-sdk/client-bedrock-agentcore";
+import type { ExecItem } from "../../exec";
 
 // The transcript reducer folds a harness invocation's stream events into a flat
 // list of display items. It is pure data-in/data-out (no React, no IO), so the
@@ -32,19 +32,11 @@ export type TranscriptItem =
     }
   // A shell command run in the harness's runtime container (exec mode).
   // `output` interleaves stdout and stderr in arrival order.
-  | {
-      kind: "exec";
-      command: string;
-      output: string;
-      exitCode?: number;
-      status: "running" | "success" | "error";
-    }
+  | ExecItem
   // A stream-borne or transport error.
   | { kind: "error"; message: string }
   // An informational line (turn summary, abnormal stop, interruption).
   | { kind: "notice"; text: string };
-
-export type ExecItem = Extract<TranscriptItem, { kind: "exec" }>;
 
 // Turn is the reducer state for a single invocation. `blocks` maps the current
 // message's contentBlockIndex to the item it feeds — indexes are scoped per
@@ -235,55 +227,4 @@ export function turnSummary(turn: Turn): string {
   if (turn.usage?.totalTokens !== undefined) parts.push(`${turn.usage.totalTokens} tokens`);
   if (turn.latencyMs !== undefined) parts.push(`${(turn.latencyMs / 1000).toFixed(1)}s`);
   return parts.join(" · ");
-}
-
-// ─── exec (InvokeAgentRuntimeCommand) ─────────────────────────────────────────
-
-export function newExecItem(command: string): ExecItem {
-  return { kind: "exec", command, output: "", status: "running" };
-}
-
-// appendLine adds `text` on its own line of the exec output.
-function appendLine(item: ExecItem, text: string): void {
-  if (item.output !== "" && !item.output.endsWith("\n")) item.output += "\n";
-  item.output += text + "\n";
-}
-
-// applyExecEvent folds one command-stream event into the exec item, mutating it
-// in place: output deltas accumulate, the stop event settles the exit code, and
-// stream-borne errors fail the item with the message in its output. Unknown
-// events are ignored.
-export function applyExecEvent(item: ExecItem, event: InvokeAgentRuntimeCommandStreamOutput): void {
-  if (event.chunk) {
-    const { contentDelta, contentStop } = event.chunk;
-    if (contentDelta) {
-      item.output += (contentDelta.stdout ?? "") + (contentDelta.stderr ?? "");
-    }
-    if (contentStop) {
-      item.exitCode = contentStop.exitCode;
-      if (contentStop.status === "TIMED_OUT") appendLine(item, "command timed out");
-      item.status =
-        contentStop.status === "COMPLETED" && contentStop.exitCode === 0 ? "success" : "error";
-    }
-    return;
-  }
-
-  const error =
-    event.validationException ??
-    event.accessDeniedException ??
-    event.resourceNotFoundException ??
-    event.serviceQuotaExceededException ??
-    event.throttlingException ??
-    event.internalServerException ??
-    event.runtimeClientError;
-  if (error) {
-    item.status = "error";
-    appendLine(item, error.message ?? String(error));
-  }
-}
-
-// finishExec settles an exec item whose stream ended (or was aborted) without a
-// contentStop: a command with no exit code did not complete.
-export function finishExec(item: ExecItem): void {
-  if (item.status === "running") item.status = "error";
 }

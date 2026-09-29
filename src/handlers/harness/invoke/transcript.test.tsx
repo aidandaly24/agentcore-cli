@@ -5,17 +5,14 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore";
 import {
   applyEvent,
-  applyExecEvent,
   compactJson,
-  finishExec,
   finishTurn,
-  newExecItem,
   newSessionId,
   newTurn,
   turnSummary,
-  type ExecItem,
   type Turn,
 } from "./transcript";
+import { applyExecEvent, finishExec, newExecItem, type ExecItem } from "../../exec";
 
 // Unit tests for the pure transcript reducer: stream events in, display items
 // out. Event literals mirror the SDK's InvokeHarnessStreamOutput union members.
