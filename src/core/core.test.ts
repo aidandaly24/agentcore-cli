@@ -465,24 +465,47 @@ test("invokeHarness stream iteration rejects promptly when aborted mid-stream", 
   expect(pending).rejects.toMatchObject({ name: "AbortError" });
 });
 
-test("invokeAgentRuntimeCommand sends the command on the data client with the abort signal", async () => {
-  const sent: { command: unknown; options: unknown }[] = [];
-  const core = coreWithDataSend(async (command, options) => {
-    sent.push({ command, options });
-    return { statusCode: 200, stream: undefined };
-  });
+test.each(["harness", "runtime"] as const)(
+  "%s invokeAgentRuntimeCommand sends the command on the data client with the abort signal",
+  async (kind) => {
+    const sent: { command: unknown; options: unknown }[] = [];
+    const core = coreWithDataSend(async (command, options) => {
+      sent.push({ command, options });
+      return { statusCode: 200, stream: undefined };
+    });
 
-  const request = {
-    agentRuntimeArn: "arn:aws:bedrock-agentcore:us-east-1:123:harness/h-1",
-    body: { command: "ls" },
-  };
+    const request = {
+      agentRuntimeArn: `arn:aws:bedrock-agentcore:us-east-1:123:${kind}/h-1`,
+      body: { command: "ls" },
+    };
+    const controller = new AbortController();
+    await core[kind].invokeAgentRuntimeCommand(request, { region: "us-east-1" }, controller.signal);
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.command).toBeInstanceOf(InvokeAgentRuntimeCommandCommand);
+    expect((sent[0]!.command as InvokeAgentRuntimeCommandCommand).input).toEqual(request);
+    expect(sent[0]!.options).toEqual({ abortSignal: controller.signal });
+  },
+);
+
+test("Runtime exec aborts an established command stream", async () => {
+  const core = coreWithDataSend(async () => ({
+    stream: (async function* () {
+      yield { chunk: { contentDelta: { stdout: "first" } } };
+      await new Promise(() => {});
+    })(),
+  }));
   const controller = new AbortController();
-  await core.harness.invokeAgentRuntimeCommand(request, { region: "us-east-1" }, controller.signal);
-
-  expect(sent).toHaveLength(1);
-  expect(sent[0]!.command).toBeInstanceOf(InvokeAgentRuntimeCommandCommand);
-  expect((sent[0]!.command as InvokeAgentRuntimeCommandCommand).input).toEqual(request);
-  expect(sent[0]!.options).toEqual({ abortSignal: controller.signal });
+  const response = await core.runtime.invokeAgentRuntimeCommand(
+    { agentRuntimeArn: "arn", body: { command: "ls" } },
+    { region: "us-east-1" },
+    controller.signal,
+  );
+  const iterator = response.stream![Symbol.asyncIterator]();
+  expect((await iterator.next()).value).toEqual({ chunk: { contentDelta: { stdout: "first" } } });
+  const pending = iterator.next();
+  controller.abort();
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
 });
 
 test("invokeRuntime maps all modeled IAM fields and response metadata", async () => {
