@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ServiceException } from "@smithy/core/client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Box, Text, useInput, useWindowSize } from "ink";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router";
@@ -18,7 +18,11 @@ import { Spinner } from "../../../components/ui/spinner";
 import type { RuntimeInvokeResponse } from "../types";
 import { normalizeRuntimeInvokeRequest } from "./request";
 import { classifyRuntimeResponse } from "./response";
-import { RuntimeInvokeLaunchContextKey, type RuntimeInvokeLaunchContext } from "./launchContext";
+import {
+  RuntimeInvokeLaunchContextKey,
+  RuntimeInvokeLaunchSessionContext,
+  type RuntimeInvokeLaunchContext,
+} from "./launchContext";
 
 const theme = darkTheme;
 
@@ -28,7 +32,6 @@ type TargetPickerState = { stage: "runtime" } | { stage: "endpoint"; runtimeId: 
 
 type RuntimeInvokeLocationState = {
   returnOnEscape?: boolean;
-  resetLaunchSession?: boolean;
 };
 
 type ErrorDetails = {
@@ -97,16 +100,16 @@ export function RuntimeInvokeScreen(props: ScreenProps) {
   const { runtimeId, qualifier } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const launchSession = useContext(RuntimeInvokeLaunchSessionContext);
   const launchContext = props.ctx.value(RuntimeInvokeLaunchContextKey);
-  const locationState = location.state as RuntimeInvokeLocationState | null;
   const initialContext =
     launchContext !== undefined && launchContext.runtimeId === runtimeId
-      ? locationState?.resetLaunchSession
-        ? { ...launchContext, runtimeSessionId: undefined }
-        : launchContext
+      ? {
+          ...launchContext,
+          runtimeSessionId: launchSession.consumed ? undefined : launchContext.runtimeSessionId,
+        }
       : undefined;
-  const returnOnEscape = locationState?.returnOnEscape;
-  const resetState = locationState?.resetLaunchSession ? { resetLaunchSession: true } : undefined;
+  const returnOnEscape = (location.state as RuntimeInvokeLocationState | null)?.returnOnEscape;
 
   if (!runtimeId) {
     return (
@@ -114,7 +117,7 @@ export function RuntimeInvokeScreen(props: ScreenProps) {
         {...props}
         breadcrumb={["agentcore", "runtime", "invoke"]}
         description="choose a Runtime to invoke"
-        onSelect={(id) => navigate(invokePath(id), { state: resetState })}
+        onSelect={(id) => navigate(invokePath(id))}
       />
     );
   }
@@ -129,12 +132,12 @@ export function RuntimeInvokeScreen(props: ScreenProps) {
         onSelect={(selected) =>
           navigate(invokePath(runtimeId, selected), {
             replace: returnOnEscape === true,
-            state: locationState ?? undefined,
+            state: returnOnEscape ? { returnOnEscape } : undefined,
           })
         }
         onEscape={() => {
           if (returnOnEscape) navigate(-1);
-          else navigate(invokePath(), { state: resetState });
+          else navigate(invokePath());
         }}
       />
     );
@@ -170,6 +173,7 @@ export function RuntimeInvokeConsole({
 }: RuntimeInvokeConsoleProps) {
   const opts = coreOptsFromCtx(ctx);
   const navigate = useNavigate();
+  const launchSession = useContext(RuntimeInvokeLaunchSessionContext);
   const { columns, rows } = useWindowSize();
   const [target, setTarget] = useState({ runtimeId, qualifier });
   const [targetPicker, setTargetPicker] = useState<TargetPickerState | null>(null);
@@ -320,13 +324,12 @@ export function RuntimeInvokeConsole({
       }
       if (key.escape) {
         if (abortRef.current) abortRef.current.abort();
-        else if (onBack) onBack();
-        else if (returnOnEscape) navigate(-1);
-        else
-          navigate(invokePath(target.runtimeId), {
-            replace: true,
-            state: { resetLaunchSession: true },
-          });
+        else {
+          if (initialContext?.runtimeSessionId) launchSession.consume();
+          if (onBack) onBack();
+          else if (returnOnEscape) navigate(-1);
+          else navigate(invokePath(target.runtimeId), { replace: true });
+        }
         return;
       }
       const view = scrollRef.current;
