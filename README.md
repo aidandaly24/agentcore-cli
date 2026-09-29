@@ -79,6 +79,34 @@ Global flags (declared at the root, available on every command):
 
 Run `agentcore --version` to check the installed CLI version.
 
+### Runtime Commands
+
+From `agentcore status`, select a deployed Runtime and choose **exec** to run shell
+commands in its container. This is a command-by-command console, not a PTY; use
+**shell** for an interactive terminal.
+
+For direct CLI access, enable standalone resource commands:
+
+```bash
+agentcore config imperative-commands true
+agentcore runtime exec --id MyAgent-AbCdEf1234 --command "pwd"
+agentcore runtime exec --id MyAgent-AbCdEf1234 --qualifier DEFAULT
+```
+
+With `--command`, exec returns JSON containing the command, combined stdout/stderr,
+status, exit code when available, and session ID. Like Harness exec, a failed remote
+command is reported in the JSON result. Without `--command`, it opens the console;
+omitting `--id` as well opens the Runtime picker. `--json` requires `--command`.
+
+Use `--session-id` to reuse a Runtime session and `--timeout` for a command timeout
+of 1-3600 seconds. These settings also carry into the console. Commands within the
+console reuse one session; switching endpoints starts a new session. Escape
+interrupts the local stream while a command is running, or returns when idle.
+Interrupting the stream does not guarantee the remote process has stopped.
+
+Exec uses AWS credentials and requires `bedrock-agentcore:GetAgentRuntime` and
+`bedrock-agentcore:InvokeAgentRuntimeCommand`. Select a profile with `AWS_PROFILE`.
+
 ## Extending the CDK app
 
 `agentcore/cdk/` has two source files. `bin/cdk.ts` reads the project once
