@@ -807,7 +807,7 @@ function ModelStep({
         ))}
       {error && <Text color={theme.colors.error}>{error}</Text>}
       {provider.kind !== "default" && (
-        <Text color={theme.colors.info}>
+        <Text color={theme.colors.primary}>
           use the command line to pass additional params, e.g.,{" "}
           <Text color={theme.colors.primary}>agentcore harness create --name …</Text>
         </Text>
