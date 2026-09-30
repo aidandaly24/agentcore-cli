@@ -64,6 +64,28 @@ function menuGroups(frame: string): { title: string | undefined; names: string[]
 // rendered frames — behavior a user would see, not internal state.
 
 describe("menu rendering", () => {
+  test.each([
+    "/agentcore/log",
+    "/agentcore/traces",
+    "/agentcore/harness/traces",
+    "/agentcore/runtime/traces",
+    "/agentcore/payment",
+    "/agentcore/payment/connector",
+    "/agentcore/payment/manager",
+    "/agentcore/payment/session",
+    "/agentcore/payment/instrument",
+  ])("%s has no extra divider above a CLI-only menu", async (path) => {
+    const r = renderScreen(path, { withContext: inProjectContext });
+    await waitForText(r.lastFrame, "type to choose a command");
+
+    const frame = r.lastFrame()!;
+    const lines = frame.split("\n");
+    const filterRow = lines.findIndex((line) => /^\s*\/ /.test(line));
+    expect(lines[filterRow + 2]).toMatch(/^\s*❯ /);
+    expect(hasCliDivider(frame)).toBe(false);
+    r.unmount();
+  });
+
   test("CLI-only command names use the same white and focused colors as other commands", () => {
     // A separate process keeps ANSI enabled without changing the plain-text screen tests.
     const result = spawnSync(
@@ -316,6 +338,21 @@ describe("narrow terminals", () => {
 });
 
 describe("filtering", () => {
+  test("removes the CLI-only divider when filtering leaves only that group and restores it", async () => {
+    const r = renderScreen("/agentcore");
+    await waitForText(r.lastFrame, "❯ create");
+    expect(hasCliDivider(r.lastFrame()!)).toBe(true);
+
+    await r.write("feedback");
+    await waitForText(r.lastFrame, "❯ feedback");
+    expect(hasCliDivider(r.lastFrame()!)).toBe(false);
+
+    for (const _ of "feedback") await r.press("backspace");
+    await waitForText(r.lastFrame, "❯ create");
+    expect(hasCliDivider(r.lastFrame()!)).toBe(true);
+    r.unmount();
+  });
+
   test("typing narrows the options to matches", async () => {
     const r = renderScreen("/agentcore/harness");
     await waitForText(r.lastFrame, "list");
@@ -432,6 +469,18 @@ describe("navigation", () => {
 
 describe("short terminals", () => {
   const ROWS = 15;
+
+  test("does not reserve a row for a redundant CLI-only divider", async () => {
+    const r = renderScreen("/agentcore/log", { withContext: inProjectContext });
+    await waitForText(r.lastFrame, "❯ runtime");
+    await r.resize(100, 8);
+
+    expect(r.lastFrame()).toContain("❯ runtime");
+    expect(r.lastFrame()).toContain("harness");
+    expect(r.lastFrame()).not.toContain("more");
+    expect(hasCliDivider(r.lastFrame()!)).toBe(false);
+    r.unmount();
+  });
 
   // fullMenu renders the root menu at the default height, where every option fits.
   async function fullMenu() {
