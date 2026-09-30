@@ -195,6 +195,7 @@ This reference was generated from `agentcore --help` for version `1.0.0-rc.4`.
     - [`agentcore payment connector`](#agentcore-payment-connector)
       - [`agentcore payment connector get`](#agentcore-payment-connector-get)
       - [`agentcore payment connector list`](#agentcore-payment-connector-list)
+      - [`agentcore payment connector rotate-credentials`](#agentcore-payment-connector-rotate-credentials)
     - [`agentcore payment session`](#agentcore-payment-session)
       - [`agentcore payment session get`](#agentcore-payment-session-get)
       - [`agentcore payment session list`](#agentcore-payment-session-list)
@@ -2844,6 +2845,21 @@ list the connectors of a payment manager
 - `--manager-id <manager-id>`: the parent payment manager ID (required)
 - `--next-token <next-token>`: pagination token returned by a previous request
 - `--max-results <max-results>`: maximum number of items to return
+
+##### `agentcore payment connector rotate-credentials`
+
+```text
+agentcore payment connector rotate-credentials [options]
+```
+
+rotate service-managed credentials for a Quick Create Coinbase connector
+
+**Options**
+
+- `--manager-id <manager-id>`: the parent payment manager ID (required)
+- `--connector-id <connector-id>`: the payment connector ID (required)
+- `--secrets <secrets...>`: credential kinds to rotate: API\_KEY, WALLET\_SECRET, or both (not secret values) (required)
+- `--client-token <client-token>`: idempotency token for this request
 
 #### `agentcore payment session`
 
