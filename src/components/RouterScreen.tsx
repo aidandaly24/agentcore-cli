@@ -64,9 +64,6 @@ interface Option {
   description: string;
   hint?: string;
   notice?: string;
-  // cliOnly marks a subcommand without a screen; it is listed under a divider
-  // and opens its help instead.
-  cliOnly: boolean;
   // section is the divider title this option is listed under, if any.
   section?: string;
 }
@@ -155,14 +152,13 @@ function CommandMenu({
         description: c.description(),
         hint: optionHints?.[c.name()],
         notice: optionNotices?.[c.name()],
-        cliOnly,
         section: belongsToCliSection ? CLI_ONLY_SECTION : sectionOf(index),
       };
     });
     const actualNames = new Set(actual.map((option) => option.name));
     const tuiOnly = tuiOnlyCommands
       .filter((option) => !actualNames.has(option.name))
-      .map((option): Option => ({ ...option, hint: optionHints?.[option.name], cliOnly: false }));
+      .map((option): Option => ({ ...option, hint: optionHints?.[option.name] }));
     return [
       ...tuiOnly,
       ...actual.filter((option) => option.section !== CLI_ONLY_SECTION),
@@ -362,13 +358,7 @@ function CommandMenuBody({
                   </Text>
                   <Text
                     bold={isHighlighted}
-                    color={
-                      isHighlighted
-                        ? theme.colors.focus
-                        : option.cliOnly
-                          ? theme.colors.muted
-                          : theme.colors.text
-                    }
+                    color={isHighlighted ? theme.colors.focus : theme.colors.text}
                   >
                     {option.name.padEnd(nameWidth)}
                   </Text>

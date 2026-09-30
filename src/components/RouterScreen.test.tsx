@@ -1,4 +1,5 @@
 import { test, expect, describe, afterEach } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { PACKAGE_VERSION } from "../constants";
 import {
   cleanupScreens,
@@ -63,6 +64,52 @@ function menuGroups(frame: string): { title: string | undefined; names: string[]
 // rendered frames — behavior a user would see, not internal state.
 
 describe("menu rendering", () => {
+  test("CLI-only command names use the same white and focused colors as other commands", () => {
+    // A separate process keeps ANSI enabled without changing the plain-text screen tests.
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--eval",
+        `
+          import { renderScreen, waitForText } from "./src/testing/renderScreen.tsx";
+          const frames = [];
+          for (const [path, selected] of [
+            ["/agentcore", "feedback"],
+            ["/agentcore/harness", "logs"],
+          ]) {
+            const screen = renderScreen(path);
+            await waitForText(screen.lastFrame, selected);
+            const idle = screen.lastFrame();
+            await screen.write(selected);
+            frames.push({ idle, focused: screen.lastFrame(), selected });
+            screen.unmount();
+          }
+          process.stdout.write(JSON.stringify(frames));
+        `,
+      ],
+      {
+        cwd: new URL("../../", import.meta.url),
+        env: { ...process.env, FORCE_COLOR: "3", NO_COLOR: undefined, WT_SESSION: "bun-test" },
+        timeout: 10_000,
+        encoding: "utf8",
+      },
+    );
+    expect(result.status).toBe(0);
+    const frames = JSON.parse(result.stdout) as {
+      idle: string;
+      focused: string;
+      selected: string;
+    }[];
+    for (const [index, names] of [
+      ["runtime", "feedback", "config", "update"],
+      ["get", "update", "logs", "traces"],
+    ].entries()) {
+      const frame = frames[index]!;
+      for (const name of names) expect(frame.idle).toContain(`\u001b[37m${name}`);
+      expect(frame.focused).toContain(`\u001b[36m${glyphs.pointer} \u001b[1m${frame.selected}`);
+    }
+  });
+
   test("lists the current command's subcommands with their descriptions", async () => {
     const r = renderScreen("/agentcore");
     await waitForText(r.lastFrame, "No project detected");
