@@ -289,7 +289,10 @@ function CommandMenuBody({
   query,
   onQueryChange,
 }: CommandMenuBodyProps) {
-  const sections = useMemo(() => filtered.map((option) => option.section), [filtered]);
+  const sections = useMemo(() => {
+    const onlyCli = filtered.every((option) => option.section === CLI_ONLY_SECTION);
+    return filtered.map((option) => (onlyCli ? undefined : option.section));
+  }, [filtered]);
   const menuHeight = Math.max(0, contentRows - FILTER_ROWS - alertRows(alert, columns));
   const windowStart = Math.max(0, highlight - Math.floor(menuHeight / 2));
   const view = scrollWindow({

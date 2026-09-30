@@ -39,7 +39,7 @@ function cliOnlyCommands(
 
 const CLI_ONLY = cliOnlyCommands();
 
-describe("menus list command-line-only subcommands below a divider", () => {
+describe("menus separate mixed command groups with a divider", () => {
   test("the root menu", async () => {
     const r = renderScreen("/agentcore", { withContext: inProjectContext });
 
@@ -77,13 +77,14 @@ describe("menus list command-line-only subcommands below a divider", () => {
     r.unmount();
   });
 
-  test("a menu whose every subcommand is command line only", async () => {
+  test("a menu whose every subcommand is command line only has no redundant divider", async () => {
     const r = renderScreen("/agentcore/eval/ondemand");
 
-    await waitFor(() => hasCliDivider(r.lastFrame()!));
+    await waitForText(r.lastFrame, "❯ evaluate");
+    expect(hasCliDivider(r.lastFrame()!)).toBe(false);
     expect(menuEntries(r.lastFrame()!)).toEqual({
-      screens: [],
-      cliOnly: ["evaluate", "simulate"],
+      screens: ["evaluate", "simulate"],
+      cliOnly: [],
     });
     r.unmount();
   });
@@ -133,10 +134,12 @@ describe("every command-line-only command opens on screen", () => {
       const parent = command.parent!;
 
       if (command.commands.length > 0) {
-        // A group opens its own menu, with every child under the divider.
+        // A CLI-only group opens its own menu without a redundant separator.
         await waitForText(r.lastFrame, path.join(" → "));
-        await waitFor(() => hasCliDivider(r.lastFrame()!));
-        expect(menuEntries(r.lastFrame()!).screens).toEqual([]);
+        expect(hasCliDivider(r.lastFrame()!)).toBe(false);
+        expect(menuEntries(r.lastFrame()!).screens).toEqual(
+          command.commands.map((child) => child.name()),
+        );
       } else {
         await waitForText(r.lastFrame, "this command runs from the command line");
         const help = command.createHelp();
