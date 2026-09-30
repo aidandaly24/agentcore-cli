@@ -17,5 +17,7 @@ permissions:
 
 jobs:
   call:
+    # Fork PRs do not receive the AWS credentials required for notifications.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     uses: aws/agentcore-devx-devtools/.github/workflows/reusable-slack-pr-review-notification.yml@626595f508220b53805c86c1b54d089420add4d3
     secrets: inherit
