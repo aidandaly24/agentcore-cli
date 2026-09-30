@@ -88,13 +88,10 @@ test.each([
     "--secrets",
     ...secrets,
     ...(clientToken ? ["--client-token", clientToken] : []),
-    "--endpoint-url",
-    "https://control.example.test",
     "--json",
   ]);
   expect(createControlClient).toHaveBeenCalledWith({
     region: "us-west-2",
-    endpoint: "https://control.example.test",
   });
   expect(send).toHaveBeenCalledTimes(1);
   const command = send.mock.calls[0]![0];
