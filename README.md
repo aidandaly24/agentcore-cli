@@ -180,5 +180,4 @@ declares, not the ones you add in the stack.
 
 - [Amazon Bedrock AgentCore documentation](https://docs.aws.amazon.com/bedrock-agentcore/): service guides and API references.
 - [Harness project configuration](docs/harness-project-configuration.md): Harness YAML, prompts, tools, skills, and environment settings.
-- [Payment connector credentials](docs/payment-connector-credentials.md): credential rotation and its scope.
 - [Contributing](CONTRIBUTING.md): development, builds, architecture, and testing.
