@@ -95,27 +95,6 @@ One-shot commands return JSON output, status, exit code, and session ID.
 Escape interrupts the local stream, not necessarily the remote process.
 Use `runtime shell` for a native interactive terminal.
 
-### Rotate Payment Connector Credentials
-
-Only READY Coinbase Quick Create connectors support credential rotation.
-`--secrets` selects `API_KEY`, `WALLET_SECRET`, or both; it does not accept secret
-values. Rotation uses the connector's existing consent and the caller's
-control-plane IAM permissions, without an application user ID.
-
-```bash
-agentcore payment connector rotate-credentials \
-  --manager-id "$MANAGER_ID" --connector-id "$CONNECTOR_ID" \
-  --secrets API_KEY WALLET_SECRET
-```
-
-The service performs the rotation and returns its result. An optional
-`--client-token` identifies retries of the same request.
-
-Wallet-secret rotation can interrupt wallet operations while the new credential
-is installed. Selecting both credentials rotates the API key first, then the
-wallet secret; this is not atomic. An error does not guarantee that credentials
-are unchanged.
-
 ## Extending the CDK app
 
 `agentcore/cdk/` has two source files. `bin/cdk.ts` reads the project once
@@ -201,4 +180,5 @@ declares, not the ones you add in the stack.
 
 - [Amazon Bedrock AgentCore documentation](https://docs.aws.amazon.com/bedrock-agentcore/): service guides and API references.
 - [Harness project configuration](docs/harness-project-configuration.md): Harness YAML, prompts, tools, skills, and environment settings.
+- [Payment connector credentials](docs/payment-connector-credentials.md): credential rotation and its scope.
 - [Contributing](CONTRIBUTING.md): development, builds, architecture, and testing.
