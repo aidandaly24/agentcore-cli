@@ -66,7 +66,7 @@ export function FormRadioGroup({
           const accentColor = focused
             ? theme.colors.focus
             : selected
-              ? theme.colors.focus
+              ? theme.colors.selection
               : undefined;
           const highlighted = focused || selected;
           return (
@@ -77,7 +77,7 @@ export function FormRadioGroup({
                 </Text>
               </Box>
               <Box width={2} flexShrink={0}>
-                <Text color={selected ? theme.colors.focus : theme.colors.muted}>
+                <Text color={selected ? accentColor : theme.colors.muted}>
                   {selected ? "●" : "○"}
                 </Text>
               </Box>
