@@ -306,11 +306,12 @@ function CommandMenuBody({
   return (
     <Box flexDirection="column" height={contentRows} overflow="hidden">
       <Box paddingX={1} height={1} overflow="hidden" flexShrink={0}>
+        <Text color={theme.colors.focus}>/ </Text>
         <TextInput
           value={query}
           onChange={onQueryChange}
           placeholder={PLACEHOLDER}
-          prompt="/ "
+          prompt=""
           focus={isRawModeSupported}
         />
       </Box>

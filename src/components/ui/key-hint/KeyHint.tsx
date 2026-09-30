@@ -55,7 +55,7 @@ export const KeyHint: React.FC<KeyHintProps> = ({ keys, theme = darkTheme }) => 
     <Box width={columns} height={1} overflow="hidden" gap={ITEM_GAP}>
       {fitKeys(keys, columns).map(({ key, label }) => (
         <Box key={key} flexShrink={0} gap={1}>
-          <Text bold dimColor={key !== "/"} color={key === "/" ? theme.colors.focus : undefined}>
+          <Text bold dimColor>
             [{key}]
           </Text>
           <Text color={theme.colors.muted}>{label}</Text>
