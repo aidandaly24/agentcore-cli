@@ -1,5 +1,7 @@
 FROM public.ecr.aws/docker/library/python:3.12-slim-trixie
 
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 {{#if gitSkills}}
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
