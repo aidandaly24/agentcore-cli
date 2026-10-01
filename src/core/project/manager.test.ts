@@ -364,6 +364,25 @@ describe("FsProjectManager.create", () => {
     );
   });
 
+  test("container scaffolds remove global uv after syncing and before changing users", async () => {
+    const directory = await inTempDirectory();
+    await runCreate(manager().manager, {
+      name: "example",
+      scaffoldRuntimeInput: AGENT_PYTHON_STRANDS_CONTAINER,
+    });
+
+    const dockerfile = await readFile(
+      join(directory, "example", "app", AGENT_PYTHON_STRANDS_CONTAINER.runtimeName, "Dockerfile"),
+      "utf8",
+    );
+    const uninstall = "/usr/local/bin/python -m pip uninstall -y uv";
+    expect(dockerfile).toContain(uninstall);
+    expect(dockerfile.lastIndexOf("uv sync --frozen")).toBeLessThan(dockerfile.indexOf(uninstall));
+    expect(dockerfile.indexOf(uninstall)).toBeLessThan(
+      dockerfile.indexOf("USER bedrock_agentcore"),
+    );
+  });
+
   test("scaffolds the Bedrock Managed Agents environment and runtime defaults", async () => {
     const directory = await inTempDirectory();
     const setup = manager();
