@@ -63,6 +63,10 @@ dependencies = [
 ]
 ```
 
+Strands projects using the AgentCore Memory integration should enable the SDK's `strands-agents` extra, for example
+`bedrock-agentcore[strands-agents] >= 1.18.1`. This extra declares the compatible Strands dependency. Remove old Strands
+minor-version pins that would prevent resolution of that dependency, while retaining any model-provider extras.
+
 Then refresh the lockfile from the agent's code directory:
 
 ```bash
