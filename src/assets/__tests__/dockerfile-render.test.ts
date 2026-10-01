@@ -15,6 +15,12 @@ describe('Dockerfile enableOtel rendering', () => {
     expect(rendered.indexOf('apt-get upgrade -y')).toBeLessThan(rendered.indexOf('USER bedrock_agentcore'));
   });
 
+  it('disables uv caching before installing the locked dependencies', () => {
+    const rendered = template({ entrypoint: 'main', enableOtel: true });
+    expect(rendered).toContain('UV_NO_CACHE=1');
+    expect(rendered.indexOf('UV_NO_CACHE=1')).toBeLessThan(rendered.indexOf('RUN uv sync --frozen'));
+  });
+
   it('renders opentelemetry-instrument CMD when enableOtel is true', () => {
     const rendered = template({ entrypoint: 'main', enableOtel: true });
     expect(rendered).toMatchSnapshot('Dockerfile-enableOtel-true');
