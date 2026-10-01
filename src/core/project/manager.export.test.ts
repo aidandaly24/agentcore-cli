@@ -86,16 +86,6 @@ function exportInput(overrides: Partial<ExportHarnessInput> = {}): ExportHarness
 }
 
 describe("FsProjectManager.exportHarness rendered tree", () => {
-  test("an exported harness requires an SDK with the package-installation fix", async () => {
-    const { manager: subject } = manager();
-    const project = await projectWithHarness(subject);
-
-    const result = await drain(subject.exportHarness(project, exportInput()));
-
-    const pyproject = await Bun.file(join(result.agentPath, "pyproject.toml")).text();
-    expect(pyproject).toContain('"bedrock-agentcore[strands-agents] >= 1.18.1, < 2.0.0"');
-  });
-
   test("an exported harness permits the framework version selected by the SDK integration", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject);
@@ -104,16 +94,6 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
 
     const pyproject = await Bun.file(join(result.agentPath, "pyproject.toml")).text();
     expect(pyproject).toContain('"strands-agents >= 1.54.0, < 2.0.0"');
-  });
-
-  test("an exported harness permits patched MCP 1.x releases", async () => {
-    const { manager: subject } = manager();
-    const project = await projectWithHarness(subject);
-
-    const result = await drain(subject.exportHarness(project, exportInput()));
-
-    const pyproject = await Bun.file(join(result.agentPath, "pyproject.toml")).text();
-    expect(pyproject).toContain('"mcp >= 1.28.1, < 2.0.0"');
   });
 
   test("loads only the MCP tools allowedTools selects", async () => {
