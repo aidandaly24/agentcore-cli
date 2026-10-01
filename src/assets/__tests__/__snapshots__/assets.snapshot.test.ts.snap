@@ -2304,7 +2304,7 @@ dependencies = [
     {{#if (eq modelProvider "Anthropic")}}"anthropic >= 0.30.0",
     {{/if}}"a2a-sdk[all] >= 0.3.0, < 0.4.0",
     "aws-opentelemetry-distro ~= 0.18.0",
-    "bedrock-agentcore[a2a] >= 1.9.1",
+    "bedrock-agentcore[a2a] >= 1.18.1",
     "botocore[crt] >= 1.35.0",
     {{#if (eq modelProvider "Gemini")}}"google-genai >= 1.0.0",
     {{/if}}{{#if (eq modelProvider "OpenAI")}}"openai >= 1.0.0",
@@ -2609,7 +2609,7 @@ requires-python = ">=3.10"
 dependencies = [
     "ag-ui-adk >= 0.6.0",
     "ag-ui-protocol >= 0.1.10",
-    "bedrock-agentcore >= 1.8.0",
+    "bedrock-agentcore >= 1.18.1",
     "fastapi >= 0.115.12",
     "google-adk >= 1.16.0, < 2.0.0",
     "google-genai >= 1.0.0, < 2.0.0",
@@ -2982,7 +2982,7 @@ dependencies = [
     {{/if}}{{#if (eq modelProvider "OpenAI")}}"langchain-openai >= 0.2.0",
     {{/if}}"aws-opentelemetry-distro ~= 0.18.0",
     "opentelemetry-instrumentation-langchain >= 0.59.0",
-    "bedrock-agentcore >= 1.8.0",
+    "bedrock-agentcore >= 1.18.1",
     "botocore[crt] >= 1.35.0",
     "langgraph >= 0.3.25",
     "langchain >= 0.3.0",
@@ -3324,7 +3324,7 @@ dependencies = [
     {{/if}}"ag-ui-strands >= 0.1.7",
     "ag-ui-protocol >= 0.1.10",
     "aws-opentelemetry-distro ~= 0.18.0",
-    "bedrock-agentcore >= 1.9.1",
+    "bedrock-agentcore >= 1.18.1",
     "botocore[crt] >= 1.35.0",
     "fastapi >= 0.115.12",
     {{#if (eq modelProvider "Gemini")}}"google-genai >= 1.0.0",
@@ -3835,7 +3835,7 @@ dependencies = [
     "autogen-ext[mcp] >= 0.7.5",
     "opentelemetry-distro",
     "opentelemetry-exporter-otlp",
-    "bedrock-agentcore >= 1.8.0",
+    "bedrock-agentcore >= 1.18.1",
     "botocore[crt] >= 1.35.0",
     "tiktoken",
 {{#if (eq modelProvider "Bedrock")}}
@@ -5407,7 +5407,7 @@ dependencies = [
     "google-genai >= 1.0.0, < 2.0.0",
     # 1.13.0 was yanked for broken imports.
     "opentelemetry-resourcedetector-gcp >= 1.9.0a0, < 2.0.0, != 1.13.0",
-    "bedrock-agentcore >= 1.0.3",
+    "bedrock-agentcore >= 1.18.1",
     "botocore[crt] >= 1.35.0",
     {{#if hasGateway}}{{#if (includes gatewayAuthTypes "AWS_IAM")}}"mcp-proxy-for-aws >= 1.1.0",
     {{/if}}{{/if}}
@@ -5981,7 +5981,7 @@ dependencies = [
     "mcp >= 1.28.1, < 2.0.0",
     "langchain-mcp-adapters >= 0.3.1",
     "langchain >= 1.0.3",
-    "bedrock-agentcore >= 1.8.0",
+    "bedrock-agentcore >= 1.18.1",
     "botocore[crt] >= 1.35.0",
 {{#if (eq modelProvider "Bedrock")}}
     "langchain-aws >= 1.0.0",
@@ -6446,7 +6446,7 @@ requires-python = ">=3.10"
 dependencies = [
     "aws-opentelemetry-distro ~= 0.18.0",
     "openai-agents >= 0.16.0",
-    "bedrock-agentcore >= 1.8.0",
+    "bedrock-agentcore >= 1.18.1",
     "botocore[crt] >= 1.35.0",
     {{#if hasGateway}}{{#if (includes gatewayAuthTypes "AWS_IAM")}}"mcp-proxy-for-aws >= 1.1.0",
     {{/if}}{{/if}}
@@ -7681,7 +7681,7 @@ requires-python = ">=3.10"
 dependencies = [
     {{#if (eq modelProvider "Anthropic")}}"anthropic >= 0.30.0",
     {{/if}}"aws-opentelemetry-distro ~= 0.18.0",
-    "bedrock-agentcore >= 1.9.1",
+    "bedrock-agentcore >= 1.18.1",
     "botocore[crt] >= 1.35.0",
     {{#if (eq modelProvider "Gemini")}}"google-genai >= 1.0.0",
     {{/if}}"mcp >= 1.28.1, < 2.0.0",

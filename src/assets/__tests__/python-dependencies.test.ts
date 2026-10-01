@@ -32,4 +32,25 @@ describe('generated Python dependency constraints', () => {
     const pyproject = readFileSync(join(destination, 'pyproject.toml'), 'utf-8');
     expect(pyproject).toContain(`"${dependency} >= 1.28.1, < 2.0.0"`);
   });
+
+  it.each([
+    ['python/http/strands/base', 'bedrock-agentcore'],
+    ['python/http/langchain_langgraph/base', 'bedrock-agentcore'],
+    ['python/http/googleadk/base', 'bedrock-agentcore'],
+    ['python/http/openaiagents/base', 'bedrock-agentcore'],
+    ['python/http/autogen/base', 'bedrock-agentcore'],
+    ['python/a2a/strands/base', 'bedrock-agentcore[a2a]'],
+    ['python/agui/strands/base', 'bedrock-agentcore'],
+    ['python/agui/langchain_langgraph/base', 'bedrock-agentcore'],
+    ['python/agui/googleadk/base', 'bedrock-agentcore'],
+  ])('%s requires an AgentCore SDK with the package-installation fix', async (assetDir, dependency) => {
+    const destination = join(outputDir, assetDir);
+    await copyAndRenderDir(join(ASSETS_DIR, assetDir), destination, {
+      name: 'dependency_probe',
+      modelProvider: 'Bedrock',
+    });
+
+    const pyproject = readFileSync(join(destination, 'pyproject.toml'), 'utf-8');
+    expect(pyproject).toContain(`"${dependency} >= 1.18.1"`);
+  });
 });
