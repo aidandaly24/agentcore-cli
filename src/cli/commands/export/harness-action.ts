@@ -373,13 +373,17 @@ export function buildCustomDockerfileNote(dockerfile: string, targetAgentName: s
       `the exported agent will NOT run as-is: a harness Dockerfile has no dependency install, code copy, or ` +
       `startup command (the harness runtime supplied those). Add the Strands agent build layer to the end ` +
       `of app/${targetAgentName}/${dockerfile} before \`agentcore deploy\` ` +
-      `(adjust if your base image is not Python 3.12+/uv, or already sets WORKDIR/USER):\n\n` +
+      `(adjust if your base image is not Python 3.12+/uv, or already sets WORKDIR/USER). ` +
+      `First refresh the base image and its OS packages using the appropriate package manager, ` +
+      `with the privileges required by that base. Adjust the global Python path below to match ` +
+      `the interpreter used to install uv; retain uv if your custom application requires it at runtime:\n\n` +
       `  WORKDIR /app\n` +
       `  RUN pip install --no-cache-dir uv\n` +
+      `  ENV UV_NO_CACHE=1 PATH="/app/.venv/bin:$PATH"\n` +
       `  COPY pyproject.toml uv.lock ./\n` +
       `  RUN uv sync --frozen --no-dev --no-install-project\n` +
       `  COPY --chown=bedrock_agentcore:bedrock_agentcore . .\n` +
-      `  RUN uv sync --frozen --no-dev\n` +
+      `  RUN uv sync --frozen --no-dev && /usr/local/bin/python -m pip uninstall -y uv\n` +
       `  USER bedrock_agentcore\n` +
       `  EXPOSE 8080 8000 9000\n` +
       `  CMD ["opentelemetry-instrument", "python", "-m", "main"]\n\n` +

@@ -35,6 +35,14 @@ describe('buildCustomDockerfileNote', () => {
     expect(note.message).toContain('COPY --chown=bedrock_agentcore:bedrock_agentcore . .');
     expect(note.message).toContain('CMD ["opentelemetry-instrument", "python", "-m", "main"]');
   });
+
+  it('provides a cache-free build layer and requires base-specific OS updates', () => {
+    const note = buildCustomDockerfileNote('Custom.Dockerfile', 'AgentX');
+    expect(note.message).toContain('UV_NO_CACHE=1');
+    expect(note.message).toContain('/usr/local/bin/python -m pip uninstall -y uv');
+    expect(note.message).toContain('OS packages');
+    expect(note.message).toContain('package manager');
+  });
 });
 
 // ============================================================================
