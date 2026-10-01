@@ -347,6 +347,23 @@ describe("FsProjectManager.create", () => {
     );
   });
 
+  test("container scaffolds disable uv caching before installing locked dependencies", async () => {
+    const directory = await inTempDirectory();
+    await runCreate(manager().manager, {
+      name: "example",
+      scaffoldRuntimeInput: AGENT_PYTHON_STRANDS_CONTAINER,
+    });
+
+    const dockerfile = await readFile(
+      join(directory, "example", "app", AGENT_PYTHON_STRANDS_CONTAINER.runtimeName, "Dockerfile"),
+      "utf8",
+    );
+    expect(dockerfile).toContain("UV_NO_CACHE=1");
+    expect(dockerfile.indexOf("UV_NO_CACHE=1")).toBeLessThan(
+      dockerfile.indexOf("RUN uv sync --frozen"),
+    );
+  });
+
   test("scaffolds the Bedrock Managed Agents environment and runtime defaults", async () => {
     const directory = await inTempDirectory();
     const setup = manager();
