@@ -138,11 +138,56 @@ async function projectManifest(projectRoot: string): Promise<string[]> {
 
 describe("FsProjectManager.create", () => {
   test.each([
+    ["Bedrock", "strands-agents"],
+    ["Anthropic", "strands-agents[anthropic]"],
+    ["OpenAI", "strands-agents[openai]"],
+    ["Gemini", "strands-agents[gemini]"],
+    ["LiteLLM", "strands-agents[litellm]"],
+  ] as const)(
+    "Strands with %s permits the framework version selected by the SDK integration",
+    async (modelProvider, dependency) => {
+      const directory = await inTempDirectory();
+      const runtime = resolveRuntimeTemplateShortcut("agent-python-strands", {
+        modelProvider,
+        ...(modelProvider !== "Bedrock" && { apiKey: "test-model-key" }),
+      });
+      await runCreate(manager().manager, {
+        name: "example",
+        scaffoldRuntimeInput: runtime,
+      });
+
+      const pyproject = await readFile(
+        join(directory, "example", "app", runtime.runtimeName, "pyproject.toml"),
+        "utf8",
+      );
+      expect(pyproject).toContain(`"${dependency} >= 1.15.0, < 2.0.0"`);
+    },
+  );
+
+  test.each(["a2a-python-strands", "agui-python-strands"] as const)(
+    "%s permits the framework version selected by the SDK integration",
+    async (template) => {
+      const directory = await inTempDirectory();
+      const runtime = resolveRuntimeTemplateShortcut(template);
+      await runCreate(manager().manager, {
+        name: "example",
+        scaffoldRuntimeInput: runtime,
+      });
+
+      const pyproject = await readFile(
+        join(directory, "example", "app", runtime.runtimeName, "pyproject.toml"),
+        "utf8",
+      );
+      expect(pyproject).toContain('"strands-agents >= 1.15.0, < 2.0.0"');
+    },
+  );
+
+  test.each([
     ["agent-python-minimal", "bedrock-agentcore"],
-    ["agent-python-strands", "bedrock-agentcore"],
-    ["agent-python-strands-container", "bedrock-agentcore"],
-    ["a2a-python-strands", "bedrock-agentcore[a2a]"],
-    ["agui-python-strands", "bedrock-agentcore"],
+    ["agent-python-strands", "bedrock-agentcore[strands-agents]"],
+    ["agent-python-strands-container", "bedrock-agentcore[strands-agents]"],
+    ["a2a-python-strands", "bedrock-agentcore[a2a,strands-agents]"],
+    ["agui-python-strands", "bedrock-agentcore[strands-agents]"],
   ] as const)(
     "%s requires an SDK with the package-installation fix",
     async (template, dependency) => {

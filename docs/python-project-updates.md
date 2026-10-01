@@ -17,6 +17,11 @@ Run this from the Runtime's code directory to refresh the locked versions:
 uv lock --upgrade
 ```
 
+Strands projects using the AgentCore Memory integration should enable the SDK's `strands-agents`
+extra, for example `bedrock-agentcore[strands-agents] >= 1.18.1, < 2.0.0`. This extra declares the
+compatible Strands dependency. Replace older `strands-agents ~= 1.15.0` constraints with
+`strands-agents >= 1.15.0, < 2.0.0`, preserving any model-provider extras, then refresh the lockfile.
+
 The Strands container template installs available Debian package updates, uses
 `uv sync --frozen --no-dev`, disables uv caching, and removes the globally installed uv after the
 final dependency installation. Its entrypoint runs Python directly.
