@@ -39,47 +39,15 @@ app/MyAgent/
 
 ## Generated Dockerfile
 
-The template uses `public.ecr.aws/docker/library/python:3.12-slim-trixie` as the base image (with `uv` installed via
+The template uses `public.ecr.aws/docker/library/python:3.12-slim` as the base image (with `uv` installed via
 `pip install uv`) with these design choices:
 
-- **OS updates**: Installs available Debian package updates during the build
 - **Layer caching**: Dependencies (`pyproject.toml`) are installed before copying application code
 - **Non-root**: Runs as `bedrock_agentcore` (UID 1000)
 - **Observability**: Default CMD wraps the agent with `opentelemetry-instrument`
-- **Locked installs**: Uses `uv sync --frozen --no-dev` to install the versions in `uv.lock`
-- **Build-tool cleanup**: Disables uv caching and removes uv after the final dependency installation
+- **Fast installs**: Uses `uv pip install` for dependency resolution
 
 You can customize the Dockerfile freely — add system packages, change the base image, or use multi-stage builds.
-
-### Updating Existing Python Projects
-
-Updating the CLI does not rewrite an existing project's Dockerfile, dependency constraints, or lockfile. Update the
-affected entries in the agent's `pyproject.toml` dependency list, keeping its other dependencies and package extras:
-
-```toml
-dependencies = [
-    "mcp >= 1.28.1, < 2.0.0",
-    "bedrock-agentcore >= 1.18.1",
-]
-```
-
-Strands projects using the AgentCore Memory integration should enable the SDK's `strands-agents` extra, for example
-`bedrock-agentcore[strands-agents] >= 1.18.1`. This extra declares the compatible Strands dependency. Remove old Strands
-minor-version pins that would prevent resolution of that dependency, while retaining any model-provider extras.
-
-Then refresh the lockfile from the agent's code directory:
-
-```bash
-uv lock --upgrade
-```
-
-For an older generated container Dockerfile, add the OS update step before switching users, set `UV_NO_CACHE=1` before
-both sync steps, and remove the globally installed uv after the final sync. Keep uv if your custom application invokes
-it at runtime. Rebuild and redeploy the changed image, test the application, and inspect its package versions and scan
-findings.
-
-Docker may reuse cached base images and OS-update layers on later builds. When building manually, use
-`docker build --pull --no-cache` to refresh them; a successful unchanged deployment is not evidence of updated packages.
 
 ### TypeScript Dockerfile
 
