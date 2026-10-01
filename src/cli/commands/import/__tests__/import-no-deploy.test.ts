@@ -4,6 +4,7 @@
  * Verifies that the import command correctly handles starter toolkit projects
  * that were created but never deployed (no agent_id/memory_id in YAML).
  */
+import { handleImport } from '../actions.js';
 import { parseStarterToolkitYaml } from '../yaml-parser.js';
 import assert from 'node:assert';
 import * as fs from 'node:fs';
@@ -645,6 +646,47 @@ agents:
     await handleImport({ source: yamlPath });
 
     expect(mockSetupPythonProject).not.toHaveBeenCalled();
+  });
+
+  it('generates the hardened shared Dockerfile when the imported source has none', async () => {
+    const sourceDir = path.join(tmpDir, 'starter', 'src');
+    fs.mkdirSync(sourceDir, { recursive: true });
+    fs.writeFileSync(path.join(sourceDir, 'worker.py'), 'print("imported")\n');
+    fs.writeFileSync(path.join(sourceDir, '.dockerignore'), 'customer-specific-ignore\n');
+    fs.writeFileSync(
+      yamlPath,
+      `agents:
+  test_agent:
+    name: test_agent
+    entrypoint: worker.py
+    deployment_type: container
+    source_path: ${JSON.stringify(sourceDir)}
+    aws:
+      account: '111122223333'
+      region: us-east-1
+`
+    );
+    mockReadProjectSpec.mockResolvedValue({
+      name: 'myproject',
+      version: 1,
+      runtimes: [],
+      memories: [],
+      knowledgeBases: [],
+      credentials: [],
+    });
+    mockReadAWSDeploymentTargets.mockResolvedValue([]);
+
+    const result = await handleImport({ source: yamlPath });
+
+    assert(result.success);
+    const appDir = path.join(tmpDir, 'myproject', 'app', 'test_agent');
+    const dockerfile = fs.readFileSync(path.join(appDir, 'Dockerfile'), 'utf8');
+    expect(dockerfile).toContain('apt-get upgrade -y');
+    expect(dockerfile).toContain('UV_NO_CACHE=1');
+    expect(dockerfile).toContain('/usr/local/bin/python -m pip uninstall -y uv');
+    expect(dockerfile).toContain('PATH="/app/.venv/bin:$PATH"');
+    expect(dockerfile).toContain('CMD ["opentelemetry-instrument", "python", "-m", "worker"]');
+    expect(fs.readFileSync(path.join(appDir, '.dockerignore'), 'utf8')).toBe('customer-specific-ignore\n');
   });
 
   it('returns correct stackName in result', async () => {

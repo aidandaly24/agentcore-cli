@@ -10,9 +10,11 @@ import type {
 import { isContainerBuild } from '../../../schema/constants';
 import { validateAwsCredentials } from '../../aws/account';
 import { arnPrefix } from '../../aws/partition';
-import { ANSI, PYTHON_BASE_IMAGE } from '../../constants';
+import { ANSI } from '../../constants';
 import { ExecLogger } from '../../logging';
 import { setupPythonProject } from '../../operations/python/setup';
+import { copyAndRenderDir } from '../../templates/render';
+import { getTemplatePath } from '../../templates/templateRoot';
 import { resolveVpcIdFromSubnets } from '../shared/vpc-utils';
 import { executeCdkImportPipeline } from './import-pipeline';
 import { copyDirRecursive, fixPyprojectForSetuptools, toStackName } from './import-utils';
@@ -408,34 +410,11 @@ export async function handleImport(options: ImportOptions): Promise<ImportResult
               logger.log('Generating Dockerfile for Container build');
               onProgress?.(`Generating Dockerfile for Container build`);
               const entryModule = path.basename(agent.entrypoint, '.py');
-              fs.writeFileSync(
-                destDockerfile,
-                [
-                  `FROM ${PYTHON_BASE_IMAGE}`,
-                  'RUN pip install --no-cache-dir uv',
-                  'WORKDIR /app',
-                  '',
-                  'ENV UV_SYSTEM_PYTHON=1 \\',
-                  '    UV_COMPILE_BYTECODE=1 \\',
-                  '    UV_NO_PROGRESS=1 \\',
-                  '    PYTHONUNBUFFERED=1 \\',
-                  '    DOCKER_CONTAINER=1',
-                  '',
-                  'RUN useradd -m -u 1000 bedrock_agentcore',
-                  '',
-                  'COPY pyproject.toml uv.lock ./',
-                  'RUN uv sync --frozen --no-dev --no-install-project',
-                  '',
-                  'COPY --chown=bedrock_agentcore:bedrock_agentcore . .',
-                  'RUN uv sync --frozen --no-dev',
-                  '',
-                  'USER bedrock_agentcore',
-                  '',
-                  'EXPOSE 8080 8000 9000',
-                  '',
-                  `CMD ["opentelemetry-instrument", "python", "-m", "${entryModule}"]`,
-                  '',
-                ].join('\n')
+              await copyAndRenderDir(
+                getTemplatePath('container', 'python'),
+                appDir,
+                { entrypoint: entryModule, enableOtel: true },
+                { exclude: new Set(['.dockerignore']) }
               );
             }
           }
