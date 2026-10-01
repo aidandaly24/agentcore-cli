@@ -146,7 +146,6 @@ declares, not the ones you add in the stack.
 
 - [Command reference](command.md): every command and flag.
 - [Harness project configuration](docs/harness-project-configuration.md): Harness YAML, prompts, tools, skills, and environment settings.
-- [Python project updates](docs/python-project-updates.md): dependency upgrades and container rebuilds for existing generated projects.
 - [China regions](docs/china-regions.md): what is available there and how the restrictions are enforced.
 - [Amazon Bedrock AgentCore documentation](https://docs.aws.amazon.com/bedrock-agentcore/): service guides and API references.
 - [Contributing](CONTRIBUTING.md): development, builds, architecture, and testing.
