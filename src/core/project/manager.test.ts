@@ -137,6 +137,21 @@ async function projectManifest(projectRoot: string): Promise<string[]> {
 }
 
 describe("FsProjectManager.create", () => {
+  test("a generated FastMCP project permits patched MCP 1.x releases", async () => {
+    const directory = await inTempDirectory();
+    const runtime = resolveRuntimeTemplateShortcut("mcp-python-fastmcp");
+    await runCreate(manager().manager, {
+      name: "example",
+      scaffoldRuntimeInput: runtime,
+    });
+
+    const pyproject = await readFile(
+      join(directory, "example", "app", runtime.runtimeName, "pyproject.toml"),
+      "utf8",
+    );
+    expect(pyproject).toContain('"mcp >= 1.28.1, < 2.0.0"');
+  });
+
   test("scaffolds the expected file tree into a fresh directory", async () => {
     const directory = await inTempDirectory();
     await runCreate(manager().manager, {
