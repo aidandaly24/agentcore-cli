@@ -116,7 +116,7 @@ describe.sequential('e2e: archive command lifecycle', () => {
   // ════════════════════════════════════════════════════════════════════════
 
   it.skipIf(!canRun)(
-    'runs batch evaluation and captures the ID',
+    'waits for batch evaluation to finish and captures the ID',
     async () => {
       await retry(
         async () => {
@@ -129,6 +129,7 @@ describe.sequential('e2e: archive command lifecycle', () => {
             'Builtin.Faithfulness',
             '--lookback-days',
             '1',
+            '--wait',
             '--json',
           ]);
           expect(result.exitCode, `batch-evaluation failed (stdout: ${result.stdout}, stderr: ${result.stderr})`).toBe(
@@ -137,7 +138,7 @@ describe.sequential('e2e: archive command lifecycle', () => {
           const json = parseJsonOutput(result.stdout) as Record<string, unknown>;
           expect(json).toHaveProperty('success', true);
           expect(json.id).toBeTruthy();
-          expect(json.status).not.toBe('FAILED');
+          expect(['COMPLETED', 'COMPLETED_WITH_ERRORS', 'STOPPED']).toContain(json.status);
           batchEvaluationId = json.id as string;
         },
         6,
