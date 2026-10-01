@@ -21,6 +21,14 @@ describe('Dockerfile enableOtel rendering', () => {
     expect(rendered.indexOf('UV_NO_CACHE=1')).toBeLessThan(rendered.indexOf('RUN uv sync --frozen'));
   });
 
+  it('removes the global uv installation after the final sync and before changing users', () => {
+    const rendered = template({ entrypoint: 'main', enableOtel: true });
+    const uninstall = '/usr/local/bin/python -m pip uninstall -y uv';
+    expect(rendered).toContain(uninstall);
+    expect(rendered.lastIndexOf('uv sync --frozen')).toBeLessThan(rendered.indexOf(uninstall));
+    expect(rendered.indexOf(uninstall)).toBeLessThan(rendered.indexOf('USER bedrock_agentcore'));
+  });
+
   it('renders opentelemetry-instrument CMD when enableOtel is true', () => {
     const rendered = template({ entrypoint: 'main', enableOtel: true });
     expect(rendered).toMatchSnapshot('Dockerfile-enableOtel-true');

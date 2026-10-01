@@ -29,7 +29,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY --chown=bedrock_agentcore:bedrock_agentcore . .
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev && /usr/local/bin/python -m pip uninstall -y uv
 
 USER bedrock_agentcore
 
