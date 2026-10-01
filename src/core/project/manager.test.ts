@@ -329,6 +329,24 @@ describe("FsProjectManager.create", () => {
     expect(spec.runtimes[0]).toMatchObject({ build: "Container", dockerfile: "Dockerfile" });
   });
 
+  test("container scaffolds apply OS updates before switching to the runtime user", async () => {
+    const directory = await inTempDirectory();
+    await runCreate(manager().manager, {
+      name: "example",
+      scaffoldRuntimeInput: AGENT_PYTHON_STRANDS_CONTAINER,
+    });
+
+    const dockerfile = await readFile(
+      join(directory, "example", "app", AGENT_PYTHON_STRANDS_CONTAINER.runtimeName, "Dockerfile"),
+      "utf8",
+    );
+    expect(dockerfile).toContain("apt-get update");
+    expect(dockerfile).toContain("apt-get upgrade -y");
+    expect(dockerfile.indexOf("apt-get upgrade -y")).toBeLessThan(
+      dockerfile.indexOf("USER bedrock_agentcore"),
+    );
+  });
+
   test("scaffolds the Bedrock Managed Agents environment and runtime defaults", async () => {
     const directory = await inTempDirectory();
     const setup = manager();
