@@ -137,6 +137,30 @@ async function projectManifest(projectRoot: string): Promise<string[]> {
 }
 
 describe("FsProjectManager.create", () => {
+  test.each([
+    ["agent-python-minimal", "bedrock-agentcore"],
+    ["agent-python-strands", "bedrock-agentcore"],
+    ["agent-python-strands-container", "bedrock-agentcore"],
+    ["a2a-python-strands", "bedrock-agentcore[a2a]"],
+    ["agui-python-strands", "bedrock-agentcore"],
+  ] as const)(
+    "%s requires an SDK with the package-installation fix",
+    async (template, dependency) => {
+      const directory = await inTempDirectory();
+      const runtime = resolveRuntimeTemplateShortcut(template);
+      await runCreate(manager().manager, {
+        name: "example",
+        scaffoldRuntimeInput: runtime,
+      });
+
+      const pyproject = await readFile(
+        join(directory, "example", "app", runtime.runtimeName, "pyproject.toml"),
+        "utf8",
+      );
+      expect(pyproject).toContain(`"${dependency} >= 1.18.1, < 2.0.0"`);
+    },
+  );
+
   test("a generated FastMCP project permits patched MCP 1.x releases", async () => {
     const directory = await inTempDirectory();
     const runtime = resolveRuntimeTemplateShortcut("mcp-python-fastmcp");

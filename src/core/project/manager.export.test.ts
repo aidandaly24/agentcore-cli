@@ -86,6 +86,16 @@ function exportInput(overrides: Partial<ExportHarnessInput> = {}): ExportHarness
 }
 
 describe("FsProjectManager.exportHarness rendered tree", () => {
+  test("an exported harness requires an SDK with the package-installation fix", async () => {
+    const { manager: subject } = manager();
+    const project = await projectWithHarness(subject);
+
+    const result = await drain(subject.exportHarness(project, exportInput()));
+
+    const pyproject = await Bun.file(join(result.agentPath, "pyproject.toml")).text();
+    expect(pyproject).toContain('"bedrock-agentcore >= 1.18.1, < 2.0.0"');
+  });
+
   test("an exported harness permits patched MCP 1.x releases", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject);
