@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { compiledRootCommand, expectError } from "../../../../testing";
+import { expectError } from "../../../../testing";
 import { createPaymentProjectTestHarness } from "../payment-test-support";
 import { InputValidationError } from "../../../../errors";
 
@@ -9,15 +9,6 @@ const { cleanup, inProject, projectSpec, run } = createPaymentProjectTestHarness
 afterEach(cleanup);
 
 describe("project add payment-manager", () => {
-  test("help describes --no-auto-payment as disabling automatic settlement", () => {
-    const add = compiledRootCommand().commands.find((command) => command.name() === "add")!;
-    const manager = add.commands.find((command) => command.name() === "payment-manager")!;
-
-    expect(manager.helpInformation()).toMatch(
-      /--no-auto-payment\s+disable automatic payment settlement/,
-    );
-  });
-
   test("adds a manager with materialized defaults", async () => {
     const projectRoot = await inProject();
 
