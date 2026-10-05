@@ -312,7 +312,7 @@ invoke a Runtime, harness, or Gateway
 - `--content-type <content-type>`: the payload content type
 - `--accept <accept>`: the accepted response content type
 - `--session-id <session-id>`: the Runtime session ID
-- `--user-id <user-id>`: the Runtime user ID (default "default")
+- `--user-id <user-id>`: the user ID to invoke as
 - `--header <header...>`: an ordered application header
 - `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token
 - `--mcp-session-id <mcp-session-id>`: the MCP session ID
