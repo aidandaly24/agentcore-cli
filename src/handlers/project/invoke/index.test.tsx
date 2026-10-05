@@ -190,7 +190,12 @@ afterEach(async () => {
 describe("invoke", () => {
   test.each([
     ["runtime", ["--runtime", "checkout", "--payload", "{}"], "runtime", "invokeRuntime"],
-    ["harness", ["--harness", "support", "--prompt", "hi"], "harness", "invokeHarness"],
+    [
+      "harness",
+      ["--harness", "support", "--prompt", "hi", "--user-id", "user-123"],
+      "harness",
+      "invokeHarness",
+    ],
     [
       "gateway",
       ["--gateway", "tools", "--path", "/mcp", "--payload", "{}"],
@@ -208,19 +213,12 @@ describe("invoke", () => {
 
       const invoke = core[client].calls.find((call) => call.method === method)!;
       expect(invoke.args[1]).toEqual({ region: TARGET.region, credentials: TARGET_CREDENTIALS });
+      if (client === "harness") {
+        expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBe("user-123");
+      }
       expect(resolved.targets).toEqual(["default"]);
     },
   );
-
-  test("forwards --user-id when invoking a project harness", async () => {
-    const { core } = await run(
-      ["--harness", HARNESS.name, "--prompt", "hi", "--user-id", "user-123"],
-      { harnesses: [HARNESS] },
-    );
-
-    const invoke = core.harness.calls.find((call) => call.method === "invokeHarness")!;
-    expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBe("user-123");
-  });
 
   test.each([
     [["--runtime", "checkout"], `/agentcore/runtime/invoke/${RUNTIME_ID}`],
