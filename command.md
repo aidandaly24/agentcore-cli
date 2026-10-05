@@ -633,7 +633,7 @@ add a payment manager to the current project
 - `--allowed-audience <allowed-audience...>`: allowed JWT audiences
 - `--allowed-scopes <allowed-scopes...>`: allowed JWT scopes
 - `--description <description>`: payment manager description
-- `--no-auto-payment`: automatically settle payment requests
+- `--no-auto-payment`: disable automatic payment settlement
 - `--default-spend-limit <default-spend-limit>`: default payment-session spend limit (default: "10.00")
 - `--tool-allowlist <tool-allowlist...>`: tools eligible for automatic payment
 - `--network-preferences <network-preferences...>`: preferred payment networks
