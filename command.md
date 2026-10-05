@@ -312,12 +312,12 @@ invoke a Runtime, harness, or Gateway
 - `--content-type <content-type>`: the payload content type
 - `--accept <accept>`: the accepted response content type
 - `--session-id <session-id>`: the Runtime session ID
+- `--user-id <user-id>`: the Runtime user ID (default "default")
 - `--header <header...>`: an ordered application header
 - `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token
 - `--mcp-session-id <mcp-session-id>`: the MCP session ID
 - `--mcp-protocol-version <mcp-protocol-version>`: the MCP protocol version
 - `--output-file <output-file>`: the response output file
-- `--user-id <user-id>`: the Runtime user ID (default "default")
 - `--mcp-method <mcp-method>`: the MCP method
 - `--mcp-name <mcp-name>`: the MCP tool, resource, or prompt name
 - `--trace-id <trace-id>`: the X-Ray trace ID
@@ -1065,6 +1065,7 @@ invoke a harness
 
 - `--id <id>`: the ID of the harness (required)
 - `--prompt <prompt>`: the message to send to the harness
+- `--user-id <user-id>`: the end-user ID for user-scoped AgentCore Identity credentials
 - `--session-id <session-id>`: the Runtime session ID to continue (33-100 characters)
 - `--qualifier <qualifier>`: the harness endpoint qualifier to invoke (default DEFAULT)
 
