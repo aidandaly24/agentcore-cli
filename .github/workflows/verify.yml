@@ -54,7 +54,8 @@ jobs:
         if: runner.os == 'Linux' && !cancelled()
       - run: bun run typecheck
         if: runner.os == 'Linux' && !cancelled()
-      - run: bun audit
+      # braces has no patched release; remove this advisory exception when #2528 is fixed.
+      - run: bun audit --ignore GHSA-vfj7-8cjw-p6xm
         if: runner.os == 'Linux' && !cancelled()
       - run: bun run secrets:check
         if: runner.os == 'Linux' && !cancelled()
