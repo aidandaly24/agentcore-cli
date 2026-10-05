@@ -17,7 +17,7 @@ export async function invokeHarnessTurn(
     prompt: string;
     qualifier?: string;
     sessionId?: string;
-    runtimeUserId?: string;
+    userId?: string;
   },
   options: CoreOptions,
   signal?: AbortSignal,
@@ -29,7 +29,7 @@ export async function invokeHarnessTurn(
       harnessArn: detail.harness?.arn,
       qualifier: input.qualifier ?? "DEFAULT",
       runtimeSessionId: sessionId,
-      runtimeUserId: input.runtimeUserId,
+      runtimeUserId: input.userId,
       messages: [{ role: "user", content: [{ text: input.prompt }] }],
     },
     options,

@@ -58,9 +58,7 @@ export function HarnessInvokeScreen(props: ScreenProps) {
       harnessId={harnessId}
       initialSessionId={sessionId}
       initialQualifier={search.get("qualifier") ?? undefined}
-      runtimeUserId={
-        launchContext?.harnessId === harnessId ? launchContext.runtimeUserId : undefined
-      }
+      userId={launchContext?.harnessId === harnessId ? launchContext.userId : undefined}
       variant="invoke"
     />
   );
@@ -81,7 +79,7 @@ export interface HarnessChatProps extends ScreenProps {
   // initialQualifier is the endpoint the session targets (default DEFAULT,
   // which every harness has). Ctrl+T switches endpoints mid-chat.
   initialQualifier?: string;
-  runtimeUserId?: string;
+  userId?: string;
   // variant is the command hosting the chat: it names the breadcrumb and picks
   // the starting mode ("exec" starts in exec mode; "invoke" in chat mode).
   variant: "invoke" | "exec";
@@ -99,7 +97,7 @@ export function HarnessChat({
   harnessId,
   initialSessionId,
   initialQualifier,
-  runtimeUserId,
+  userId,
   variant,
   onBack,
 }: HarnessChatProps) {
@@ -174,7 +172,7 @@ export function HarnessChat({
           harnessArn: arn,
           qualifier,
           runtimeSessionId: sessionId,
-          runtimeUserId,
+          runtimeUserId: userId,
           messages: [{ role: "user", content: [{ text: trimmed }] }],
         },
         opts,

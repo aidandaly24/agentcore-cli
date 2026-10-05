@@ -145,68 +145,47 @@ describe("harness invoke", () => {
       "hi",
       "--session-id",
       sessionId,
+      "--user-id",
+      "user-123",
     ]);
 
     const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
-    expect((invoke.args[0] as InvokeHarnessRequest).runtimeSessionId).toBe(sessionId);
+    const request = invoke.args[0] as InvokeHarnessRequest;
+    expect(request.runtimeSessionId).toBe(sessionId);
+    expect(request.runtimeUserId).toBe("user-123");
+    expect(request.actorId).toBeUndefined();
     expect(JSON.parse(stdout).sessionId).toBe(sessionId);
   });
 
-  test.each([undefined, "custom-session-id-that-is-long-enough"])(
-    "--user-id is passed through without changing memory identity (session=%s)",
-    async (sessionId) => {
+  test("passes --user-id to the TUI without a prompt", async () => {
+    const render = spyOn(tui, "renderTuiAt").mockResolvedValue(undefined);
+    try {
       const { core } = await run([
         "harness",
         "invoke",
         "--id",
         "MyHarness-abc123",
-        "--prompt",
-        "hi",
         "--user-id",
         "user-123",
-        "--json",
-        ...(sessionId ? ["--session-id", sessionId] : []),
+        "--qualifier",
+        "prod",
+        "--session-id",
+        "custom-session-id-that-is-long-enough",
       ]);
 
-      const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
-      const request = invoke.args[0] as InvokeHarnessRequest;
-      expect(request.runtimeUserId).toBe("user-123");
-      expect(request.actorId).toBeUndefined();
-      if (sessionId) expect(request.runtimeSessionId).toBe(sessionId);
-    },
-  );
-
-  test.each([undefined, "custom-session-id-that-is-long-enough"])(
-    "passes --user-id to the TUI without a prompt (session=%s)",
-    async (sessionId) => {
-      const render = spyOn(tui, "renderTuiAt").mockResolvedValue(undefined);
-      try {
-        const { core } = await run([
-          "harness",
-          "invoke",
-          "--id",
-          "MyHarness-abc123",
-          "--user-id",
-          "user-123",
-          "--qualifier",
-          "prod",
-          ...(sessionId ? ["--session-id", sessionId] : []),
-        ]);
-
-        expect(render).toHaveBeenCalledTimes(1);
-        expect(render.mock.calls[0]![0]).toBe(
-          `/agentcore/harness/invoke/MyHarness-abc123${sessionId ? `/${sessionId}` : ""}?qualifier=prod`,
-        );
-        expect(render.mock.calls[0]![1].value(HarnessInvokeLaunchContextKey)).toEqual({
-          harnessId: "MyHarness-abc123",
-          runtimeUserId: "user-123",
-        });
-        expect(core.harness.calls).toEqual([]);
-      } finally {
-        render.mockRestore();
-      }
-    },
-  );
+      expect(render).toHaveBeenCalledTimes(1);
+      expect(render.mock.calls[0]![0]).toBe(
+        "/agentcore/harness/invoke/MyHarness-abc123/custom-session-id-that-is-long-enough?qualifier=prod",
+      );
+      expect(render.mock.calls[0]![1].value(HarnessInvokeLaunchContextKey)).toEqual({
+        harnessId: "MyHarness-abc123",
+        userId: "user-123",
+      });
+      expect(core.harness.calls).toEqual([]);
+    } finally {
+      render.mockRestore();
+    }
+  });
 
   test("--session-id shorter than 33 characters is rejected", async () => {
     await expect(

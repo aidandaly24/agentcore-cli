@@ -2,7 +2,7 @@ import { contextKey } from "../../../router";
 
 export type HarnessInvokeLaunchContext = {
   harnessId: string;
-  runtimeUserId?: string;
+  userId?: string;
 };
 
 export const HarnessInvokeLaunchContextKey =

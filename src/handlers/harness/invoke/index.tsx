@@ -51,7 +51,7 @@ export const createInvokeHarnessHandler = (core: Core, io: AppIO) =>
           path,
           ctx.withValue(HarnessInvokeLaunchContextKey, {
             harnessId: flags["id"],
-            runtimeUserId: flags["user-id"],
+            userId: flags["user-id"],
           }),
           core,
           io,
@@ -69,7 +69,7 @@ export const createInvokeHarnessHandler = (core: Core, io: AppIO) =>
             prompt,
             qualifier: flags["qualifier"] ?? "DEFAULT",
             sessionId: flags["session-id"],
-            runtimeUserId: flags["user-id"],
+            userId: flags["user-id"],
           },
           opts,
         );
