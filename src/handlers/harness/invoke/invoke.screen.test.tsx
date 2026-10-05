@@ -12,6 +12,7 @@ import {
   StreamController,
   TestCoreClient,
 } from "../../../testing";
+import { HarnessInvokeLaunchContextKey } from "./launchContext";
 
 afterEach(cleanupScreens);
 
@@ -130,26 +131,65 @@ describe("invoke chat screen", () => {
     r.unmount();
   });
 
-  test("the session id is stable across sends and each send carries only the new message", async () => {
+  test.each([
+    { sessionId: undefined, runtimeUserId: undefined },
+    { sessionId: undefined, runtimeUserId: "user-123" },
+    { sessionId: "resumed-session-0123456789abcdefghijklmn", runtimeUserId: undefined },
+    { sessionId: "resumed-session-0123456789abcdefghijklmn", runtimeUserId: "user-123" },
+  ])(
+    "keeps session and user identity across sends, sending only new messages (%j)",
+    async ({ sessionId, runtimeUserId }) => {
+      const core = chatCore();
+      const r = renderScreen(`${CHAT_PATH}${sessionId ? `/${sessionId}` : ""}`, {
+        core,
+        withContext: (ctx) =>
+          ctx.withValue(HarnessInvokeLaunchContextKey, {
+            harnessId: "MyHarness-abc123",
+            runtimeUserId,
+          }),
+      });
+
+      await waitForText(r.lastFrame, "send a message…");
+      await sendMessage(r, "first");
+      await waitForText(r.lastFrame, "end_turn");
+      await sendMessage(r, "second");
+      await waitFor(
+        () => core.harness.calls.filter((c) => c.method === "invokeHarness").length === 2,
+      );
+
+      const [a, b] = core.harness.calls
+        .filter((c) => c.method === "invokeHarness")
+        .map((c) => c.args[0] as InvokeHarnessRequest);
+      expect(a!.harnessArn).toBe(ARN);
+      expect(a!.runtimeSessionId).toBe(b!.runtimeSessionId!);
+      expect(a!.runtimeSessionId!.length).toBeGreaterThanOrEqual(33);
+      expect(a!.runtimeUserId).toBe(runtimeUserId);
+      expect(b!.runtimeUserId).toBe(runtimeUserId);
+      expect(a!.actorId).toBeUndefined();
+      expect(b!.actorId).toBeUndefined();
+      if (sessionId) expect(a!.runtimeSessionId).toBe(sessionId);
+      expect(a!.messages).toEqual([{ role: "user", content: [{ text: "first" }] }]);
+      expect(b!.messages).toEqual([{ role: "user", content: [{ text: "second" }] }]);
+      r.unmount();
+    },
+  );
+
+  test("does not apply launch identity to a different harness", async () => {
     const core = chatCore();
-    const r = renderScreen(CHAT_PATH, { core });
+    const r = renderScreen(CHAT_PATH, {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(HarnessInvokeLaunchContextKey, {
+          harnessId: "OtherHarness-abc123",
+          runtimeUserId: "user-123",
+        }),
+    });
 
     await waitForText(r.lastFrame, "send a message…");
-    await sendMessage(r, "first");
-    await waitForText(r.lastFrame, "end_turn");
-    await sendMessage(r, "second");
-    await waitFor(
-      () => core.harness.calls.filter((c) => c.method === "invokeHarness").length === 2,
-    );
-
-    const [a, b] = core.harness.calls
-      .filter((c) => c.method === "invokeHarness")
-      .map((c) => c.args[0] as InvokeHarnessRequest);
-    expect(a!.harnessArn).toBe(ARN);
-    expect(a!.runtimeSessionId).toBe(b!.runtimeSessionId!);
-    expect(a!.runtimeSessionId!.length).toBeGreaterThanOrEqual(33);
-    expect(a!.messages).toEqual([{ role: "user", content: [{ text: "first" }] }]);
-    expect(b!.messages).toEqual([{ role: "user", content: [{ text: "second" }] }]);
+    await sendMessage(r, "hi");
+    await waitFor(() => core.harness.calls.some((c) => c.method === "invokeHarness"));
+    const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
+    expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBeUndefined();
     r.unmount();
   });
 
@@ -195,7 +235,14 @@ describe("invoke chat screen", () => {
         },
       ],
     });
-    const r = renderScreen(CHAT_PATH, { core });
+    const r = renderScreen(CHAT_PATH, {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(HarnessInvokeLaunchContextKey, {
+          harnessId: "MyHarness-abc123",
+          runtimeUserId: "user-123",
+        }),
+    });
 
     await waitForText(r.lastFrame, "send a message…");
     expect(r.lastFrame()).toContain("qualifier: DEFAULT");
@@ -210,6 +257,7 @@ describe("invoke chat screen", () => {
     await waitFor(() => core.harness.calls.some((c) => c.method === "invokeHarness"));
     const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
     expect((invoke.args[0] as InvokeHarnessRequest).qualifier).toBe("prod");
+    expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBe("user-123");
     r.unmount();
   });
 

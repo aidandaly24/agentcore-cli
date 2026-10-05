@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, spyOn } from "bun:test";
 import type {
   InvokeHarnessRequest,
   InvokeHarnessStreamOutput,
@@ -16,6 +16,8 @@ import {
   waitFor,
 } from "../../../testing";
 import { InputValidationError } from "../../../errors";
+import * as tui from "../../../tui";
+import { HarnessInvokeLaunchContextKey } from "./launchContext";
 
 // Command-flow tests for `harness invoke`, driven through the real root handler
 // exactly as the CLI runs it. Unlike the get/list suites these use a
@@ -126,6 +128,7 @@ describe("harness invoke", () => {
     // Omitting --qualifier targets the DEFAULT endpoint explicitly.
     expect(request.qualifier).toBe("DEFAULT");
     expect(request.messages).toEqual([{ role: "user", content: [{ text: "hi" }] }]);
+    expect(request.runtimeUserId).toBeUndefined();
     expect(request.runtimeSessionId!.length).toBeGreaterThanOrEqual(33);
     expect(request.runtimeSessionId!.length).toBeLessThanOrEqual(100);
     expect((invoke.args[1] as { region: string }).region).toBe("us-west-2");
@@ -148,6 +151,62 @@ describe("harness invoke", () => {
     expect((invoke.args[0] as InvokeHarnessRequest).runtimeSessionId).toBe(sessionId);
     expect(JSON.parse(stdout).sessionId).toBe(sessionId);
   });
+
+  test.each([undefined, "custom-session-id-that-is-long-enough"])(
+    "--user-id is passed through without changing memory identity (session=%s)",
+    async (sessionId) => {
+      const { core } = await run([
+        "harness",
+        "invoke",
+        "--id",
+        "MyHarness-abc123",
+        "--prompt",
+        "hi",
+        "--user-id",
+        "user-123",
+        "--json",
+        ...(sessionId ? ["--session-id", sessionId] : []),
+      ]);
+
+      const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
+      const request = invoke.args[0] as InvokeHarnessRequest;
+      expect(request.runtimeUserId).toBe("user-123");
+      expect(request.actorId).toBeUndefined();
+      if (sessionId) expect(request.runtimeSessionId).toBe(sessionId);
+    },
+  );
+
+  test.each([undefined, "custom-session-id-that-is-long-enough"])(
+    "passes --user-id to the TUI without a prompt (session=%s)",
+    async (sessionId) => {
+      const render = spyOn(tui, "renderTuiAt").mockResolvedValue(undefined);
+      try {
+        const { core } = await run([
+          "harness",
+          "invoke",
+          "--id",
+          "MyHarness-abc123",
+          "--user-id",
+          "user-123",
+          "--qualifier",
+          "prod",
+          ...(sessionId ? ["--session-id", sessionId] : []),
+        ]);
+
+        expect(render).toHaveBeenCalledTimes(1);
+        expect(render.mock.calls[0]![0]).toBe(
+          `/agentcore/harness/invoke/MyHarness-abc123${sessionId ? `/${sessionId}` : ""}?qualifier=prod`,
+        );
+        expect(render.mock.calls[0]![1].value(HarnessInvokeLaunchContextKey)).toEqual({
+          harnessId: "MyHarness-abc123",
+          runtimeUserId: "user-123",
+        });
+        expect(core.harness.calls).toEqual([]);
+      } finally {
+        render.mockRestore();
+      }
+    },
+  );
 
   test("--session-id shorter than 33 characters is rejected", async () => {
     await expect(
@@ -190,9 +249,6 @@ describe("harness invoke", () => {
     await expectError(run(["harness", "invoke", "--prompt", "hi"]), /--id/, InputValidationError);
   });
 
-  // Without --prompt (and outside JSON mode) the handler opens the interactive
-  // chat instead — that path is covered by the screen tests, since the test IO
-  // streams cannot host an Ink render.
   test("errors when --prompt is omitted in JSON mode", async () => {
     await expect(run(["harness", "invoke", "--id", "MyHarness-abc123", "--json"])).rejects.toThrow(
       /--prompt/,
