@@ -2,6 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import type { InvokeHarnessRequest } from "@aws-sdk/client-bedrock-agentcore";
 import type {
   GetAgentRuntimeResponse,
   GetGatewayResponse,
@@ -210,6 +211,16 @@ describe("invoke", () => {
       expect(resolved.targets).toEqual(["default"]);
     },
   );
+
+  test("forwards --user-id when invoking a project harness", async () => {
+    const { core } = await run(
+      ["--harness", HARNESS.name, "--prompt", "hi", "--user-id", "user-123"],
+      { harnesses: [HARNESS] },
+    );
+
+    const invoke = core.harness.calls.find((call) => call.method === "invokeHarness")!;
+    expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBe("user-123");
+  });
 
   test.each([
     [["--runtime", "checkout"], `/agentcore/runtime/invoke/${RUNTIME_ID}`],
