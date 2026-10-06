@@ -82,7 +82,7 @@ export function createRuntimeShellOpener(config: RuntimeShellOpenerConfig = {}):
           throw new InputValidationError(
             "Runtime rejected the shell request (HTTP 400). Check the session ID and endpoint qualifier. " +
               "If this Runtime is managed by a harness, its backing Runtime cannot be used directly. " +
-              "Run commands through the harness with: agentcore harness exec --id <harness-id> --command <command>",
+              "Open an interactive shell through the harness with: agentcore harness shell --id <harness-id>",
             { cause: error },
           );
         }
