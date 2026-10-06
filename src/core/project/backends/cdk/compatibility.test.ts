@@ -2,7 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { cdkCompatibilityWarning, MINIMUM_COMPATIBLE_CDK_VERSION } from "./compatibility";
+import {
+  cdkCompatibilityWarning,
+  MINIMUM_COMPATIBLE_CDK_VERSION,
+  requireExplicitRoleCapability,
+} from "./compatibility";
+import { ProjectRuntimeSchema } from "../../../../projectSchemas/runtime";
 
 const tempDirectories: string[] = [];
 
@@ -22,6 +27,45 @@ async function cdkDirectoryWith(version: unknown): Promise<string> {
 }
 
 describe("cdkCompatibilityWarning", () => {
+  test.each(["missing", "stripped", "partial", "supported"])(
+    "checks the installed public schema capability: %s",
+    async (capability) => {
+      const directory = await cdkDirectoryWith("999.0.0");
+      const packageDirectory = join(directory, "node_modules", "@aws", "agentcore-cdk");
+      await writeFile(
+        join(packageDirectory, "package.json"),
+        JSON.stringify({ version: "999.0.0", main: "index.cjs" }),
+      );
+      await writeFile(
+        join(packageDirectory, "index.cjs"),
+        capability === "missing"
+          ? "module.exports = {};"
+          : `module.exports.AgentEnvSpecSchema = { safeParse(value) { return { success: true, data: ${capability === "supported" ? "value" : capability === "partial" ? '{ executionRoleConfig: { policyMode: "explicit" } }' : "{}"} }; } };`,
+      );
+      const runtime = ProjectRuntimeSchema.parse({
+        name: "exported",
+        build: "CodeZip",
+        entrypoint: "main.py",
+        codeLocation: "app/exported",
+        runtimeVersion: "PYTHON_3_14",
+        executionRoleConfig: {
+          policyMode: "explicit",
+          tags: { team: "agents" },
+          permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/Boundary",
+        },
+      });
+      if (capability === "supported")
+        expect(() => requireExplicitRoleCapability(directory, [runtime])).not.toThrow();
+      else
+        expect(() => requireExplicitRoleCapability(directory, [runtime])).toThrow(
+          /executionRoleConfig/,
+        );
+    },
+  );
+
+  test("normal projects keep the version-warning behavior without loading the CDK module", () => {
+    expect(() => requireExplicitRoleCapability("/missing", [])).not.toThrow();
+  });
   test.each(["0.0.0-0", "1.0.0-rc.1", "1.0.0-rc.2"])(
     "warns for incompatible version %s",
     async (version) => {

@@ -24,6 +24,23 @@ const networkConfig = {
   securityGroups: ["sg-0123456789abcdef0"],
 };
 describe("runtime custom validation", () => {
+  it("retains explicit execution-role config and rejects an imported role alongside it", () => {
+    const executionRoleConfig = {
+      policyMode: "explicit",
+      permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/Boundary",
+      tags: { team: "agents" },
+    };
+    expect(ProjectRuntimeSchema.parse({ ...codeZipAgent, executionRoleConfig })).toMatchObject({
+      executionRoleConfig,
+    });
+    expect(
+      ProjectRuntimeSchema.safeParse({
+        ...codeZipAgent,
+        executionRoleConfig,
+        executionRoleArn: "arn:aws:iam::111122223333:role/OldRole",
+      }).success,
+    ).toBe(false);
+  });
   it("validates Dockerfile paths through the shared guard", () => {
     expect(isValidDockerfilePath(".docker/Dockerfile")).toBe(true);
     for (const path of ["../Dockerfile", "/Dockerfile", "docker/", "a//Dockerfile", "a;rm"]) {

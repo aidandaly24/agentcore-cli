@@ -589,6 +589,32 @@ describe("CdkBackend.deploy", () => {
     expect(provisioned).toBe(false);
   });
 
+  test("rejects an unsupported explicit-role project before provisioning or synthesis", async () => {
+    const source = await project();
+    source.spec.runtimes.push({
+      name: "exported",
+      build: "CodeZip",
+      entrypoint: "main.py",
+      codeLocation: "app/exported" as never,
+      runtimeVersion: "PYTHON_3_14",
+      executionRoleConfig: { policyMode: "explicit" },
+    });
+    let provisioned = false;
+    const subject = harness({
+      provisionCredentials: async function* () {
+        provisioned = true;
+        yield { type: "step", message: "Unexpected credential provisioning" };
+        return {};
+      },
+    });
+    await expect(collectDeploy(subject.backend.deploy(source, deployInput()))).rejects.toThrow(
+      /executionRoleConfig/,
+    );
+    expect(provisioned).toBe(false);
+    expect(subject.commands).toEqual([]);
+    expect(subject.runs).toEqual([]);
+  });
+
   test("skips Transaction Search (does not fail the deploy) when setup errors", async () => {
     const input = await project();
     await writeAssembly(input, [TARGET.name]);
