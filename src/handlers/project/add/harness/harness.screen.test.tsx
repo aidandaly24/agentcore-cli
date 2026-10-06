@@ -237,7 +237,10 @@ describe("project add harness wizard", () => {
     await screen.press("return");
 
     // LiteLLM is the one provider with an API base; its key is optional.
-    await waitForText(screen.lastFrame, "API base URL");
+    await waitForText(screen.lastFrame, "Custom API base URL");
+    expect(screen.lastFrame()).toContain(
+      "leave blank to use the model provider's default endpoint",
+    );
     expect(screen.lastFrame()).toContain(`bedrock/${DEFAULT_HARNESS_MODEL.modelId}`);
     await screen.press("return"); // keep the default model ID
     await screen.press("return"); // no API key ARN
@@ -247,7 +250,7 @@ describe("project add harness wizard", () => {
     await waitForText(screen.lastFrame, "this harness will be added to agentcore.json");
     const review = flatFrame(screen.lastFrame);
     expect(review).toContain("provider litellm");
-    expect(review).toContain("API base URL https://llm.example.com/v1");
+    expect(review).toContain("Custom API base URL https://llm.example.com/v1");
     expect(review).not.toContain("API key ARN");
     await screen.press("return");
 
