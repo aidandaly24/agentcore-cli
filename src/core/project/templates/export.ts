@@ -127,7 +127,7 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
   if (input.sourceArn) {
     notes.push({
       category: "Source provenance",
-      message: `Source harness: ${input.sourceArn}. Existing dependency ARNs remain literal and source-owned. The new project's default target uses the source account and region; existing project targets are unchanged.`,
+      message: `Source harness: ${input.sourceArn}. Existing dependency ARNs remain literal and source-owned. Existing project targets are unchanged.`,
     });
   }
   if (roleSource) {

@@ -61,6 +61,7 @@ function categories(result: ReturnType<typeof mapHarnessToExportPlan>): string[]
 
 describe("mapHarnessToExportPlan model mapping", () => {
   test("preserves captured IAM documents and references without inferred application grants", () => {
+    const sourceArn = "arn:aws:bedrock-agentcore:us-west-2:111122223333:harness/source";
     const document = {
       Version: "2012-10-17",
       Statement: [
@@ -73,6 +74,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
       ],
     };
     const result = plan({
+      sourceArn,
       spec: harness({
         model: { provider: "bedrock", modelId: "openai.gpt-oss-120b", apiFormat: "responses" },
         skills: [{ s3Uri: "s3://restricted/skills" }],
@@ -95,6 +97,10 @@ describe("mapHarnessToExportPlan model mapping", () => {
       policyMode: "explicit",
       permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/Boundary",
       tags: { team: "agents" },
+    });
+    expect(result.notes).toContainEqual({
+      category: "Source provenance",
+      message: `Source harness: ${sourceArn}. Existing dependency ARNs remain literal and source-owned. Existing project targets are unchanged.`,
     });
   });
 
