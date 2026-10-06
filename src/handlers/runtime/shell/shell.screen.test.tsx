@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { renderTuiAt } from "../../../tui";
+import { createRuntimeShellOpener } from "../../../core/runtimeShell";
 import { DebugKey, EndpointKey, JsonKey, RegionKey } from "../../keys";
 import { ValueContext } from "../../../router";
 import type { RuntimeShellSession } from "../types";
@@ -146,19 +147,62 @@ describe("RuntimeShellScreen", () => {
     expect(streams.stderr()).toContain("Connected");
   });
 
-  test("renderTuiAt propagates unexpected shell failures", async () => {
+  test("keeps rejected shell connections in the TUI with retry and endpoint back navigation", async () => {
     const value = core();
-    value.runtime.setError(new Error("shell lookup failed"));
-    const { streams } = ttyTestIO();
+    const rejectShell = createRuntimeShellOpener({
+      createClient: () => ({
+        openShell: async () => {
+          throw new Error("Server rejected WebSocket connection: HTTP 400");
+        },
+      }),
+    });
+    const openShell = value.runtime.openRuntimeShell.bind(value.runtime);
+    let attempts = 0;
+    let reported: Error | undefined;
+    value.runtime.openRuntimeShell = async (request, options) => {
+      if (++attempts > 2) return openShell(request, options);
+      try {
+        return await rejectShell(request, options);
+      } catch (error) {
+        reported = error as Error;
+        throw error;
+      }
+    };
+    const { streams, stdin } = ttyTestIO();
     const ctx = ValueContext.EmptyContext()
       .withValue(RegionKey, "us-east-1")
       .withValue(EndpointKey, undefined)
       .withValue(JsonKey, false)
       .withValue(DebugKey, false);
 
-    await expect(
-      renderTuiAt("/agentcore/runtime/shell/checkout-AbCdEf1234/prod", ctx, value, streams.io),
-    ).rejects.toThrow("shell lookup failed");
+    const rendering = renderTuiAt(
+      "/agentcore/runtime/shell/checkout-AbCdEf1234/prod",
+      ctx,
+      value,
+      streams.io,
+    );
+    void rendering.catch(() => {});
+    try {
+      const errorText = "HTTP 400";
+      await waitFor(() => streams.stdout().includes(errorText));
+      expect(streams.stdout()).toContain("checkout-AbCdEf1234");
+      expect(streams.stdout()).toContain("retry");
+      expect(streams.stdout()).toContain("back");
+      expect(streams.stdout().replace(/\s+/g, "")).toContain(reported!.message.replace(/\s+/g, ""));
+      const errorsBeforeRetry = streams.stdout().split(errorText).length;
+      stdin.write("r");
+      await waitFor(() => attempts === 2);
+      await waitFor(() => streams.stdout().split(errorText).length > errorsBeforeRetry);
+      stdin.write("\x1b");
+      await waitFor(() => streams.stdout().includes("choose an endpoint to open a shell"));
+      await waitFor(() => streams.stdout().includes("updated UTC"));
+      expect(value.runtime.calls.some((call) => call.method === "listRuntimes")).toBe(false);
+      stdin.write("\r");
+      await waitFor(() => streams.stderr().includes("Session closed"));
+      expect(attempts).toBe(3);
+    } finally {
+      await interruptUntilExit(rendering, stdin);
+    }
   });
 
   test("renderTuiAt returns to a requested origin after the shell ends", async () => {
