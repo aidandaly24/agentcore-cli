@@ -83,6 +83,7 @@ function runtimeShellSdkPlugin(): Bun.BunPlugin {
   const runtimeDirectory = resolve(runtimeEntry, "..");
   const runtimeClient = join(runtimeDirectory, "client.js");
   const shellProtocol = join(runtimeDirectory, "shell", "protocol.js");
+  const shellSession = join(runtimeDirectory, "shell", "session.js");
   const namespace = "runtime-shell-sdk";
 
   return {
@@ -98,10 +99,14 @@ function runtimeShellSdkPlugin(): Bun.BunPlugin {
       build.onResolve({ filter: /^runtime-shell-sdk\/protocol$/ }, () => ({
         path: shellProtocol,
       }));
+      build.onResolve({ filter: /^runtime-shell-sdk\/session$/ }, () => ({
+        path: shellSession,
+      }));
       build.onLoad({ filter: /^runtime$/, namespace }, () => ({
         contents: [
           'export { RuntimeClient } from "runtime-shell-sdk/client";',
-          'export { ShellChannel, MAX_FRAME_SIZE } from "runtime-shell-sdk/protocol";',
+          'export { ShellChannel, ShellFramer, MAX_FRAME_SIZE } from "runtime-shell-sdk/protocol";',
+          'export { ShellSession } from "runtime-shell-sdk/session";',
         ].join("\n"),
         loader: "js",
       }));

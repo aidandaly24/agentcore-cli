@@ -7,6 +7,7 @@ import { ApplicationSignalsClient } from "@aws-sdk/client-application-signals";
 import { EvalClient } from "./eval";
 import { GatewayClient } from "./gateway";
 import { HarnessClient } from "./harness";
+import type { OpenHarnessShell } from "./harnessShell";
 import { IdentityClient } from "./identity";
 import { MemoryClient } from "./memory";
 import { PaymentClient } from "./payment";
@@ -59,6 +60,7 @@ type CoreClientConfig = {
   now?: () => number;
   bedrockAgentImporter?: CoreBedrockAgentImporter;
   openRuntimeShell?: OpenRuntimeShell;
+  openHarnessShell?: OpenHarnessShell;
 };
 
 // CoreClient is the single entry point to the Bedrock AgentCore APIs. It owns the
@@ -82,7 +84,7 @@ export class CoreClient implements AwsClients {
   private logger: Logger;
 
   // Feature-scoped sub-clients. Access as e.g. `coreClient.harness.getHarness(...)`.
-  readonly harness: HarnessClient = new HarnessClient(this);
+  readonly harness: HarnessClient;
   readonly identity: IdentityClient = new IdentityClient(this);
   readonly memory: MemoryClient = new MemoryClient(this);
   readonly runtime: RuntimeClient;
@@ -107,6 +109,7 @@ export class CoreClient implements AwsClients {
     const fetch = config.fetch ?? globalThis.fetch;
     const cloudWatch = new CloudWatchClient(this);
     this.fetch = fetch;
+    this.harness = new HarnessClient(this, config.openHarnessShell);
     this.runtime = new RuntimeClient(
       this,
       fetch,
