@@ -179,7 +179,6 @@ class HarnessShellClient {
     return {
       url: websocketUrl,
       headers: signed.headers,
-      protocols: ["v1.command.agentcore.aws.dev"],
     };
   }
 

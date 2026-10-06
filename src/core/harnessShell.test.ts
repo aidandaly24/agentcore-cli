@@ -131,7 +131,7 @@ describe("Harness shell connection", () => {
       expect(decodeURIComponent(url.pathname)).toBe(`/runtimes/${ARN}/ws/shells`);
       expect(url.searchParams.get("qualifier")).toBe("prod");
       expect(value.configs).toEqual([{ region: "us-west-2", credentials }]);
-      expect(connection.protocols).toEqual(["v1.command.agentcore.aws.dev"]);
+      expect(connection.protocols).toBeUndefined();
       expect(connection.options?.handshakeTimeout).toBe(330_000);
       expect(value.signatures[0]?.headers["X-Amzn-Bedrock-AgentCore-Runtime-Session-Id"]).toBe(
         SESSION,
