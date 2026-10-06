@@ -64,7 +64,7 @@ import { OnlineEvalConfigSchema } from "../../projectSchemas/online-eval-config"
 import { PaymentConnectorSchema, PaymentManagerSchema } from "../../projectSchemas/payment";
 import { PolicyEngineSchema, PolicySchema } from "../../projectSchemas/policy";
 import { RuntimeEndpointSchema } from "../../projectSchemas/runtime";
-import { enclosingProjectRoot, projectSpecPath } from "./fsUtils";
+import { defaultExportProjectName, enclosingProjectRoot, projectSpecPath } from "./fsUtils";
 import {
   AgentCoreCLIError,
   DeserializationError,
@@ -1014,9 +1014,26 @@ export class FsProjectManager implements ProjectManager {
   }
 
   public async *exportHarness(
-    project: Project,
+    project: Project | undefined,
     input: ExportHarnessInput,
   ): AsyncGenerator<ProjectEvent, ExportHarnessResult> {
+    if (!project) {
+      if (!input.prefetched) {
+        throw new ProjectStateError(
+          "--name requires an AgentCore project. Use --arn to export a deployed harness into a new project.",
+        );
+      }
+      const projectName = input.projectName ?? defaultExportProjectName(input.prefetched.spec.name);
+      const destination = join(process.cwd(), projectName);
+      if (existsSync(destination)) {
+        throw new InputValidationError(
+          `the export project directory '${destination}' already exists; ` +
+            "run export inside an existing AgentCore project or choose a different working directory",
+        );
+      }
+      project = yield* this.create({ name: projectName });
+    }
+
     const agentCoreSpecPath = this.getProjectSpecPath(project);
     const { targetAgentName } = input;
 
