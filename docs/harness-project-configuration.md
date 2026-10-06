@@ -13,7 +13,6 @@
 - [Networking and authentication](#networking-and-authentication)
 - [Session lifetime and storage](#session-lifetime-and-storage)
 - [Tags](#tags)
-- [Export a Harness](#export-a-harness)
 - [Validation](#validation)
 
 ## Harness Project Files
@@ -713,47 +712,6 @@ Tag values are strings. Keys are 1-128 characters, values are at most 256
 characters, and `aws:` is reserved. Project and resource tags are merged during
 deployment, with resource values taking precedence. The merged resource tag set
 must stay within the 50-tag limit.
-
-## Export a Harness
-
-Convert a local harness into editable Python Strands code inside its project:
-
-```sh
-agentcore export harness --name assistant
-```
-
-Export a deployed harness using its ARN, whether or not a project declares it:
-
-```sh
-AWS_PROFILE=deploy agentcore export harness \
-  --arn arn:aws:bedrock-agentcore:us-west-2:111122223333:harness/example-id
-```
-
-Inside a project, the generated runtime is added to that project. Outside a
-project, export creates a new project in the current directory named after the
-service harness. Names already valid for projects are preserved; underscores
-are removed, names are truncated to 23 characters, and reserved names receive a
-`Project` suffix. An existing destination directory is never reused or overwritten.
-`--name` still requires a project because it reads local harness files.
-Use `--project-name MyProject` to override the new project's name. This option
-is rejected inside an existing project.
-The new project's default deployment target uses the source ARN's account and
-region in `agentcore/aws-targets.json`.
-
-The ARN's region selects the service client. Export calls `GetHarness` with the
-harness ID and maps the returned model, system prompt, tools, skills, execution
-limits, and environment settings into the Strands templates. It does not read
-the original project's files or recover code from the harness container.
-Credentials must allow the service fetch.
-
-The generated agent defaults to `<harnessName>Agent`, shortened when necessary
-to fit the new project's deployed runtime name; override it with
-`--target-agent-name`. Its code and `EXPORT_NOTES.md` are written under
-`app/<agentName>/`, and its CodeZip runtime is registered in
-`agentcore/agentcore.json`. A newly created project contains only the exported
-runtime, not a copy of the service harness. The source harness is unchanged.
-Review the export notes for features requiring manual wiring, then run
-`agentcore build` and `agentcore deploy` from the destination project.
 
 ## Validation
 
