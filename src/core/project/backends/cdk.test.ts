@@ -459,6 +459,53 @@ describe("CdkBackend.deploy", () => {
     expect(subject.transactionSearchRegions).toEqual([]);
   });
 
+  test.each([
+    { executionRoleArn: "arn:aws:iam::111122223333:role/Source" },
+    { executionRoleConfig: { policyMode: "explicit" as const } },
+    { executionRoleConfig: { policyMode: "explicit" as const, tags: {} } },
+    {
+      executionRoleConfig: {
+        policyMode: "explicit" as const,
+        tags: { tenant: "source", "agentcore:project-name": "source" },
+      },
+    },
+  ])("omits propagated stack tags only for explicit-role projects: %j", async (role) => {
+    const input = await project();
+    input.spec = ProjectSpecSchema.parse({
+      ...input.spec,
+      runtimes: [
+        {
+          name: "exported",
+          build: "CodeZip",
+          entrypoint: "main.py",
+          codeLocation: "app/exported",
+          runtimeVersion: "PYTHON_3_14",
+          ...role,
+        },
+      ],
+    });
+    const packageDirectory = join(cdkDirectory(input), "node_modules", "@aws", "agentcore-cdk");
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(
+      join(packageDirectory, "package.json"),
+      JSON.stringify({ version: "999.0.0", main: "index.cjs" }),
+    );
+    await writeFile(
+      join(packageDirectory, "index.cjs"),
+      "module.exports.AgentEnvSpecSchema = { safeParse(value) { return { success: true, data: value }; } };",
+    );
+    await writeAssembly(input, [TARGET.name]);
+    const subject = harness();
+
+    await collectDeploy(subject.backend.deploy(input, deployInput()));
+
+    expect(subject.runs[0]!.operation).toEqual({
+      kind: "deploy",
+      stackArtifactId: "AgentCore-example-default-0",
+      ...("executionRoleConfig" in role && { omitStackTags: true }),
+    });
+  });
+
   test("streams Toolkit lines as output events under the deploy step", async () => {
     const input = await project();
     await writeAssembly(input, [TARGET.name]);

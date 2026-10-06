@@ -350,7 +350,13 @@ export class CdkBackend implements ProjectBackend {
 
     yield { type: "step", message: `Deploying ${artifact.id}` };
     const { outputs, stackArn } = yield* this.runCdk(
-      { kind: "deploy", stackArtifactId: artifact.id },
+      {
+        kind: "deploy",
+        stackArtifactId: artifact.id,
+        ...(project.spec.runtimes.some(
+          (runtime) => runtime.executionRoleConfig?.policyMode === "explicit",
+        ) && { omitStackTags: true }),
+      },
       options,
     );
 
