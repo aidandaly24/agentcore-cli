@@ -68,6 +68,34 @@ async function inProjectWithHarness(
 }
 
 describe("project export harness handler", () => {
+  test("requires readable source-role capture before creating any export output", async () => {
+    const subject = testExportCommand();
+    const { path, cleanup } = await inTempDirectory();
+    cleanups.push(cleanup);
+    subject.core.harness.setGetResponse({
+      harness: {
+        harnessName: "RemoteHarness",
+        executionRoleArn: "arn:aws:iam::111122223333:role/Source",
+        model: { bedrockModelConfig: { modelId: "model" } },
+      },
+    } as never);
+    subject.core.executionRoleSourceError = new Error("IAM AccessDenied");
+    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow("IAM AccessDenied");
+    expect(await readdir(path)).toEqual([]);
+    expect(subject.core.projectCommands).toEqual([]);
+    expect(subject.core.executionRoleSourceCalls).toMatchObject([
+      { roleArn: "arn:aws:iam::111122223333:role/Source", options: { region: "us-west-2" } },
+    ]);
+    subject.core.executionRoleSourceError = undefined;
+    subject.core.harness.setGetResponse({
+      harness: {
+        harnessName: "RemoteHarness",
+        model: { bedrockModelConfig: { modelId: "model" } },
+      },
+    } as never);
+    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/executionRoleArn/);
+    expect(await readdir(path)).toEqual([]);
+  });
   test("exports conventional prompt file contents as literal text", async () => {
     const prompt = "\uFEFFREADME.md\r\n";
     const subject = testExportCommand();
@@ -224,7 +252,12 @@ describe("project export harness handler", () => {
       agentName: "exportmeAgent",
       agentPath: join(projectRoot, "app", "exportmeAgent"),
       notesPath: join(projectRoot, "app", "exportmeAgent", "EXPORT_NOTES.md"),
-      notes: [],
+      notes: [
+        {
+          category: "Deployed IAM not captured",
+          message: expect.stringContaining("configuration-only"),
+        },
+      ],
     });
   });
 
@@ -270,6 +303,7 @@ describe("project export harness handler", () => {
     subject.core.harness.setGetResponse({
       harness: {
         harnessName: "remote_harness",
+        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
         model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
       },
     } as never);
@@ -284,6 +318,7 @@ describe("project export harness handler", () => {
     subject.core.harness.setGetResponse({
       harness: {
         harnessName: "remote_container",
+        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
         model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
         environmentArtifact: {
           containerConfiguration: {
@@ -343,6 +378,7 @@ describe("project export harness handler", () => {
     subject.core.harness.setGetResponse({
       harness: {
         harnessName: "RemoteHarness",
+        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
         model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0", maxTokens: 128 } },
         systemPrompt: [{ text: "Fetched prompt." }],
       },
@@ -362,6 +398,9 @@ describe("project export harness handler", () => {
     const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     expect(spec.name).toBe(projectName);
     expect(spec.harnesses).toEqual([]);
+    expect(await Bun.file(join(projectRoot, "agentcore", "aws-targets.json")).json()).toEqual([
+      { name: "default", account: "111122223333", region: "us-west-2" },
+    ]);
     expect(spec.runtimes.map((runtime: { name: string }) => runtime.name)).toEqual([
       "RemoteHarnessAgent",
     ]);
@@ -409,6 +448,7 @@ describe("project export harness handler", () => {
       subject.core.harness.setGetResponse({
         harness: {
           harnessName,
+          executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
           model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
         },
       } as never);
@@ -438,6 +478,7 @@ describe("project export harness handler", () => {
     subject.core.harness.setGetResponse({
       harness: {
         harnessName: "RemoteHarness",
+        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
         model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
       },
     } as never);
@@ -532,6 +573,7 @@ describe("project export harness handler", () => {
     subject.core.harness.setGetResponse({
       harness: {
         harnessName: "RemoteHarness",
+        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
         model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
       },
     } as never);

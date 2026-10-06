@@ -6,9 +6,9 @@ import z from "zod";
 import { InputValidationError, MalformedServiceResponseError } from "../../../errors";
 import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
 import type { ExportNote } from "../../../core/project/templates/export";
+import type { MemoryRetrievalConfig } from "./types";
 
 export const SERVICE_FIELD_OMITTED_NOTE_CATEGORY = "Service harness field not exported";
-export const MEMORY_TUNING_NOTE_CATEGORY = "Harness memory tuning requires manual follow-up";
 
 function parseHarnessArn(arn: string): { region: string; harnessId: string } {
   const match = /^arn:[^:]+:bedrock-agentcore:([a-z0-9-]+):(\d{12}):harness\/([^/]+)$/.exec(arn);
@@ -47,8 +47,30 @@ export function mapServiceHarnessToSpec(harness: Harness): {
   notes: ExportNote[];
   /** Service model additionalParams, which the local harness spec only holds for lite_llm. */
   modelAdditionalParams?: Record<string, unknown>;
+  memoryRetrievalConfig?: MemoryRetrievalConfig;
+  modelApiBase?: string;
 } {
   const notes: ExportNote[] = [];
+  if (harness.hooks !== undefined) {
+    notes.push({
+      category: SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
+      message:
+        "The source harness has hooks; hook behavior is not preserved. No hook code or resources were exported.",
+    });
+  }
+  if (harness.memory?.managedMemoryConfiguration?.arn) {
+    notes.push({
+      category: "Source-managed memory retention",
+      message:
+        "The exported runtime references the source-managed memory; it remains source-owned. DeleteHarness deletes this memory by default. Explicitly retain it before deleting the source harness. No data was migrated, and historic session format parity is not guaranteed.",
+    });
+  }
+  const authorizer = harness.authorizerConfiguration;
+  if (authorizer && !authorizer.customJWTAuthorizer) {
+    throw new InputValidationError(
+      "The source harness authorizer configuration is unsupported; export cannot downgrade it to IAM.",
+    );
+  }
   const promptBlocks = harness.systemPrompt ?? [];
   const joinedPrompt = promptBlocks
     .map((block) => ("text" in block ? block.text : undefined))
@@ -87,6 +109,10 @@ export function mapServiceHarnessToSpec(harness: Harness): {
     truncation: harness.truncation,
     containerUri: mapContainerUri(harness.environmentArtifact, notes),
     environmentVariables: harness.environmentVariables,
+    ...(authorizer && {
+      authorizerType: "CUSTOM_JWT",
+      authorizerConfiguration: { customJwtAuthorizer: authorizer.customJWTAuthorizer },
+    }),
     // The harness's executionRoleArn is deliberately NOT carried: the exported
     // agent is a new runtime that gets its own CDK-managed execution role.
     ...mapRuntimeEnvironment(harness, notes),
@@ -105,7 +131,16 @@ export function mapServiceHarnessToSpec(harness: Harness): {
     typeof params === "object" && params !== null && !Array.isArray(params)
       ? (params as Record<string, unknown>)
       : undefined;
-  return { spec: parsed.data, systemPrompt, notes, modelAdditionalParams };
+  const memoryRetrievalConfig = harness.memory?.agentCoreMemoryConfiguration?.retrievalConfig;
+  const modelApiBase = (openAiModelConfig as { apiBase?: string } | undefined)?.apiBase;
+  return {
+    spec: parsed.data,
+    systemPrompt,
+    notes,
+    modelAdditionalParams,
+    memoryRetrievalConfig,
+    modelApiBase,
+  };
 }
 
 function mapModel(model: Harness["model"]): Record<string, unknown> {
@@ -204,16 +239,7 @@ function mapMemory(
 ): Record<string, unknown> | undefined {
   if (!memory) return undefined;
   if ("agentCoreMemoryConfiguration" in memory && memory.agentCoreMemoryConfiguration?.arn) {
-    const { arn, actorId, messagesCount, retrievalConfig } = memory.agentCoreMemoryConfiguration;
-    if (messagesCount !== undefined || retrievalConfig !== undefined) {
-      notes.push({
-        category: MEMORY_TUNING_NOTE_CATEGORY,
-        message:
-          `The service harness configured external memory${messagesCount !== undefined ? ` messagesCount=${messagesCount}` : ""}` +
-          `${retrievalConfig !== undefined ? " with per-namespace retrieval tuning" : ""}. ` +
-          "The exported runtime cannot apply those settings until the external memory is wired manually.",
-      });
-    }
+    const { arn, actorId, messagesCount } = memory.agentCoreMemoryConfiguration;
     return clean({ mode: "existing", arn, actorId, messagesCount });
   }
   if ("managedMemoryConfiguration" in memory && memory.managedMemoryConfiguration) {

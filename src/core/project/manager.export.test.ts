@@ -86,6 +86,103 @@ function exportInput(overrides: Partial<ExportHarnessInput> = {}): ExportHarness
 }
 
 describe("FsProjectManager.exportHarness rendered tree", () => {
+  test.each(["awsIam", "none"] as const)(
+    "renders preserved memory, %s gateway and captured policies through existing writers",
+    async (auth) => {
+      const { manager: subject } = manager();
+      const project = await projectWithHarness(subject);
+      const document = {
+        Version: "2012-10-17",
+        Statement: [{ Effect: "Deny", Action: "s3:*", Resource: "*" }],
+      };
+      const spec = HarnessSpecSchema.parse({
+        name: "remote",
+        model: {
+          provider: "open_ai",
+          modelId: "gpt-5",
+          apiKeyArn:
+            "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/Original",
+        },
+        memory: {
+          mode: "existing",
+          arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/Original",
+        },
+        tools: [
+          {
+            name: "gateway",
+            type: "agentcore_gateway",
+            config: {
+              agentCoreGateway: {
+                gatewayArn: "arn:aws:bedrock-agentcore:eu-west-1:111122223333:gateway/Original",
+                outboundAuth: { [auth]: {} },
+              },
+            },
+          },
+        ],
+      });
+      const result = await drain(
+        subject.exportHarness(
+          project,
+          exportInput({
+            prefetched: {
+              spec,
+              sourceArn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:harness/source",
+              modelApiBase: "https://models.example/v1",
+              memoryRetrievalConfig: {
+                "/actual/{actorId}/{sessionId}/": { topK: 9, relevanceScore: 0.2 },
+              },
+              executionRoleSource: {
+                roleArn: "arn:aws:iam::111122223333:role/Source",
+                inlinePolicies: [{ name: "Limits", document }],
+                managedPolicyArns: [],
+                tags: {},
+              },
+            },
+          }),
+        ),
+      );
+      expect(await Bun.file(join(result.agentPath, "source-role-Limits.json")).json()).toEqual(
+        document,
+      );
+      const generated = await Bun.file(
+        join(project.rootPath, "agentcore", "agentcore.json"),
+      ).json();
+      expect(
+        generated.runtimes.find((runtime: { name: string }) => runtime.name === result.agentName)
+          .executionRoleConfig,
+      ).toEqual({ policyMode: "explicit", tags: {} });
+      expect(generated.credentials).toEqual([]);
+      const main = await Bun.file(join(result.agentPath, "main.py")).text();
+      expect(main).toContain("context.request_headers");
+      expect(main).toContain('headers.get("x-amzn-bedrock-agentcore-runtime-user-id")');
+      expect(main).not.toContain("default-user");
+      expect(main).not.toContain("getattr(context, 'user_id'");
+      const session = await Bun.file(join(result.agentPath, "memory", "session.py")).text();
+      expect(session).toContain(
+        '"/actual/{actorId}/{sessionId}/": RetrievalConfig(top_k=9, relevance_score=0.2)',
+      );
+      expect(session).not.toContain("/users/");
+      expect(session).toContain('REGION = "us-west-2"');
+      const mcp = await Bun.file(join(result.agentPath, "mcp_client", "client.py")).text();
+      if (auth === "awsIam") {
+        expect(mcp).toContain(
+          'aws_iam_streamablehttp_client(endpoint=url, aws_service="bedrock-agentcore", aws_region="eu-west-1")',
+        );
+      } else {
+        expect(mcp).toContain("streamablehttp_client(url)");
+        expect(mcp).not.toContain("aws_iam_streamablehttp_client");
+      }
+      expect(mcp).toContain("AGENTCORE_GATEWAY_GATEWAY_ORIGINAL_URL");
+      expect(
+        (await Bun.file(join(result.agentPath, "pyproject.toml")).text()).includes(
+          "mcp-proxy-for-aws",
+        ),
+      ).toBe(auth === "awsIam");
+      expect(await Bun.file(join(result.agentPath, "model", "load.py")).text()).toContain(
+        '"base_url": "https://models.example/v1"',
+      );
+    },
+  );
   test("an exported harness permits the framework version selected by the SDK integration", async () => {
     const { manager: subject } = manager();
     const project = await projectWithHarness(subject);
@@ -189,7 +286,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     expect(await Bun.file(join(result.agentPath, "main.py")).text()).toContain(
       "from memory.session import get_memory_session_manager",
     );
-    expect(result.notes).toEqual([]);
+    expect(result.notes).toMatchObject([{ category: "Deployed IAM not captured" }]);
   });
 
   test("renders memory retrieval tuning and notes messagesCount", async () => {
@@ -241,9 +338,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
 
     const loadModel = await Bun.file(join(result.agentPath, "model", "load.py")).text();
     expect(loadModel).toContain("from strands.models.openai_responses import OpenAIResponsesModel");
-    expect(loadModel).toContain(
-      'IDENTITY_PROVIDER_NAME = os.environ.get("AGENTCORE_CREDENTIAL_OPENAIKEY_NAME", "OpenAiKey")',
-    );
+    expect(loadModel).toContain('IDENTITY_PROVIDER_NAME = "OpenAiKey"');
     expect(loadModel).toContain('params["max_output_tokens"] = 512');
     expect(loadModel).toContain('params["temperature"] = 0.2');
     expect(loadModel).toContain('params["top_p"] = 0.8');
@@ -348,7 +443,10 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     const result = await drain(subject.exportHarness(project, exportInput()));
 
     expect(existsSync(join(result.agentPath, "Dockerfile"))).toBe(false);
-    expect(result.notes.map((note) => note.category)).toEqual(["Container image not carried over"]);
+    expect(result.notes.map((note) => note.category)).toEqual([
+      "Container image not carried over",
+      "Deployed IAM not captured",
+    ]);
     const spec = await Bun.file(join(project.rootPath, "agentcore", "agentcore.json")).json();
     const runtime = spec.runtimes.find((r: { name: string }) => r.name === "assistantAgent");
     expect(runtime.build).toBe("CodeZip");

@@ -1,6 +1,10 @@
 import { dirname, relative } from "node:path";
 import z from "zod";
-import { InputValidationError, ResourceNotFoundError } from "../../../errors";
+import {
+  InputValidationError,
+  MalformedServiceResponseError,
+  ResourceNotFoundError,
+} from "../../../errors";
 import { createHandler, flag, ProjectKey } from "../../../router";
 import { JsonRendererKey } from "../../../tui";
 import { JsonKey } from "../../keys";
@@ -60,15 +64,26 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
         if (!response.harness) {
           throw new ResourceNotFoundError(`no harness exists for '${flags.arn}'`);
         }
-        const { spec, systemPrompt, notes, modelAdditionalParams } = mapServiceHarnessToSpec(
-          response.harness,
+        const mapped = mapServiceHarnessToSpec(response.harness);
+        const { spec } = mapped;
+        if (!response.harness.executionRoleArn) {
+          throw new MalformedServiceResponseError(
+            "GetHarness returned no executionRoleArn; source IAM capture is required for ARN export.",
+          );
+        }
+        if (response.harness.arn && response.harness.arn !== flags.arn) {
+          throw new MalformedServiceResponseError("GetHarness returned a different source ARN.");
+        }
+        const executionRoleSource = await config.core.executionRoleSource.read(
+          response.harness.executionRoleArn,
+          { ...coreOpts, region },
         );
         const projectName = project
           ? undefined
           : (flags["project-name"] ?? defaultExportProjectName(spec.name));
         input = {
           projectName,
-          prefetched: { spec, systemPrompt, notes, modelAdditionalParams },
+          prefetched: { ...mapped, executionRoleSource, sourceArn: flags.arn },
           targetAgentName: resolveTargetAgentName(
             flags["target-agent-name"],
             spec.name,

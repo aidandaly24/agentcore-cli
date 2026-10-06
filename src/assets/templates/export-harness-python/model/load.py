@@ -101,7 +101,7 @@ from strands.models.openai import OpenAIModel
 {{/if}}
 from bedrock_agentcore.identity.auth import requires_api_key
 
-IDENTITY_PROVIDER_NAME = os.environ.get("{{identityProviders.[0].envVarName}}_NAME", "{{identityProviders.[0].name}}")
+IDENTITY_PROVIDER_NAME = {{safeJson identityProviders.[0].name}}
 IDENTITY_ENV_VAR = "{{identityProviders.[0].envVarName}}"
 
 
@@ -139,7 +139,7 @@ def load_model():
     params["top_p"] = {{modelTopP}}
     {{/if}}
     return {{#if (eq modelApiFormat "responses")}}OpenAIResponsesModel{{else}}OpenAIModel{{/if}}(
-        client_args={"api_key": _get_api_key()},
+        client_args={"api_key": _get_api_key(){{#if openAiApiBase}}, "base_url": {{safeJson openAiApiBase}}{{/if}} },
         model_id="{{#if modelId}}{{modelId}}{{else}}gpt-4.1{{/if}}",
         params=params,
     )
@@ -153,7 +153,7 @@ import os
 from strands.models.gemini import GeminiModel
 from bedrock_agentcore.identity.auth import requires_api_key
 
-IDENTITY_PROVIDER_NAME = os.environ.get("{{identityProviders.[0].envVarName}}_NAME", "{{identityProviders.[0].name}}")
+IDENTITY_PROVIDER_NAME = {{safeJson identityProviders.[0].name}}
 IDENTITY_ENV_VAR = "{{identityProviders.[0].envVarName}}"
 
 
@@ -209,7 +209,7 @@ from strands.models.litellm import LiteLLMModel
 {{#if identityProviders.[0].name}}
 from bedrock_agentcore.identity.auth import requires_api_key
 
-IDENTITY_PROVIDER_NAME = os.environ.get("{{identityProviders.[0].envVarName}}_NAME", "{{identityProviders.[0].name}}")
+IDENTITY_PROVIDER_NAME = {{safeJson identityProviders.[0].name}}
 IDENTITY_ENV_VAR = "{{identityProviders.[0].envVarName}}"
 
 

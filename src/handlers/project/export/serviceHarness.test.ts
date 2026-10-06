@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import type { Harness } from "@aws-sdk/client-bedrock-agentcore-control";
 import { InputValidationError, MalformedServiceResponseError } from "../../../errors";
 import {
-  MEMORY_TUNING_NOTE_CATEGORY,
   SERVICE_FIELD_OMITTED_NOTE_CATEGORY,
   harnessIdFromArn,
   mapServiceHarnessToSpec,
@@ -315,8 +314,8 @@ describe("mapServiceHarnessToSpec", () => {
     expect(openAi.modelAdditionalParams).toEqual({ reasoning: { effort: "low" } });
   });
 
-  test("notes external-memory tuning that cannot be wired automatically", () => {
-    const { spec, notes } = mapServiceHarnessToSpec(
+  test("preserves external-memory namespace tuning for the SDK adapter", () => {
+    const { spec, memoryRetrievalConfig } = mapServiceHarnessToSpec(
       serviceHarness({
         memory: {
           agentCoreMemoryConfiguration: {
@@ -331,7 +330,50 @@ describe("mapServiceHarnessToSpec", () => {
     );
 
     expect(spec.memory).toMatchObject({ mode: "existing", messagesCount: 12 });
-    expect(notes.map((note) => note.category)).toEqual([MEMORY_TUNING_NOTE_CATEGORY]);
+    expect(memoryRetrievalConfig).toEqual({
+      "/users/{actorId}/facts": { topK: 8, relevanceScore: 0.7 },
+    });
+  });
+
+  test("reports the retention action for reused source-managed memory", () => {
+    const { spec, notes } = mapServiceHarnessToSpec(
+      serviceHarness({
+        memory: {
+          managedMemoryConfiguration: {
+            arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/source",
+          },
+        },
+      }),
+    );
+    expect(spec.memory).toMatchObject({ mode: "existing" });
+    expect(
+      notes.some((note) => note.message.includes("DeleteHarness deletes this memory by default")),
+    ).toBe(true);
+  });
+
+  test("preserves inbound JWT and reports hooks without generating hook behavior", () => {
+    const jwt = {
+      discoveryUrl: "https://issuer.example/.well-known/openid-configuration",
+      allowedAudience: ["customer"],
+    };
+    const { spec, notes } = mapServiceHarnessToSpec(
+      serviceHarness({
+        authorizerConfiguration: { customJWTAuthorizer: jwt },
+        hooks: [{}],
+      } as Partial<Harness>),
+    );
+    expect(spec.authorizerType).toBe("CUSTOM_JWT");
+    expect(spec.authorizerConfiguration).toEqual({ customJwtAuthorizer: jwt });
+    expect(notes.some((note) => note.message.includes("hook behavior is not preserved"))).toBe(
+      true,
+    );
+    expect(() =>
+      mapServiceHarnessToSpec(
+        serviceHarness({
+          authorizerConfiguration: { $unknown: ["future", {}] },
+        }),
+      ),
+    ).toThrow(/authorizer/);
   });
 
   test("rejects a VPC harness without explicit subnets/security groups before anything is written", () => {

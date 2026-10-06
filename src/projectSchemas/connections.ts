@@ -92,3 +92,27 @@ export const ConnectionSchema = z
   .strict();
 export type Connection = z.infer<typeof ConnectionSchema>;
 export const ConnectionsSchema = z.array(ConnectionSchema);
+
+// Keep discovery tokens in sync with @aws/agentcore-cdk's connections schema.
+export const CONNECTION_ID_MAX_LENGTH = 64;
+
+export function resourceIdFromArn(arn: string): string {
+  const afterColon = arn.split(":").pop() ?? arn;
+  const slash = afterColon.lastIndexOf("/");
+  return slash >= 0 ? afterColon.slice(slash + 1) : afterColon;
+}
+
+export function connectionIdForTarget(target: ConnectionTarget): string {
+  const suffix = "arn" in target && target.arn ? resourceIdFromArn(target.arn) : target.type;
+  return `${target.type}-${suffix}`
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .slice(0, CONNECTION_ID_MAX_LENGTH);
+}
+
+export function connectionEnvToken(id: string): string {
+  return id.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+}
+
+export function connectionTokenFor(connection: Connection): string {
+  return connectionEnvToken(connection.id ?? connectionIdForTarget(connection.to));
+}

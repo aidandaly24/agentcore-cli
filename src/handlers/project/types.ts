@@ -1,5 +1,6 @@
 import { HarnessSpecSchema } from "../../projectSchemas/harness";
 import type { ExportNote } from "../../core/project/templates/export";
+import type { ExecutionRoleSource, MemoryRetrievalConfig } from "./export/types";
 import type { CredentialSchema } from "../../projectSchemas/credential";
 import type { PaymentConnectorSchema, PaymentManagerSchema } from "../../projectSchemas/payment";
 import type { ConfigBundleSchema } from "../../projectSchemas/config-bundle";
@@ -372,6 +373,10 @@ export type ExportHarnessInput = {
     systemPrompt?: string;
     notes?: ExportNote[];
     modelAdditionalParams?: Record<string, unknown>;
+    executionRoleSource?: ExecutionRoleSource;
+    sourceArn?: string;
+    memoryRetrievalConfig?: MemoryRetrievalConfig;
+    modelApiBase?: string;
   };
   /** Name of the runtime agent to generate. */
   targetAgentName: string;

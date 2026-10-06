@@ -60,6 +60,113 @@ function categories(result: ReturnType<typeof mapHarnessToExportPlan>): string[]
 }
 
 describe("mapHarnessToExportPlan model mapping", () => {
+  test("preserves captured IAM documents and references without inferred application grants", () => {
+    const document = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Deny",
+          NotAction: ["s3:GetObject"],
+          Resource: "*",
+          Condition: { StringNotEquals: { "aws:ResourceTag/team": "agents" } },
+        },
+      ],
+    };
+    const result = plan({
+      spec: harness({
+        model: { provider: "bedrock", modelId: "openai.gpt-oss-120b", apiFormat: "responses" },
+        skills: [{ s3Uri: "s3://restricted/skills" }],
+      }),
+      executionRoleSource: {
+        roleArn: "arn:aws:iam::111122223333:role/HarnessRole",
+        inlinePolicies: [{ name: "Restrict", document }],
+        managedPolicyArns: ["arn:aws:iam::111122223333:policy/OwnedElsewhere"],
+        permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/Boundary",
+        tags: { team: "agents" },
+      },
+    });
+    expect(result.policyFiles).toEqual({ "source-role-Restrict.json": document });
+    expect(result.runtime.additionalPolicies).toEqual([
+      "source-role-Restrict.json",
+      "arn:aws:iam::111122223333:policy/OwnedElsewhere",
+    ]);
+    expect(result.runtime.executionRoleArn).toBeUndefined();
+    expect(result.runtime.executionRoleConfig).toEqual({
+      policyMode: "explicit",
+      permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/Boundary",
+      tags: { team: "agents" },
+    });
+  });
+
+  test("maps existing memory and IAM gateway into native connection discovery", () => {
+    const memoryArn = "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/source-1";
+    const gatewayArn = "arn:aws:bedrock-agentcore:eu-west-1:111122223333:gateway/source-2";
+    const result = plan({
+      spec: harness({
+        memory: { mode: "existing", arn: memoryArn },
+        tools: [
+          {
+            name: "source",
+            type: "agentcore_gateway",
+            config: { agentCoreGateway: { gatewayArn, outboundAuth: { awsIam: {} } } },
+          },
+        ],
+      }),
+      memoryRetrievalConfig: { "/facts/{actorId}/": { topK: 7, relevanceScore: 0 } },
+    });
+    expect(result.hasMemory).toBe(true);
+    expect(result.context.memoryEnvVarName).toBe("AGENTCORE_MEMORY_MEMORY_SOURCE_1_ID");
+    expect(result.context.memoryRegion).toBe("us-west-2");
+    expect(result.context.memoryRetrievalNamespaces).toEqual([
+      { namespace: "/facts/{actorId}/", topK: 7, relevanceScore: 0 },
+    ]);
+    expect(result.runtime.connections).toEqual([
+      { id: "memory-source-1", to: { type: "memory", arn: memoryArn }, access: "readwrite" },
+      {
+        id: "gateway-source-2",
+        to: { type: "gateway", arn: gatewayArn, outboundAuth: { awsIam: {} } },
+      },
+    ]);
+    expect(result.context.remoteMcpTools).toMatchObject([
+      { urlEnvVar: "AGENTCORE_GATEWAY_GATEWAY_SOURCE_2_URL", awsRegion: "eu-west-1", awsIam: true },
+    ]);
+  });
+
+  test("retains API-key provider placeholders as references, never secret values", () => {
+    const arn =
+      "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/ActualProvider";
+    const result = plan({
+      spec: harness({
+        model: { provider: "open_ai", modelId: "gpt-5", apiKeyArn: `\${arn:${arn}}` },
+        tools: [
+          {
+            type: "remote_mcp",
+            name: "existing",
+            config: {
+              remoteMcp: {
+                url: "https://tools.example/mcp",
+                headers: { Authorization: `Bearer \${arn:${arn}}` },
+              },
+            },
+          },
+        ],
+        skills: [
+          { gitUrl: "https://git.example/skills", auth: { credentialArn: `\${arn:${arn}}` } },
+        ],
+      }),
+    });
+    expect(result.credentials).toEqual([]);
+    expect(result.envEntries).toEqual([]);
+    expect(result.context.identityProviders).toMatchObject([{ name: "ActualProvider" }]);
+    expect(result.context.remoteMcpTools).toMatchObject([
+      {
+        headerCredentials: [
+          { credentialName: "ActualProvider", prefix: "Bearer ", existing: true },
+        ],
+      },
+    ]);
+    expect(result.context.gitSkills).toMatchObject([{ credentialArn: arn }]);
+  });
   test("maps a bedrock model with sampling params and limits into the render context", () => {
     const result = plan({
       spec: harness({
@@ -139,9 +246,7 @@ describe("mapHarnessToExportPlan model mapping", () => {
     expect(result.context.identityProviders).toEqual([
       { name: "MyOpenAiKey", envVarName: "AGENTCORE_CREDENTIAL_MYOPENAIKEY" },
     ]);
-    expect(result.credentials).toEqual([
-      { authorizerType: "ApiKeyCredentialProvider", name: "MyOpenAiKey" },
-    ]);
+    expect(result.credentials).toEqual([]);
     expect(categories(result)).toEqual([MODEL_API_KEY_NOTE_CATEGORY]);
   });
 
@@ -352,6 +457,13 @@ describe("mapHarnessToExportPlan tools", () => {
             config: {
               agentCoreGateway: {
                 gatewayArn: "arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/g-1",
+                outboundAuth: {
+                  oauth: {
+                    providerArn:
+                      "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/oauth2credentialprovider/oauth",
+                    scopes: ["read"],
+                  },
+                },
               },
             },
           },
@@ -372,7 +484,7 @@ describe("mapHarnessToExportPlan tools", () => {
       BROWSER_TOOL_NOTE_CATEGORY,
       CODE_INTERPRETER_TOOL_NOTE_CATEGORY,
     ]);
-    expect(result.notes[0]!.message).toContain("gateway/g-1");
+    expect(result.notes[0]!.message).toContain("OAuth/user-consent");
   });
 
   test("includes the harness builtins unless allowedTools filters them out", () => {
@@ -541,7 +653,7 @@ describe("mapHarnessToExportPlan memory", () => {
     expect(categories(result)).toEqual([MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY]);
   });
 
-  test("notes an external memory referenced by ARN", () => {
+  test("wires an external memory referenced by ARN and notes its ownership", () => {
     const result = plan({
       spec: harness({
         memory: {
@@ -550,7 +662,7 @@ describe("mapHarnessToExportPlan memory", () => {
         },
       }),
     });
-    expect(result.hasMemory).toBe(false);
+    expect(result.hasMemory).toBe(true);
     expect(categories(result)).toEqual([MEMORY_ARN_NOTE_CATEGORY]);
     expect(result.notes[0]!.message).toContain("memory/m-1");
   });
@@ -620,9 +732,7 @@ describe("mapHarnessToExportPlan skills", () => {
       }),
     });
 
-    expect(result.credentials).toEqual([
-      { authorizerType: "ApiKeyCredentialProvider", name: "GitPat" },
-    ]);
+    expect(result.credentials).toEqual([]);
     expect((result.context.gitSkills as unknown[])[0]).toMatchObject({
       url: "https://github.com/example/private.git",
       credentialArn:

@@ -318,11 +318,11 @@ def agent_factory():
     cache = {}
     def get_or_create_agent(session_id, user_id{{#if hasSkillsFetcher}}, skill_plugins=None{{/if}}):
         {{#if actorId}}
-        _actor_id = "{{actorId}}"
+        _actor_id = {{safeJson actorId}}
         {{else}}
         _actor_id = user_id
         {{/if}}
-        key = f"{session_id}/{_actor_id}"
+        key = (session_id, _actor_id)
         if key not in cache:
             cache[key] = Agent(
                 model=load_model(),
@@ -469,11 +469,16 @@ async def invoke(payload, context):
 {{/if}}
 
 {{#if hasMemory}}
-    session_id = getattr(context, 'session_id', 'default-session')
+    session_id = context.session_id
+    if not session_id:
+        raise ValueError("Memory requires a Runtime session ID")
     {{#if actorId}}
-    user_id = "{{actorId}}"
+    user_id = {{safeJson actorId}}
     {{else}}
-    user_id = getattr(context, 'user_id', 'default-user')
+    headers = {key.lower(): value for key, value in (context.request_headers or {}).items()}
+    user_id = headers.get("x-amzn-bedrock-agentcore-runtime-user-id")
+    if not user_id:
+        raise ValueError("Memory requires a configured actorId or Runtime user-id header")
     {{/if}}
     agent = get_or_create_agent(session_id, user_id{{#if hasSkillsFetcher}}, _skill_plugins{{/if}})
 {{else}}
