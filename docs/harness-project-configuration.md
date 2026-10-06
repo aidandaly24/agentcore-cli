@@ -743,7 +743,10 @@ The ARN's region selects the service client. Export calls `GetHarness` with the
 harness ID and maps the returned model, system prompt, tools, skills, execution
 limits, and environment settings into the Strands templates. It does not read
 the original project's files or recover code from the harness container.
-Credentials must allow the service fetch.
+Credentials must allow the service fetch and IAM reads of its execution role:
+`GetRole`, `ListRolePolicies`, `GetRolePolicy`, `ListAttachedRolePolicies`, and
+`ListRoleTags`. Export fails before local output if role capture is incomplete
+or unreadable. All IAM lists are paginated.
 
 The generated agent defaults to `<harnessName>Agent`, shortened when necessary
 to fit the new project's deployed runtime name; override it with
@@ -753,6 +756,41 @@ to fit the new project's deployed runtime name; override it with
 runtime, not a copy of the service harness. The source harness is unchanged.
 Review the export notes for features requiring manual wiring, then run
 `agentcore build` and `agentcore deploy` from the destination project.
+
+ARN exports capture complete inline policy documents, references to attached
+managed policies, the permissions boundary, and durable role tags. The new
+runtime owns a new execution role and its trust. `executionRoleConfig` selects
+explicit application policies; inferred model, skills, binding, and file-write
+grants are not added. Runtime startup permissions remain separate. No arbitrary
+ARNs or conditions are rewritten. Managed policies remain controlled by their
+existing owners, and resource policies or principal-specific conditions may
+require owner action for the new principal. This is not a universal clone of
+effective access. Build and deployment fail closed if the installed CDK public
+schema does not retain `executionRoleConfig`; install a companion CDK release
+with that capability. Ordinary projects retain the existing compatibility warnings.
+
+External memory (including the source harness's provisioned managed memory)
+and selected IAM/no-auth gateways remain existing ARN references, wired through
+native CDK connections. Source memory namespace retrieval settings are passed to
+the SDK session manager. Memory requires an explicit actor or the Runtime user-id
+header from `RequestContext.request_headers`, plus a session ID. A header is not
+authorization proof; the application must enforce its identity boundary.
+No data is migrated and historic session format parity is not guaranteed.
+Source-managed memory remains source-owned: **DeleteHarness deletes it by
+default, so explicitly retain it before deleting the source harness.**
+
+API-key provider ARNs and documented `${arn:...}` placeholders retain the
+original provider name; export does not read secrets, mint tokens, obtain
+consent, or create replacement providers. These SDK name-based references
+require the provider's account and region at runtime. New projects use the
+source harness's account and region as their default target; existing project
+targets are unchanged. Literal MCP header values retain the local secrets-file
+handling. Unsupported credential templates fail explicitly; OAuth/user-consent
+gateway tools and source hook behavior are reported as not preserved.
+No dependency gateways, targets, memories, or roles are cloned.
+
+Local `--name` export remains configuration-only and reports that deployed IAM
+was not captured; it does not guess an execution role.
 
 ## Validation
 
