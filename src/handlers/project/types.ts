@@ -435,6 +435,7 @@ export type ExportHarnessInput = {
     systemPrompt?: string;
     notes?: ExportNote[];
     modelAdditionalParams?: Record<string, unknown>;
+    sourceArn?: string;
   };
   /** Name of the runtime agent to generate. */
   targetAgentName: string;
