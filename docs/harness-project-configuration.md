@@ -737,6 +737,8 @@ are removed, names are truncated to 23 characters, and reserved names receive a
 `--name` still requires a project because it reads local harness files.
 Use `--project-name MyProject` to override the new project's name. This option
 is rejected inside an existing project.
+The new project's default deployment target uses the source ARN's account and
+region in `agentcore/aws-targets.json`.
 
 The ARN's region selects the service client. Export calls `GetHarness` with the
 harness ID and maps the returned model, system prompt, tools, skills, execution
