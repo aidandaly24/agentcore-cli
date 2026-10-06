@@ -189,6 +189,13 @@ describe("RuntimeShellScreen", () => {
       expect(streams.stdout()).toContain("retry");
       expect(streams.stdout()).toContain("back");
       expect(streams.stdout().replace(/\s+/g, "")).toContain(reported!.message.replace(/\s+/g, ""));
+      expect(streams.stdout().replace(/\s+/g, " ")).toContain(
+        "If this Runtime is managed by a harness",
+      );
+      expect(streams.stdout()).toContain("\nIf this Runtime");
+      expect(streams.stdout().replace(/\s+/g, " ")).toContain(
+        "agentcore harness shell --id <harness-id>",
+      );
       const errorsBeforeRetry = streams.stdout().split(errorText).length;
       stdin.write("r");
       await waitFor(() => attempts === 2);

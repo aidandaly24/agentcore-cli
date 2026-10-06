@@ -10,9 +10,10 @@ type ShellHandoffProps = {
   label: string;
   returnPath?: string;
   run: (io: AppIO) => Promise<void>;
+  errorHint?: (error: Error) => string | undefined;
 };
 
-export function ShellHandoff({ label, returnPath, run }: ShellHandoffProps) {
+export function ShellHandoff({ label, returnPath, run, errorHint }: ShellHandoffProps) {
   const { exit, suspendTerminal } = useApp();
   const { stdin } = useStdin();
   const { stdout } = useStdout();
@@ -61,6 +62,7 @@ export function ShellHandoff({ label, returnPath, run }: ShellHandoffProps) {
   }, [attempt, exit, navigate, returnPath, run, stderr, stdin, stdout, suspendTerminal]);
 
   if (error) {
+    const hint = errorHint?.(error);
     return (
       <Layout
         breadcrumb={location.pathname.split("/").filter(Boolean).map(decodeURIComponent)}
@@ -71,6 +73,12 @@ export function ShellHandoff({ label, returnPath, run }: ShellHandoffProps) {
         ]}
       >
         <Text color="red">Error: {error.message}</Text>
+        {hint && (
+          <Text>
+            {"\n"}
+            {hint}
+          </Text>
+        )}
       </Layout>
     );
   }

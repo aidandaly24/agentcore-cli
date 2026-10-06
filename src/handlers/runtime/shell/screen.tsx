@@ -4,6 +4,7 @@ import { RuntimePicker } from "../../../components/RuntimePicker";
 import { ShellHandoff } from "../../../components/ShellHandoff";
 import type { ScreenProps } from "../../types";
 import { RuntimeShellLaunchContextKey } from "./launchContext";
+import { runtimeShellErrorHint } from "./error";
 import { runRuntimeShell } from "./operation";
 
 type RuntimeShellLocationState = {
@@ -66,6 +67,7 @@ export function RuntimeShellScreen(props: ScreenProps) {
     <ShellHandoff
       label={`Opening shell for ${runtimeId} (${qualifier})...`}
       returnPath={locationState?.returnPath}
+      errorHint={runtimeShellErrorHint}
       run={(io) =>
         runRuntimeShell({
           ...props,
