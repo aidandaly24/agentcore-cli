@@ -789,6 +789,9 @@ handling. Unsupported credential templates fail explicitly; OAuth/user-consent
 gateway tools and source hook behavior are reported as not preserved.
 No dependency gateways, targets, memories, or roles are cloned.
 
+ARN export rejects JWT `privateEndpoint` and `privateEndpointOverrides` because
+the exported runtime cannot preserve private authorizer networking.
+
 Local `--name` export remains configuration-only and reports that deployed IAM
 was not captured; it does not guess an execution role.
 

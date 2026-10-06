@@ -376,6 +376,30 @@ describe("mapServiceHarnessToSpec", () => {
     ).toThrow(/authorizer/);
   });
 
+  test.each(["privateEndpoint", "privateEndpointOverrides"] as const)(
+    "rejects JWT %s that runtime export cannot preserve",
+    (field) => {
+      const privateEndpoint = {
+        selfManagedLatticeResource: {
+          resourceConfigurationIdentifier: "rcfg-0123456789abcdef0",
+        },
+      };
+      const source = serviceHarness({
+        authorizerConfiguration: {
+          customJWTAuthorizer: {
+            discoveryUrl: "https://issuer.example/.well-known/openid-configuration",
+            allowedAudience: ["customer"],
+            [field]: field === "privateEndpoint" ? privateEndpoint : [],
+          },
+        },
+      });
+      expect(() => mapServiceHarnessToSpec(source)).toThrow(InputValidationError);
+      expect(() => mapServiceHarnessToSpec(source)).toThrow(
+        /cannot preserve private JWT authorizer networking/,
+      );
+    },
+  );
+
   test("rejects a VPC harness without explicit subnets/security groups before anything is written", () => {
     expect(() =>
       mapServiceHarnessToSpec(

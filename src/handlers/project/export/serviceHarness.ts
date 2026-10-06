@@ -71,6 +71,16 @@ export function mapServiceHarnessToSpec(harness: Harness): {
       "The source harness authorizer configuration is unsupported; export cannot downgrade it to IAM.",
     );
   }
+  const jwtAuthorizer = authorizer?.customJWTAuthorizer;
+  if (
+    jwtAuthorizer?.privateEndpoint !== undefined ||
+    jwtAuthorizer?.privateEndpointOverrides !== undefined
+  ) {
+    throw new InputValidationError(
+      "Harness export cannot preserve private JWT authorizer networking " +
+        "(privateEndpoint or privateEndpointOverrides). Export is unsupported for this source configuration.",
+    );
+  }
   const promptBlocks = harness.systemPrompt ?? [];
   const joinedPrompt = promptBlocks
     .map((block) => ("text" in block ? block.text : undefined))
