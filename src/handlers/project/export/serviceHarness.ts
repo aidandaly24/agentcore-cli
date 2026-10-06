@@ -74,7 +74,7 @@ export function mapServiceHarnessToSpec(harness: Harness): {
   const jwtAuthorizer = authorizer?.customJWTAuthorizer;
   if (
     jwtAuthorizer?.privateEndpoint !== undefined ||
-    jwtAuthorizer?.privateEndpointOverrides !== undefined
+    (jwtAuthorizer?.privateEndpointOverrides?.length ?? 0) > 0
   ) {
     throw new InputValidationError(
       "Harness export cannot preserve private JWT authorizer networking " +

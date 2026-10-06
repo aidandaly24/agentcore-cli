@@ -355,12 +355,22 @@ describe("mapServiceHarnessToSpec", () => {
     const jwt = {
       discoveryUrl: "https://issuer.example/.well-known/openid-configuration",
       allowedAudience: ["customer"],
+      privateEndpointOverrides: [],
     };
     const { spec, notes } = mapServiceHarnessToSpec(
       serviceHarness({
         authorizerConfiguration: { customJWTAuthorizer: jwt },
-        hooks: [{}],
-      } as Partial<Harness>),
+        hooks: [
+          {
+            beforeInvocation: {
+              name: "before",
+              target: {
+                lambda: { arn: "arn:aws:lambda:us-west-2:111122223333:function:SourceHook" },
+              },
+            },
+          },
+        ],
+      }),
     );
     expect(spec.authorizerType).toBe("CUSTOM_JWT");
     expect(spec.authorizerConfiguration).toEqual({ customJwtAuthorizer: jwt });
@@ -389,7 +399,10 @@ describe("mapServiceHarnessToSpec", () => {
           customJWTAuthorizer: {
             discoveryUrl: "https://issuer.example/.well-known/openid-configuration",
             allowedAudience: ["customer"],
-            [field]: field === "privateEndpoint" ? privateEndpoint : [],
+            [field]:
+              field === "privateEndpoint"
+                ? privateEndpoint
+                : [{ domain: "issuer.example", privateEndpoint }],
           },
         },
       });
