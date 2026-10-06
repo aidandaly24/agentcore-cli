@@ -226,7 +226,9 @@ describe("createRuntimeShellOpener", () => {
         source: "user",
         exitCode: 2,
       });
-      expect((error as Error).message).toContain("If this Runtime is managed by a harness");
+      expect((error as Error).message).toContain(
+        "HTTP 400\n\nIf this Runtime is managed by a harness",
+      );
       expect((error as Error).message).toContain("agentcore harness shell --id <harness-id>");
     } else {
       await expect(opener(REQUEST, { region: "us-west-2" })).rejects.toBe(failure);
