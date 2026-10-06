@@ -17,6 +17,7 @@ import { HarnessUpdateScreen } from "../handlers/harness/update/screen.tsx";
 import { HarnessDeleteScreen } from "../handlers/harness/delete/screen.tsx";
 import { HarnessInvokeScreen } from "../handlers/harness/invoke/screen.tsx";
 import { HarnessExecScreen } from "../handlers/harness/exec/screen.tsx";
+import { HarnessShellScreen } from "../handlers/harness/shell/screen.tsx";
 import { HarnessEndpointScreen } from "../handlers/harness/endpoint/screen.tsx";
 import { HarnessCreateEndpointScreen } from "../handlers/harness/endpoint/create/screen.tsx";
 import { HarnessGetEndpointScreen } from "../handlers/harness/endpoint/get/screen.tsx";
@@ -336,6 +337,18 @@ function RouteTable({ ctx, core }: ScreenProps) {
         element={<HarnessInvokeScreen ctx={ctx} core={core} />}
       />
       <Route path="agentcore/harness/exec" element={<HarnessExecScreen ctx={ctx} core={core} />} />
+      <Route
+        path="agentcore/harness/shell"
+        element={<HarnessShellScreen ctx={ctx} core={core} />}
+      />
+      <Route
+        path="agentcore/harness/shell/:harnessId"
+        element={<HarnessShellScreen ctx={ctx} core={core} />}
+      />
+      <Route
+        path="agentcore/harness/shell/:harnessId/:qualifier"
+        element={<HarnessShellScreen ctx={ctx} core={core} />}
+      />
       <Route
         path="agentcore/harness/exec/:harnessId"
         element={<HarnessExecScreen ctx={ctx} core={core} />}
