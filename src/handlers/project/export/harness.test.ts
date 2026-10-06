@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AgentCoreCLIError } from "../../../errors";
 import { createRootHandler } from "../../index";
@@ -70,8 +70,13 @@ async function inProjectWithHarness(
 describe("project export harness handler", () => {
   test("requires readable source-role capture before creating any export output", async () => {
     const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
+    const projectRoot = await inProjectWithHarness(subject);
+    const specPath = join(projectRoot, "agentcore", "agentcore.json");
+    const targetsPath = join(projectRoot, "agentcore", "aws-targets.json");
+    const specBefore = await Bun.file(specPath).text();
+    const targetsBefore = await Bun.file(targetsPath).text();
+    const appBefore = await readdir(join(projectRoot, "app"));
+    const commandsBefore = [...subject.core.projectCommands];
     subject.core.harness.setGetResponse({
       harness: {
         harnessName: "RemoteHarness",
@@ -81,8 +86,10 @@ describe("project export harness handler", () => {
     } as never);
     subject.core.executionRoleSourceError = new Error("IAM AccessDenied");
     await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow("IAM AccessDenied");
-    expect(await readdir(path)).toEqual([]);
-    expect(subject.core.projectCommands).toEqual([]);
+    expect(await Bun.file(specPath).text()).toBe(specBefore);
+    expect(await Bun.file(targetsPath).text()).toBe(targetsBefore);
+    expect(await readdir(join(projectRoot, "app"))).toEqual(appBefore);
+    expect(subject.core.projectCommands).toEqual(commandsBefore);
     expect(subject.core.executionRoleSourceCalls).toMatchObject([
       { roleArn: "arn:aws:iam::111122223333:role/Source", options: { region: "us-west-2" } },
     ]);
@@ -94,7 +101,11 @@ describe("project export harness handler", () => {
       },
     } as never);
     await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/executionRoleArn/);
-    expect(await readdir(path)).toEqual([]);
+    expect(await Bun.file(specPath).text()).toBe(specBefore);
+    expect(await Bun.file(targetsPath).text()).toBe(targetsBefore);
+    expect(await readdir(join(projectRoot, "app"))).toEqual(appBefore);
+    expect(subject.core.projectCommands).toEqual(commandsBefore);
+    expect(subject.core.executionRoleSourceCalls).toHaveLength(1);
   });
   test("exports conventional prompt file contents as literal text", async () => {
     const prompt = "\uFEFFREADME.md\r\n";
@@ -264,6 +275,8 @@ describe("project export harness handler", () => {
   test("exports a service harness by ARN, fetching from the ARN's region", async () => {
     const subject = testExportCommand();
     const projectRoot = await inProjectWithHarness(subject);
+    const targetsPath = join(projectRoot, "agentcore", "aws-targets.json");
+    const targetsBefore = await Bun.file(targetsPath).text();
     subject.core.harness.setGetResponse({
       harness: {
         harnessId: "h-abc123",
@@ -288,6 +301,13 @@ describe("project export harness handler", () => {
         args: ["h-abc123", expect.objectContaining({ region: "us-west-2" })],
       },
     ]);
+    expect(subject.core.executionRoleSourceCalls).toEqual([
+      {
+        roleArn: "arn:aws:iam::111122223333:role/HarnessRole",
+        options: expect.objectContaining({ region: "us-west-2" }),
+      },
+    ]);
+    expect(await Bun.file(targetsPath).text()).toBe(targetsBefore);
     expect(await Bun.file(join(projectRoot, "app", "exported_arn", "main.py")).text()).toContain(
       'DEFAULT_SYSTEM_PROMPT = """Fetched prompt."""',
     );
@@ -368,220 +388,18 @@ describe("project export harness handler", () => {
     expect(existsSync(join(projectRoot, "app", "remote_containerAgent", "Dockerfile"))).toBe(false);
   });
 
-  test.each([
-    [undefined, "RemoteHarness"],
-    ["ChosenProject", "ChosenProject"],
-  ])("creates an export project with name override %s", async (override, projectName) => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    subject.core.harness.setGetResponse({
-      harness: {
-        harnessName: "RemoteHarness",
-        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
-        model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0", maxTokens: 128 } },
-        systemPrompt: [{ text: "Fetched prompt." }],
-      },
-    } as never);
-
-    await subject.run([
-      "--arn",
-      HARNESS_ARN,
-      "--region",
-      "us-east-1",
-      "--json",
-      ...(override ? ["--project-name", override] : []),
-    ]);
-
-    const projectRoot = join(path, projectName);
-    const agentPath = join(projectRoot, "app", "RemoteHarnessAgent");
-    const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
-    expect(spec.name).toBe(projectName);
-    expect(spec.harnesses).toEqual([]);
-    expect(await Bun.file(join(projectRoot, "agentcore", "aws-targets.json")).json()).toEqual([
-      { name: "default", account: "111122223333", region: "us-west-2" },
-    ]);
-    expect(spec.runtimes.map((runtime: { name: string }) => runtime.name)).toEqual([
-      "RemoteHarnessAgent",
-    ]);
-    expect(await Bun.file(join(agentPath, "main.py")).text()).toContain("Fetched prompt.");
-    expect(await Bun.file(join(agentPath, "model", "load.py")).text()).toContain("max_tokens=128");
-    expect(existsSync(join(projectRoot, "agentcore", "cdk", "package.json"))).toBe(true);
-    expect(subject.core.projectCommands).toContainEqual({
-      command: ["npm", "install", "--loglevel=http"],
-      cwd: join(projectRoot, "agentcore", "cdk"),
-    });
-    expect(subject.core.projectCommands).toContainEqual({
-      command: ["git", "init"],
-      cwd: projectRoot,
-    });
-    expect(subject.core.projectCommands).toContainEqual({
-      command: ["uv", "sync"],
-      cwd: agentPath,
-    });
-    expect(subject.core.harness.calls).toEqual([
-      {
-        method: "getHarness",
-        args: ["h-abc123", expect.objectContaining({ region: "us-west-2" })],
-      },
-    ]);
-    expect(JSON.parse(subject.io.stdout())).toMatchObject({
-      harnessName: "RemoteHarness",
-      agentName: "RemoteHarnessAgent",
-      agentPath,
-    });
-    expect(subject.io.stderr()).toContain(`cd ${projectName}`);
-    expect(process.cwd()).toBe(path);
-  });
-
-  test.each([
-    ["remote_harness", "remoteharness", "customAgent"],
-    ["RemoteHarnessWithAVeryLongName", "RemoteHarnessWithAVeryL", "customAgent"],
-    ["strands", "strandsProject", "customAgent"],
-    ["RemoteHarnessWithAVeryLongName", "RemoteHarnessWithAVeryL", undefined],
-  ])(
-    "creates deployable default names for harness %s",
-    async (harnessName, projectName, agentName) => {
-      const subject = testExportCommand();
-      const { path, cleanup } = await inTempDirectory();
-      cleanups.push(cleanup);
-      subject.core.harness.setGetResponse({
-        harness: {
-          harnessName,
-          executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
-          model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
-        },
-      } as never);
-
-      await subject.run([
-        "--arn",
-        HARNESS_ARN,
-        ...(agentName ? ["--target-agent-name", agentName] : []),
-      ]);
-
-      const projectRoot = join(path, projectName);
-      const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
-      expect(spec.name).toBe(projectName);
-      const generatedName = spec.runtimes[0].name;
-      expect(`${projectName}_default_${generatedName}`.length).toBeLessThanOrEqual(48);
-      expect(existsSync(join(projectRoot, "app", generatedName, "main.py"))).toBe(true);
-    },
-  );
-
-  test("does not modify an existing destination directory", async () => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    const destination = join(path, "RemoteHarness");
-    await mkdir(destination);
-    await writeFile(join(destination, "keep.txt"), "customer content");
-    subject.core.harness.setGetResponse({
-      harness: {
-        harnessName: "RemoteHarness",
-        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
-        model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
-      },
-    } as never);
-
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/already exists/);
-
-    expect(await readdir(destination)).toEqual(["keep.txt"]);
-    expect(await readFile(join(destination, "keep.txt"), "utf8")).toBe("customer content");
-    expect(subject.core.projectCommands).toEqual([]);
-  });
-
-  test("requires a project for --name and explains how to export a service harness", async () => {
+  test("validates the project before fetching from the service", async () => {
     const subject = testExportCommand();
     const { path, cleanup } = await inTempDirectory();
     cleanups.push(cleanup);
 
-    await expect(subject.run(["--name", "exportme"])).rejects.toThrow(
-      /--name requires an AgentCore project.*--arn/,
-    );
+    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/No AgentCore project found/);
+    await expect(subject.run(["--name", "exportme"])).rejects.toThrow(/No AgentCore project found/);
 
     expect(subject.core.harness.calls).toEqual([]);
-    expect(await readdir(path)).toEqual([]);
-  });
-
-  test("rejects a project-name override inside an existing project", async () => {
-    const subject = testExportCommand();
-    await inProjectWithHarness(subject);
-    await expect(subject.run(["--arn", HARNESS_ARN, "--project-name", "Other"])).rejects.toThrow(
-      /only available outside/,
-    );
-    expect(subject.core.harness.calls).toEqual([]);
-  });
-
-  test("validates an existing project before fetching from the service", async () => {
-    const subject = testExportCommand();
-    const projectRoot = await inProjectWithHarness(subject);
-    await writeFile(join(projectRoot, "agentcore", "agentcore.json"), "{ invalid json");
-
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow();
-
-    expect(subject.core.harness.calls).toEqual([]);
-  });
-
-  test("does not create a project when the service harness is missing", async () => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    subject.core.harness.setGetResponse({ harness: undefined });
-
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(/no harness exists/);
-
-    expect(await readdir(path)).toEqual([]);
+    expect(subject.core.executionRoleSourceCalls).toEqual([]);
     expect(subject.core.projectCommands).toEqual([]);
-  });
-
-  test("does not create a project when the service fetch fails", async () => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    subject.core.harness.setError(new Error("Access denied"));
-
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow("Access denied");
-
     expect(await readdir(path)).toEqual([]);
-    expect(subject.core.projectCommands).toEqual([]);
-  });
-
-  test("does not create a project when the service response cannot be mapped", async () => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    subject.core.harness.setGetResponse({
-      harness: { harnessName: "RemoteHarness", model: {} },
-    } as never);
-
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(
-      /no recognized model configuration/,
-    );
-
-    expect(await readdir(path)).toEqual([]);
-    expect(subject.core.projectCommands).toEqual([]);
-  });
-
-  test.each([
-    [["--target-agent-name", "9bad"], /invalid --target-agent-name/],
-    [["--target-agent-name", "RuntimeNameThatDoesNotFitTheNewProject"], /must fit within/],
-    [["--project-name", "9bad"], /Project name/],
-  ])("does not create a project for invalid naming %j", async (flags, error) => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    subject.core.harness.setGetResponse({
-      harness: {
-        harnessName: "RemoteHarness",
-        executionRoleArn: "arn:aws:iam::111122223333:role/HarnessRole",
-        model: { bedrockModelConfig: { modelId: "us.amazon.nova-lite-v1:0" } },
-      },
-    } as never);
-
-    await expect(subject.run(["--arn", HARNESS_ARN, ...flags])).rejects.toThrow(error);
-
-    expect(await readdir(path)).toEqual([]);
-    expect(subject.core.projectCommands).toEqual([]);
   });
 
   test("rejects a malformed --arn before calling the service", async () => {
