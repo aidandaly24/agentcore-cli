@@ -931,10 +931,11 @@ convert project resources into editable code you own
 agentcore export harness [options]
 ```
 
-convert a managed harness into a code-defined harness with the Strands Harness SDK
+convert a managed harness into a code-defined harness with the Strands Harness SDK, creating a project if needed
 
 **Options**
 
+- `--project-name <project-name>`: name of the project to create when exporting outside a project
 - `--name <name>`: the name of an in-project harness to export
 - `--arn <arn>`: the ARN of a deployed harness to fetch from the service and export
 - `--target-agent-name <target-agent-name>`: the name of the generated Runtime agent (default &lt;harnessName&gt;Agent)
