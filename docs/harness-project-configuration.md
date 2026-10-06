@@ -730,14 +730,9 @@ AWS_PROFILE=deploy agentcore export harness \
   --arn arn:aws:bedrock-agentcore:us-west-2:111122223333:harness/example-id
 ```
 
-Inside a project, the generated runtime is added to that project. Outside a
-project, export creates a new project in the current directory named after the
-service harness. Names already valid for projects are preserved; underscores
-are removed, names are truncated to 23 characters, and reserved names receive a
-`Project` suffix. An existing destination directory is never reused or overwritten.
-`--name` still requires a project because it reads local harness files.
-Use `--project-name MyProject` to override the new project's name. This option
-is rejected inside an existing project.
+Both `--name` and `--arn` require an existing AgentCore project. The generated
+runtime is added to that project. `--name` reads its local harness files;
+`--arn` fetches a deployed harness even if the project does not declare it.
 
 The ARN's region selects the service client. Export calls `GetHarness` with the
 harness ID and maps the returned model, system prompt, tools, skills, execution
@@ -748,14 +743,12 @@ Credentials must allow the service fetch and IAM reads of its execution role:
 `ListRoleTags`. Export fails before local output if role capture is incomplete
 or unreadable. All IAM lists are paginated.
 
-The generated agent defaults to `<harnessName>Agent`, shortened when necessary
-to fit the new project's deployed runtime name; override it with
+The generated agent defaults to `<harnessName>Agent`; override it with
 `--target-agent-name`. Its code and `EXPORT_NOTES.md` are written under
 `app/<agentName>/`, and its CodeZip runtime is registered in
-`agentcore/agentcore.json`. A newly created project contains only the exported
-runtime, not a copy of the service harness. The source harness is unchanged.
+`agentcore/agentcore.json`. The source harness is unchanged.
 Review the export notes for features requiring manual wiring, then run
-`agentcore build` and `agentcore deploy` from the destination project.
+`agentcore build` and `agentcore deploy` from the existing project.
 
 ARN exports capture complete inline policy documents, references to attached
 managed policies, the permissions boundary, and durable role tags. The new
@@ -782,9 +775,8 @@ default, so explicitly retain it before deleting the source harness.**
 API-key provider ARNs and documented `${arn:...}` placeholders retain the
 original provider name; export does not read secrets, mint tokens, obtain
 consent, or create replacement providers. These SDK name-based references
-require the provider's account and region at runtime. New projects use the
-source harness's account and region as their default target; existing project
-targets are unchanged. Literal MCP header values retain the local secrets-file
+require the provider's account and region at runtime. Existing project targets
+are unchanged. Literal MCP header values retain the local secrets-file
 handling. Unsupported credential templates fail explicitly; OAuth/user-consent
 gateway tools and source hook behavior are reported as not preserved.
 No dependency gateways, targets, memories, or roles are cloned.
