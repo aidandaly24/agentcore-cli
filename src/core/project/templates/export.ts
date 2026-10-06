@@ -659,7 +659,7 @@ function resolveTools(
           for (const headerKey of headerKeys) {
             const value = cfg.headers![headerKey] ?? "";
             if (value.includes("${")) {
-              const placeholder = /^([^$]*)\$\{arn:(arn:[^{}]+)\}([^$]*)$/.exec(value);
+              const placeholder = /^([^$]*)\$\{(arn:[^{}]+)\}([^$]*)$/.exec(value);
               if (!placeholder?.[2])
                 throw new InputValidationError(
                   `Unsupported credential template in MCP header "${headerKey}" on "${tool.name}"; authentication cannot be downgraded.`,
@@ -947,7 +947,7 @@ function resolveSkills(spec: HarnessSpec, notes: ExportNote[]): SkillsResolution
 }
 
 function apiKeyProviderReference(value: string): { arn: string; name: string } {
-  const arn = /^\$\{arn:(arn:[^{}]+)\}$/.exec(value)?.[1] ?? value;
+  const arn = /^\$\{(arn:[^{}]+)\}$/.exec(value)?.[1] ?? value;
   if (
     !/^arn:[^:]+:bedrock-agentcore:[a-z0-9-]+:\d{12}:token-vault\/[^/]+\/apikeycredentialprovider\/[^/{}]+$/.test(
       arn,

@@ -132,41 +132,82 @@ describe("mapHarnessToExportPlan model mapping", () => {
     ]);
   });
 
-  test("retains API-key provider placeholders as references, never secret values", () => {
-    const arn =
-      "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/ActualProvider";
-    const result = plan({
-      spec: harness({
-        model: { provider: "open_ai", modelId: "gpt-5", apiKeyArn: `\${arn:${arn}}` },
-        tools: [
-          {
-            type: "remote_mcp",
-            name: "existing",
-            config: {
-              remoteMcp: {
-                url: "https://tools.example/mcp",
-                headers: { Authorization: `Bearer \${arn:${arn}}` },
+  test.each(["wrapped", "plain"])(
+    "retains %s API-key provider references, never secret values",
+    (form) => {
+      const arn =
+        "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/ActualProvider";
+      const reference = form === "wrapped" ? `\${${arn}}` : arn;
+      const result = plan({
+        spec: harness({
+          model: { provider: "open_ai", modelId: "gpt-5", apiKeyArn: reference },
+          tools: [
+            {
+              type: "remote_mcp",
+              name: "existing",
+              config: {
+                remoteMcp: {
+                  url: "https://tools.example/mcp",
+                  headers: { "x-api-key": `\${${arn}}`, Authorization: `Bearer \${${arn}}` },
+                },
               },
             },
-          },
-        ],
-        skills: [
-          { gitUrl: "https://git.example/skills", auth: { credentialArn: `\${arn:${arn}}` } },
-        ],
-      }),
-    });
-    expect(result.credentials).toEqual([]);
-    expect(result.envEntries).toEqual([]);
-    expect(result.context.identityProviders).toMatchObject([{ name: "ActualProvider" }]);
-    expect(result.context.remoteMcpTools).toMatchObject([
-      {
-        headerCredentials: [
-          { credentialName: "ActualProvider", prefix: "Bearer ", existing: true },
-        ],
-      },
-    ]);
-    expect(result.context.gitSkills).toMatchObject([{ credentialArn: arn }]);
-  });
+          ],
+          skills: [{ gitUrl: "https://git.example/skills", auth: { credentialArn: reference } }],
+        }),
+      });
+      expect(result.credentials).toEqual([]);
+      expect(result.envEntries).toEqual([]);
+      expect(result.context.identityProviders).toMatchObject([{ name: "ActualProvider" }]);
+      expect(result.context.remoteMcpTools).toMatchObject([
+        {
+          headerCredentials: [
+            {
+              headerKey: "x-api-key",
+              credentialName: "ActualProvider",
+              prefix: "",
+              existing: true,
+            },
+            { credentialName: "ActualProvider", prefix: "Bearer ", existing: true },
+          ],
+        },
+      ]);
+      expect(result.context.gitSkills).toMatchObject([{ credentialArn: arn }]);
+    },
+  );
+
+  test.each(["model", "git", "header"])(
+    "rejects malformed ARN and arbitrary templates in %s references",
+    (source) => {
+      const arn =
+        "arn:aws:bedrock-agentcore:us-west-2:111122223333:token-vault/default/apikeycredentialprovider/ActualProvider";
+      for (const reference of [`\${arn:${arn}}`, "${env:API_KEY}"]) {
+        const spec = harness({
+          ...(source === "model" && {
+            model: { provider: "open_ai", modelId: "gpt-5", apiKeyArn: reference },
+          }),
+          ...(source === "git" && {
+            skills: [{ gitUrl: "https://git.example/skills", auth: { credentialArn: reference } }],
+          }),
+          ...(source === "header" && {
+            tools: [
+              {
+                type: "remote_mcp",
+                name: "existing",
+                config: {
+                  remoteMcp: {
+                    url: "https://tools.example/mcp",
+                    headers: { "x-api-key": reference },
+                  },
+                },
+              },
+            ],
+          }),
+        });
+        expect(() => plan({ spec })).toThrow(/Unsupported .* (reference|template)/);
+      }
+    },
+  );
   test("maps a bedrock model with sampling params and limits into the render context", () => {
     const result = plan({
       spec: harness({
