@@ -119,6 +119,10 @@ import type {
 } from "@aws-sdk/client-bedrock-agentcore";
 import type { Core } from "../handlers/types";
 import type {
+  CoreExecutionRoleSourceReader,
+  ExecutionRoleSource,
+} from "../handlers/project/export/types";
+import type {
   CoreHarnessClient,
   CreateHarnessInput,
   ResolvedHarnessRuntime,
@@ -2601,6 +2605,20 @@ export class TestPolicyClient implements CorePolicyClient {
 
 // TestCoreClient implements the Core contract with fully controllable sub-clients.
 export class TestCoreClient implements Core {
+  executionRoleSourceResult: Omit<ExecutionRoleSource, "roleArn"> = {
+    inlinePolicies: [],
+    managedPolicyArns: [],
+    tags: {},
+  };
+  executionRoleSourceError?: Error;
+  readonly executionRoleSourceCalls: { roleArn: string; options: CoreOptions }[] = [];
+  readonly executionRoleSource: CoreExecutionRoleSourceReader = {
+    read: async (roleArn, options) => {
+      this.executionRoleSourceCalls.push({ roleArn, options });
+      if (this.executionRoleSourceError) throw this.executionRoleSourceError;
+      return { roleArn, ...this.executionRoleSourceResult };
+    },
+  };
   readonly harness = new TestHarnessClient();
   readonly identity = new TestIdentityClient();
   readonly payment = new TestPaymentClient();

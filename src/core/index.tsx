@@ -31,6 +31,7 @@ import type { Logger } from "../logging";
 import type { ProjectManager } from "../handlers/project/types";
 import { FsProjectManager } from "./project";
 import { BedrockAgentImporter, type CoreBedrockAgentImporter } from "./project/bedrockAgentImport";
+import { ExecutionRoleSourceReader } from "./executionRoleSource";
 
 export type {
   AwsClients,
@@ -83,6 +84,7 @@ export class CoreClient implements AwsClients {
 
   // Feature-scoped sub-clients. Access as e.g. `coreClient.harness.getHarness(...)`.
   readonly harness: HarnessClient = new HarnessClient(this);
+  readonly executionRoleSource = new ExecutionRoleSourceReader(this);
   readonly identity: IdentityClient = new IdentityClient(this);
   readonly memory: MemoryClient = new MemoryClient(this);
   readonly runtime: RuntimeClient;
