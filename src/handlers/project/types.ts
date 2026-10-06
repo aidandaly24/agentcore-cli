@@ -362,6 +362,8 @@ export type ProjectResource = AddResourceInput["resourceType"];
 
 /** Input for {@link ProjectManager.exportHarness}. */
 export type ExportHarnessInput = {
+  /** Name of the project created when exporting outside an existing project. */
+  projectName?: string;
   /** Name of an in-project harness. Mutually exclusive with `prefetched`. */
   harnessName?: string;
   /** A harness spec + system prompt fetched from the service (the `--arn` path). */
@@ -518,10 +520,11 @@ export interface ProjectManager {
    * Convert a harness into an editable Strands runtime agent: render the agent
    * code under app/<targetAgentName>/, register the runtime in agentcore.json
    * (the source harness entry is kept), and write EXPORT_NOTES.md for anything
-   * that could not be mapped mechanically.
+   * that could not be mapped mechanically. Without a project, a prefetched
+   * service harness is exported into a new project named after that harness.
    */
   exportHarness(
-    project: Project,
+    project: Project | undefined,
     input: ExportHarnessInput,
   ): AsyncGenerator<ProjectEvent, ExportHarnessResult>;
 }
