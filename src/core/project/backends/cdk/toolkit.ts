@@ -13,7 +13,12 @@ import type { Logger } from "../../../../logging";
 
 export type CdkOperation =
   | { kind: "bootstrap"; environments: string[]; templateFile?: string }
-  | { kind: "deploy"; stackArtifactId: string }
+  | {
+      kind: "deploy";
+      stackArtifactId: string;
+      /** Prevent CloudFormation stack tags from extending explicit execution-role tags. */
+      omitStackTags?: boolean;
+    }
   | { kind: "destroy"; stackArtifactId: string };
 
 export type CdkRunOptions = {
@@ -216,7 +221,24 @@ export async function performCdkOperation(
     return { outputs: {} };
   }
 
-  const result = await toolkit.deploy(source, { stacks });
+  // An empty deploy-options tag list falls back to artifact tags in the Toolkit.
+  // Clear only the deployment view; the manifest still carries CLI routing tags.
+  const deploymentSource = operation.omitStackTags
+    ? {
+        produce: async () => {
+          const assembly = await source.produce();
+          try {
+            const artifact = assembly.cloudAssembly.getStackArtifact(operation.stackArtifactId);
+            for (const key of Object.keys(artifact.tags)) delete artifact.tags[key];
+            return assembly;
+          } catch (error) {
+            await assembly.dispose();
+            throw error;
+          }
+        },
+      }
+    : source;
+  const result = await toolkit.deploy(deploymentSource, { stacks });
 
   // PATTERN_MUST_MATCH_SINGLE throws when the pattern matches anything other
   // than one stack, so a missing result is not "no match": the Toolkit skips a

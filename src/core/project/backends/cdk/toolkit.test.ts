@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { rm } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import type { IIoHost, IoMessage, IoRequest } from "@aws-cdk/toolkit-lib";
 import * as toolkitLib from "@aws-cdk/toolkit-lib";
 import { createSilentLogger } from "../../../../testing";
+import { FsReadWriteJson } from "../../../../io";
+import { stackArtifactForTarget } from "./assembly";
 import {
   createCdkIoHost,
   createCdkRunner,
@@ -192,6 +195,88 @@ describe("performCdkOperation", () => {
       },
     });
   });
+
+  test.each([
+    { omitStackTags: true, roleTags: undefined },
+    { omitStackTags: true, roleTags: {} },
+    {
+      omitStackTags: true,
+      roleTags: { tenant: "source", "agentcore:project-name": "source" },
+    },
+    { omitStackTags: false, roleTags: undefined },
+  ])(
+    "preserves role tags and routing while scoping the deployment tag opt-out: %j",
+    async ({ roleTags, omitStackTags }) => {
+      const directory = await mkdtemp(join(tmpdir(), "agentcore-role-tags-"));
+      temporaryTemplates.push(join(directory, "manifest.json"));
+      const stackId = "AgentCore-orders-default";
+      const stackTags = {
+        "agentcore:project-name": "orders",
+        "agentcore:target-name": "default",
+        tenant: "destination",
+      };
+      const otherStackTags = { ...stackTags, "agentcore:target-name": "prod" };
+      const role = {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          AssumeRolePolicyDocument: { Version: "2012-10-17", Statement: [] },
+          Tags: Object.entries(roleTags ?? {}).map(([Key, Value]) => ({ Key, Value })),
+        },
+      };
+      const manifest = {
+        version: "36.0.0",
+        artifacts: Object.fromEntries(
+          [stackId, "Other"].map((id) => [
+            id,
+            {
+              type: "aws:cloudformation:stack",
+              environment: "aws://111122223333/us-east-1",
+              properties: {
+                templateFile: "stack.template.json",
+                tags: id === stackId ? stackTags : otherStackTags,
+              },
+            },
+          ]),
+        ),
+      };
+      await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
+      await writeFile(
+        join(directory, "stack.template.json"),
+        JSON.stringify({ Resources: { Role: role } }),
+      );
+      const logger = createSilentLogger();
+      const realToolkit = await loadCdkToolkit(createCdkIoHost(logger), "us-east-1", credentials);
+      const { loaded } = loadedToolkit();
+      loaded.toolkit.fromAssemblyDirectory = (...args) =>
+        realToolkit.toolkit.fromAssemblyDirectory(...args);
+      let deployed = false;
+      loaded.toolkit.deploy = async (source) => {
+        const assembly = await source.produce();
+        try {
+          const stack = assembly.cloudAssembly.getStackArtifact(stackId);
+          expect(stack.tags).toEqual(omitStackTags ? {} : stackTags);
+          expect(stack.template.Resources.Role).toEqual(role);
+          expect(assembly.cloudAssembly.getStackArtifact("Other").tags).toEqual(otherStackTags);
+          deployed = true;
+          return { stacks: [DEPLOYED_STACK] } as never;
+        } finally {
+          await assembly.dispose();
+        }
+      };
+
+      await performCdkOperation(
+        loaded,
+        { kind: "deploy", stackArtifactId: stackId, omitStackTags },
+        runOptions({ assemblyDirectory: directory }),
+      );
+
+      expect(deployed).toBe(true);
+      expect(await Bun.file(join(directory, "manifest.json")).json()).toEqual(manifest);
+      expect(
+        await stackArtifactForTarget(new FsReadWriteJson({ logger }), directory, "default"),
+      ).toEqual({ id: stackId, stackName: stackId, templateFile: "stack.template.json" });
+    },
+  );
 
   // The Toolkit returns normally after skipping *or deleting* a resource-less
   // stack, so treating an absent stack as empty outputs would report a deletion
