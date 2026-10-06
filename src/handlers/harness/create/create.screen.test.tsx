@@ -245,6 +245,8 @@ describe("harness create wizard", () => {
     await r.press("down"); // litellm
     await waitForText(r.lastFrame, "● litellm");
     await r.press("return"); // focus the model id field
+    await waitForText(r.lastFrame, "Custom API base URL");
+    expect(r.lastFrame()).toContain("leave blank to use the model provider's default endpoint");
     await r.write("anthropic/claude-3-sonnet");
     await r.press("return"); // api key arn — optional, leave empty
     await r.press("return"); // api base url — optional, leave empty

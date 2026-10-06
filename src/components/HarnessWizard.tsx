@@ -671,8 +671,8 @@ const MODEL_PROVIDERS: {
       },
       {
         key: "apiBase",
-        name: "API base URL",
-        helpText: "optional · the provider API endpoint",
+        name: "Custom API base URL",
+        helpText: "optional · leave blank to use the model provider's default endpoint",
         placeholder: "https://…",
         required: false,
         requiredError: "",
