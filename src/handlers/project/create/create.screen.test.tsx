@@ -345,7 +345,10 @@ describe("project create wizard", () => {
     const scrolled = await settledLines();
     expect(scrolled[firstContentLine]).not.toBe(" choose a model provider");
     expect(scrolled).toContain(" model ID");
-    expect(scrolled).toContain(" API base URL");
+    expect(scrolled).toContain(" Custom API base URL");
+    expect(scrolled.join("\n")).toContain(
+      "leave blank to use the model provider's default endpoint",
+    );
 
     // Moving back up to fields that are still visible does not shift the view.
     await r.press("up");
