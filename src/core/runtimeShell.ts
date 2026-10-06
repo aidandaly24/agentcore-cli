@@ -7,6 +7,7 @@ import {
   type ShellSession,
 } from "bedrock-agentcore/runtime";
 import { Buffer } from "node:buffer";
+import { InputValidationError } from "../errors";
 import type { RuntimeShellFrame, RuntimeShellSession } from "../handlers/runtime/types";
 import type { OpenRuntimeShell } from "./runtime";
 import type { CoreOptions } from "./types";
@@ -74,6 +75,17 @@ export function createRuntimeShellOpener(config: RuntimeShellOpenerConfig = {}):
         const session = await client.openShell(input);
         return new RuntimeShellSessionAdapter(session);
       } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "Server rejected WebSocket connection: HTTP 400"
+        ) {
+          throw new InputValidationError(
+            "Runtime rejected the shell request (HTTP 400). Check the session ID and endpoint qualifier. " +
+              "If this Runtime is managed by a harness, its backing Runtime cannot be used directly. " +
+              "Run commands through the harness with: agentcore harness exec --id <harness-id> --command <command>",
+            { cause: error },
+          );
+        }
         if (attempt >= MAX_ATTEMPTS || !isRetryableUpgrade(error)) throw error;
         await sleep(delayMs);
         delayMs *= 2;

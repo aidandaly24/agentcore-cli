@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { MAX_FRAME_SIZE, ShellChannel } from "bedrock-agentcore/runtime";
+import { InputValidationError } from "../errors";
 import type { RuntimeShellRequest } from "../handlers/runtime/types";
 import {
   createRuntimeShellOpener,
@@ -204,9 +205,9 @@ describe("createRuntimeShellOpener", () => {
     expect(delays).toEqual([250, 500]);
   });
 
-  test("does not retry a non-retryable failure", async () => {
+  test.each([400, 403])("does not retry an HTTP %s rejection", async (statusCode) => {
     let attempts = 0;
-    const failure = new Error("Server rejected WebSocket connection: HTTP 403");
+    const failure = new Error(`Server rejected WebSocket connection: HTTP ${statusCode}`);
     const opener = createRuntimeShellOpener({
       createClient: () => ({
         openShell: async () => {
@@ -217,7 +218,21 @@ describe("createRuntimeShellOpener", () => {
       sleep: async () => {},
     });
 
-    await expect(opener(REQUEST, { region: "us-west-2" })).rejects.toBe(failure);
+    if (statusCode === 400) {
+      const error = await opener(REQUEST, { region: "us-west-2" }).catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(InputValidationError);
+      expect(error).toMatchObject({
+        cause: failure,
+        source: "user",
+        exitCode: 2,
+      });
+      expect((error as Error).message).toContain("If this Runtime is managed by a harness");
+      expect((error as Error).message).toContain(
+        "agentcore harness exec --id <harness-id> --command <command>",
+      );
+    } else {
+      await expect(opener(REQUEST, { region: "us-west-2" })).rejects.toBe(failure);
+    }
     expect(attempts).toBe(1);
   });
 });
