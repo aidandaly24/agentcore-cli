@@ -475,7 +475,9 @@ async def invoke(payload, context):
     {{#if actorId}}
     user_id = {{safeJson actorId}}
     {{else}}
-    headers = {key.lower(): value for key, value in (context.request_headers or {}).items()}
+    # The SDK's forwarded header map excludes reserved Runtime identity headers.
+    request_headers = context.request.headers if context.request is not None else context.request_headers
+    headers = {key.lower(): value for key, value in (request_headers or {}).items()}
     user_id = headers.get("x-amzn-bedrock-agentcore-runtime-user-id")
     if not user_id:
         raise ValueError("Memory requires a configured actorId or Runtime user-id header")

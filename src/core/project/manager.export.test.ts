@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import z from "zod";
@@ -154,6 +155,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
       expect(generated.credentials).toEqual([]);
       const main = await Bun.file(join(result.agentPath, "main.py")).text();
       expect(main).toContain("context.request_headers");
+      expect(main).toContain("context.request.headers");
       expect(main).toContain('headers.get("x-amzn-bedrock-agentcore-runtime-user-id")');
       expect(main).not.toContain("default-user");
       expect(main).not.toContain("getattr(context, 'user_id'");
@@ -288,6 +290,140 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     );
     expect(result.notes).toMatchObject([{ category: "Deployed IAM not captured" }]);
   });
+
+  test.each([undefined, "configured-actor"])(
+    "resolves memory actors through rendered Python with SDK-filtered headers: %p",
+    async (actorId) => {
+      const { manager: subject } = manager();
+      const project = await projectWithHarness(subject, {
+        memory: {
+          mode: "existing",
+          arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/Original",
+          actorId,
+        },
+      });
+      const result = await drain(subject.exportHarness(project, exportInput()));
+      const script = `
+import ast
+import asyncio
+import json
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+
+bindings = []
+
+def memory_session(session_id, actor_id):
+    bindings.append([session_id, actor_id])
+    return SimpleNamespace(session_id=session_id, actor_id=actor_id)
+
+class Agent:
+    def __init__(self, **kwargs):
+        self.session_manager = kwargs["session_manager"]
+
+    async def stream_async(self, prompt, **kwargs):
+        yield {"event": {"contentBlockDelta": {"delta": {"text": prompt}}}}
+
+namespace = {
+    "Any": Any,
+    "Agent": Agent,
+    "asyncio": asyncio,
+    "log": SimpleNamespace(info=lambda *args: None),
+    "get_memory_session_manager": memory_session,
+    "load_model": lambda: None,
+    "_make_conversation_manager": lambda: None,
+    "DEFAULT_SYSTEM_PROMPT": "",
+    "tools": [],
+}
+tree = ast.parse(Path(sys.argv[1]).read_text())
+functions = [
+    node for node in tree.body
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    and node.name in {"agent_factory", "invoke", "_extract_prompt", "strip_trailing_tool_use"}
+]
+for function in functions:
+    function.decorator_list = []
+exec(compile(ast.Module(body=functions, type_ignores=[]), sys.argv[1], "exec"), namespace)
+namespace["get_or_create_agent"] = namespace["agent_factory"]()
+
+def context(session_id, actor_id):
+    headers = {"X-Amzn-Bedrock-AgentCore-Runtime-Custom-Trace": "trace"}
+    if actor_id is not None:
+        headers["X-Amzn-Bedrock-AgentCore-Runtime-User-Id"] = actor_id
+    # SDK 1.24.0 excludes reserved x-amzn-* headers, retaining Runtime-Custom-*.
+    forwarded = {
+        key: value for key, value in headers.items()
+        if not key.lower().startswith("x-amzn-")
+        or key.lower().startswith("x-amzn-bedrock-agentcore-runtime-custom-")
+    }
+    assert "X-Amzn-Bedrock-AgentCore-Runtime-User-Id" not in forwarded
+    return SimpleNamespace(
+        session_id=session_id, request_headers=forwarded,
+        request=SimpleNamespace(headers=headers),
+    )
+
+async def invoke(request_context):
+    events = [event async for event in namespace["invoke"]({"prompt": "hello"}, request_context)]
+    assert events == [{"event": {"contentBlockDelta": {"delta": {"text": "hello"}}}}]
+
+async def check():
+    await invoke(context("session-a", "actor-a"))
+    await invoke(context("session-a", "actor-b"))
+    await invoke(context("session-b", "actor-a"))
+    await invoke(context("session-a", "actor-a"))
+    await invoke(SimpleNamespace(
+        session_id="legacy",
+        request=None,
+        request_headers={"X-Amzn-Bedrock-AgentCore-Runtime-User-Id": "legacy-actor"},
+    ))
+    for missing, message in [
+        (context(None, "actor-a"), "Memory requires a Runtime session ID"),
+        (context("missing-user", None), "Memory requires a configured actorId or Runtime user-id header"),
+    ]:
+        if missing.session_id and sys.argv[2] != "null":
+            await invoke(missing)
+            continue
+        before = len(bindings)
+        try:
+            await invoke(missing)
+        except ValueError as error:
+            assert str(error) == message
+        else:
+            raise AssertionError("missing memory identity was accepted")
+        assert len(bindings) == before
+
+asyncio.run(check())
+print(json.dumps(bindings))
+`;
+      const executed = spawnSync(
+        process.platform === "win32" ? "python" : "python3",
+        ["-c", script, join(result.agentPath, "main.py"), JSON.stringify(actorId ?? null)],
+        { encoding: "utf8" },
+      );
+
+      expect(executed.error).toBeUndefined();
+      expect({ status: executed.status, stderr: executed.stderr }).toEqual({
+        status: 0,
+        stderr: "",
+      });
+      expect(JSON.parse(executed.stdout)).toEqual(
+        actorId
+          ? [
+              ["session-a", actorId],
+              ["session-b", actorId],
+              ["legacy", actorId],
+              ["missing-user", actorId],
+            ]
+          : [
+              ["session-a", "actor-a"],
+              ["session-a", "actor-b"],
+              ["session-b", "actor-a"],
+              ["legacy", "legacy-actor"],
+            ],
+      );
+    },
+  );
 
   test("renders memory retrieval tuning and notes messagesCount", async () => {
     const { manager: subject } = manager();
