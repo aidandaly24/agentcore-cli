@@ -304,6 +304,8 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
       });
       const result = await drain(subject.exportHarness(project, exportInput()));
       const script = `
+from __future__ import annotations
+
 import ast
 import asyncio
 import json
