@@ -370,6 +370,9 @@ describe("project export harness handler", () => {
     const spec = await Bun.file(join(projectRoot, "agentcore", "agentcore.json")).json();
     expect(spec.name).toBe(projectName);
     expect(spec.harnesses).toEqual([]);
+    expect(await Bun.file(join(projectRoot, "agentcore", "aws-targets.json")).json()).toEqual([
+      { name: "default", account: "111122223333", region: "us-west-2" },
+    ]);
     expect(spec.runtimes.map((runtime: { name: string }) => runtime.name)).toEqual([
       "RemoteHarnessAgent",
     ]);

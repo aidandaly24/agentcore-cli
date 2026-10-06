@@ -72,7 +72,7 @@ export const createExportHarnessHandler = (config: ExportProjectResourceConfig) 
               : (flags["project-name"] ?? defaultExportProjectName(spec.name));
             input = {
               projectName,
-              prefetched: { spec, systemPrompt, notes, modelAdditionalParams },
+              prefetched: { spec, systemPrompt, notes, modelAdditionalParams, sourceArn: flags.arn },
               targetAgentName: resolveTargetAgentName(
                 flags["target-agent-name"],
                 spec.name,
