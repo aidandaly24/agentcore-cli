@@ -355,7 +355,7 @@ describe("project export harness handler", () => {
   });
 
   test.each([
-    [undefined, "RemoteHarness"],
+    [undefined, "ExportRemoteHarness"],
     ["ChosenProject", "ChosenProject"],
   ])("creates an export project with name override %s", async (override, projectName) => {
     const subject = testExportCommand();
@@ -420,10 +420,10 @@ describe("project export harness handler", () => {
   });
 
   test.each([
-    ["remote_harness", "remoteharness", "customAgent"],
-    ["RemoteHarnessWithAVeryLongName", "RemoteHarnessWithAVeryL", "customAgent"],
-    ["strands", "strandsProject", "customAgent"],
-    ["RemoteHarnessWithAVeryLongName", "RemoteHarnessWithAVeryL", undefined],
+    ["remote_harness", "Exportremoteharness", "customAgent"],
+    ["RemoteHarnessWithAVeryLongName", "ExportRemoteHarnessWith", "customAgent"],
+    ["strands", "Exportstrands", "customAgent"],
+    ["RemoteHarnessWithAVeryLongName", "ExportRemoteHarnessWith", undefined],
   ])(
     "creates deployable default names for harness %s",
     async (harnessName, projectName, agentName) => {
@@ -457,7 +457,7 @@ describe("project export harness handler", () => {
     const subject = testExportCommand();
     const { path, cleanup } = await inTempDirectory();
     cleanups.push(cleanup);
-    const destination = join(path, "RemoteHarness");
+    const destination = join(path, "ExportRemoteHarness");
     await mkdir(destination);
     await writeFile(join(destination, "keep.txt"), "customer content");
     subject.core.harness.setGetResponse({

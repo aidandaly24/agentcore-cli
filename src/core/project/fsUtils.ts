@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { isReservedProjectName } from "../../projectSchemas/constants";
 
 /** The project spec, relative to the project root. */
 export const PROJECT_SPEC_RELATIVE_PATH = join("agentcore", "agentcore.json");
@@ -30,6 +29,5 @@ export function toPythonPackageName(name: string): string {
 }
 
 export function defaultExportProjectName(harnessName: string): string {
-  const name = harnessName.replace(/_/g, "").slice(0, 23);
-  return isReservedProjectName(name) ? `${name.slice(0, 16)}Project` : name;
+  return `Export${harnessName.replace(/_/g, "")}`.slice(0, 23);
 }
