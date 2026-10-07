@@ -11,17 +11,18 @@ import {
   TestCoreClient,
   TestGlobalConfigAccessor,
   testIO,
+  type TestIOOptions,
 } from "../../../testing";
 
 const HARNESS_ARN = "arn:aws:bedrock-agentcore:us-west-2:111122223333:harness/h-abc123";
 
-function testExportCommand() {
+function testExportCommand(ioOptions: TestIOOptions = {}) {
   const core = new TestCoreClient();
   // A fresh root per invocation, so wiring-time state (e.g. the add router's
   // pinned cwd) always reflects the directory the test has cd'd into. The core
   // client is shared so mock responses and recorded calls span invocations.
   const route = (args: string[]) => {
-    const io = testIO({});
+    const io = testIO(ioOptions);
     const root = createRootHandler(core, {
       io: io.io,
       globalConfigAccessor: new TestGlobalConfigAccessor(),
@@ -124,8 +125,15 @@ describe("project export harness handler", () => {
   });
 
   test("exports an in-project harness to a buildable runtime and registers it", async () => {
-    const subject = testExportCommand();
+    const subject = testExportCommand({ isTTY: true });
     const projectRoot = await inProjectWithHarness(subject);
+    const exportHarness = subject.core.projectManager.exportHarness.bind(
+      subject.core.projectManager,
+    );
+    subject.core.projectManager.exportHarness = async function* (project, input) {
+      yield { type: "warning", message: "Review exported credentials" } as const;
+      return yield* exportHarness(project, input);
+    };
 
     await subject.run(["--name", "exportme"]);
 
@@ -168,6 +176,8 @@ describe("project export harness handler", () => {
     expect(subject.io.stderr()).toContain(
       `Exported harness 'exportme' to runtime agent 'exportmeAgent' (${join("app", "exportmeAgent")})\nNext steps:`,
     );
+    expect(subject.io.stderr()).toContain("Review exported credentials");
+    expect(subject.io.stderr()).toContain("✓ Writing EXPORT_NOTES.md");
     expect(subject.io.stdout()).toBe("");
   });
 
@@ -217,7 +227,7 @@ describe("project export harness handler", () => {
   });
 
   test("emits a machine-readable summary with --json", async () => {
-    const subject = testExportCommand();
+    const subject = testExportCommand({ isTTY: true });
     const projectRoot = await inProjectWithHarness(subject);
 
     await subject.run(["--name", "exportme", "--json"]);
@@ -231,6 +241,9 @@ describe("project export harness handler", () => {
     });
     expect(subject.io.stderr()).not.toContain("Next steps:");
     expect(subject.io.stderr()).not.toContain("Exported harness");
+    expect(subject.io.stderr()).toContain("Writing EXPORT_NOTES.md");
+    expect(subject.io.stderr()).not.toContain(String.fromCharCode(0x1b));
+    expect(subject.io.stderr()).not.toContain("✓");
   });
 
   test("exports a service harness by ARN, fetching from the ARN's region", async () => {
