@@ -2,6 +2,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { RuntimeEndpointPicker } from "../../../components/RuntimeEndpointPicker";
 import { RuntimePicker } from "../../../components/RuntimePicker";
 import { ShellHandoff } from "../../../components/ShellHandoff";
+import { TuiExitErrorKey } from "../../../tui/exitError";
 import type { ScreenProps } from "../../types";
 import { RuntimeShellLaunchContextKey } from "./launchContext";
 import { runtimeShellErrorHint } from "./error";
@@ -68,6 +69,7 @@ export function RuntimeShellScreen(props: ScreenProps) {
       label={`Opening shell for ${runtimeId} (${qualifier})...`}
       returnPath={locationState?.returnPath}
       errorHint={runtimeShellErrorHint}
+      setExitError={props.ctx.value(TuiExitErrorKey)}
       run={(io) =>
         runRuntimeShell({
           ...props,
