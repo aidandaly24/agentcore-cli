@@ -3,6 +3,7 @@ import { Text, useApp, useInput, useStderr, useStdin, useStdout } from "ink";
 import { useLocation, useNavigate } from "react-router";
 import { AgentCoreCLIError, SilentCLIError } from "../errors";
 import type { AppIO } from "../io";
+import type { SetTuiExitError } from "../tui/exitError";
 import { Layout } from "./Layout";
 import { Spinner } from "./ui/spinner";
 
@@ -11,9 +12,16 @@ type ShellHandoffProps = {
   returnPath?: string;
   run: (io: AppIO) => Promise<void>;
   errorHint?: (error: Error) => string | undefined;
+  setExitError?: SetTuiExitError;
 };
 
-export function ShellHandoff({ label, returnPath, run, errorHint }: ShellHandoffProps) {
+export function ShellHandoff({
+  label,
+  returnPath,
+  run,
+  errorHint,
+  setExitError,
+}: ShellHandoffProps) {
   const { exit, suspendTerminal } = useApp();
   const { stdin } = useStdin();
   const { stdout } = useStdout();
@@ -26,13 +34,16 @@ export function ShellHandoff({ label, returnPath, run, errorHint }: ShellHandoff
 
   useInput(
     (input, key) => {
-      if (key.ctrl && input === "c") exit();
+      if (key.ctrl && input === "c") exit(error ?? undefined);
       else if (key.escape) {
-        navigate(returnPath ?? location.pathname.slice(0, location.pathname.lastIndexOf("/")), {
-          replace: true,
-        });
+        if (returnPath === undefined) exit(error ?? undefined);
+        else {
+          setExitError?.(undefined);
+          navigate(returnPath, { replace: true });
+        }
       } else if (input === "r") {
         requested.current = false;
+        setExitError?.(undefined);
         setError(null);
         setAttempt((current) => current + 1);
       }
@@ -48,7 +59,9 @@ export function ShellHandoff({ label, returnPath, run, errorHint }: ShellHandoff
         await suspendTerminal(() => run({ stdin, stdout, stderr }));
       } catch (caught) {
         if (!(caught instanceof SilentCLIError)) {
-          setError(AgentCoreCLIError.fromError(caught));
+          const failure = AgentCoreCLIError.fromError(caught);
+          setExitError?.(failure);
+          setError(failure);
           return;
         }
         if (returnPath === undefined) {
@@ -59,7 +72,18 @@ export function ShellHandoff({ label, returnPath, run, errorHint }: ShellHandoff
       if (returnPath === undefined) exit();
       else navigate(returnPath, { replace: true });
     })();
-  }, [attempt, exit, navigate, returnPath, run, stderr, stdin, stdout, suspendTerminal]);
+  }, [
+    attempt,
+    exit,
+    navigate,
+    returnPath,
+    run,
+    setExitError,
+    stderr,
+    stdin,
+    stdout,
+    suspendTerminal,
+  ]);
 
   if (error) {
     const hint = errorHint?.(error);
@@ -68,7 +92,7 @@ export function ShellHandoff({ label, returnPath, run, errorHint }: ShellHandoff
         breadcrumb={location.pathname.split("/").filter(Boolean).map(decodeURIComponent)}
         keyHints={[
           { key: "r", label: "retry" },
-          { key: "esc", label: "back" },
+          { key: "esc", label: returnPath === undefined ? "quit" : "back" },
           { key: "ctrl+c", label: "quit" },
         ]}
       >
