@@ -4,6 +4,7 @@ import { InputValidationError } from "../../../errors/errors";
 import { HarnessSpecSchema, type HarnessSpec } from "../../../projectSchemas/harness";
 import { ProjectSpecSchema } from "../../../projectSchemas/project";
 import { credentialEnvVarName } from "../../../projectSchemas/credential";
+import type { Connection } from "../../../projectSchemas/connections";
 import {
   ALLOWED_TOOLS_NOTE_CATEGORY,
   AWS_SKILLS_NOTE_CATEGORY,
@@ -15,7 +16,7 @@ import {
   LITELLM_NO_API_KEY_NOTE_CATEGORY,
   MALFORMED_S3_SKILL_NOTE_CATEGORY,
   MCP_HEADER_CREDS_NOTE_CATEGORY,
-  MEMORY_ARN_NOTE_CATEGORY,
+  MEMORY_ACTOR_NOTE_CATEGORY,
   MEMORY_MANAGED_NOTE_CATEGORY,
   MEMORY_MESSAGES_COUNT_NOTE_CATEGORY,
   MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY,
@@ -59,6 +60,47 @@ function categories(result: ReturnType<typeof mapHarnessToExportPlan>): string[]
 }
 
 describe("mapHarnessToExportPlan model mapping", () => {
+  test("uses captured IAM without widening it and keeps local model defaults independent", () => {
+    const document = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Deny",
+          Action: "bedrock:InvokeModel",
+          NotResource: "arn:aws:bedrock:us-west-2::foundation-model/allowed",
+          Condition: { StringEquals: { "aws:PrincipalTag/team": "agents" } },
+        },
+      ],
+    };
+    const source = {
+      roleArn: "arn:aws:iam::111122223333:role/source",
+      inlinePolicies: [{ name: "Original", document }],
+      managedPolicyArns: ["arn:aws:iam::111122223333:policy/original"],
+      permissionsBoundaryArn: "arn:aws:iam::111122223333:policy/boundary",
+      tags: { team: "agents" },
+    };
+    const captured = plan({
+      executionRoleSource: source,
+      spec: harness({
+        model: { provider: "bedrock", modelId: "openai.gpt-oss-120b", apiFormat: "responses" },
+        skills: [{ s3Uri: "s3://source-owned/skills/" }],
+      }),
+    });
+    expect(captured.runtime).toMatchObject({
+      bindingMode: "explicit",
+      executionRoleConfig: {
+        policyMode: "explicit",
+        permissionsBoundaryArn: source.permissionsBoundaryArn,
+        tags: source.tags,
+      },
+      additionalPolicies: ["source-role-Original.json", ...source.managedPolicyArns],
+    });
+    expect(captured.policyFiles).toEqual({ "source-role-Original.json": document });
+    expect(captured.runtime.executionRoleArn).toBeUndefined();
+    const local = plan();
+    expect(local.runtime).toMatchObject({ bindingMode: "explicit" });
+    expect(local.runtime.executionRoleConfig).toBeUndefined();
+  });
   test("maps a bedrock model with sampling params and limits into the render context", () => {
     const result = plan({
       spec: harness({
@@ -391,6 +433,13 @@ describe("mapHarnessToExportPlan tools", () => {
             config: {
               agentCoreGateway: {
                 gatewayArn: "arn:aws:bedrock-agentcore:us-east-1:111122223333:gateway/g-1",
+                outboundAuth: {
+                  oauth: {
+                    providerArn:
+                      "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/oauth2credentialprovider/example",
+                    scopes: ["tools"],
+                  },
+                },
               },
             },
           },
@@ -533,6 +582,26 @@ describe("matchesAllowedTools", () => {
 });
 
 describe("mapHarnessToExportPlan memory", () => {
+  test("reuses a named Memory discovery alias without changing the project resource", () => {
+    const connection: Connection = {
+      id: "memory-alias",
+      to: { type: "memory", name: "chat_history" },
+      access: "readwrite",
+    };
+    const spec = harness({
+      memory: { mode: "existing", name: "chat_history", actorId: "source-actor" },
+      connections: [connection],
+    });
+    const result = plan({
+      spec,
+      projectSpec: projectSpec({
+        memories: [{ name: "chat_history", eventExpiryDuration: 30, strategies: [] }],
+      }),
+    });
+    expect(result.runtime.connections).toEqual([connection]);
+    expect(result.context.memoryEnvVarName).toBe("AGENTCORE_MEMORY_MEMORY_ALIAS_ID");
+    expect(spec.connections).toEqual([connection]);
+  });
   test("wires an in-project memory by name with its strategies", () => {
     const result = plan({
       spec: harness({ memory: { mode: "existing", name: "chat_history", actorId: "actor-1" } }),
@@ -547,6 +616,10 @@ describe("mapHarnessToExportPlan memory", () => {
     expect(result.context.memoryEnvVarName).toBe("AGENTCORE_MEMORY_CHAT_HISTORY_ID");
     expect(result.context.memoryStrategies).toEqual(["SEMANTIC"]);
     expect(result.context.actorId).toBe("actor-1");
+    expect(result.runtime.connections).toContainEqual({
+      to: { type: "memory", name: "chat_history" },
+      access: "readwrite",
+    });
     expect(result.notes).toEqual([]);
   });
 
@@ -557,6 +630,7 @@ describe("mapHarnessToExportPlan memory", () => {
           mode: "existing",
           name: "chat_history",
           messagesCount: 12,
+          actorId: "actor-1",
           retrievalConfig: { topK: 7, relevanceScore: 0 },
         },
       }),
@@ -580,7 +654,7 @@ describe("mapHarnessToExportPlan memory", () => {
     expect(categories(result)).toEqual([MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY]);
   });
 
-  test("notes an external memory referenced by ARN", () => {
+  test("wires external memory by ARN but requires manual actor configuration", () => {
     const result = plan({
       spec: harness({
         memory: {
@@ -589,9 +663,17 @@ describe("mapHarnessToExportPlan memory", () => {
         },
       }),
     });
-    expect(result.hasMemory).toBe(false);
-    expect(categories(result)).toEqual([MEMORY_ARN_NOTE_CATEGORY]);
-    expect(result.notes[0]!.message).toContain("memory/m-1");
+    expect(result.hasMemory).toBe(true);
+    expect(result.runtime.connections).toEqual([
+      {
+        to: { type: "memory", arn: "arn:aws:bedrock-agentcore:us-east-1:111122223333:memory/m-1" },
+        access: "readwrite",
+      },
+    ]);
+    expect(result.context.memoryEnvVarName).toBe("AGENTCORE_MEMORY_MEMORY_M_1_ID");
+    expect(result.context.memoryRegion).toBe("us-east-1");
+    expect(categories(result)).toEqual([MEMORY_ACTOR_NOTE_CATEGORY]);
+    expect(result.notes[0]!.message).toContain("No shared/default actor");
   });
 
   test("notes managed harness memory and disables none", () => {
@@ -781,6 +863,7 @@ describe("mapHarnessToExportPlan runtime spec entry", () => {
       codeLocation: "app/assistantAgent" as (typeof result.runtime)["codeLocation"],
       protocol: "HTTP",
       runtimeVersion: "PYTHON_3_14",
+      bindingMode: "explicit",
       envVars: [{ name: "LOG_LEVEL", value: "debug" }],
       networkMode: "VPC",
       networkConfig: { subnets: ["subnet-12345678"], securityGroups: ["sg-12345678"] },
