@@ -238,8 +238,8 @@ describe("project add harness wizard", () => {
 
     // LiteLLM is the one provider with an API base; its key is optional.
     await waitForText(screen.lastFrame, "Custom API base URL");
-    expect(screen.lastFrame()).toContain("optional for bedrock/... (uses IAM)");
-    expect(screen.lastFrame()).toContain("Anthropic/OpenAI need");
+    expect(screen.lastFrame()).toContain("optional · non-Bedrock models may need");
+    expect(screen.lastFrame()).toContain("Bedrock uses AWS IAM (SigV4)");
     expect(screen.lastFrame()).toContain(
       "leave blank to use the model provider's default endpoint",
     );
