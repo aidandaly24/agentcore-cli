@@ -17,6 +17,7 @@ import { JsonKey } from "../handlers/keys";
 import { ProjectDetectedKey } from "../handlers/project/context";
 import { ExitCode, InvalidEnvironmentError } from "../errors";
 import { TuiExitMessageKey } from "./exitMessage";
+import { TuiExitErrorKey } from "./exitError";
 import { createResizeGate } from "./resize";
 import { TuiHandoffKey, handoffArgs } from "./handoff";
 
@@ -65,6 +66,7 @@ export async function renderTuiAt(
   }
 
   let exitMessage: string | undefined;
+  let exitError: Error | undefined;
   let handoff: string[] | undefined;
   let tuiContext = ctx;
   if (isRootMenuPath(path)) {
@@ -76,6 +78,9 @@ export async function renderTuiAt(
     tuiContext = tuiContext.withValue(ProjectDetectedKey, projectDetected);
   }
   tuiContext = tuiContext
+    .withValue(TuiExitErrorKey, (error) => {
+      exitError = error;
+    })
     .withValue(TuiExitMessageKey, (message) => {
       exitMessage = message;
     })
@@ -104,6 +109,8 @@ export async function renderTuiAt(
   } finally {
     resizeGate.dispose();
   }
+  // Ink handles Ctrl+C before invoking screen input handlers.
+  if (exitError !== undefined) throw exitError;
   if (exitMessage !== undefined) {
     io.stdout.write(exitMessage.endsWith("\n") ? exitMessage : `${exitMessage}\n`);
   }
