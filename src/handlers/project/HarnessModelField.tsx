@@ -145,7 +145,7 @@ function modelFields(provider: HarnessModelProvider): ModelField[] {
       name: "API key ARN",
       helpText:
         provider === "lite_llm"
-          ? "optional · an AgentCore Identity API-key credential provider ARN"
+          ? "optional for bedrock/... (uses IAM); Anthropic/OpenAI need an AgentCore Identity API-key ARN unless configured elsewhere"
           : "an AgentCore Identity API-key credential provider ARN",
       placeholder:
         provider === "lite_llm"
