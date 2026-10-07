@@ -59,7 +59,6 @@ This reference was generated from `agentcore --help` for version `1.0.0-rc.5`.
     - [`agentcore harness delete`](#agentcore-harness-delete)
     - [`agentcore harness invoke`](#agentcore-harness-invoke)
     - [`agentcore harness exec`](#agentcore-harness-exec)
-    - [`agentcore harness shell`](#agentcore-harness-shell)
     - [`agentcore harness logs`](#agentcore-harness-logs)
     - [`agentcore harness traces`](#agentcore-harness-traces)
       - [`agentcore harness traces list`](#agentcore-harness-traces-list)
@@ -1082,21 +1081,6 @@ run a shell command in a harness
 - `--session-id <session-id>`: the Runtime session ID to run in (33-100 characters)
 - `--qualifier <qualifier>`: the harness endpoint qualifier to run in (default DEFAULT)
 - `--timeout <timeout>`: seconds to wait for the command (1-3600)
-
-#### `agentcore harness shell`
-
-```text
-agentcore harness shell [options]
-```
-
-open an interactive shell in a harness
-
-**Options**
-
-- `--id <id>`: the ID of the harness (required)
-- `--qualifier <qualifier>`: the harness endpoint qualifier
-- `--session-id <session-id>`: the Runtime session ID to use
-- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token
 
 #### `agentcore harness logs`
 
