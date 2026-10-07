@@ -665,7 +665,7 @@ const MODEL_PROVIDERS: {
         key: "apiKeyArn",
         name: "API key ARN",
         helpText:
-          "optional · non-Bedrock models may need an AgentCore Identity API-key ARN unless configured elsewhere; Bedrock uses AWS IAM (SigV4)",
+          "optional · non-Bedrock models may need an AgentCore Identity API-key ARN unless configured elsewhere. Bedrock uses AWS IAM.",
         placeholder: "arn:aws:bedrock-agentcore:…:token-vault/…",
         required: false,
         requiredError: "",

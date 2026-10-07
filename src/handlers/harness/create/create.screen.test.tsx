@@ -247,7 +247,7 @@ describe("harness create wizard", () => {
     await r.press("return"); // focus the model id field
     await waitForText(r.lastFrame, "Custom API base URL");
     expect(r.lastFrame()).toContain("optional · non-Bedrock models may need");
-    expect(r.lastFrame()).toContain("Bedrock uses AWS IAM (SigV4)");
+    expect(r.lastFrame()).toContain("Bedrock uses AWS IAM.");
     expect(r.lastFrame()).toContain("leave blank to use the model provider's default endpoint");
     await r.write("anthropic/claude-3-sonnet");
     await r.press("return"); // api key arn — optional, leave empty
