@@ -93,14 +93,17 @@ class HarnessShellClient {
       initialized = resolve;
       initializationFailed = reject;
     });
+    let connected = false;
     let currentReadiness: Promise<boolean>;
     const session = new ShellSession({
       sessionId: input.sessionId,
       reconnectConfig: {
         ...input.reconnectConfig,
-        onReconnect: async () => {
-          const reconnected = await currentReadiness;
-          await input.reconnectConfig?.onReconnect?.(reconnected);
+        onReconnect: () => {
+          // Waiting here would hold the SDK's reconnect loop past its metadata timeout.
+          void currentReadiness
+            .then((reconnected) => input.reconnectConfig?.onReconnect?.(reconnected))
+            .catch(() => {});
         },
       },
       connectFn: (shellId, sessionId) => this.connection(input, shellId, sessionId),
@@ -118,8 +121,12 @@ class HarnessShellClient {
         currentReadiness.then(
           () => initialized(),
           (error) => {
-            initializationFailed(error);
-            void session.close();
+            if (!connected) {
+              initializationFailed(error);
+              void session.close();
+            } else {
+              socket.terminate();
+            }
           },
         );
         return socket;
@@ -127,6 +134,7 @@ class HarnessShellClient {
     });
     try {
       await Promise.all([session.connect(), initialization]);
+      connected = true;
       return session;
     } catch (error) {
       await session.close();

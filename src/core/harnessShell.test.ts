@@ -5,20 +5,10 @@ import type { BedrockAgentCoreClient } from "@aws-sdk/client-bedrock-agentcore";
 import type { ShellSessionOptions } from "bedrock-agentcore/runtime";
 import type { AwsClients, ClientConfig } from "./types";
 import { createHarnessShellOpener } from "./harnessShell";
+import { waitFor } from "../testing";
 
 const ARN = "arn:aws:bedrock-agentcore:us-west-2:123456789012:harness/checkout-AbCdEf1234";
 const SESSION = "session-012345678901234567890123456789";
-const STATUS = Buffer.concat([
-  Buffer.from([3]),
-  Buffer.from(
-    JSON.stringify({
-      kind: "Status",
-      status: "Success",
-      metadata: { shellId: "server-shell", reconnected: false },
-    }),
-  ),
-]);
-
 class TestSocket extends EventEmitter {
   readyState: number = WebSocket.CONNECTING;
   readonly sent: Buffer[] = [];
@@ -32,7 +22,24 @@ class TestSocket extends EventEmitter {
       },
     });
     this.emit("open");
-    if (confirmation) this.emit("message", STATUS, true);
+    if (confirmation) this.confirm();
+  }
+
+  confirm(reconnected = false) {
+    this.emit(
+      "message",
+      Buffer.concat([
+        Buffer.from([3]),
+        Buffer.from(
+          JSON.stringify({
+            kind: "Status",
+            status: "Success",
+            metadata: { shellId: "server-shell", reconnected },
+          }),
+        ),
+      ]),
+      true,
+    );
   }
 
   send(data: Buffer, callback?: (error?: Error) => void) {
@@ -44,14 +51,14 @@ class TestSocket extends EventEmitter {
     this.emit("pong");
   }
 
-  close() {
+  close(code = 1000) {
     if (this.readyState === WebSocket.CLOSED) return;
     this.readyState = WebSocket.CLOSED;
-    this.emit("close", 1000, Buffer.alloc(0));
+    this.emit("close", code, Buffer.alloc(0));
   }
 
   terminate() {
-    this.close();
+    this.close(1006);
   }
 }
 
@@ -198,7 +205,7 @@ describe("Harness shell connection", () => {
     try {
       await new Promise((resolve) => setTimer(resolve, 20));
       expect(connected).toBe(false);
-      value.connections[0]!.socket.emit("message", STATUS, true);
+      value.connections[0]!.socket.confirm();
       await (await opening).close();
     } finally {
       timer.mockRestore();
@@ -227,6 +234,81 @@ describe("Harness shell connection", () => {
     ).rejects.toThrow("Harness shell initialization failed");
     expect(failed.connections[0]?.socket.readyState).toBe(WebSocket.CLOSED);
   });
+
+  test.each(["close", "timeout"])(
+    "recovers when a reconnect initialization fails by %s",
+    async (failure) => {
+      const setTimer = globalThis.setTimeout;
+      const timer = spyOn(globalThis, "setTimeout").mockImplementation(((
+        callback: (...args: any[]) => void,
+        delay?: number,
+        ...args: any[]
+      ) => setTimer(callback, delay === 10_000 ? 5 : delay, ...args)) as typeof setTimeout);
+      let attempts = 0;
+      const value = subject((socket) => {
+        socket.open(false);
+        if (++attempts === 2) {
+          if (failure === "close") setTimer(() => socket.terminate(), 15);
+        } else {
+          socket.confirm(attempts > 1);
+          if (attempts > 1) {
+            setTimer(
+              () =>
+                socket.emit(
+                  "message",
+                  Buffer.concat([Buffer.from([1]), Buffer.from("recovered")]),
+                  true,
+                ),
+              15,
+            );
+          }
+        }
+      }, 20);
+      const outcomes: boolean[] = [];
+      let session: Awaited<ReturnType<typeof value.open>> | undefined;
+      try {
+        session = await value.open(
+          {
+            harnessArn: ARN,
+            qualifier: "DEFAULT",
+            runtimeSessionId: SESSION,
+            onReconnect: (reconnected) => {
+              outcomes.push(reconnected);
+            },
+          },
+          { region: "us-west-2" },
+        );
+        const output = session[Symbol.asyncIterator]().next();
+        let received = false;
+        void output
+          .finally(() => {
+            received = true;
+          })
+          .catch(() => {});
+        value.connections[0]!.socket.terminate();
+        await waitFor(() => outcomes.includes(true), 3000);
+        expect(value.connections.length).toBeGreaterThanOrEqual(3);
+        expect(value.connections[1]!.socket.readyState).toBe(WebSocket.CLOSED);
+        await waitFor(() => received);
+        await expect(output).resolves.toEqual({
+          done: false,
+          value: { type: "stdout", data: new TextEncoder().encode("recovered") },
+        });
+        expect(
+          value.connections.flatMap(({ socket }) => socket.sent).some((frame) => frame[0] === 255),
+        ).toBe(false);
+        for (const connection of value.connections.slice(1)) {
+          expect(new URL(connection.url).searchParams.get("shellId")).toBe("server-shell");
+        }
+        const socket = value.connections.at(-1)!.socket;
+        await session.send(Buffer.from("pwd\n"));
+        expect(socket.sent[0]![0]).toBe(0);
+      } finally {
+        await session?.close();
+        timer.mockRestore();
+      }
+    },
+  );
 
   test("retries provisioning/server failures but not an authorization rejection", async () => {
     for (const failure of ["upgrade", "initialization"]) {
