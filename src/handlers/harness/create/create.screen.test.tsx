@@ -248,8 +248,9 @@ describe("harness create wizard", () => {
       await waitForText(r.lastFrame, "● litellm");
       await r.press("return"); // focus the model id field
       await waitForText(r.lastFrame, "Custom API base URL");
-      expect(r.lastFrame()).toContain("optional · Bedrock uses AWS IAM.");
-      expect(r.lastFrame()?.replace(/\s+/g, " ")).toContain("for providers that require API keys");
+      expect(r.lastFrame()?.replace(/\s+/g, " ")).toContain(
+        "optional · Providers that require API keys need an AgentCore Identity API-key credential provider ARN. Bedrock models can use AWS IAM or an API key.",
+      );
       expect(r.lastFrame()).toContain("leave blank to use the model provider's default endpoint");
       await waitForText(r.lastFrame, HARNESS_DEFAULT_MODEL_IDS.lite_llm);
       if (modelId !== HARNESS_DEFAULT_MODEL_IDS.lite_llm) {
