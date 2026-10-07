@@ -204,9 +204,9 @@ describe("createRuntimeShellOpener", () => {
     expect(delays).toEqual([250, 500]);
   });
 
-  test("does not retry a non-retryable failure", async () => {
+  test.each([400, 403])("does not retry or translate an HTTP %s rejection", async (statusCode) => {
     let attempts = 0;
-    const failure = new Error("Server rejected WebSocket connection: HTTP 403");
+    const failure = new Error(`Server rejected WebSocket connection: HTTP ${statusCode}`);
     const opener = createRuntimeShellOpener({
       createClient: () => ({
         openShell: async () => {

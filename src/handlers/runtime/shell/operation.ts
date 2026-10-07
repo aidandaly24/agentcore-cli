@@ -6,6 +6,7 @@ import type { Core } from "../../types";
 import { coreOptsFromCtx } from "../../utils";
 import type { RuntimeShellLaunchContext } from "./launchContext";
 import { normalizeRuntimeShellRequest } from "./request";
+import { runtimeShellErrorHint } from "./error";
 
 export type RunRuntimeShellInput = {
   ctx: Context;
@@ -34,5 +35,14 @@ export async function runRuntimeShell(input: RunRuntimeShellInput): Promise<void
   request.onReconnect = shell.onReconnect;
 
   io.stderr.write(`Connecting to Runtime ${runtimeId} (${qualifier})...\n`);
-  await shell.run(await core.runtime.openRuntimeShell(request, options));
+  const session = await core.runtime.openRuntimeShell(request, options).catch((error: unknown) => {
+    if (error instanceof Error) {
+      const hint = runtimeShellErrorHint(error);
+      if (hint !== undefined) {
+        throw new InputValidationError(`${error.message}\n\n${hint}`, { cause: error });
+      }
+    }
+    throw error;
+  });
+  await shell.run(session);
 }
