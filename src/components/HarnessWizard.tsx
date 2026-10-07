@@ -8,7 +8,7 @@ import type {
   UpdateHarnessRequest,
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type { CreateHarnessInput } from "../handlers/harness/types";
-import { DEFAULT_HARNESS_MODEL } from "../projectSchemas/harness";
+import { DEFAULT_HARNESS_MODEL, HARNESS_DEFAULT_MODEL_IDS } from "../projectSchemas/harness";
 import type { ScreenProps } from "../handlers/types";
 import { coreOptsFromCtx } from "../handlers/utils";
 import { Layout } from "./Layout";
@@ -70,6 +70,7 @@ export function emptyHarnessForm(): HarnessFormValues {
 
 // defaultModelId is the model ID a provider starts with in the create flow.
 function defaultModelId(kind: ModelKind): string {
+  if (kind === "litellm") return HARNESS_DEFAULT_MODEL_IDS.lite_llm;
   return kind === DEFAULT_HARNESS_MODEL.provider ? DEFAULT_HARNESS_MODEL.modelId : "";
 }
 
@@ -657,7 +658,7 @@ const MODEL_PROVIDERS: {
         key: "modelId",
         name: "model ID",
         helpText: "the LiteLLM model identifier (provider/model)",
-        placeholder: "anthropic/claude-sonnet-5-5",
+        placeholder: HARNESS_DEFAULT_MODEL_IDS.lite_llm,
         required: true,
         requiredError: "enter a LiteLLM model identifier",
       },
@@ -665,7 +666,7 @@ const MODEL_PROVIDERS: {
         key: "apiKeyArn",
         name: "API key ARN",
         helpText:
-          "optional · non-Bedrock models may need an AgentCore Identity API-key ARN unless configured elsewhere. Bedrock uses AWS IAM.",
+          "optional · Bedrock uses AWS IAM. Enter an AgentCore Identity API-key ARN for providers that require API keys, unless configured elsewhere.",
         placeholder: "arn:aws:bedrock-agentcore:…:token-vault/…",
         required: false,
         requiredError: "",
