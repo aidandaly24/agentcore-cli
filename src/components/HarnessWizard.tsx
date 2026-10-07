@@ -664,7 +664,8 @@ const MODEL_PROVIDERS: {
       {
         key: "apiKeyArn",
         name: "API key ARN",
-        helpText: "optional · an AgentCore Identity API-key credential provider ARN",
+        helpText:
+          "optional for bedrock/... (uses IAM); Anthropic/OpenAI need an AgentCore Identity API-key ARN unless configured elsewhere",
         placeholder: "arn:aws:bedrock-agentcore:…:token-vault/…",
         required: false,
         requiredError: "",
