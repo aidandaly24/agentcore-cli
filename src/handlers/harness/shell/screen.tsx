@@ -2,6 +2,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { HarnessEndpointPicker } from "../../../components/HarnessEndpointPicker";
 import { HarnessPicker } from "../../../components/HarnessPicker";
 import { ShellHandoff } from "../../../components/ShellHandoff";
+import { TuiExitErrorKey } from "../../../tui/exitError";
 import type { ScreenProps } from "../../types";
 import { HarnessShellLaunchContextKey } from "./launchContext";
 import { runHarnessShell } from "./operation";
@@ -55,6 +56,7 @@ export function HarnessShellScreen(props: ScreenProps) {
     <ShellHandoff
       label={`Opening shell for ${harnessId} (${qualifier})...`}
       returnPath={state?.returnPath}
+      setExitError={props.ctx.value(TuiExitErrorKey)}
       run={(io) =>
         runHarnessShell({
           ...props,

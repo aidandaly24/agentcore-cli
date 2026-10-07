@@ -156,8 +156,21 @@ describe("harness shell navigation", () => {
     await waitForText(screen.lastFrame, "choose a harness to open a shell");
   });
 
-  test("keeps CLI authentication and session context through endpoint selection", async () => {
+  test("keeps CLI authentication and session context and propagates a failed shell quit", async () => {
     const core = new TestCoreClient();
+    const failure = new Error("shell failed");
+    core.harness.setShellSession({
+      runtimeSessionId: SESSION_ID,
+      kicked: false,
+      exitCode: null,
+      send: async () => {},
+      resize: async () => {},
+      close: async () => {},
+      async *[Symbol.asyncIterator]() {
+        yield { type: "stdout", data: new TextEncoder().encode("partial harness output") };
+        throw failure;
+      },
+    });
     core.harness.setGetResponse({
       harness: {
         arn: ARN,
@@ -204,10 +217,11 @@ describe("harness shell navigation", () => {
       .finally(() => {
         settled = true;
       });
+    void rendering.catch(() => {});
     try {
       await waitFor(() => streams.stdout().includes("prod"));
       stdin.write("\r");
-      await waitFor(() => streams.stderr().includes("Session closed"));
+      await waitFor(() => streams.stdout().includes("Error: shell failed"));
       expect(
         core.harness.calls.find((call) => call.method === "openHarnessShell")?.args[0],
       ).toMatchObject({
@@ -217,12 +231,18 @@ describe("harness shell navigation", () => {
         qualifier: "prod",
       });
       expect(core.runtime.calls).toEqual([]);
+      stdin.write("\x03");
+      await expect(rendering).rejects.toMatchObject({
+        message: failure.message,
+        cause: failure,
+        exitCode: 1,
+      });
     } finally {
       while (!settled) {
         stdin.write("\x03");
         await tick();
       }
-      await rendering;
+      await rendering.catch(() => {});
     }
   });
 });
