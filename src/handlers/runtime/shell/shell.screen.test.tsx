@@ -132,19 +132,84 @@ describe("RuntimeShellScreen", () => {
     );
   });
 
-  test("renderTuiAt runs a direct shell to completion", async () => {
+  test("renderTuiAt completes successfully after retrying a failed direct shell", async () => {
     const value = core();
-    const { streams } = ttyTestIO();
+    const openShell = value.runtime.openRuntimeShell.bind(value.runtime);
+    let attempts = 0;
+    value.runtime.openRuntimeShell = async (request, options) => {
+      if (++attempts === 1) throw new Error("shell failed");
+      return openShell(request, options);
+    };
+    const { streams, stdin } = ttyTestIO();
     const ctx = ValueContext.EmptyContext()
       .withValue(RegionKey, "us-east-1")
       .withValue(EndpointKey, undefined)
       .withValue(JsonKey, false)
       .withValue(DebugKey, false);
 
-    await renderTuiAt("/agentcore/runtime/shell/checkout-AbCdEf1234/prod", ctx, value, streams.io);
+    const rendering = renderTuiAt(
+      "/agentcore/runtime/shell/checkout-AbCdEf1234/prod",
+      ctx,
+      value,
+      streams.io,
+    );
+    void rendering.catch(() => {});
+    try {
+      await waitFor(() => streams.stdout().includes("Error: shell failed"));
+      stdin.write("r");
+      await rendering;
+    } finally {
+      await interruptUntilExit(
+        rendering.catch(() => {}),
+        stdin,
+      );
+    }
 
+    expect(attempts).toBe(2);
     expect(value.runtime.calls.some((call) => call.method === "openRuntimeShell")).toBe(true);
     expect(streams.stderr()).toContain("Connected");
+  });
+
+  test.each([
+    { key: "Ctrl+C", input: "\x03" },
+    { key: "Escape", input: "\x1b" },
+  ])("renderTuiAt propagates a failed direct shell when quitting with $key", async ({ input }) => {
+    const value = core();
+    const failure = new Error("shell failed");
+    value.runtime.openRuntimeShell = async () => {
+      throw failure;
+    };
+    const { streams, stdin } = ttyTestIO();
+    const ctx = ValueContext.EmptyContext()
+      .withValue(RegionKey, "us-east-1")
+      .withValue(EndpointKey, undefined)
+      .withValue(JsonKey, false)
+      .withValue(DebugKey, false);
+    let settled = false;
+    const rendering = renderTuiAt(
+      "/agentcore/runtime/shell/checkout-AbCdEf1234/prod",
+      ctx,
+      value,
+      streams.io,
+    ).finally(() => {
+      settled = true;
+    });
+    void rendering.catch(() => {});
+    try {
+      await waitFor(() => streams.stdout().includes("Error: shell failed"));
+      stdin.write(input);
+      await waitFor(() => settled);
+      await expect(rendering).rejects.toMatchObject({
+        message: failure.message,
+        cause: failure,
+        exitCode: 1,
+      });
+    } finally {
+      await interruptUntilExit(
+        rendering.catch(() => {}),
+        stdin,
+      );
+    }
   });
 
   test("keeps rejected shell connections in the TUI with retry and endpoint back navigation", async () => {
@@ -176,13 +241,15 @@ describe("RuntimeShellScreen", () => {
       .withValue(DebugKey, false);
 
     const rendering = renderTuiAt(
-      "/agentcore/runtime/shell/checkout-AbCdEf1234/prod",
+      "/agentcore/runtime/shell/checkout-AbCdEf1234",
       ctx,
       value,
       streams.io,
     );
     void rendering.catch(() => {});
     try {
+      await waitFor(() => streams.stdout().includes("updated UTC"));
+      stdin.write("\r");
       const errorText = "HTTP 400";
       await waitFor(() => streams.stdout().includes(errorText));
       expect(streams.stdout()).toContain("checkout-AbCdEf1234");
@@ -200,9 +267,10 @@ describe("RuntimeShellScreen", () => {
       stdin.write("r");
       await waitFor(() => attempts === 2);
       await waitFor(() => streams.stdout().split(errorText).length > errorsBeforeRetry);
+      const selectionsBeforeBack = streams.stdout().split("[enter] select").length;
       stdin.write("\x1b");
       await waitFor(() => streams.stdout().includes("choose an endpoint to open a shell"));
-      await waitFor(() => streams.stdout().includes("updated UTC"));
+      await waitFor(() => streams.stdout().split("[enter] select").length > selectionsBeforeBack);
       expect(value.runtime.calls.some((call) => call.method === "listRuntimes")).toBe(false);
       stdin.write("\r");
       await waitFor(() => streams.stderr().includes("Session closed"));
