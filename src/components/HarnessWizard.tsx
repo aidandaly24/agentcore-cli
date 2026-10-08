@@ -785,7 +785,7 @@ function ModelStep({
   return (
     <Box flexDirection="column" paddingX={1}>
       <FormRadioGroup
-        name="choose a model provider"
+        name="choose a model provider or gateway"
         helpText="the provider and model that will power the harness"
         options={rows}
         focusedIndex={focusedField === null ? index : undefined}

@@ -49,7 +49,7 @@ describe("harness create wizard", () => {
 
     // Step: model provider — bedrock is preselected with the default model ID;
     // enter reveals it and enter again accepts it.
-    await waitForText(r.lastFrame, "choose a model provider");
+    await waitForText(r.lastFrame, "choose a model provider or gateway");
     expect(r.lastFrame()).toContain("● model provider ──");
     expect(r.lastFrame()).toContain("● bedrock");
     expect(r.lastFrame()).not.toContain("service default");
