@@ -312,7 +312,7 @@ export function HarnessModelField({
       >
         <FormRadioGroup
           key="provider"
-          helpText="choose a model provider"
+          helpText="choose a model provider or gateway"
           options={options}
           focusedIndex={focusedField === null ? providerIndex : undefined}
           selectedIndex={providerIndex}

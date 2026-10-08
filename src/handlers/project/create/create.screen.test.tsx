@@ -73,7 +73,7 @@ describe("project create wizard", () => {
     await r.press("return");
 
     // Model step: fields stay hidden until the provider is confirmed.
-    await waitForText(r.lastFrame, "choose a model provider");
+    await waitForText(r.lastFrame, "choose a model provider or gateway");
     expect(r.lastFrame()).toContain("● model provider ──");
     expect(r.lastFrame()).toContain("● bedrock");
     expect(r.lastFrame()).not.toContain("bedrock (recommended)");
@@ -310,7 +310,7 @@ describe("project create wizard", () => {
     const lines = r.lastFrame()!.split("\n");
     expect(lines).toHaveLength(24);
     expect(lines[0]).toContain("agentcore → create");
-    expect(lines).toContain(" choose a model provider");
+    expect(lines).toContain(" choose a model provider or gateway");
     expect(lines).toContain(" model ID");
     expect(lines).toContain(" API key ARN");
     expect(lines.at(-2)).toBe("─".repeat(80));
@@ -379,15 +379,15 @@ describe("project create wizard", () => {
     // Model ID and API key ARN are already visible, so the view stays put.
     await r.press("return");
     await waitForText(r.lastFrame, "the litellm model to use");
-    expect((await settledLines())[firstContentLine]).toBe(" choose a model provider");
+    expect((await settledLines())[firstContentLine]).toBe(" choose a model provider or gateway");
     await r.press("down");
-    expect((await settledLines())[firstContentLine]).toBe(" choose a model provider");
+    expect((await settledLines())[firstContentLine]).toBe(" choose a model provider or gateway");
 
     // API base URL is below the fold: scroll just far enough to show it.
     await r.press("down");
     await waitForText(r.lastFrame, "https://…");
     const scrolled = await settledLines();
-    expect(scrolled[firstContentLine]).not.toBe(" choose a model provider");
+    expect(scrolled[firstContentLine]).not.toBe(" choose a model provider or gateway");
     expect(scrolled).toContain(" model ID");
     expect(scrolled).toContain(" Custom API base URL");
     expect(scrolled.join("\n")).toContain(
@@ -403,7 +403,7 @@ describe("project create wizard", () => {
     // Returning to the provider list shows it from the top again.
     await r.press("up");
     await waitFor(
-      () => r.lastFrame()!.split("\n")[firstContentLine] === " choose a model provider",
+      () => r.lastFrame()!.split("\n")[firstContentLine] === " choose a model provider or gateway",
     );
     expect(r.lastFrame()).not.toContain("model ID");
     r.unmount();
