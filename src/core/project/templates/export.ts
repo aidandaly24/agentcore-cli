@@ -94,6 +94,7 @@ export const MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY = "Memory reference could not b
 export const MEMORY_MESSAGES_COUNT_NOTE_CATEGORY =
   "Memory messagesCount is not directly portable to Strands";
 export const MEMORY_ACTOR_NOTE_CATEGORY = "Memory requires a configured actorId";
+export const MEMORY_OWNERSHIP_NOTE_CATEGORY = "Source Memory ownership";
 export const SOURCE_ROLE_NOTE_CATEGORY = "Source execution-role policies retained";
 export const PATH_SKILLS_NOTE_CATEGORY = "path skills require container filesystem";
 export const GIT_SKILLS_CONTAINER_NOTE_CATEGORY = "git skills require git in container image";
@@ -632,6 +633,12 @@ function resolveMemory(
   }
 
   if (memory.arn) {
+    notes.push({
+      category: MEMORY_OWNERSHIP_NOTE_CATEGORY,
+      message:
+        `Memory ${memory.arn} remains source-owned; imported CDK bindings do not transfer ownership. ` +
+        "If it was Harness-managed, retain it when deleting the source Harness with DeleteHarness.deleteManagedMemory=false to avoid deleting its data.",
+    });
     const connection = addConnection(
       connections,
       {

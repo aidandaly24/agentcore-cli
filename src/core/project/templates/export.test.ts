@@ -17,6 +17,7 @@ import {
   MALFORMED_S3_SKILL_NOTE_CATEGORY,
   MCP_HEADER_CREDS_NOTE_CATEGORY,
   MEMORY_ACTOR_NOTE_CATEGORY,
+  MEMORY_OWNERSHIP_NOTE_CATEGORY,
   MEMORY_MANAGED_NOTE_CATEGORY,
   MEMORY_MESSAGES_COUNT_NOTE_CATEGORY,
   MEMORY_NAME_NOT_FOUND_NOTE_CATEGORY,
@@ -708,8 +709,13 @@ describe("mapHarnessToExportPlan memory", () => {
     ]);
     expect(result.context.memoryEnvVarName).toBe("AGENTCORE_MEMORY_MEMORY_M_1_ID");
     expect(result.context.memoryRegion).toBe("us-east-1");
-    expect(categories(result)).toEqual([MEMORY_ACTOR_NOTE_CATEGORY]);
+    expect(categories(result)).toEqual([
+      MEMORY_ACTOR_NOTE_CATEGORY,
+      MEMORY_OWNERSHIP_NOTE_CATEGORY,
+    ]);
     expect(result.notes[0]!.message).toContain("No shared/default actor");
+    expect(result.notes[1]!.message).toContain("imported CDK bindings do not transfer ownership");
+    expect(result.notes[1]!.message).toContain("DeleteHarness.deleteManagedMemory=false");
   });
 
   test("notes managed harness memory and disables none", () => {
