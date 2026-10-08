@@ -870,7 +870,15 @@ function addConnection(
   to: ConnectionTarget,
   access?: Connection["access"],
 ): Connection {
-  const existing = connections.find((connection) => isDeepStrictEqual(connection.to, to));
+  const existing = connections.find((connection) => {
+    if (connection.to.type === "gateway" && to.type === "gateway") {
+      return isDeepStrictEqual(
+        { ...connection.to, outboundAuth: connection.to.outboundAuth ?? { awsIam: {} } },
+        { ...to, outboundAuth: to.outboundAuth ?? { awsIam: {} } },
+      );
+    }
+    return isDeepStrictEqual(connection.to, to);
+  });
   if (existing) {
     if (access) existing.access = access;
     return existing;

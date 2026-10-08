@@ -309,6 +309,42 @@ describe("mapHarnessToExportPlan model mapping", () => {
 });
 
 describe("mapHarnessToExportPlan tools", () => {
+  test("deduplicates omitted/default IAM auth while preserving aliases and real conflicts", () => {
+    const arn = "arn:aws:bedrock-agentcore:us-west-2:111122223333:gateway/source";
+    const gateway = {
+      type: "agentcore_gateway",
+      name: "source",
+      config: { agentCoreGateway: { gatewayArn: arn } },
+    };
+    const result = plan({
+      spec: harness({
+        tools: [gateway],
+        connections: [{ id: "original-alias", to: { type: "gateway", arn } }],
+      }),
+    });
+    expect(result.runtime.connections).toEqual([
+      { id: "original-alias", to: { type: "gateway", arn } },
+    ]);
+    expect(result.context.remoteMcpTools).toMatchObject([
+      { urlEnvVar: "AGENTCORE_GATEWAY_ORIGINAL_ALIAS_URL" },
+    ]);
+    expect(
+      plan({
+        spec: harness({
+          tools: [gateway],
+          connections: [{ to: { type: "gateway", arn } }],
+        }),
+      }).runtime.connections,
+    ).toHaveLength(1);
+    expect(() =>
+      plan({
+        spec: harness({
+          tools: [gateway],
+          connections: [{ to: { type: "gateway", arn, outboundAuth: { none: {} } } }],
+        }),
+      }),
+    ).toThrow("Connection discovery name collision");
+  });
   test("maps remote MCP and inline function tools into the render context", () => {
     const result = plan({
       spec: harness({
