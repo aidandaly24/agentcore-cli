@@ -247,6 +247,43 @@ describe("mapHarnessToExportPlan model mapping", () => {
     );
   });
 
+  test("keeps project credentials distinct from retained source API-key providers", () => {
+    const executionRoleSource = {
+      roleArn: "arn:aws:iam::111122223333:role/source",
+      inlinePolicies: [],
+      managedPolicyArns: [],
+      tags: {},
+    };
+    const withKey = (apiKey: { apiKeyArn: string } | { apiKeyCredentialName: string }) =>
+      plan({
+        executionRoleSource,
+        spec: harness({ model: { provider: "open_ai", modelId: "gpt-4.1", ...apiKey } }),
+      });
+    const retained = withKey({
+      apiKeyArn:
+        "arn:aws:bedrock-agentcore:us-east-1:111122223333:token-vault/default/apikeycredentialprovider/SourceKey",
+    });
+    expect(retained.context.identityProviders).toEqual([
+      { name: "SourceKey", envVarName: credentialEnvVarName("SourceKey") },
+    ]);
+    expect(retained.credentials).toEqual([]);
+    expect(
+      retained.notes.find((note) => note.category === MODEL_API_KEY_NOTE_CATEGORY)?.message,
+    ).toContain("no provider or secret is cloned");
+    expect(() => withKey({ apiKeyArn: "not-a-provider-arn" })).toThrow(InputValidationError);
+
+    const named = withKey({ apiKeyCredentialName: "ProjectKey" });
+    expect(named.context.identityProviders).toEqual([
+      { name: "ProjectKey", envVarName: credentialEnvVarName("ProjectKey") },
+    ]);
+    expect(named.credentials).toEqual([
+      { authorizerType: "ApiKeyCredentialProvider", name: "ProjectKey" },
+    ]);
+    expect(named.runtime.bindingMode).toBe("explicit");
+    expect(named.runtime.executionRoleConfig?.policyMode).toBe("explicit");
+    expect(named.policyFiles).toEqual({});
+  });
+
   test("threads LiteLLM apiBase and additionalParams and trusts bedrock/ models without a key", () => {
     const result = plan({
       spec: harness({
