@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { GetAgentRuntimeResponse } from "@aws-sdk/client-bedrock-agentcore-control";
+import { createRuntimeShellOpener } from "../../../core/runtimeShell";
+import { InputValidationError } from "../../../errors";
 import { createRootHandler } from "../../index";
 import type { RuntimeShellRequest, RuntimeShellSession } from "../types";
 import {
@@ -129,6 +131,35 @@ describe("runtime shell command", () => {
     expect(subject.io.stderr()).toContain("Reattached to existing shell.");
     expect(subject.io.stderr()).toContain("Previous shell unavailable; started a new shell.");
   });
+
+  test.each([400, 403])(
+    "reports an HTTP %s rejection through the direct CLI path",
+    async (statusCode) => {
+      const subject = harness();
+      const failure = new Error(`Server rejected WebSocket connection: HTTP ${statusCode}`);
+      subject.core.runtime.openRuntimeShell = createRuntimeShellOpener({
+        createClient: () => ({
+          openShell: async () => {
+            throw failure;
+          },
+        }),
+      });
+      const running = subject.run("--id", RUNTIME_ID, "--qualifier", "DEFAULT");
+      if (statusCode === 400) {
+        const error = await running.catch((error: unknown) => error);
+        expect(error).toBeInstanceOf(InputValidationError);
+        expect(error).toMatchObject({ cause: failure, source: "user", exitCode: 2 });
+        expect((error as Error).message).toBe(
+          `${failure.message}\n\nIf this Runtime is managed by a harness, open its shell with:\n` +
+            "agentcore harness shell --id <harness-id>",
+        );
+      } else {
+        await expect(running).rejects.toBe(failure);
+      }
+      expect(subject.io.stderr()).not.toContain("Connected");
+      expect(subject.shell.closed).toBe(0);
+    },
+  );
 
   test("rejects JSON mode", async () => {
     const subject = harness();

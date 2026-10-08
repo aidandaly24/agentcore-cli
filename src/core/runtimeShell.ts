@@ -88,7 +88,7 @@ function credentialProvider(
   return typeof credentials === "function" ? credentials : async () => credentials;
 }
 
-function isRetryableUpgrade(error: unknown): boolean {
+export function isRetryableUpgrade(error: unknown): boolean {
   const reported = error instanceof Error ? error : new Error(String(error));
   return (
     RETRYABLE_UPGRADE.test(reported.message) ||
@@ -98,7 +98,7 @@ function isRetryableUpgrade(error: unknown): boolean {
   );
 }
 
-class RuntimeShellSessionAdapter implements RuntimeShellSession {
+export class RuntimeShellSessionAdapter implements RuntimeShellSession {
   constructor(private readonly session: RuntimeShellSdkSession) {}
 
   get runtimeSessionId(): string {

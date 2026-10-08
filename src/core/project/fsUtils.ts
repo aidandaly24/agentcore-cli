@@ -27,3 +27,7 @@ export function toPythonPackageName(name: string): string {
     .replace(/^[^a-zA-Z0-9]+/, "")
     .replace(/[^a-zA-Z0-9]+$/, "");
 }
+
+export function defaultExportProjectName(harnessName: string): string {
+  return `Export${harnessName.replace(/_/g, "")}`.slice(0, 23);
+}

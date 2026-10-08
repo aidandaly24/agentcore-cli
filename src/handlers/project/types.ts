@@ -163,6 +163,12 @@ export type CreateProjectInput = CreateProjectInputBase &
     | {
         /** The harness the created project declares (the default create path). */
         scaffoldHarnessInput: ScaffoldHarnessInput;
+        /**
+         * The harness model's API key, already read from its source. Stored in
+         * agentcore/.env.local under a project credential the model names; never
+         * written to the spec.
+         */
+        harnessApiKey?: string;
         scaffoldRuntimeInput?: undefined;
         importBedrockAgent?: undefined;
       }
@@ -349,6 +355,12 @@ export type AddResourceInput =
   | {
       resourceType: "harness";
       resourceConfig: z.input<typeof HarnessSpecSchema>;
+      /**
+       * The model's API key, already read from its source. Stored in
+       * agentcore/.env.local under a project credential the model names
+       * (`apiKeyCredentialName`); never written to the spec.
+       */
+      apiKey?: string;
     }
   | {
       resourceType: "runtime";
@@ -425,6 +437,8 @@ export type ProjectResource = AddResourceInput["resourceType"];
 
 /** Input for {@link ProjectManager.exportHarness}. */
 export type ExportHarnessInput = {
+  /** Name of the project created when exporting outside an existing project. */
+  projectName?: string;
   /** Name of an in-project harness. Mutually exclusive with `prefetched`. */
   harnessName?: string;
   /** A harness spec + system prompt fetched from the service (the `--arn` path). */
@@ -433,6 +447,7 @@ export type ExportHarnessInput = {
     systemPrompt?: string;
     notes?: ExportNote[];
     modelAdditionalParams?: Record<string, unknown>;
+    sourceArn?: string;
   };
   /** Name of the runtime agent to generate. */
   targetAgentName: string;
@@ -585,10 +600,11 @@ export interface ProjectManager {
    * Convert a harness into an editable Strands runtime agent: render the agent
    * code under app/<targetAgentName>/, register the runtime in agentcore.json
    * (the source harness entry is kept), and write EXPORT_NOTES.md for anything
-   * that could not be mapped mechanically.
+   * that could not be mapped mechanically. Without a project, a prefetched
+   * service harness is exported into a new project named after that harness.
    */
   exportHarness(
-    project: Project,
+    project: Project | undefined,
     input: ExportHarnessInput,
   ): AsyncGenerator<ProjectEvent, ExportHarnessResult>;
 }

@@ -8,10 +8,16 @@ import { JsonRendererKey, renderTuiAt } from "../../../tui";
 import { runWithProgress } from "../../../tui/progress";
 import { InputValidationError } from "../../../errors";
 import { invokeHarnessTurn } from "./operation.ts";
+import { HarnessInvokeLaunchContextKey } from "./launchContext";
 
 export const invokeHarnessFlags = [
   flag("id", "the ID of the harness", z.string().min(1).max(48)),
   flag("prompt", "the message to send to the harness", z.string().optional()),
+  flag(
+    "user-id",
+    "the end-user ID for user-scoped AgentCore Identity credentials",
+    z.string().optional(),
+  ),
   flag(
     "session-id",
     "the Runtime session ID to continue (33-100 characters)",
@@ -41,7 +47,15 @@ export const createInvokeHarnessHandler = (core: Core, io: AppIO) =>
         let path = `${ctx.require(PathKey)}/${flags["id"]}`;
         if (flags["session-id"]) path += `/${flags["session-id"]}`;
         if (flags["qualifier"]) path += `?qualifier=${encodeURIComponent(flags["qualifier"])}`;
-        await renderTuiAt(path, ctx, core, io);
+        await renderTuiAt(
+          path,
+          ctx.withValue(HarnessInvokeLaunchContextKey, {
+            harnessId: flags["id"],
+            userId: flags["user-id"],
+          }),
+          core,
+          io,
+        );
         return;
       }
 
@@ -55,6 +69,7 @@ export const createInvokeHarnessHandler = (core: Core, io: AppIO) =>
             prompt,
             qualifier: flags["qualifier"] ?? "DEFAULT",
             sessionId: flags["session-id"],
+            userId: flags["user-id"],
           },
           opts,
         );

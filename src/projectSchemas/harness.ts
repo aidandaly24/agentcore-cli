@@ -15,6 +15,7 @@ import { ConnectionSchema } from "./connections";
 import { uniqueBy } from "./zod-util";
 import { TagsSchema } from "./tags";
 import { z } from "zod";
+import { modelIdHelp } from "./modelDocs";
 export const CONTAINER_URI_PATTERN =
   /^(([0-9]{12})\.dkr\.ecr\.([a-z0-9-]+)\.amazonaws\.com(\.cn)?|public\.ecr\.aws)\/((?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)*[a-z0-9]+(?:[._-][a-z0-9]+)*)(?::([^:@]{1,300}))?(?:@(.+))?$/;
 export const MAX_CONTAINER_URI_LENGTH = 1024;
@@ -49,6 +50,10 @@ export const HARNESS_DEFAULT_MODEL_IDS: Record<HarnessModelProvider, string> = {
   gemini: "gemini-3.8-flash",
   lite_llm: `bedrock/${DEFAULT_HARNESS_MODEL.modelId}`,
 };
+/** The harness model ID field's help text, with a link to the provider's model IDs. */
+export function harnessModelIdHelp(provider: HarnessModelProvider, what: string): string {
+  return modelIdHelp(provider, what);
+}
 export const MAX_LITE_LLM_API_BASE_LENGTH = 16383;
 export const BedrockApiFormatSchema = z.enum(["converse_stream", "responses", "chat_completions"]);
 export type BedrockApiFormat = z.infer<typeof BedrockApiFormatSchema>;
@@ -61,6 +66,12 @@ export const HarnessModelSchema = z
     provider: HarnessModelProviderSchema,
     modelId: z.string().min(1, "Model ID is required"),
     apiKeyArn: z.string().optional(),
+    /**
+     * A project credential (`credentials` in agentcore.json) whose API key credential provider the
+     * model uses. Resolved to its ARN at synth time from the deployed credentials, so the CLI can
+     * create and manage the provider. Mutually exclusive with `apiKeyArn`.
+     */
+    apiKeyCredentialName: z.string().min(1).optional(),
     apiFormat: HarnessApiFormatSchema.optional(),
     temperature: z.number().min(0).max(2).optional(),
     topP: z.number().min(0).max(1).optional(),
@@ -92,13 +103,29 @@ export const HarnessModelSchema = z
         });
       }
     }
+    if (model.apiKeyArn !== undefined && model.apiKeyCredentialName !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Set either apiKeyArn or apiKeyCredentialName, not both",
+        path: ["apiKeyCredentialName"],
+      });
+    }
+    if (model.apiKeyCredentialName !== undefined && model.provider === "bedrock") {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          'apiKeyCredentialName is not supported for the "bedrock" provider; Bedrock uses the harness role',
+        path: ["apiKeyCredentialName"],
+      });
+    }
     if (
       model.apiKeyArn === undefined &&
+      model.apiKeyCredentialName === undefined &&
       (model.provider === "open_ai" || model.provider === "gemini")
     ) {
       ctx.addIssue({
         code: "custom",
-        message: `apiKeyArn is required for the "${model.provider}" provider`,
+        message: `apiKeyArn or apiKeyCredentialName is required for the "${model.provider}" provider`,
         path: ["apiKeyArn"],
       });
     }

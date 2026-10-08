@@ -12,6 +12,7 @@ import {
   StreamController,
   TestCoreClient,
 } from "../../../testing";
+import { HarnessInvokeLaunchContextKey } from "./launchContext";
 
 afterEach(cleanupScreens);
 
@@ -82,13 +83,24 @@ describe("invoke picker screen", () => {
   test("selecting a harness opens its chat", async () => {
     const core = chatCore();
     core.harness.setListResponse({ harnesses: [summary()] });
-    const r = renderScreen("/agentcore/harness/invoke", { core });
+    const r = renderScreen("/agentcore/harness/invoke", {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(HarnessInvokeLaunchContextKey, {
+          harnessId: "OtherHarness-abc123",
+          userId: "user-123",
+        }),
+    });
 
     await waitForText(r.lastFrame, "MyHarness");
     await r.press("return");
     // The chat screen's breadcrumb carries the harness id and the prompt mounts.
     await waitForText(r.lastFrame, "invoke → MyHarness-abc123");
     await waitForText(r.lastFrame, "send a message…");
+    await sendMessage(r, "hi");
+    await waitFor(() => core.harness.calls.some((c) => c.method === "invokeHarness"));
+    const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
+    expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBeUndefined();
     r.unmount();
   });
 
@@ -116,22 +128,33 @@ describe("invoke picker screen", () => {
 
 describe("invoke chat screen", () => {
   test("sending a message streams the reply and appends a turn summary", async () => {
-    const r = renderScreen(CHAT_PATH, { core: chatCore() });
+    const core = chatCore();
+    const r = renderScreen(CHAT_PATH, { core });
 
     await waitForText(r.lastFrame, "send a message…");
     await sendMessage(r, "hi agent");
 
     await waitForText(r.lastFrame, "Hello from the agent");
-    await waitForText(r.lastFrame, "end_turn · 15 tokens · 0.8s");
+    await waitForText(r.lastFrame, "end_turn · 15 tokens");
+    expect(r.lastFrame()).not.toContain("0.8s");
     // The user's message renders as a `❯` line and the prompt is ready again.
     expect(r.lastFrame()).toContain("❯ hi agent");
     expect(r.lastFrame()).toContain("session:");
+    const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
+    expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBeUndefined();
     r.unmount();
   });
 
-  test("the session id is stable across sends and each send carries only the new message", async () => {
+  test("keeps the session and user ID across sends, sending only new messages", async () => {
     const core = chatCore();
-    const r = renderScreen(CHAT_PATH, { core });
+    const r = renderScreen(CHAT_PATH, {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(HarnessInvokeLaunchContextKey, {
+          harnessId: "MyHarness-abc123",
+          userId: "user-123",
+        }),
+    });
 
     await waitForText(r.lastFrame, "send a message…");
     await sendMessage(r, "first");
@@ -147,6 +170,10 @@ describe("invoke chat screen", () => {
     expect(a!.harnessArn).toBe(ARN);
     expect(a!.runtimeSessionId).toBe(b!.runtimeSessionId!);
     expect(a!.runtimeSessionId!.length).toBeGreaterThanOrEqual(33);
+    expect(a!.runtimeUserId).toBe("user-123");
+    expect(b!.runtimeUserId).toBe("user-123");
+    expect(a!.actorId).toBeUndefined();
+    expect(b!.actorId).toBeUndefined();
     expect(a!.messages).toEqual([{ role: "user", content: [{ text: "first" }] }]);
     expect(b!.messages).toEqual([{ role: "user", content: [{ text: "second" }] }]);
     r.unmount();
@@ -155,7 +182,14 @@ describe("invoke chat screen", () => {
   test("a session id in the route resumes that session", async () => {
     const resumed = "resumed-session-0123456789abcdefghijklmn"; // 33+ chars
     const core = chatCore();
-    const r = renderScreen(`${CHAT_PATH}/${resumed}`, { core });
+    const r = renderScreen(`${CHAT_PATH}/${resumed}`, {
+      core,
+      withContext: (ctx) =>
+        ctx.withValue(HarnessInvokeLaunchContextKey, {
+          harnessId: "MyHarness-abc123",
+          userId: "user-123",
+        }),
+    });
 
     // The bottom bar shows the resumed session immediately.
     await waitForText(r.lastFrame, `session: ${resumed}`);
@@ -165,6 +199,7 @@ describe("invoke chat screen", () => {
     await waitFor(() => core.harness.calls.some((c) => c.method === "invokeHarness"));
     const invoke = core.harness.calls.find((c) => c.method === "invokeHarness")!;
     expect((invoke.args[0] as InvokeHarnessRequest).runtimeSessionId).toBe(resumed);
+    expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBe("user-123");
     r.unmount();
   });
 

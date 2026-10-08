@@ -24,6 +24,15 @@ import type {
   InvokeHarnessResponse,
 } from "@aws-sdk/client-bedrock-agentcore";
 import type { CoreOptions } from "../../core/types";
+import type { RuntimeShellSession } from "../runtime/types";
+
+export type HarnessShellRequest = {
+  harnessArn: string;
+  qualifier: string;
+  runtimeSessionId?: string;
+  bearerToken?: string;
+  onReconnect?: (reconnected: boolean) => void | Promise<void>;
+};
 
 // CreateHarnessInput is CreateHarnessRequest with the execution role made
 // optional: when omitted, Core provisions the default execution role in IAM and
@@ -38,6 +47,10 @@ export type ResolvedHarnessRuntime = {
 };
 
 export interface CoreHarnessClient {
+  openHarnessShell(
+    request: HarnessShellRequest,
+    options: CoreOptions,
+  ): Promise<RuntimeShellSession>;
   createHarness(input: CreateHarnessInput, options: CoreOptions): Promise<CreateHarnessResponse>;
   updateHarness(
     request: UpdateHarnessRequest,

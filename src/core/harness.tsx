@@ -39,7 +39,10 @@ import type {
   CoreHarnessClient,
   CreateHarnessInput,
   ResolvedHarnessRuntime,
+  HarnessShellRequest,
 } from "../handlers/harness/types";
+import type { RuntimeShellSession } from "../handlers/runtime/types";
+import { createHarnessShellOpener, type OpenHarnessShell } from "./harnessShell";
 import { InputValidationError } from "../errors";
 import type { AwsClients, CoreOptions } from "./types";
 import { abortable } from "./abortable";
@@ -50,7 +53,17 @@ import { toClientConfig } from "./utils";
 // clients provided by CoreClient. It owns no clients of its own; it borrows the
 // cached ones so every Core sub-client shares the same connections.
 export class HarnessClient implements CoreHarnessClient {
-  constructor(private readonly clients: AwsClients) {}
+  constructor(
+    private readonly clients: AwsClients,
+    private readonly openShell: OpenHarnessShell = createHarnessShellOpener(clients),
+  ) {}
+
+  openHarnessShell(
+    request: HarnessShellRequest,
+    options: CoreOptions,
+  ): Promise<RuntimeShellSession> {
+    return this.openShell(request, options);
+  }
 
   async getHarness(id: string, options: CoreOptions): Promise<GetHarnessResponse> {
     return this.clients

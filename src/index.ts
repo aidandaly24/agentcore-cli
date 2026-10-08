@@ -24,6 +24,9 @@ import { CommandRunMetricEventKey, ValueContext } from "./router";
 import { NpmCliVersionManager, printUpdateNotice } from "./cliVersionManager";
 import { CliVersionManagerKey } from "./handlers/keys";
 
+// Suppress only the AWS SDK's Node.js version support warning before constructing clients.
+process.env.AWS_SDK_JS_NODE_VERSION_SUPPORT_WARNING_DISABLED = "true";
+
 process.exit(
   await runWithExitCode(async (argv: string[]) => {
     const startTime = Date.now();

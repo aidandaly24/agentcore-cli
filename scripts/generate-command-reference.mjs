@@ -77,6 +77,7 @@ function isOptionSection(section) {
   return (
     section !== "global options" &&
     section !== "commands" &&
+    section !== "resources" &&
     section !== "parameter details" &&
     section !== "description"
   );
@@ -131,7 +132,7 @@ function parseHelp(text) {
       continue;
     }
 
-    if (section === "commands") {
+    if (section === "commands" || section === "resources") {
       const match = line.match(/^ {2}([a-z][a-z0-9-]*)\b(?:\s{2,}.*)?$/);
       if (match) parsed.commands.push(match[1]);
       continue;

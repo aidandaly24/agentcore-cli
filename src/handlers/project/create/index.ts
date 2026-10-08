@@ -30,6 +30,8 @@ import { JsonKey, RegionKey } from "../../keys";
 import { renderResult } from "../../utils";
 import { projectReference, type ProjectMutationResult } from "../output";
 import { stripCreateRegionUnavailableDefaults, validateCreateRegionSupport } from "./region";
+import { MODEL_DOCS_URLS } from "../../../projectSchemas/modelDocs";
+import { harnessApiKeyCredentialName } from "../../../core/project/templates/harness";
 
 type CreateProjectHandlerConfig = {
   projectManager: ProjectManager;
@@ -56,6 +58,17 @@ const ModelProviderFlagSchema = z.preprocess((value) => {
   return MODEL_PROVIDER_FLAG_ALIASES[lower] ?? lower;
 }, z.enum(MODEL_PROVIDER_FLAG_VALUES));
 type ModelProviderFlag = z.infer<typeof ModelProviderFlagSchema>;
+
+// Where each --model-provider lists its model IDs. openai_compatible has no
+// single list: the IDs are whatever the chosen endpoint serves.
+const MODEL_ID_FLAG_HELP = [
+  "(model id)",
+  "Model IDs by --model-provider:",
+  ...(["bedrock", "anthropic", "open_ai", "gemini", "lite_llm"] as const).map(
+    (provider) => `  ${provider.padEnd(18)}${MODEL_DOCS_URLS[provider]}`,
+  ),
+  `  ${"openai_compatible".padEnd(18)}the IDs your endpoint serves`,
+].join("\n");
 
 export const DEFAULT_CREATE_RUNTIME_NAME = "agent";
 
@@ -92,10 +105,12 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
         "model id for the scaffolded Runtime code, overriding the provider's default " +
           "(required with openai_compatible, and with litellm in China regions)",
         z.string().min(1).optional(),
+        { help: MODEL_ID_FLAG_HELP },
       ),
       flag(
         "api-key",
-        "API key for non-Bedrock providers: '-' for stdin, 'file://path' for file",
+        "API key for non-Bedrock providers (runtime templates and the default harness): '-' for " +
+          "stdin, 'file://path' for file",
         z.string().optional(),
         { sensitive: true },
       ),
@@ -124,8 +139,15 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
       const modelProviderFlag = flags["model-provider"];
       const apiKeyFlag = flags["api-key"];
 
+      // The default harness takes a harness model provider, its model id, and
+      // an API key; anything else stays a runtime-template flag.
+      const harnessModelFlags =
+        template === undefined &&
+        (modelProviderFlag === undefined || MODEL_PROVIDERS[modelProviderFlag].harness);
       const runtimeCodeFlags = (
-        ["model-provider", "model-id", "api-key", "api-base"] as const
+        harnessModelFlags
+          ? (["api-base"] as const)
+          : (["model-provider", "model-id", "api-key", "api-base"] as const)
       ).filter((flagName) => flags[flagName] !== undefined);
       if (runtimeCodeFlags.length > 0) {
         if (template === undefined || template === EMPTY_TEMPLATE_NAME) {
@@ -148,7 +170,24 @@ export const createCreateProjectHandler = (config: CreateProjectHandlerConfig) =
 
       let createInput: CreateProjectInput;
       if (template === undefined) {
-        createInput = { ...base, scaffoldHarnessInput: resolveScaffoldHarnessInput({ name }) };
+        if (
+          apiKeyFlag === undefined &&
+          (modelProviderFlag === "open_ai" || modelProviderFlag === "gemini")
+        ) {
+          throw new InputValidationError(
+            `--model-provider ${modelProviderFlag} requires --api-key ('-' for stdin, ` +
+              "'file://path' for file)",
+          );
+        }
+        const scaffoldHarnessInput = resolveScaffoldHarnessInput({
+          name,
+          "model-provider": modelProviderFlag,
+          "model-id": flags["model-id"],
+          "api-key": apiKeyFlag,
+        });
+        const source = new SourceResolver({ stdin: config.io.stdin });
+        const harnessApiKey = await source.resolveSecret("api-key", apiKeyFlag);
+        createInput = { ...base, scaffoldHarnessInput, harnessApiKey };
       } else if (template === EMPTY_TEMPLATE_NAME) {
         createInput = { ...base };
       } else {
@@ -197,6 +236,12 @@ type HarnessPathFlagValues = {
   "model-provider"?: ModelProviderFlag;
   "model-id"?: string;
   "api-key-arn"?: string;
+  /**
+   * Where the managed API key comes from ('-', 'file://path'). Only its presence
+   * matters here: the model then names the project credential the key is stored
+   * under. The caller reads the key itself and passes it as harnessApiKey.
+   */
+  "api-key"?: string;
   "api-base"?: string;
 };
 
@@ -206,13 +251,30 @@ type HarnessPathFlagValues = {
 // input through the exact same translation as the flag-driven path.
 export function resolveScaffoldHarnessInput(flags: HarnessPathFlagValues): ScaffoldHarnessInput {
   const provider = resolveHarnessModelProvider(flags["model-provider"]);
+  const name = defaultHarnessNameFor(flags["name"]);
+  const managedApiKey = flags["api-key"] !== undefined;
+  if (managedApiKey && provider === "bedrock") {
+    throw new InputValidationError(
+      "--api-key is not supported for the bedrock model provider; Bedrock uses the harness role. " +
+        "Pass --model-provider open_ai, gemini, or lite_llm",
+    );
+  }
+  if (managedApiKey && flags["api-key-arn"] !== undefined) {
+    throw new InputValidationError(
+      "give either an API key or an API key credential provider ARN, not both",
+    );
+  }
 
   const input: ScaffoldHarnessInput = {
-    name: defaultHarnessNameFor(flags["name"]),
+    name,
     model: {
       provider,
       modelId: flags["model-id"] ?? HARNESS_DEFAULT_MODEL_IDS[provider],
       apiKeyArn: flags["api-key-arn"],
+      ...(managedApiKey &&
+        provider !== "bedrock" && {
+          apiKeyCredentialName: harnessApiKeyCredentialName(name, provider),
+        }),
       apiBase: flags["api-base"],
     },
   };

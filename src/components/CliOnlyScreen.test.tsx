@@ -92,7 +92,8 @@ describe("menus separate mixed command groups with a divider", () => {
   test("the harness menu", async () => {
     const r = renderScreen("/agentcore/harness");
 
-    await waitFor(() => hasCliDivider(r.lastFrame()!));
+    await waitForText(r.lastFrame, "type to choose a command");
+    await r.resize(100, 45);
     expect(menuEntries(r.lastFrame()!)).toEqual({
       screens: [
         "create",
@@ -102,11 +103,16 @@ describe("menus separate mixed command groups with a divider", () => {
         "delete",
         "invoke",
         "exec",
+        "shell",
+        "logs",
+        "traces",
         "endpoint",
         "version",
       ],
-      cliOnly: ["logs", "traces"],
+      cliOnly: [],
     });
+    expect(r.lastFrame()).toContain("── resources");
+    expect(hasCliDivider(r.lastFrame()!)).toBe(false);
     r.unmount();
   });
 
@@ -176,7 +182,8 @@ describe("paths without a screen of their own", () => {
   test("a group drills down to a leaf's help and back", async () => {
     const r = renderScreen("/agentcore/eval/evaluator");
 
-    await waitFor(() => hasCliDivider(r.lastFrame()!));
+    await waitForText(r.lastFrame, "type to choose a command");
+    expect(r.lastFrame()).toContain("── resources");
     await r.write("delete");
     await waitForText(r.lastFrame, "❯ delete");
     await r.press("return");

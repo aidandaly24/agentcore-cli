@@ -122,6 +122,7 @@ import type {
   CoreHarnessClient,
   CreateHarnessInput,
   ResolvedHarnessRuntime,
+  HarnessShellRequest,
 } from "../handlers/harness/types";
 import type {
   CoreGatewayClient,
@@ -410,6 +411,15 @@ export class TestHarnessClient implements CoreHarnessClient {
   private updateEndpointResponse: UpdateHarnessEndpointResponse = DEFAULT_UPDATE_ENDPOINT_RESPONSE;
   private deleteEndpointResponse: DeleteHarnessEndpointResponse = DEFAULT_DELETE_ENDPOINT_RESPONSE;
   private resolvedRuntime: ResolvedHarnessRuntime = DEFAULT_RESOLVED_HARNESS_RUNTIME;
+  private shellSession: RuntimeShellSession = {
+    runtimeSessionId: "harness-session-012345678901234567890123",
+    kicked: false,
+    exitCode: 0,
+    send: async () => {},
+    resize: async () => {},
+    close: async () => {},
+    async *[Symbol.asyncIterator]() {},
+  };
   private error?: Error;
 
   // setListResponse sets what listHarnesses resolves to (when not erroring).
@@ -418,6 +428,20 @@ export class TestHarnessClient implements CoreHarnessClient {
   setListResponse(response: ListHarnessesResponse, forNextToken?: string): this {
     this.listResponses.set(forNextToken, response);
     return this;
+  }
+
+  setShellSession(session: RuntimeShellSession): this {
+    this.shellSession = session;
+    return this;
+  }
+
+  async openHarnessShell(
+    request: HarnessShellRequest,
+    options: CoreOptions,
+  ): Promise<RuntimeShellSession> {
+    this.calls.push({ method: "openHarnessShell", args: [request, options] });
+    if (this.error) throw this.error;
+    return this.shellSession;
   }
 
   // setGetResponse sets what getHarness resolves to (when not erroring).

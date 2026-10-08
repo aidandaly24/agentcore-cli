@@ -2,6 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import type { InvokeHarnessRequest } from "@aws-sdk/client-bedrock-agentcore";
 import type {
   GetAgentRuntimeResponse,
   GetGatewayResponse,
@@ -189,7 +190,12 @@ afterEach(async () => {
 describe("invoke", () => {
   test.each([
     ["runtime", ["--runtime", "checkout", "--payload", "{}"], "runtime", "invokeRuntime"],
-    ["harness", ["--harness", "support", "--prompt", "hi"], "harness", "invokeHarness"],
+    [
+      "harness",
+      ["--harness", "support", "--prompt", "hi", "--user-id", "user-123"],
+      "harness",
+      "invokeHarness",
+    ],
     [
       "gateway",
       ["--gateway", "tools", "--path", "/mcp", "--payload", "{}"],
@@ -207,6 +213,9 @@ describe("invoke", () => {
 
       const invoke = core[client].calls.find((call) => call.method === method)!;
       expect(invoke.args[1]).toEqual({ region: TARGET.region, credentials: TARGET_CREDENTIALS });
+      if (client === "harness") {
+        expect((invoke.args[0] as InvokeHarnessRequest).runtimeUserId).toBe("user-123");
+      }
       expect(resolved.targets).toEqual(["default"]);
     },
   );
