@@ -229,6 +229,7 @@ export function mapHarnessToExportPlan(input: HarnessExportInput): HarnessExport
         namespace,
         topK: config.topK ?? 3,
         relevanceScore: config.relevanceScore ?? 0.5,
+        strategyId: config.strategyId,
       })),
     ),
     memoryStrategies: memory.provider?.strategies ?? [],

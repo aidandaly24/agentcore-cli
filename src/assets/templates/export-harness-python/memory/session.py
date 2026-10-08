@@ -16,7 +16,7 @@ def get_memory_session_manager(
 {{#if memoryRetrievalNamespaces}}
     retrieval_config = {
 {{#each memoryRetrievalNamespaces}}
-        {{safeJson namespace}}: RetrievalConfig(top_k={{topK}}, relevance_score={{relevanceScore}}),
+        {{safeJson namespace}}: RetrievalConfig(top_k={{topK}}, relevance_score={{relevanceScore}}{{#if strategyId}}, strategy_id={{safeJson strategyId}}{{/if}}),
 {{/each}}
     }
 {{else}}

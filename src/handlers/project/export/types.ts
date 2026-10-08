@@ -15,7 +15,10 @@ export interface CoreExecutionRoleSourceReader {
   read(roleArn: string, options: CoreOptions): Promise<ExecutionRoleSource>;
 }
 
-export type MemoryRetrievalConfig = Record<string, { topK?: number; relevanceScore?: number }>;
+export type MemoryRetrievalConfig = Record<
+  string,
+  { topK?: number; relevanceScore?: number; strategyId?: string }
+>;
 
 /** Dependencies for `agentcore export` handlers. */
 export type ExportProjectResourceConfig = {

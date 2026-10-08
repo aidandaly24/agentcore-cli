@@ -322,7 +322,11 @@ describe("mapServiceHarnessToSpec", () => {
             arn: "arn:aws:bedrock-agentcore:us-west-2:111122223333:memory/m-1",
             messagesCount: 12,
             retrievalConfig: {
-              "/users/{actorId}/facts": { topK: 8, relevanceScore: 0.7 },
+              "/users/{actorId}/facts": {
+                topK: 8,
+                relevanceScore: 0.7,
+                strategyId: "source-strategy",
+              },
             },
           },
         },
@@ -332,7 +336,7 @@ describe("mapServiceHarnessToSpec", () => {
     expect(spec.memory).toMatchObject({ mode: "existing", messagesCount: 12 });
     expect(notes).toEqual([]);
     expect(memoryRetrievalConfig).toEqual({
-      "/users/{actorId}/facts": { topK: 8, relevanceScore: 0.7 },
+      "/users/{actorId}/facts": { topK: 8, relevanceScore: 0.7, strategyId: "source-strategy" },
     });
   });
 

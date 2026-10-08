@@ -114,7 +114,13 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
               },
             ],
           }),
-          memoryRetrievalConfig: { "/source/{actorId}/facts": { topK: 4, relevanceScore: 0 } },
+          memoryRetrievalConfig: {
+            "/source/{memoryStrategyId}/{actorId}/{sessionId}/facts": {
+              topK: 4,
+              relevanceScore: 0,
+              strategyId: "source-strategy",
+            },
+          },
           executionRoleSource: {
             roleArn: "arn:aws:iam::111122223333:role/source",
             inlinePolicies: [],
@@ -138,7 +144,7 @@ describe("FsProjectManager.exportHarness rendered tree", () => {
     expect(session).toContain('MEMORY_ID = os.getenv("AGENTCORE_MEMORY_MEMORY_SOURCE_MEMORY_ID")');
     expect(session).toContain('REGION = "us-east-1"');
     expect(session).toContain(
-      '"/source/{actorId}/facts": RetrievalConfig(top_k=4, relevance_score=0)',
+      '"/source/{memoryStrategyId}/{actorId}/{sessionId}/facts": RetrievalConfig(top_k=4, relevance_score=0, strategy_id="source-strategy")',
     );
     const after = await Bun.file(join(project.rootPath, "agentcore", "agentcore.json")).json();
     for (const field of ["memories", "agentCoreGateways", "harnesses", "credentials"]) {
