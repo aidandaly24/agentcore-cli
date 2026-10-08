@@ -455,6 +455,11 @@ describe("project export harness handler", () => {
     const { path, cleanup } = await inTempDirectory();
     cleanups.push(cleanup);
     subject.core.harness.setGetResponse(serviceHarness());
+    const document = {
+      Version: "2012-10-17",
+      Statement: [{ Effect: "Deny", Action: "s3:*", Resource: "*" }],
+    };
+    subject.core.executionRoleSourcePolicies = { Source: document };
 
     await subject.run([
       "--arn",
@@ -475,6 +480,18 @@ describe("project export harness handler", () => {
     ]);
     expect(spec.runtimes.map((runtime: { name: string }) => runtime.name)).toEqual([
       "RemoteHarnessAgent",
+    ]);
+    expect(spec.runtimes[0]).toMatchObject({
+      bindingMode: "explicit",
+      executionRoleConfig: { policyMode: "explicit" },
+      additionalPolicies: ["source-role-Source.json"],
+    });
+    expect(await Bun.file(join(agentPath, "source-role-Source.json")).json()).toEqual(document);
+    expect(subject.core.executionRoleSourceCalls).toEqual([
+      {
+        roleArn: "arn:aws:iam::111122223333:role/HarnessRole",
+        options: expect.objectContaining({ region: "us-west-2" }),
+      },
     ]);
     expect(existsSync(join(agentPath, "main.py"))).toBe(true);
     expect(existsSync(join(projectRoot, "agentcore", "cdk", "package.json"))).toBe(true);
@@ -594,6 +611,19 @@ describe("project export harness handler", () => {
     else subject.core.harness.setGetResponse(response as never);
 
     await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(error);
+
+    expect(await readdir(path)).toEqual([]);
+    expect(subject.core.projectCommands).toEqual([]);
+  });
+
+  test("does not scaffold a project when source IAM capture fails", async () => {
+    const subject = testExportCommand();
+    const { path, cleanup } = await inTempDirectory();
+    cleanups.push(cleanup);
+    subject.core.harness.setGetResponse(serviceHarness());
+    subject.core.executionRoleSourceError = new Error("AccessDenied");
+
+    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow("AccessDenied");
 
     expect(await readdir(path)).toEqual([]);
     expect(subject.core.projectCommands).toEqual([]);
