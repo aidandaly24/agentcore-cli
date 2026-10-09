@@ -602,14 +602,15 @@ function resolveMemory(
           "memory/session.py if the exact restore limit is required.",
       });
     }
+    const namespaces = entry.strategies.flatMap(
+      (strategy) => strategy.namespaceTemplates ?? strategy.namespaces ?? [],
+    );
     const connection = addConnection(
       connections,
       {
         type: "memory",
         name: entry.name,
-        ...(entry.strategies.some((s) => (s.namespaceTemplates ?? s.namespaces)?.length) && {
-          namespaces: entry.strategies.flatMap((s) => s.namespaceTemplates ?? s.namespaces ?? []),
-        }),
+        ...(namespaces.length > 0 && { namespaces }),
       },
       "readwrite",
     );
@@ -622,12 +623,7 @@ function resolveMemory(
       actorId: memory.actorId,
       retrievalConfig: memory.retrievalConfig,
       namespaceConfig: Object.fromEntries(
-        entry.strategies.flatMap((strategy) =>
-          (strategy.namespaceTemplates ?? strategy.namespaces ?? []).map((namespace) => [
-            namespace,
-            memory.retrievalConfig ?? {},
-          ]),
-        ),
+        namespaces.map((namespace) => [namespace, memory.retrievalConfig ?? {}]),
       ),
     };
   }
