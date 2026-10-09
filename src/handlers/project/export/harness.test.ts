@@ -596,38 +596,31 @@ describe("project export harness handler", () => {
   });
 
   test.each([
-    ["service harness is missing", {}, /no harness exists/],
-    ["service fetch fails", new Error("Access denied"), /Access denied/],
+    ["service harness is missing", {}, /no harness exists/, undefined],
+    ["service fetch fails", new Error("Access denied"), /Access denied/, undefined],
     [
       "service response cannot be mapped",
       { harness: { harnessName: "RemoteHarness", model: {} } },
       /no recognized model configuration/,
+      undefined,
     ],
-  ] as const)("does not create a project when the %s", async (_failure, response, error) => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    if (response instanceof Error) subject.core.harness.setError(response);
-    else subject.core.harness.setGetResponse(response as never);
+    ["source IAM capture fails", serviceHarness(), /AccessDenied/, new Error("AccessDenied")],
+  ] as const)(
+    "does not create a project when the %s",
+    async (_failure, response, error, sourceIamError) => {
+      const subject = testExportCommand();
+      const { path, cleanup } = await inTempDirectory();
+      cleanups.push(cleanup);
+      if (response instanceof Error) subject.core.harness.setError(response);
+      else subject.core.harness.setGetResponse(response as never);
+      subject.core.executionRoleSourceError = sourceIamError;
 
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(error);
+      await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow(error);
 
-    expect(await readdir(path)).toEqual([]);
-    expect(subject.core.projectCommands).toEqual([]);
-  });
-
-  test("does not scaffold a project when source IAM capture fails", async () => {
-    const subject = testExportCommand();
-    const { path, cleanup } = await inTempDirectory();
-    cleanups.push(cleanup);
-    subject.core.harness.setGetResponse(serviceHarness());
-    subject.core.executionRoleSourceError = new Error("AccessDenied");
-
-    await expect(subject.run(["--arn", HARNESS_ARN])).rejects.toThrow("AccessDenied");
-
-    expect(await readdir(path)).toEqual([]);
-    expect(subject.core.projectCommands).toEqual([]);
-  });
+      expect(await readdir(path)).toEqual([]);
+      expect(subject.core.projectCommands).toEqual([]);
+    },
+  );
 
   test.each([
     [["--target-agent-name", "9bad"], /invalid --target-agent-name/],
