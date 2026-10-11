@@ -96,6 +96,34 @@ async function inProject(
   return projectRoot;
 }
 
+test.each(["build", "deploy"])(
+  "the %s screen shows legacy dependency guidance without starting backend work",
+  async (command) => {
+    const { backend, deploys } = fakeBackend();
+    const core = new TestCoreClient({ backends: { CDK: backend } });
+    const projectRoot = await inProject(core);
+    await writeFile(
+      join(projectRoot, "agentcore", "agentcore.json"),
+      JSON.stringify({ name: "orders", version: 1 }),
+    );
+    await writeFile(
+      join(projectRoot, "agentcore", "cdk", "package.json"),
+      JSON.stringify({ dependencies: { "@aws/agentcore-cdk": "^0.1.0-alpha.19" } }),
+    );
+    const r = renderScreen(`/agentcore/${command}`, { core });
+
+    await waitForFlatText(r.lastFrame, "npx @aws/agentcore@0 deploy");
+
+    expect(flatFrame(r.lastFrame)).toContain("CDK dependencies are older than v0.24.2");
+    expect(r.frames.some((frame) => frame.includes("Synthesizing CloudFormation templates"))).toBe(
+      false,
+    );
+    expect(deploys).toEqual([]);
+    expect(core.projectCommands).toEqual([]);
+    r.unmount();
+  },
+);
+
 describe("project build screen", () => {
   test("starts at once, renders the backend's steps as the CLI does, then the CLI's own success line", async () => {
     const { backend } = fakeBackend();

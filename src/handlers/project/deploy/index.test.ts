@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { UserCancellationError } from "../../../errors/errors";
 import { createRootHandler } from "../../index";
@@ -143,6 +143,42 @@ async function emptyProjectSpec(projectRoot: string): Promise<void> {
 }
 
 describe("project deploy handler", () => {
+  test.each(["--yes", "--json"])(
+    "gives legacy dependency guidance with %s before resolving an account or deploying",
+    async (flag) => {
+      const projectRoot = await inProjectWithTargets();
+      const specPath = join(projectRoot, "agentcore", "agentcore.json");
+      const manifestPath = join(projectRoot, "agentcore", "cdk", "package.json");
+      await writeFile(specPath, JSON.stringify({ name: "orders", version: 1 }));
+      await writeFile(
+        manifestPath,
+        JSON.stringify({ dependencies: { "@aws/agentcore-cdk": "^0.1.0-alpha.19" } }),
+      );
+      const before = await Promise.all([
+        readFile(specPath, "utf8"),
+        readFile(manifestPath, "utf8"),
+      ]);
+      const accountCalls: string[] = [];
+      const subject = testDeployCommand({ outputs: {} }, [], {
+        resolveAccount: async (region) => {
+          accountCalls.push(region);
+          return DEFAULT_TARGET.account;
+        },
+      });
+
+      await expect(subject.run([flag])).rejects.toThrow(
+        "Run `npx @aws/agentcore@0 deploy` once to update them, then try again.",
+      );
+
+      expect(subject.calls).toEqual([]);
+      expect(accountCalls).toEqual([]);
+      expect(subject.io.stdout()).toBe("");
+      expect(
+        await Promise.all([readFile(specPath, "utf8"), readFile(manifestPath, "utf8")]),
+      ).toEqual(before);
+    },
+  );
+
   test("defaults to the default target and keeps progress off stdout", async () => {
     const subject = testDeployCommand(
       { outputs: { ZetaUrl: "https://zeta.example", AlphaArn: "arn:alpha" } },
