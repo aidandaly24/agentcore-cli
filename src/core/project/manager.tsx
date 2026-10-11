@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import semver from "semver";
 import type {
   AddResourceOptions,
   AddResourceInput,
@@ -109,6 +110,8 @@ const TARGETS_EXAMPLE = '[{ "name": "default", "account": "111122223333", "regio
 
 const NODE_INSTALL_HINT = "Install Node.js: https://nodejs.org/";
 const UV_INSTALL_HINT = "Install uv: https://docs.astral.sh/uv/getting-started/installation/";
+// v0.24.2 introduced dependency syncing with this exact CDK pin.
+const MINIMUM_V0_CDK_VERSION = "0.1.0-alpha.45";
 
 /**
  * Shown when a runtime template hardwired to an unreachable model provider
@@ -395,12 +398,46 @@ export class FsProjectManager implements ProjectManager {
     if (!rootPath) return undefined;
 
     const configPath = projectSpecPath(rootPath);
-    const spec = await this.json.read(configPath, ProjectSpecSchema);
+    let spec: Project["spec"];
+    try {
+      spec = await this.json.read(configPath, ProjectSpecSchema);
+    } catch (error) {
+      // Version-1 projects fail the v1 schema before reaching deploy preflight.
+      if (error instanceof DeserializationError) {
+        const warning = await this.v0DependencyWarning(rootPath);
+        if (warning) throw new ProjectStateError(warning, { cause: error });
+      }
+      throw error;
+    }
     return {
       name: spec.name,
       rootPath,
       spec,
     };
+  }
+
+  private async v0DependencyWarning(rootPath: string): Promise<string | undefined> {
+    const header = await this.json
+      .read(projectSpecPath(rootPath), z.object({ version: z.unknown().optional() }))
+      .catch(() => undefined);
+    if (header?.version !== 1) return undefined;
+
+    const manifest = await this.json
+      .read(
+        join(rootPath, "agentcore", "cdk", "package.json"),
+        z.object({ dependencies: z.record(z.string(), z.unknown()).optional() }),
+      )
+      .catch(() => undefined);
+    const declared = manifest?.dependencies?.["@aws/agentcore-cdk"];
+    if (typeof declared !== "string") return undefined;
+
+    const version = semver.valid(declared.trim().replace(/^[~^=]/, ""));
+    if (!version || !semver.lt(version, MINIMUM_V0_CDK_VERSION)) return undefined;
+
+    return (
+      "This project's CDK dependencies are older than v0.24.2. " +
+      "Run `npx @aws/agentcore@0 deploy` once to update them, then try again."
+    );
   }
 
   public async *create(input: CreateProjectInput): AsyncGenerator<ProjectEvent, Project> {

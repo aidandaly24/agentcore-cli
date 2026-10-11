@@ -2035,6 +2035,127 @@ describe("FsProjectManager.deploy", () => {
 });
 
 describe("FsProjectManager.resolve", () => {
+  async function legacyProject(
+    dependency: unknown,
+    version: unknown,
+  ): Promise<{ root: string; configPath: string; manifestPath: string }> {
+    const root = await inTempDirectory();
+    const configPath = join(root, "agentcore", "agentcore.json");
+    const manifestPath = join(root, "agentcore", "cdk", "package.json");
+    await mkdir(join(root, "agentcore", "cdk"), { recursive: true });
+    await writeFile(
+      configPath,
+      JSON.stringify({ name: "example", version, $schema: "https://example.com/v0-schema" }),
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({ dependencies: { "@aws/agentcore-cdk": dependency } }),
+    );
+    return { root, configPath, manifestPath };
+  }
+
+  test.each([
+    "^0.1.0-alpha.1",
+    "^0.1.0-alpha.19",
+    "~0.1.0-alpha.19",
+    "0.1.0-alpha.44",
+    "=0.1.0-alpha.44",
+    " ^0.1.0-alpha.19 ",
+  ])(
+    "gives v0 deploy guidance for legacy CDK dependency %s without changing files",
+    async (dependency) => {
+      const { root, configPath, manifestPath } = await legacyProject(dependency, 1);
+      const before = await Promise.all([
+        readFile(configPath, "utf8"),
+        readFile(manifestPath, "utf8"),
+      ]);
+      const subject = manager();
+      await mkdir(join(root, "app", "nested"), { recursive: true });
+
+      const error = await subject.manager
+        .resolve({ filePath: join(root, "app", "nested") })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ProjectStateError);
+      expect(error).toHaveProperty(
+        "message",
+        "This project's CDK dependencies are older than v0.24.2. " +
+          "Run `npx @aws/agentcore@0 deploy` once to update them, then try again.",
+      );
+      expect(
+        await Promise.all([readFile(configPath, "utf8"), readFile(manifestPath, "utf8")]),
+      ).toEqual(before);
+      expect(subject.commands).toEqual([]);
+      expect(subject.checkedTools).toEqual([]);
+    },
+  );
+
+  test.each([
+    "0.1.0-alpha.45",
+    "0.1.0-alpha.46",
+    "0.1.0",
+    "1.0.0-rc.3",
+    "^0.1.0-alpha.45",
+    undefined,
+    19,
+    "not-semver",
+    "file:../agentcore-cdk",
+    "git+https://example.com/agentcore-cdk.git",
+    "latest",
+    "*",
+    ">=0.1.0-alpha.19",
+  ])(
+    "preserves v0 schema validation for an updated or unknown dependency %s",
+    async (dependency) => {
+      const { root, configPath } = await legacyProject(dependency, 1);
+
+      const error = await manager()
+        .manager.resolve({ filePath: root })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(DeserializationError);
+      expect(error).toHaveProperty("message", expect.stringContaining(configPath));
+      expect(error).toHaveProperty("message", expect.not.stringContaining("npx @aws/agentcore@0"));
+    },
+  );
+
+  test.each([undefined, 0, 2, 3, "1"])(
+    "does not apply v0 dependency guidance to project version %s",
+    async (version) => {
+      const { root } = await legacyProject("^0.1.0-alpha.19", version);
+
+      const error = await manager()
+        .manager.resolve({ filePath: root })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(DeserializationError);
+      expect(error).toHaveProperty("message", expect.not.stringContaining("npx @aws/agentcore@0"));
+    },
+  );
+
+  test.each(["missing", "malformed", "invalid-shape"] as const)(
+    "preserves the original schema error when the v0 CDK manifest is %s",
+    async (state) => {
+      const { root, manifestPath } = await legacyProject("^0.1.0-alpha.19", 1);
+      if (state === "missing") await rm(manifestPath);
+      else await writeFile(manifestPath, state === "malformed" ? "{ not valid json" : "null");
+
+      await expect(manager().manager.resolve({ filePath: root })).rejects.toBeInstanceOf(
+        DeserializationError,
+      );
+    },
+  );
+
+  test("loads a v1 project with an old CDK declaration without legacy guidance", async () => {
+    const { root, configPath } = await legacyProject("^0.1.0-alpha.19", 2);
+    await writeFile(configPath, JSON.stringify({ name: "example", version: 2 }));
+
+    const project = await manager().manager.resolve({ filePath: root });
+
+    expect(project?.spec.version).toBe(2);
+    expect(project?.name).toBe("example");
+  });
+
   test("round-trips a project it just created", async () => {
     const root = await inTempDirectory();
     const subject = manager().manager;
