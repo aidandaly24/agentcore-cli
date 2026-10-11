@@ -23,7 +23,7 @@ const ASSET_NAMING = "agentcore-assets/[dir]/[name].[ext]";
 // __dirname to the *build machine's* path, which resolves on the builder and
 // fails everywhere else. Binaries therefore have to hand the Toolkit an
 // explicit copy of anything it would otherwise read from its package.
-const EXTERNAL = ["@aws-cdk/toolkit-lib"];
+const EXTERNAL = ["@aws-cdk/toolkit-lib", "@napi-rs/keyring"];
 
 const BOOTSTRAP_TEMPLATE = ["lib", "api", "bootstrap", "bootstrap-template.yaml"];
 
@@ -202,6 +202,7 @@ async function compile(target: string): Promise<void> {
     define: DEFINE,
     root: REPO_ROOT,
     naming: { asset: ASSET_NAMING },
+    external: ["@napi-rs/keyring"],
     plugins: [assetLoaderPlugin(), runtimeShellSdkPlugin()],
   });
   await assertTemplateIsEmbedded(outfile, template);
