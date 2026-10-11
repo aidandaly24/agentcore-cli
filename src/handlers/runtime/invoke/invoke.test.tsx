@@ -1,4 +1,5 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
@@ -25,6 +26,21 @@ const REGION = "us-west-2";
 const RUNTIME_ID = "runtime-123";
 const ACCOUNT_ID = "123456789012";
 const RUNTIME_ARN = `arn:aws:bedrock-agentcore:${REGION}:${ACCOUNT_ID}:runtime/${RUNTIME_ID}`;
+const tempDirectories: string[] = [];
+
+async function tokenFile(contents: string): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "runtime-invoke-token-"));
+  tempDirectories.push(directory);
+  const path = join(directory, "token");
+  await writeFile(path, contents);
+  return `file://${path}`;
+}
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
 
 function body(...chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
   return (async function* () {
@@ -213,7 +229,7 @@ describe("runtime invoke", () => {
         "--mcp-method",
         "tools/call",
         "--bearer-token",
-        "secret-token",
+        await tokenFile("secret-token\n"),
       ],
       {
         getResponse: {
@@ -235,6 +251,27 @@ describe("runtime invoke", () => {
       mcpMethod: "tools/call",
       bearerToken: "secret-token",
     });
+  });
+
+  test.each<[string, string[]]>([
+    ["interactive launch", []],
+    ["headless invocation", ["--payload", "{}"]],
+  ])("rejects inline bearer-token flags for %s before Core calls", async (_name, flags) => {
+    const core = new TestCoreClient();
+    const output = captureIO();
+
+    await expect(
+      runCommand(core, output.io, [
+        "runtime",
+        "invoke",
+        "--id",
+        RUNTIME_ID,
+        "--bearer-token",
+        "inline-token",
+        ...flags,
+      ]),
+    ).rejects.toThrow("inline secret values are not accepted");
+    expect(core.runtime.calls).toEqual([]);
   });
 
   test.each([
@@ -635,7 +672,7 @@ describe("runtime invoke", () => {
         "--header",
         "X-Tenant: retail",
         "--bearer-token",
-        "secret-token",
+        await tokenFile("secret-token\n"),
       ]);
 
       expect(render).toHaveBeenCalledTimes(1);

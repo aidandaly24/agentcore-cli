@@ -1,4 +1,7 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { GetAgentRuntimeResponse } from "@aws-sdk/client-bedrock-agentcore-control";
 import { InputValidationError, SourceResolutionError } from "../../../errors";
@@ -14,6 +17,21 @@ const REGION = "us-west-2";
 const RUNTIME_ID = "runtime-123";
 const ACCOUNT_ID = "123456789012";
 const ARN = `arn:aws:bedrock-agentcore:${REGION}:${ACCOUNT_ID}:runtime/${RUNTIME_ID}`;
+const tempDirectories: string[] = [];
+
+async function tokenFile(contents: string): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "runtime-token-"));
+  tempDirectories.push(directory);
+  const path = join(directory, "token");
+  await writeFile(path, contents);
+  return `file://${path}`;
+}
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
 
 function detail(overrides: Partial<GetAgentRuntimeResponse> = {}): GetAgentRuntimeResponse {
   return {
@@ -36,12 +54,37 @@ describe("resolveRuntimeInvokeSources", () => {
   test("resolves payload bytes and bearer-token text through one resolver", async () => {
     const bytes = Uint8Array.from([9, 0, 254]);
     const result = await resolveRuntimeInvokeSources(
-      { payload: "-", bearerToken: "secret-€" },
+      { payload: "-", bearerToken: await tokenFile("secret-€\r\n") },
       stdin(bytes),
     );
 
     expect(result.payload).toEqual(bytes);
     expect(result.bearerToken).toBe("secret-€");
+  });
+
+  test("rejects inline tokens before reading payload stdin without exposing them", async () => {
+    let reads = 0;
+    const secret = "inline-token-must-not-leak";
+    const error = await resolveRuntimeInvokeSources(
+      { payload: "-", bearerToken: secret },
+      stdin(new Uint8Array(), () => reads++),
+    ).catch((error) => error);
+
+    expect(error).toBeInstanceOf(InputValidationError);
+    expect(error.message).toContain("--bearer-token must come from stdin");
+    expect(error.message).not.toContain(secret);
+    expect(error.cause).toBeInstanceOf(SourceResolutionError);
+    expect(reads).toBe(0);
+  });
+
+  test("reads a bearer token from stdin and strips a trailing newline", async () => {
+    const result = await resolveRuntimeInvokeSources(
+      { payload: "{}", bearerToken: "-" },
+      stdin(new TextEncoder().encode("secret-token\n")),
+    );
+
+    expect(result.bearerToken).toBe("secret-token");
+    expect(result.payload).toEqual(new TextEncoder().encode("{}"));
   });
 
   test("rejects dual stdin before reading", async () => {
@@ -101,7 +144,7 @@ test("brands TUI bearer-token file failures as input errors", async () => {
 
 test("preserves unexpected TUI bearer-token source failures", async () => {
   const failure = new TypeError("source failed");
-  const resolve = spyOn(SourceResolver.prototype, "resolveText").mockRejectedValue(failure);
+  const resolve = spyOn(SourceResolver.prototype, "resolveSecret").mockRejectedValue(failure);
 
   try {
     await expect(resolveRuntimeInvokeTuiBearerToken("token", stdin(new Uint8Array()))).rejects.toBe(
@@ -110,6 +153,20 @@ test("preserves unexpected TUI bearer-token source failures", async () => {
   } finally {
     resolve.mockRestore();
   }
+});
+
+test("rejects inline bearer-token flags when launching the TUI", async () => {
+  await expect(
+    resolveRuntimeInvokeTuiBearerToken("inline-token", stdin(new Uint8Array())),
+  ).rejects.toThrow("inline secret values are not accepted");
+});
+
+test("reads bearer-token files when launching the TUI", async () => {
+  const source = await tokenFile("secret-token\n");
+
+  expect(await resolveRuntimeInvokeTuiBearerToken(source, stdin(new Uint8Array()))).toBe(
+    "secret-token",
+  );
 });
 
 describe("parseRuntimeInvokeHeaders", () => {
