@@ -1,7 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import type { GetGatewayResponse } from "@aws-sdk/client-bedrock-agentcore-control";
-import { SourceResolutionError } from "../../../errors";
+import { InputValidationError, SourceResolutionError } from "../../../errors";
 import { SourceResolver } from "../../../io";
 import {
   normalizeGatewayInvokeRequest,
@@ -11,6 +14,21 @@ import {
 } from "./request";
 
 const GATEWAY_ID = "gateway-123";
+const tempDirectories: string[] = [];
+
+async function tokenFile(contents: string): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "gateway-token-"));
+  tempDirectories.push(directory);
+  const path = join(directory, "token");
+  await writeFile(path, contents);
+  return `file://${path}`;
+}
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
 
 function stdin(bytes?: Uint8Array): NodeJS.ReadStream {
   const stream = new PassThrough();
@@ -39,12 +57,44 @@ describe("Gateway invoke sources", () => {
     const payload = Uint8Array.from([0, 255, 10]);
 
     const result = await resolveGatewayInvokeSources(
-      { payload: "-", bearerToken: "secret-token" },
+      { payload: "-", bearerToken: await tokenFile("secret-token\r\n") },
       stdin(payload),
     );
 
     expect(result.payload).toEqual(payload);
     expect(result.bearerToken).toBe("secret-token");
+  });
+
+  test("rejects inline tokens before reading payload stdin without exposing them", async () => {
+    const input = stdin();
+    const secret = "inline-token-must-not-leak";
+    try {
+      const error = await resolveGatewayInvokeSources(
+        {
+          payload: "-",
+          bearerToken: secret,
+        },
+        input,
+      ).catch((error) => error);
+
+      expect(error).toBeInstanceOf(InputValidationError);
+      expect(error.message).toContain("--bearer-token must come from stdin");
+      expect(error.message).not.toContain(secret);
+      expect(error.cause).toBeInstanceOf(SourceResolutionError);
+      expect(input.listenerCount("readable")).toBe(0);
+    } finally {
+      input.destroy();
+    }
+  });
+
+  test("reads a bearer token from stdin and strips a trailing newline", async () => {
+    const result = await resolveGatewayInvokeSources(
+      { payload: "{}", bearerToken: "-" },
+      stdin(Buffer.from("secret-token\n")),
+    );
+
+    expect(result.bearerToken).toBe("secret-token");
+    expect(result.payload).toEqual(new TextEncoder().encode("{}"));
   });
 
   test("preserves an explicitly empty inline payload", async () => {
@@ -75,6 +125,20 @@ test("preserves TUI bearer-token source errors", async () => {
 
   expect(error).toBeInstanceOf(SourceResolutionError);
   expect(error.message).toContain("could not read '--bearer-token' from file");
+});
+
+test("rejects inline bearer-token flags when launching the TUI", async () => {
+  await expect(
+    resolveGatewayInvokeTuiBearerToken("inline-token", new SourceResolver({})),
+  ).rejects.toThrow("inline secret values are not accepted");
+});
+
+test("reads bearer-token files when launching the TUI", async () => {
+  const source = await tokenFile("secret-token\n");
+
+  expect(await resolveGatewayInvokeTuiBearerToken(source, new SourceResolver({}))).toBe(
+    "secret-token",
+  );
 });
 
 describe("Gateway invoke headers", () => {

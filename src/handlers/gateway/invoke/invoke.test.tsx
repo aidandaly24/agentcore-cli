@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -28,6 +28,21 @@ import { GatewayInvokeLaunchContextKey } from "./launchContext";
 const REGION = "us-west-2";
 const GATEWAY_ID = "gateway-123";
 const GATEWAY_URL = "https://gateway-123.gateway.example.test/mcp";
+const tempDirectories: string[] = [];
+
+async function tokenFile(contents: string): Promise<string> {
+  const directory = await mkdtemp(join(tmpdir(), "gateway-invoke-token-"));
+  tempDirectories.push(directory);
+  const path = join(directory, "token");
+  await writeFile(path, contents);
+  return `file://${path}`;
+}
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
 
 function body(...chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
   return (async function* () {
@@ -206,7 +221,7 @@ describe("gateway invoke", () => {
       "--header",
       "X-Tenant: retail",
       "--bearer-token",
-      "secret-token",
+      await tokenFile("secret-token\n"),
       "--session-id",
       "runtime-session",
       "--mcp-session-id",
@@ -504,7 +519,7 @@ describe("gateway invoke", () => {
         path: "runtime/invocations?trace=true",
         payload: undefined,
         header: ["X-Tenant: retail"],
-        "bearer-token": "secret-token",
+        "bearer-token": await tokenFile("secret-token\n"),
         "session-id": "runtime-session",
         "mcp-session-id": "mcp-session",
         "mcp-protocol-version": "2025-06-18",
@@ -513,6 +528,27 @@ describe("gateway invoke", () => {
     );
 
     expect(renderCount).toBe(1);
+    expect(core.gateway.calls).toEqual([]);
+  });
+
+  test.each<[string, string[]]>([
+    ["interactive launch", []],
+    ["headless invocation", ["--payload", "{}"]],
+  ])("rejects inline bearer-token flags for %s before Core calls", async (_name, flags) => {
+    const core = configuredCore();
+    const output = captureIO();
+
+    await expect(
+      runCommand(core, output.io, [
+        "gateway",
+        "invoke",
+        "--id",
+        GATEWAY_ID,
+        "--bearer-token",
+        "inline-token",
+        ...flags,
+      ]),
+    ).rejects.toThrow("inline secret values are not accepted");
     expect(core.gateway.calls).toEqual([]);
   });
 
