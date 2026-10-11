@@ -1,0 +1,161 @@
+import { afterEach, expect, test } from "bun:test";
+import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ENC_PREFIX, encryptSecret } from "../secrets/cipher";
+import { LocalSecrets, type KeychainEntry } from "./localSecrets";
+
+const roots: string[] = [];
+afterEach(() =>
+  Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))),
+);
+
+async function directory(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "agentcore-secret-key-"));
+  roots.push(root);
+  return root;
+}
+
+test("creates and reuses the 32-byte owner-only fallback key", async () => {
+  const configDirectory = await directory();
+  const config = { configDirectory, keychain: () => null };
+  const encrypted = await new LocalSecrets(config).encrypt({ MODEL_API_KEY: "private-value" });
+  const path = join(configDirectory, "secrets.key");
+  const key = await readFile(path);
+  expect(key.length).toBe(32);
+  if (process.platform !== "win32") {
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
+    await chmod(path, 0o644);
+  }
+  expect(await new LocalSecrets(config).decrypt(encrypted)).toEqual({
+    MODEL_API_KEY: "private-value",
+  });
+  await new LocalSecrets(config).encrypt({ MODEL_API_KEY: "next-value" });
+  expect(await readFile(path)).toEqual(key);
+  if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
+});
+
+test("uses the persisted keychain key without creating a keyfile", async () => {
+  const configDirectory = await directory();
+  let password: string | null = null;
+  const entry: KeychainEntry = {
+    getPassword: () => password,
+    setPassword: (value) => {
+      password = value;
+    },
+  };
+  const config = { configDirectory, keychain: () => entry };
+  const encrypted = await new LocalSecrets(config).encrypt({ MODEL_API_KEY: "private-value" });
+  expect(password).not.toBeNull();
+  expect(existsSync(join(configDirectory, "secrets.key"))).toBe(false);
+  expect(await new LocalSecrets(config).decrypt(encrypted)).toEqual({
+    MODEL_API_KEY: "private-value",
+  });
+});
+
+test("encrypts with the persisted key rather than a generated key the store replaced", async () => {
+  const configDirectory = await directory();
+  const persisted = randomBytes(32).toString("base64");
+  let password: string | null = null;
+  const config = {
+    configDirectory,
+    keychain: () => ({
+      getPassword: () => password,
+      setPassword: () => {
+        password = persisted;
+      },
+    }),
+  };
+  const encrypted = await new LocalSecrets(config).encrypt({ MODEL_API_KEY: "value" });
+  expect(await new LocalSecrets(config).decrypt(encrypted)).toEqual({ MODEL_API_KEY: "value" });
+});
+
+test("independent writers reuse a fallback key and leave corrupt keychain material untouched", async () => {
+  const configDirectory = await directory();
+  const config = {
+    configDirectory,
+    keychain: () => ({
+      getPassword: () => "broken",
+      setPassword: () => {
+        throw new Error("must not replace corrupt keychain material");
+      },
+    }),
+  };
+  const [first, second] = await Promise.all([
+    new LocalSecrets(config).encrypt({ FIRST_API_KEY: "first" }),
+    new LocalSecrets(config).encrypt({ SECOND_API_KEY: "second" }),
+  ]);
+  expect(await new LocalSecrets(config).decrypt({ ...first, ...second })).toEqual({
+    FIRST_API_KEY: "first",
+    SECOND_API_KEY: "second",
+  });
+});
+
+test("falls back when keychain access fails and reads values encrypted by either source", async () => {
+  const configDirectory = await directory();
+  const keychainKey = randomBytes(32);
+  const fileOnly = new LocalSecrets({ configDirectory, keychain: () => null });
+  const fromFile = await fileOnly.encrypt({ FILE_API_KEY: "file-value" });
+  const secrets = new LocalSecrets({
+    configDirectory,
+    keychain: () => ({
+      getPassword: () => keychainKey.toString("base64"),
+      setPassword: () => {
+        throw new Error("must not overwrite an existing key");
+      },
+    }),
+  });
+  expect(
+    await secrets.decrypt({
+      ...fromFile,
+      KEYCHAIN_API_KEY: encryptSecret("keychain-value", keychainKey),
+    }),
+  ).toEqual({ FILE_API_KEY: "file-value", KEYCHAIN_API_KEY: "keychain-value" });
+
+  const unavailable = new LocalSecrets({
+    configDirectory,
+    keychain: () => {
+      throw new Error("keychain unavailable");
+    },
+  });
+  expect(await unavailable.decrypt(await unavailable.encrypt({ MODEL_API_KEY: "value" }))).toEqual({
+    MODEL_API_KEY: "value",
+  });
+});
+
+test("does not create keys for identifiers, blank placeholders, plaintext reads or encrypted writes", async () => {
+  const configDirectory = await directory();
+  const secrets = new LocalSecrets({ configDirectory, keychain: () => null });
+  const env = { AGENTCORE_CREDENTIAL_PAY_API_KEY_ID: "id", MODEL_API_KEY: "", STAGE: "dev" };
+  expect(await secrets.encrypt(env)).toEqual(env);
+  expect(await secrets.decrypt({ MODEL_API_KEY: "legacy" })).toEqual({ MODEL_API_KEY: "legacy" });
+  const token = encryptSecret("value", randomBytes(32));
+  expect(await secrets.encrypt({ MODEL_API_KEY: token })).toEqual({ MODEL_API_KEY: token });
+  expect(existsSync(join(configDirectory, "secrets.key"))).toBe(false);
+});
+
+test("missing and corrupt keys fail without replacing key material or leaking a stored value", async () => {
+  const configDirectory = await directory();
+  const path = join(configDirectory, "secrets.key");
+  const secrets = new LocalSecrets({ configDirectory, keychain: () => null });
+  const token = encryptSecret("private-value", randomBytes(32));
+  await expect(secrets.decrypt({ MODEL_API_KEY: token })).rejects.toThrow(/Could not decrypt/);
+  expect(existsSync(path)).toBe(false);
+  const corrupt = Buffer.alloc(10, 7);
+  await writeFile(path, corrupt);
+  await expect(secrets.encrypt({ MODEL_API_KEY: "private-value" })).rejects.toThrow(/is corrupt/);
+  await expect(secrets.decrypt({ MODEL_API_KEY: token })).rejects.toThrow(/Could not decrypt/);
+  expect(await readFile(path)).toEqual(corrupt);
+});
+
+test("keeps existing envelopes unchanged and encrypts only sensitive nonempty values", async () => {
+  const configDirectory = await directory();
+  const secrets = new LocalSecrets({ configDirectory, keychain: () => null });
+  const env = { MODEL_API_KEY: "value", MODEL_API_KEY_ID: "id" };
+  const encrypted = await secrets.encrypt(env);
+  expect(encrypted.MODEL_API_KEY?.startsWith(ENC_PREFIX)).toBe(true);
+  expect(encrypted.MODEL_API_KEY_ID).toBe("id");
+  expect(await secrets.encrypt(encrypted)).toEqual(encrypted);
+});
