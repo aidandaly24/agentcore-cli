@@ -136,6 +136,57 @@ describe("SourceResolver text", () => {
   });
 });
 
+describe("SourceResolver secrets", () => {
+  test("passes undefined through without reading stdin", async () => {
+    expect(await new SourceResolver({}).resolveSecret("api-key", undefined)).toBeUndefined();
+  });
+
+  test.each([
+    "api-key",
+    "client-secret",
+    "api-key-secret",
+    "wallet-secret",
+    "app-secret",
+    "authorization-private-key",
+    "bearer-token",
+  ])("rejects inline --%s values without exposing them", async (name) => {
+    const secret = "must-not-appear-in-errors";
+    const error = await new SourceResolver({}).resolveSecret(name, secret).catch((error) => error);
+
+    expect(error).toBeInstanceOf(SourceResolutionError);
+    expect(error.message).toContain(`--${name} must come from stdin`);
+    expect(error.message).not.toContain(secret);
+  });
+
+  test.each(["", "\n", "\r\n"])("reads file secrets with suffix %j", async (suffix) => {
+    const path = await tempFile(` secret value ${suffix}`);
+
+    expect(await new SourceResolver({}).resolveSecret("api-key", `file://${path}`)).toBe(
+      " secret value ",
+    );
+  });
+
+  test.each(["", "\n", "\r\n"])("reads stdin secrets with suffix %j", async (suffix) => {
+    const resolver = new SourceResolver({
+      stdin: stdin(new TextEncoder().encode(`secret${suffix}`)),
+    });
+
+    expect(await resolver.resolveSecret("api-key", "-")).toBe("secret");
+  });
+
+  test.each(["file", "stdin"])("rejects multiline secrets from %s", async (source) => {
+    const secret = "first-line\nsecond-line\n";
+    const path = await tempFile(secret);
+    const resolver = new SourceResolver({ stdin: stdin(new TextEncoder().encode(secret)) });
+    const resolution = resolver.resolveSecret(
+      "api-key",
+      source === "file" ? `file://${path}` : "-",
+    );
+
+    await expect(resolution).rejects.toThrow("--api-key must be a single-line value");
+  });
+});
+
 describe("SourceResolver cancellation", () => {
   test("rejects an already-aborted inline resolution", async () => {
     const controller = new AbortController();
