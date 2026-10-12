@@ -122,11 +122,11 @@ describe("harness exec", () => {
 
   test.each(
     [
-      ["-i", "--command", "ls"],
-      ["-i", "--timeout", "60"],
-      ["-i", "--json"],
-      ["-i", "--qualifier", ""],
-      ["-i", "--session-id", "s".repeat(257)],
+      ["--it", "--command", "ls"],
+      ["--it", "--timeout", "60"],
+      ["--it", "--json"],
+      ["--it", "--qualifier", ""],
+      ["--it", "--session-id", "s".repeat(257)],
       ["--command", "ls", "--session-id", "s".repeat(101)],
       ["--bearer-token", "token"],
     ].map((args) => ({ args })),
@@ -141,17 +141,20 @@ describe("harness exec", () => {
     expect(core!.runtime.calls).toEqual([]);
   });
 
-  test.each(["-t", "--tty", "-it"])("rejects the retired terminal flag %s", async (option) => {
-    let core: TestCoreClient | undefined;
+  test.each(["-i", "--interactive", "-t", "--tty", "-it"])(
+    "rejects unsupported interactive spelling %s",
+    async (option) => {
+      let core: TestCoreClient | undefined;
 
-    await expect(
-      run(["harness", "exec", "--id", "MyHarness-abc123", option], (value) => {
-        core = value;
-      }),
-    ).rejects.toThrow("unknown option");
-    expect(core!.harness.calls).toEqual([]);
-    expect(core!.runtime.calls).toEqual([]);
-  });
+      await expect(
+        run(["harness", "exec", "--id", "MyHarness-abc123", option], (value) => {
+          core = value;
+        }),
+      ).rejects.toThrow("unknown option");
+      expect(core!.harness.calls).toEqual([]);
+      expect(core!.runtime.calls).toEqual([]);
+    },
+  );
 
   test("the standalone shell command is not registered", async () => {
     let core: TestCoreClient | undefined;

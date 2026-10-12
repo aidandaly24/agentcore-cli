@@ -22,7 +22,7 @@ const SESSION_ID = "session-012345678901234567890123456789";
 
 afterEach(cleanupScreens);
 
-function subject(isTTY = true, interactiveFlag = "-i") {
+function subject(isTTY = true) {
   let request: HarnessShellRequest | undefined;
   let closed = 0;
   const session: RuntimeShellSession = {
@@ -64,7 +64,7 @@ function subject(isTTY = true, interactiveFlag = "-i") {
         "agentcore",
         "harness",
         "exec",
-        interactiveFlag,
+        "--it",
         ...args,
         "--region",
         "us-west-2",
@@ -72,18 +72,15 @@ function subject(isTTY = true, interactiveFlag = "-i") {
   };
 }
 
-describe("harness exec --interactive", () => {
-  test.each(["-i", "--interactive"])(
-    "%s opens the DEFAULT shell without an endpoint picker",
-    async (interactiveFlag) => {
-      const value = subject(true, interactiveFlag);
+describe("harness exec --it", () => {
+  test("--it opens the DEFAULT shell without an endpoint picker", async () => {
+    const value = subject();
 
-      await value.run("--id", ID);
+    await value.run("--id", ID);
 
-      expect(value.request()).toMatchObject({ harnessArn: ARN, qualifier: "DEFAULT" });
-      expect(value.closed()).toBe(1);
-    },
-  );
+    expect(value.request()).toMatchObject({ harnessArn: ARN, qualifier: "DEFAULT" });
+    expect(value.closed()).toBe(1);
+  });
 
   test("opens the harness ARN through the real CLI/Core path and closes the terminal session", async () => {
     const value = subject();
@@ -102,7 +99,7 @@ describe("harness exec --interactive", () => {
   });
 
   test.each([
-    [true, ["--json"], "--json cannot be used with harness exec -i"],
+    [true, ["--json"], "--json cannot be used with harness exec --it"],
     [false, [], "interactive mode requires a TTY"],
   ] as const)(
     "rejects incompatible output mode before opening a shell",
@@ -209,7 +206,7 @@ describe("harness shell entry points", () => {
       "agentcore",
       "harness",
       "exec",
-      "-i",
+      "--it",
       "--id",
       ID,
       "--qualifier",
