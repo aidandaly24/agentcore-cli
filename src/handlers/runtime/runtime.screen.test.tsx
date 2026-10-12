@@ -216,7 +216,7 @@ describe("runtime hub", () => {
     expect(failed.lastFrame()).toMatch(/failureReason\s+Image could not be pulled/);
   });
 
-  test("renders detail first, then invoke, shell, endpoint, and version actions", async () => {
+  test("renders detail, invoke, endpoint, version, and exec actions without shell", async () => {
     const core = new TestCoreClient();
     core.runtime.setGetResponse(getRuntimeResponse());
     const r = renderScreen("/agentcore/runtime/get/runtime-123", { core });
@@ -225,7 +225,7 @@ describe("runtime hub", () => {
     const frame = r.lastFrame()!;
     expect(frame).toMatch(/❯ detail\s+show the full JSON definition/);
     expect(frame).toMatch(/invoke\s+invoke this Runtime/);
-    expect(frame).toMatch(/shell\s+open an interactive terminal/);
+    expect(frame).not.toMatch(/shell\s+open an interactive terminal/);
     expect(frame).toContain("versions");
     expect(frame).toContain("endpoints");
     expect(frame).toMatch(/exec\s+run a shell command/);
@@ -256,9 +256,8 @@ describe("runtime hub", () => {
   });
 
   test.each([
-    ["shell", 2],
-    ["endpoints", 3],
-    ["versions", 4],
+    ["endpoints", 2],
+    ["versions", 3],
   ] as const)(
     "selecting %s opens its encoded Runtime-scoped route",
     async (action, downPresses) => {
@@ -299,9 +298,7 @@ describe("runtime hub", () => {
         r.lastFrame,
         action === "versions"
           ? `agentcore → runtime → version → list → ${runtimeId}`
-          : action === "shell"
-            ? `agentcore → runtime → shell → ${runtimeId}`
-            : `agentcore → runtime → endpoint → list → ${runtimeId}`,
+          : `agentcore → runtime → endpoint → list → ${runtimeId}`,
       );
     },
   );

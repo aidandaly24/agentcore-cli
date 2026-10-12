@@ -103,7 +103,6 @@ describe("menus separate mixed command groups with a divider", () => {
         "delete",
         "invoke",
         "exec",
-        "shell",
         "logs",
         "traces",
         "endpoint",

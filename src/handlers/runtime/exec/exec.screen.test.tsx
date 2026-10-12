@@ -68,7 +68,7 @@ describe("Runtime exec TUI", () => {
     const value = core();
     const screen = renderScreen(`/agentcore/runtime/get/${ID}`, { core: value });
     await waitForText(screen.lastFrame, "run a shell command");
-    for (let i = 0; i < 5; i++) await screen.press("down");
+    for (let i = 0; i < 4; i++) await screen.press("down");
     await screen.press("return");
     await waitForText(screen.lastFrame, "DEFAULT");
     await screen.press("return");

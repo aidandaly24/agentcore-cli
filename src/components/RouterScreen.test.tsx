@@ -80,13 +80,13 @@ describe("menu rendering", () => {
     },
     {
       path: "/agentcore/harness",
-      actions: ["create", "get", "list", "update", "delete", "invoke", "exec", "shell"],
+      actions: ["create", "get", "list", "update", "delete", "invoke", "exec"],
       related: ["logs", "traces", "endpoint", "version"],
       cli: [],
     },
     {
       path: "/agentcore/runtime",
-      actions: ["create", "get", "list", "invoke", "shell", "exec"],
+      actions: ["create", "get", "list", "invoke", "exec"],
       related: ["version", "endpoint", "logs", "traces"],
       cli: [],
     },

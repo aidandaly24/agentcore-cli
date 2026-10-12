@@ -58,12 +58,6 @@ const ACTIONS: {
     description: "update this harness",
     to: (id) => `/agentcore/harness/update/${id}`,
   },
-  {
-    name: "shell",
-    description: "open an interactive terminal",
-    to: (id) => `/agentcore/harness/shell/${encodeURIComponent(id)}`,
-    returnsToDetails: true,
-  },
 ];
 
 // The detail routes a linked resource forwards to, by the id the route takes.
