@@ -346,6 +346,10 @@ describe("createCredentialProvisioner", () => {
       { key: "AGENTCORE_CREDENTIAL_OPENAI_KEY", value: "sk-live", comment: "API key" },
     ]);
     expect(await Bun.file(file.path).text()).not.toContain("sk-live");
+    await writeFile(
+      file.path,
+      (await Bun.file(file.path).text()) + "SOME_API_KEY=enc:v1:unrelated\n",
+    );
 
     const { events, result } = await run(subject.provision, input);
 
@@ -403,7 +407,10 @@ describe("createCredentialProvisioner", () => {
       {},
       { AGENTCORE_CREDENTIAL_OPENAI_KEY: "sk-from-env", HOME: "/should/not/matter" },
     );
-    const input = await project([API_KEY], "AGENTCORE_CREDENTIAL_OPENAI_KEY='sk-from-file'\n");
+    const input = await project(
+      [API_KEY],
+      "AGENTCORE_CREDENTIAL_OPENAI_KEY=enc:v1:broken\nSOME_API_KEY=enc:v1:unrelated\n",
+    );
 
     await run(subject.provision, input);
 
