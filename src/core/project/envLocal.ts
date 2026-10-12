@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { parseEnv } from "node:util";
 import { atomicWrite, readTextFile } from "../../io";
 import { InputValidationError } from "../../errors";
-import { readEnvFile } from "../../io/envFile";
+import { readEnvFile, type ReadEnvFileOptions } from "../../io/envFile";
 import { LocalSecrets } from "../../io/localSecrets";
 import type { EnvLocalEntry } from "../../handlers/project/types";
 
@@ -62,7 +62,6 @@ export class EnvLocalFile {
         continue;
       }
       const separator = content === "" || content.endsWith("\n") ? "" : "\n";
-      // Each entry is two lines:  # <comment>\n<key>=<value>
       const encrypted = await this.secrets.encrypt({ [entry.key]: entry.value ?? "" });
       content += `${separator}# ${entry.comment}\n${entry.key}=${formatValue(encrypted[entry.key])}\n`;
       written.push(entry.key);
@@ -81,8 +80,8 @@ export class EnvLocalFile {
    * does not exist. Values are read back with the same parser `agentcore dev`
    * uses, so quoting written by {@link insertIfNew} round-trips.
    */
-  async read(): Promise<Record<string, string | undefined>> {
-    return readEnvFile(this.path, { secrets: this.secrets });
+  async read(options: ReadEnvFileOptions = {}): Promise<Record<string, string | undefined>> {
+    return readEnvFile(this.path, { ...options, secrets: this.secrets });
   }
 
   /**

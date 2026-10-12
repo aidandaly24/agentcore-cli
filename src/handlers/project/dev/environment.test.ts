@@ -31,9 +31,9 @@ describe("createDevEnvironmentLoader", () => {
       readFile: async () => `
 SHARED="local value"
 AWS_REGION=local-region
-PORT=9999
-FASTMCP_PORT=9998
-LOCAL_DEV=0
+PORT=enc:v1:ignored
+FASTMCP_PORT=enc:v1:ignored
+LOCAL_DEV=enc:v1:ignored
 MULTILINE="first
 second"
 `,

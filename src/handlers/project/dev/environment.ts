@@ -31,7 +31,10 @@ export function createDevEnvironmentLoader(
 
     Object.assign(
       env,
-      await readEnvFile(join(input.projectRoot, "agentcore", ".env.local"), config),
+      await readEnvFile(join(input.projectRoot, "agentcore", ".env.local"), {
+        ...config,
+        select: (name) => !RESERVED_ENV_KEYS.some((reserved) => reserved === name),
+      }),
     );
     for (const key of RESERVED_ENV_KEYS) delete env[key];
 
