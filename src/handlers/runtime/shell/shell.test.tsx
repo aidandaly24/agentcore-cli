@@ -58,7 +58,12 @@ class CompletedShell implements RuntimeShellSession {
 }
 
 function harness(
-  options: { isTTY?: boolean; runtime?: GetAgentRuntimeResponse; exitCode?: number } = {},
+  options: {
+    isTTY?: boolean;
+    runtime?: GetAgentRuntimeResponse;
+    exitCode?: number;
+    interactiveFlag?: string;
+  } = {},
 ) {
   const core = new TestCoreClient();
   core.runtime.setGetResponse(options.runtime ?? runtime());
@@ -75,24 +80,36 @@ function harness(
     shell,
     io,
     run: (...args: string[]) =>
-      root.route(["node", "agentcore", "runtime", "exec", "-it", ...args, "--region", REGION]),
+      root.route([
+        "node",
+        "agentcore",
+        "runtime",
+        "exec",
+        options.interactiveFlag ?? "-i",
+        ...args,
+        "--region",
+        REGION,
+      ]),
   };
 }
 
-describe("runtime exec -it", () => {
-  test("defaults to DEFAULT without opening an endpoint picker", async () => {
-    const subject = harness();
+describe("runtime exec --interactive", () => {
+  test.each(["-i", "--interactive"])(
+    "%s opens the DEFAULT shell without an endpoint picker",
+    async (interactiveFlag) => {
+      const subject = harness({ interactiveFlag });
 
-    await subject.run("--id", RUNTIME_ID);
+      await subject.run("--id", RUNTIME_ID);
 
-    expect(subject.core.runtime.calls.map((call) => call.method)).toEqual([
-      "getRuntime",
-      "openRuntimeShell",
-    ]);
-    expect(subject.core.runtime.calls[1]?.args[0]).toMatchObject({ qualifier: "DEFAULT" });
-    expect(subject.core.harness.calls).toEqual([]);
-    expect(subject.shell.closed).toBe(1);
-  });
+      expect(subject.core.runtime.calls.map((call) => call.method)).toEqual([
+        "getRuntime",
+        "openRuntimeShell",
+      ]);
+      expect(subject.core.runtime.calls[1]?.args[0]).toMatchObject({ qualifier: "DEFAULT" });
+      expect(subject.core.harness.calls).toEqual([]);
+      expect(subject.shell.closed).toBe(1);
+    },
+  );
 
   test("opens a direct IAM shell and closes after the remote stream ends", async () => {
     const subject = harness();
@@ -168,7 +185,7 @@ describe("runtime exec -it", () => {
         expect(error).toMatchObject({ cause: failure, source: "user", exitCode: 2 });
         expect((error as Error).message).toBe(
           `${failure.message}\n\nIf this Runtime is managed by a harness, open its shell with:\n` +
-            "agentcore harness exec -it --id <harness-id>",
+            "agentcore harness exec -i --id <harness-id>",
         );
       } else {
         await expect(running).rejects.toBe(failure);
@@ -183,7 +200,7 @@ describe("runtime exec -it", () => {
 
     await expect(
       subject.run("--id", RUNTIME_ID, "--qualifier", "DEFAULT", "--json"),
-    ).rejects.toThrow("--json cannot be used with runtime exec -it");
+    ).rejects.toThrow("--json cannot be used with runtime exec -i");
     expect(subject.core.runtime.calls.some((call) => call.method === "openRuntimeShell")).toBe(
       false,
     );

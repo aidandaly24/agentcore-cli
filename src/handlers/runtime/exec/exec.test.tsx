@@ -97,14 +97,10 @@ describe("runtime exec", () => {
       ["--id", ID, "--timeout", "0"],
       ["--id", ID, "--timeout", "3601"],
       ["--id", ID, "--timeout", "1.5"],
-      ["--id", ID, "-i"],
-      ["--id", ID, "-t"],
-      ["--id", ID, "--interactive"],
-      ["--id", ID, "--tty"],
-      ["--id", ID, "-it", "--command", "ls"],
-      ["--id", ID, "-it", "--timeout", "60"],
-      ["--id", ID, "-it", "--json"],
-      ["--id", ID, "-it", "--session-id", "s".repeat(257)],
+      ["--id", ID, "-i", "--command", "ls"],
+      ["--id", ID, "-i", "--timeout", "60"],
+      ["--id", ID, "-i", "--json"],
+      ["--id", ID, "-i", "--session-id", "s".repeat(257)],
       ["--id", ID, "--command", "ls", "--session-id", "s".repeat(101)],
       ["--id", ID, "--bearer-token", "token"],
     ].map((args) => ({ args })),
@@ -112,6 +108,14 @@ describe("runtime exec", () => {
     const { run, core } = setup();
     await expect(run(args)).rejects.toMatchObject({ exitCode: 2 });
     expect(core.runtime.calls).toEqual([]);
+  });
+
+  test.each(["-t", "--tty", "-it"])("rejects the retired terminal flag %s", async (option) => {
+    const { run, core } = setup();
+
+    await expect(run(["--id", ID, option])).rejects.toThrow("unknown option");
+    expect(core.runtime.calls).toEqual([]);
+    expect(core.harness.calls).toEqual([]);
   });
 
   test("the standalone shell command is not registered", async () => {
