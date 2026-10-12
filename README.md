@@ -104,6 +104,21 @@ Global flags, available on every command:
 | `--json`   | Emit JSON instead of opening the TUI.                                                                               |
 | `--debug`  | Debug logging.                                                                                                      |
 
+### Interactive Shells
+
+Open a native interactive shell from the CLI with `exec -it`:
+
+```bash
+agentcore runtime exec -it --id <runtime-id>
+agentcore harness exec -it --id <harness-id> --qualifier prod
+```
+
+`-it` combines `--interactive` and `--tty`; both are required. The qualifier defaults to
+`DEFAULT`. Shell mode supports `--session-id` and `--bearer-token`, requires a terminal on
+stdin and stdout, and cannot be combined with `--command`, `--timeout`, or `--json`.
+It replaces the standalone `shell` commands and is not available from the TUI.
+Without `-it`, `exec` retains its command-execution and TUI flows.
+
 ## Extending the CDK app
 
 `agentcore/cdk/` has two source files. `bin/cdk.ts` reads the project once

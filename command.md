@@ -59,7 +59,6 @@ This reference was generated from `agentcore --help` for version `1.0.0-rc.5`.
     - [`agentcore harness delete`](#agentcore-harness-delete)
     - [`agentcore harness invoke`](#agentcore-harness-invoke)
     - [`agentcore harness exec`](#agentcore-harness-exec)
-    - [`agentcore harness shell`](#agentcore-harness-shell)
     - [`agentcore harness logs`](#agentcore-harness-logs)
     - [`agentcore harness traces`](#agentcore-harness-traces)
       - [`agentcore harness traces list`](#agentcore-harness-traces-list)
@@ -77,7 +76,6 @@ This reference was generated from `agentcore --help` for version `1.0.0-rc.5`.
     - [`agentcore runtime get`](#agentcore-runtime-get)
     - [`agentcore runtime list`](#agentcore-runtime-list)
     - [`agentcore runtime invoke`](#agentcore-runtime-invoke)
-    - [`agentcore runtime shell`](#agentcore-runtime-shell)
     - [`agentcore runtime exec`](#agentcore-runtime-exec)
     - [`agentcore runtime version`](#agentcore-runtime-version)
       - [`agentcore runtime version get`](#agentcore-runtime-version-get)
@@ -258,7 +256,7 @@ create a new project
 - `--template <template>`: the template to scaffold the Runtime from; some templates also accept --model-provider/--api-key
 - `--model-provider <model-provider>`: model provider for templates that support it: bedrock, anthropic, open\_ai (or openai), openai\_compatible, gemini, or lite\_llm (or litellm)
 - `--model-id <model-id>`: model id for the scaffolded Runtime code, overriding the provider's default (required with openai\_compatible, and with litellm in China regions)
-- `--api-key <api-key>`: API key for non-Bedrock providers: '-' for stdin, 'file://path' for file
+- `--api-key <api-key>`: API key for non-Bedrock providers (runtime templates and the default harness): '-' for stdin, 'file://path' for file
 - `--api-base <api-base>`: base URL of the endpoint for --model-provider openai\_compatible (required with it, not accepted with other providers)
 - `--skip-install`: skip installing dependencies (npm install, uv sync) (default: false)
 - `--skip-git`: skip initializing a git repository (default: false)
@@ -269,15 +267,18 @@ create a new project
 agentcore dev [options]
 ```
 
-run the project locally for development
+test project changes: run Runtimes locally or deploy for Harnesses; --mode browser opens Agent Inspector.
 
 **Options**
 
-- `--agent <agent>`: Runtime to run
+- `--agent <agent>`: runtime or harness to run
+- `--ui-port <ui-port>`: port for the Agent Inspector web UI (browser mode)
+- `--mode <mode>`: how to run: browser (Agent Inspector web UI) or headless (runtime output or harness invoke guidance) (default: "headless")
 - `--port <port>`: port for the development server
 - `--no-traces`: disable local OTEL trace collection
-- `--mode <mode>`: how to run: browser (Agent Inspector web UI) or headless (agents stream to the terminal) (default: "headless")
-- `--ui-port <ui-port>`: port for the Agent Inspector web UI (browser mode)
+- `--target <target>`: name of the aws-targets.json entry to deploy; the default target is created automatically from your AWS account and region on first deploy (default: "default")
+- `--yes`: confirm removing the target's stack when the project declares nothing to deploy (default: false)
+- `--skip-deploy`: skip deployment and use the deployed harnesses (default: false)
 
 ### `agentcore deploy`
 
@@ -509,6 +510,7 @@ add a harness to the current project (not available in China regions)
 
 - `--name <name>`: the name of the harness
 - `--model <model>`: model configuration (JSON)
+- `--api-key <api-key>`: API key for a non-Bedrock --model; '-' for stdin, 'file://path' for file
 - `--system-prompt <system-prompt>`: the agent's system prompt
 - `--tags <tags...>`: tags as key=value (repeatable) or JSON object
 - `--tools <tools>`: tools available to the agent (JSON)
@@ -1077,30 +1079,18 @@ invoke a harness
 agentcore harness exec [options]
 ```
 
-run a shell command in a harness
+run a command or open an interactive shell (-it) in a harness
 
 **Options**
 
 - `--id <id>`: the ID of the harness (required)
+- `-i, --interactive`: open an interactive shell (requires --tty) (default: false)
+- `-t, --tty`: attach the terminal (requires --interactive) (default: false)
 - `--command <command>`: the shell command to run
-- `--session-id <session-id>`: the Runtime session ID to run in (33-100 characters)
+- `--session-id <session-id>`: the Runtime session ID (33-100 characters; up to 256 with -it)
+- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token for -it
 - `--qualifier <qualifier>`: the harness endpoint qualifier to run in (default DEFAULT)
 - `--timeout <timeout>`: seconds to wait for the command (1-3600)
-
-#### `agentcore harness shell`
-
-```text
-agentcore harness shell [options]
-```
-
-open an interactive shell in a harness
-
-**Options**
-
-- `--id <id>`: the ID of the harness (required)
-- `--qualifier <qualifier>`: the harness endpoint qualifier
-- `--session-id <session-id>`: the Runtime session ID to use
-- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token
 
 #### `agentcore harness logs`
 
@@ -1339,35 +1329,23 @@ invoke a Runtime
 - `--baggage <baggage>`: the W3C baggage
 - `--output-file <output-file>`: the response output file
 
-#### `agentcore runtime shell`
-
-```text
-agentcore runtime shell [options]
-```
-
-open an interactive shell in a Runtime
-
-**Options**
-
-- `--id <id>`: the ID of the Runtime (required)
-- `--qualifier <qualifier>`: the Runtime endpoint qualifier
-- `--session-id <session-id>`: the Runtime session ID to use
-- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token
-
 #### `agentcore runtime exec`
 
 ```text
 agentcore runtime exec [options]
 ```
 
-run a shell command in a Runtime
+run a command or open an interactive shell (-it) in a Runtime
 
 **Options**
 
 - `--id <id>`: the ID of the Runtime (required)
+- `-i, --interactive`: open an interactive shell (requires --tty) (default: false)
+- `-t, --tty`: attach the terminal (requires --interactive) (default: false)
 - `--command <command>`: the command to run
 - `--qualifier <qualifier>`: the endpoint qualifier (default DEFAULT)
-- `--session-id <session-id>`: the Runtime session ID
+- `--session-id <session-id>`: the Runtime session ID (33-100 characters; up to 256 with -it)
+- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token for -it
 - `--timeout <timeout>`: command timeout in seconds (1-3600)
 
 #### `agentcore runtime version`
