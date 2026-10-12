@@ -18,6 +18,7 @@ test.each([
   "AGENTCORE_CREDENTIAL_PAYMENT_APP_ID",
   "AGENTCORE_CREDENTIAL_PAYMENT_AUTHORIZATION_ID",
   "AGENTCORE_CREDENTIAL_OAUTH_CLIENT_ID",
+  "AGENTCORE_CREDENTIAL_MODEL_NAME",
   "PORT",
   "STAGE",
 ])("leaves identifier/configuration variable %s readable", (name) => {

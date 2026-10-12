@@ -1,18 +1,14 @@
-const SECRET_SUFFIXES = [
-  "_API_KEY_SECRET",
-  "_WALLET_SECRET",
-  "_AUTHORIZATION_PRIVATE_KEY",
-  "_APP_SECRET",
-  "_CLIENT_SECRET",
-  "_API_KEY",
-];
-
-const REFERENCE_SUFFIXES = ["_API_KEY_ID", "_APP_ID", "_CLIENT_ID", "_AUTHORIZATION_ID"];
+import {
+  CREDENTIAL_ENV_PREFIX,
+  CREDENTIAL_REFERENCE_SUFFIXES,
+  CREDENTIAL_SECRET_SUFFIXES,
+} from "../projectSchemas/credential";
 
 export function isSensitiveKey(key: string): boolean {
-  if (REFERENCE_SUFFIXES.some((suffix) => key.endsWith(suffix))) return false;
+  if (CREDENTIAL_REFERENCE_SUFFIXES.some((suffix) => key.endsWith(suffix))) return false;
   return (
-    SECRET_SUFFIXES.some((suffix) => key.endsWith(suffix)) ||
-    key.startsWith("AGENTCORE_CREDENTIAL_")
+    key.endsWith("_API_KEY") ||
+    CREDENTIAL_SECRET_SUFFIXES.some((suffix) => key.endsWith(suffix)) ||
+    key.startsWith(CREDENTIAL_ENV_PREFIX)
   );
 }
