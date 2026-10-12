@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { describe, expect, spyOn, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough, Writable } from "node:stream";
@@ -26,21 +25,7 @@ const REGION = "us-west-2";
 const RUNTIME_ID = "runtime-123";
 const ACCOUNT_ID = "123456789012";
 const RUNTIME_ARN = `arn:aws:bedrock-agentcore:${REGION}:${ACCOUNT_ID}:runtime/${RUNTIME_ID}`;
-const tempDirectories: string[] = [];
-
-async function tokenFile(contents: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "runtime-invoke-token-"));
-  tempDirectories.push(directory);
-  const path = join(directory, "token");
-  await writeFile(path, contents);
-  return `file://${path}`;
-}
-
-afterEach(async () => {
-  await Promise.all(
-    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
-  );
-});
+const TOKEN_SOURCE = `file://${join(import.meta.dir, "../../../testing/data/bearer-token.txt")}`;
 
 function body(...chunks: Uint8Array[]): AsyncIterable<Uint8Array> {
   return (async function* () {
@@ -229,7 +214,7 @@ describe("runtime invoke", () => {
         "--mcp-method",
         "tools/call",
         "--bearer-token",
-        await tokenFile("secret-token\n"),
+        TOKEN_SOURCE,
       ],
       {
         getResponse: {
@@ -672,7 +657,7 @@ describe("runtime invoke", () => {
         "--header",
         "X-Tenant: retail",
         "--bearer-token",
-        await tokenFile("secret-token\n"),
+        TOKEN_SOURCE,
       ]);
 
       expect(render).toHaveBeenCalledTimes(1);

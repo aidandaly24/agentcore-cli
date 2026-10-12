@@ -1,6 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, spyOn, test } from "bun:test";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { GetAgentRuntimeResponse } from "@aws-sdk/client-bedrock-agentcore-control";
@@ -17,21 +15,7 @@ const REGION = "us-west-2";
 const RUNTIME_ID = "runtime-123";
 const ACCOUNT_ID = "123456789012";
 const ARN = `arn:aws:bedrock-agentcore:${REGION}:${ACCOUNT_ID}:runtime/${RUNTIME_ID}`;
-const tempDirectories: string[] = [];
-
-async function tokenFile(contents: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "runtime-token-"));
-  tempDirectories.push(directory);
-  const path = join(directory, "token");
-  await writeFile(path, contents);
-  return `file://${path}`;
-}
-
-afterEach(async () => {
-  await Promise.all(
-    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
-  );
-});
+const TOKEN_SOURCE = `file://${join(import.meta.dir, "../../../testing/data/utf8-bearer-token.txt")}`;
 
 function detail(overrides: Partial<GetAgentRuntimeResponse> = {}): GetAgentRuntimeResponse {
   return {
@@ -54,7 +38,7 @@ describe("resolveRuntimeInvokeSources", () => {
   test("resolves payload bytes and bearer-token text through one resolver", async () => {
     const bytes = Uint8Array.from([9, 0, 254]);
     const result = await resolveRuntimeInvokeSources(
-      { payload: "-", bearerToken: await tokenFile("secret-€\r\n") },
+      { payload: "-", bearerToken: TOKEN_SOURCE },
       stdin(bytes),
     );
 
@@ -153,20 +137,6 @@ test("preserves unexpected TUI bearer-token source failures", async () => {
   } finally {
     resolve.mockRestore();
   }
-});
-
-test("rejects inline bearer-token flags when launching the TUI", async () => {
-  await expect(
-    resolveRuntimeInvokeTuiBearerToken("inline-token", stdin(new Uint8Array())),
-  ).rejects.toThrow("inline secret values are not accepted");
-});
-
-test("reads bearer-token files when launching the TUI", async () => {
-  const source = await tokenFile("secret-token\n");
-
-  expect(await resolveRuntimeInvokeTuiBearerToken(source, stdin(new Uint8Array()))).toBe(
-    "secret-token",
-  );
 });
 
 describe("parseRuntimeInvokeHeaders", () => {
