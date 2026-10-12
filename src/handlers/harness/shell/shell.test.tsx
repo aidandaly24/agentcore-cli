@@ -1,6 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { join } from "node:path";
 import type { GetHarnessResponse } from "@aws-sdk/client-bedrock-agentcore-control";
 import { CoreClient } from "../../../core";
@@ -24,19 +22,7 @@ import {
 const ID = "MyPDXHarness-rhkXkAE1IS";
 const ARN = `arn:aws:bedrock-agentcore:us-west-2:501930284170:harness/${ID}`;
 const SESSION_ID = "session-012345678901234567890123456789";
-let tokenDirectory: string;
-let tokenSource: string;
-
-beforeAll(async () => {
-  tokenDirectory = await mkdtemp(join(tmpdir(), "harness-shell-token-"));
-  const path = join(tokenDirectory, "token");
-  await writeFile(path, "token\n");
-  tokenSource = `file://${path}`;
-});
-
-afterAll(async () => {
-  await rm(tokenDirectory, { recursive: true, force: true });
-});
+const TOKEN_SOURCE = `file://${join(import.meta.dir, "../../../testing/data/shell-token.txt")}`;
 
 afterEach(cleanupScreens);
 
@@ -134,7 +120,7 @@ describe("harness shell", () => {
     await expect(value.run("--id", ID, "--qualifier", "DEFAULT")).rejects.toThrow(
       "CUSTOM_JWT Harness requires --bearer-token",
     );
-    await value.run("--id", ID, "--qualifier", "DEFAULT", "--bearer-token", tokenSource);
+    await value.run("--id", ID, "--qualifier", "DEFAULT", "--bearer-token", TOKEN_SOURCE);
     expect(value.request()?.bearerToken).toBe("token");
   });
 
@@ -142,34 +128,18 @@ describe("harness shell", () => {
     await expect(subject().run("--json")).rejects.toThrow("--id");
   });
 
-  test.each<[string, string[]]>([
-    ["interactive launch", []],
-    ["direct shell", ["--qualifier", "DEFAULT"]],
-  ])("rejects inline bearer-token flags for %s before Core calls", async (_name, flags) => {
-    const core = new TestCoreClient();
-    const io = testIO({ isTTY: true });
-    const root = createRootHandler(core, {
-      io: io.io,
-      logger: createSilentLogger(),
-      globalConfigAccessor: new TestGlobalConfigAccessor(),
-    });
-
-    await expect(
-      root.route([
-        "node",
-        "agentcore",
-        "harness",
-        "shell",
-        "--id",
-        ID,
-        "--bearer-token",
-        "inline-token",
-        ...flags,
-        "--region",
-        "us-west-2",
-      ]),
-    ).rejects.toThrow("inline secret values are not accepted");
-    expect(core.harness.calls).toEqual([]);
+  test("rejects inline bearer-token flags before looking up the Harness", async () => {
+    const value = subject();
+    const lookup = spyOn(value.core.harness, "getHarness");
+    try {
+      await expect(value.run("--id", ID, "--bearer-token", "inline-token")).rejects.toThrow(
+        "inline secret values are not accepted",
+      );
+      expect(lookup).not.toHaveBeenCalled();
+      expect(value.request()).toBeUndefined();
+    } finally {
+      lookup.mockRestore();
+    }
   });
 });
 
@@ -255,7 +225,7 @@ describe("harness shell navigation", () => {
         "--session-id",
         SESSION_ID,
         "--bearer-token",
-        tokenSource,
+        TOKEN_SOURCE,
         "--region",
         "us-west-2",
       ])

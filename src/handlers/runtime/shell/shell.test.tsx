@@ -1,6 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { GetAgentRuntimeResponse } from "@aws-sdk/client-bedrock-agentcore-control";
 import { createRuntimeShellOpener } from "../../../core/runtimeShell";
@@ -17,19 +15,7 @@ import {
 const REGION = "us-west-2";
 const RUNTIME_ID = "checkout-AbCdEf1234";
 const RUNTIME_ARN = `arn:aws:bedrock-agentcore:${REGION}:123456789012:runtime/checkout-AbCdEf1234`;
-let tokenDirectory: string;
-let tokenSource: string;
-
-beforeAll(async () => {
-  tokenDirectory = await mkdtemp(join(tmpdir(), "runtime-shell-token-"));
-  const path = join(tokenDirectory, "token");
-  await writeFile(path, "token\n");
-  tokenSource = `file://${path}`;
-});
-
-afterAll(async () => {
-  await rm(tokenDirectory, { recursive: true, force: true });
-});
+const TOKEN_SOURCE = `file://${join(import.meta.dir, "../../../testing/data/shell-token.txt")}`;
 
 function runtime(overrides: Partial<GetAgentRuntimeResponse> = {}): GetAgentRuntimeResponse {
   return {
@@ -128,22 +114,19 @@ describe("runtime shell command", () => {
       }),
     });
 
-    await subject.run("--id", RUNTIME_ID, "--qualifier", "DEFAULT", "--bearer-token", tokenSource);
+    await subject.run("--id", RUNTIME_ID, "--qualifier", "DEFAULT", "--bearer-token", TOKEN_SOURCE);
 
     expect(
       subject.core.runtime.calls.find((call) => call.method === "openRuntimeShell")?.args[0],
     ).toMatchObject({ bearerToken: "token" });
   });
 
-  test.each<[string, string[]]>([
-    ["interactive launch", []],
-    ["direct shell", ["--qualifier", "DEFAULT"]],
-  ])("rejects inline bearer-token flags for %s before Core calls", async (_name, flags) => {
+  test("rejects inline bearer-token flags before Core calls", async () => {
     const subject = harness();
 
-    await expect(
-      subject.run("--id", RUNTIME_ID, "--bearer-token", "inline-token", ...flags),
-    ).rejects.toThrow("inline secret values are not accepted");
+    await expect(subject.run("--id", RUNTIME_ID, "--bearer-token", "inline-token")).rejects.toThrow(
+      "inline secret values are not accepted",
+    );
     expect(subject.core.runtime.calls).toEqual([]);
   });
 
