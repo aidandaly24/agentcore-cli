@@ -1079,16 +1079,15 @@ invoke a harness
 agentcore harness exec [options]
 ```
 
-run a command or open an interactive shell (-it) in a harness
+run a command or open an interactive shell (-i) in a harness
 
 **Options**
 
 - `--id <id>`: the ID of the harness (required)
-- `-i, --interactive`: open an interactive shell (requires --tty) (default: false)
-- `-t, --tty`: attach the terminal (requires --interactive) (default: false)
+- `-i, --interactive`: open an interactive shell (default: false)
 - `--command <command>`: the shell command to run
-- `--session-id <session-id>`: the Runtime session ID (33-100 characters; up to 256 with -it)
-- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token for -it
+- `--session-id <session-id>`: the Runtime session ID (33-100 characters; up to 256 with -i)
+- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token for -i
 - `--qualifier <qualifier>`: the harness endpoint qualifier to run in (default DEFAULT)
 - `--timeout <timeout>`: seconds to wait for the command (1-3600)
 
@@ -1335,17 +1334,16 @@ invoke a Runtime
 agentcore runtime exec [options]
 ```
 
-run a command or open an interactive shell (-it) in a Runtime
+run a command or open an interactive shell (-i) in a Runtime
 
 **Options**
 
 - `--id <id>`: the ID of the Runtime (required)
-- `-i, --interactive`: open an interactive shell (requires --tty) (default: false)
-- `-t, --tty`: attach the terminal (requires --interactive) (default: false)
+- `-i, --interactive`: open an interactive shell (default: false)
 - `--command <command>`: the command to run
 - `--qualifier <qualifier>`: the endpoint qualifier (default DEFAULT)
-- `--session-id <session-id>`: the Runtime session ID (33-100 characters; up to 256 with -it)
-- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token for -it
+- `--session-id <session-id>`: the Runtime session ID (33-100 characters; up to 256 with -i)
+- `--bearer-token <bearer-token>`: the CUSTOM\_JWT bearer token for -i
 - `--timeout <timeout>`: command timeout in seconds (1-3600)
 
 #### `agentcore runtime version`
