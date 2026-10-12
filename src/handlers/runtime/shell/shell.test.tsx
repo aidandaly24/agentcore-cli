@@ -37,8 +37,9 @@ function runtime(overrides: Partial<GetAgentRuntimeResponse> = {}): GetAgentRunt
 class CompletedShell implements RuntimeShellSession {
   readonly runtimeSessionId = "session-012345678901234567890123456789";
   readonly kicked = false;
-  readonly exitCode = 0;
   closed = 0;
+
+  constructor(readonly exitCode = 0) {}
 
   send(): Promise<void> {
     return Promise.resolve();
@@ -56,10 +57,12 @@ class CompletedShell implements RuntimeShellSession {
   async *[Symbol.asyncIterator]() {}
 }
 
-function harness(options: { isTTY?: boolean; runtime?: GetAgentRuntimeResponse } = {}) {
+function harness(
+  options: { isTTY?: boolean; runtime?: GetAgentRuntimeResponse; exitCode?: number } = {},
+) {
   const core = new TestCoreClient();
   core.runtime.setGetResponse(options.runtime ?? runtime());
-  const shell = new CompletedShell();
+  const shell = new CompletedShell(options.exitCode);
   core.runtime.setShellSession(shell);
   const io = testIO({ isTTY: options.isTTY ?? true });
   const root = createRootHandler(core, {
@@ -72,11 +75,25 @@ function harness(options: { isTTY?: boolean; runtime?: GetAgentRuntimeResponse }
     shell,
     io,
     run: (...args: string[]) =>
-      root.route(["node", "agentcore", "runtime", "shell", ...args, "--region", REGION]),
+      root.route(["node", "agentcore", "runtime", "exec", "-it", ...args, "--region", REGION]),
   };
 }
 
-describe("runtime shell command", () => {
+describe("runtime exec -it", () => {
+  test("defaults to DEFAULT without opening an endpoint picker", async () => {
+    const subject = harness();
+
+    await subject.run("--id", RUNTIME_ID);
+
+    expect(subject.core.runtime.calls.map((call) => call.method)).toEqual([
+      "getRuntime",
+      "openRuntimeShell",
+    ]);
+    expect(subject.core.runtime.calls[1]?.args[0]).toMatchObject({ qualifier: "DEFAULT" });
+    expect(subject.core.harness.calls).toEqual([]);
+    expect(subject.shell.closed).toBe(1);
+  });
+
   test("opens a direct IAM shell and closes after the remote stream ends", async () => {
     const subject = harness();
 
@@ -151,7 +168,7 @@ describe("runtime shell command", () => {
         expect(error).toMatchObject({ cause: failure, source: "user", exitCode: 2 });
         expect((error as Error).message).toBe(
           `${failure.message}\n\nIf this Runtime is managed by a harness, open its shell with:\n` +
-            "agentcore harness shell --id <harness-id>",
+            "agentcore harness exec -it --id <harness-id>",
         );
       } else {
         await expect(running).rejects.toBe(failure);
@@ -166,7 +183,7 @@ describe("runtime shell command", () => {
 
     await expect(
       subject.run("--id", RUNTIME_ID, "--qualifier", "DEFAULT", "--json"),
-    ).rejects.toThrow("--json cannot be used with runtime shell");
+    ).rejects.toThrow("--json cannot be used with runtime exec -it");
     expect(subject.core.runtime.calls.some((call) => call.method === "openRuntimeShell")).toBe(
       false,
     );
@@ -178,7 +195,39 @@ describe("runtime shell command", () => {
     await expect(subject.run("--id", RUNTIME_ID, "--qualifier", "DEFAULT")).rejects.toThrow(
       "interactive mode requires a TTY",
     );
+    expect(subject.core.runtime.calls).toEqual([]);
   });
+
+  test("preserves a nonzero remote exit and closes the terminal session", async () => {
+    const subject = harness({ exitCode: 42 });
+
+    await expect(subject.run("--id", RUNTIME_ID)).rejects.toMatchObject({ exitCode: 42 });
+    expect(subject.shell.closed).toBe(1);
+    expect(subject.io.stderr()).toContain("exit 42");
+  });
+
+  test("rejects stdin bearer tokens before calling Core", async () => {
+    const subject = harness();
+
+    await expect(subject.run("--id", RUNTIME_ID, "--bearer-token", "-")).rejects.toThrow(
+      "stdin bearer tokens are not available",
+    );
+    expect(subject.core.runtime.calls).toEqual([]);
+  });
+
+  test.each([33, 100, 101, 256])(
+    "passes a %i-character shell session ID unchanged",
+    async (length) => {
+      const subject = harness();
+      const sessionId = "s".repeat(length);
+
+      await subject.run("--id", RUNTIME_ID, "--session-id", sessionId);
+
+      expect(subject.core.runtime.calls[1]?.args[0]).toMatchObject({
+        runtimeSessionId: sessionId,
+      });
+    },
+  );
 
   test("rejects --endpoint-url, which is globally disabled", async () => {
     const subject = harness();
