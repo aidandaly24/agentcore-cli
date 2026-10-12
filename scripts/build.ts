@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { chmod } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { runWithExitCode } from "../src/runnable";
+import { nativeKeyringPlugin } from "./keyring";
 
 const REPO_ROOT = resolve(import.meta.dir, "..");
 const ASSETS_DIR = join(REPO_ROOT, "src", "assets");
@@ -202,8 +203,7 @@ async function compile(target: string): Promise<void> {
     define: DEFINE,
     root: REPO_ROOT,
     naming: { asset: ASSET_NAMING },
-    external: ["@napi-rs/keyring"],
-    plugins: [assetLoaderPlugin(), runtimeShellSdkPlugin()],
+    plugins: [assetLoaderPlugin(), runtimeShellSdkPlugin(), nativeKeyringPlugin(target)],
   });
   await assertTemplateIsEmbedded(outfile, template);
   console.log(
