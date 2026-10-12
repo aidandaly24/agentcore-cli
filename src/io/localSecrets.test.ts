@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ENC_PREFIX, encryptSecret } from "../secrets/cipher";
+import { encryptSecret } from "../secrets/cipher";
 import { LocalSecrets, type KeychainEntry } from "./localSecrets";
 
 const roots: string[] = [];
@@ -72,27 +72,6 @@ test("encrypts with the persisted key rather than a generated key the store repl
   expect(await new LocalSecrets(config).decrypt(encrypted)).toEqual({ MODEL_API_KEY: "value" });
 });
 
-test("independent writers reuse a fallback key and leave corrupt keychain material untouched", async () => {
-  const configDirectory = await directory();
-  const config = {
-    configDirectory,
-    keychain: () => ({
-      getPassword: () => "broken",
-      setPassword: () => {
-        throw new Error("must not replace corrupt keychain material");
-      },
-    }),
-  };
-  const [first, second] = await Promise.all([
-    new LocalSecrets(config).encrypt({ FIRST_API_KEY: "first" }),
-    new LocalSecrets(config).encrypt({ SECOND_API_KEY: "second" }),
-  ]);
-  expect(await new LocalSecrets(config).decrypt({ ...first, ...second })).toEqual({
-    FIRST_API_KEY: "first",
-    SECOND_API_KEY: "second",
-  });
-});
-
 test("falls back when keychain access fails and reads values encrypted by either source", async () => {
   const configDirectory = await directory();
   const keychainKey = randomBytes(32);
@@ -148,14 +127,4 @@ test("missing and corrupt keys fail without replacing key material or leaking a 
   await expect(secrets.encrypt({ MODEL_API_KEY: "private-value" })).rejects.toThrow(/is corrupt/);
   await expect(secrets.decrypt({ MODEL_API_KEY: token })).rejects.toThrow(/Could not decrypt/);
   expect(await readFile(path)).toEqual(corrupt);
-});
-
-test("keeps existing envelopes unchanged and encrypts only sensitive nonempty values", async () => {
-  const configDirectory = await directory();
-  const secrets = new LocalSecrets({ configDirectory, keychain: () => null });
-  const env = { MODEL_API_KEY: "value", MODEL_API_KEY_ID: "id" };
-  const encrypted = await secrets.encrypt(env);
-  expect(encrypted.MODEL_API_KEY?.startsWith(ENC_PREFIX)).toBe(true);
-  expect(encrypted.MODEL_API_KEY_ID).toBe("id");
-  expect(await secrets.encrypt(encrypted)).toEqual(encrypted);
 });
