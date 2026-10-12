@@ -31,7 +31,7 @@ describe("Runtime shell entry points", () => {
     const core = new TestCoreClient();
     const screen = renderScreen("/agentcore/runtime", { core });
 
-    await waitForText(screen.lastFrame, "open an interactive shell (-i)");
+    await waitForText(screen.lastFrame, "open an interactive shell (--it)");
 
     expect(screen.lastFrame()).not.toMatch(/shell\s+open an interactive shell/);
     await screen.write("exec");

@@ -14,12 +14,10 @@ import { resolveRuntimeShellBearerToken } from "../shell/request";
 export const createRuntimeExecHandler = (core: Core, io: AppIO) =>
   createHandler({
     name: "exec",
-    description: "run a command or open an interactive shell (-i) in a Runtime",
+    description: "run a command or open an interactive shell (--it) in a Runtime",
     flags: [
       flag("id", "the ID of the Runtime", runtimeIdSchema),
-      flag("interactive", "open an interactive shell", z.boolean(), {
-        short: "i",
-      }),
+      flag("it", "open an interactive PTY shell session", z.boolean()),
       flag(
         "command",
         "the command to run",
@@ -31,10 +29,10 @@ export const createRuntimeExecHandler = (core: Core, io: AppIO) =>
       flag("qualifier", "the endpoint qualifier (default DEFAULT)", z.string().min(1).optional()),
       flag(
         "session-id",
-        "the Runtime session ID (33-100 characters; up to 256 with -i)",
+        "the Runtime session ID (33-100 characters; up to 256 with --it)",
         z.string().min(33).max(256).optional(),
       ),
-      flag("bearer-token", "the CUSTOM_JWT bearer token for -i", z.string().optional(), {
+      flag("bearer-token", "the CUSTOM_JWT bearer token for --it", z.string().optional(), {
         sensitive: true,
       }),
       flag(
@@ -44,13 +42,13 @@ export const createRuntimeExecHandler = (core: Core, io: AppIO) =>
       ),
     ],
     handle: async (ctx, flags) => {
-      if (flags.interactive) {
+      if (flags.it) {
         if (ctx.require(JsonKey)) {
-          throw new InputValidationError("--json cannot be used with runtime exec -i");
+          throw new InputValidationError("--json cannot be used with runtime exec --it");
         }
         for (const option of ["command", "timeout"] as const) {
           if (flags[option] !== undefined) {
-            throw new InputValidationError(`--${option} cannot be used with runtime exec -i`);
+            throw new InputValidationError(`--${option} cannot be used with runtime exec --it`);
           }
         }
         await runRuntimeShell({
@@ -68,10 +66,10 @@ export const createRuntimeExecHandler = (core: Core, io: AppIO) =>
         return;
       }
       if (flags["bearer-token"] !== undefined) {
-        throw new InputValidationError("--bearer-token requires runtime exec -i");
+        throw new InputValidationError("--bearer-token requires runtime exec --it");
       }
       if (flags["session-id"] !== undefined && flags["session-id"].length > 100) {
-        throw new InputValidationError("--session-id must be at most 100 characters without -i");
+        throw new InputValidationError("--session-id must be at most 100 characters without --it");
       }
       if (flags.command === undefined) {
         if (ctx.require(JsonKey)) {
