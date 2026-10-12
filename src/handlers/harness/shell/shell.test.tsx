@@ -14,9 +14,6 @@ import {
   TestGlobalConfigAccessor,
   testIO,
   tick,
-  ttyTestIO,
-  waitFor,
-  waitForText,
 } from "../../../testing";
 
 const ID = "MyPDXHarness-rhkXkAE1IS";
@@ -62,11 +59,20 @@ function subject(isTTY = true) {
     request: () => request,
     closed: () => closed,
     run: (...args: string[]) =>
-      root.route(["node", "agentcore", "harness", "shell", ...args, "--region", "us-west-2"]),
+      root.route(["node", "agentcore", "harness", "exec", "-it", ...args, "--region", "us-west-2"]),
   };
 }
 
-describe("harness shell", () => {
+describe("harness exec -it", () => {
+  test("defaults to DEFAULT without opening an endpoint picker", async () => {
+    const value = subject();
+
+    await value.run("--id", ID);
+
+    expect(value.request()).toMatchObject({ harnessArn: ARN, qualifier: "DEFAULT" });
+    expect(value.closed()).toBe(1);
+  });
+
   test("opens the harness ARN through the real CLI/Core path and closes the terminal session", async () => {
     const value = subject();
     await value.run("--id", ID, "--qualifier", "prod", "--session-id", SESSION_ID);
@@ -84,7 +90,7 @@ describe("harness shell", () => {
   });
 
   test.each([
-    [true, ["--json"], "--json cannot be used with harness shell"],
+    [true, ["--json"], "--json cannot be used with harness exec -it"],
     [false, [], "interactive mode requires a TTY"],
   ] as const)(
     "rejects incompatible output mode before opening a shell",
@@ -126,46 +132,48 @@ describe("harness shell", () => {
   test("requires --id in headless mode", async () => {
     await expect(subject().run("--json")).rejects.toThrow("--id");
   });
+
+  test.each([33, 100, 101, 256])(
+    "passes a %i-character shell session ID unchanged",
+    async (length) => {
+      const value = subject();
+      const sessionId = "s".repeat(length);
+
+      await value.run("--id", ID, "--session-id", sessionId);
+
+      expect(value.request()?.runtimeSessionId).toBe(sessionId);
+    },
+  );
 });
 
-describe("harness shell navigation", () => {
-  test("a preselected Harness goes to its endpoints without using Runtime APIs", async () => {
-    const core = new TestCoreClient();
-    core.harness.setListEndpointsResponse({
-      endpoints: [
-        {
-          harnessId: ID,
-          harnessName: "MyPDXHarness",
-          arn: `${ARN}/endpoint/prod`,
-          endpointName: "prod",
-          liveVersion: "1",
-          status: "READY",
-          createdAt: new Date("2026-10-06T00:00:00Z"),
-          updatedAt: new Date("2026-10-06T00:00:00Z"),
-        },
-      ],
-    });
-    const screen = renderScreen(`/agentcore/harness/shell/${ID}`, { core });
-    await waitForText(screen.lastFrame, "prod");
-    expect(core.harness.calls.some((call) => call.method === "listHarnesses")).toBe(false);
-    expect(core.harness.calls.find((call) => call.method === "listHarnessEndpoints")?.args[0]).toBe(
-      ID,
-    );
-    expect(core.runtime.calls).toEqual([]);
-    await screen.press("escape");
-    await waitForText(screen.lastFrame, "choose a harness to open a shell");
-  });
+describe("harness shell entry points", () => {
+  test.each(["", `/${ID}`, `/${ID}/prod`])(
+    "the retired TUI route does not open a shell or picker: %s",
+    async (suffix) => {
+      const core = new TestCoreClient();
+      const screen = renderScreen(`/agentcore/harness/shell${suffix}`, { core });
 
-  test("keeps CLI authentication and session context and propagates a failed shell quit", async () => {
+      await tick();
+
+      expect(screen.frames.join("\n")).toContain("Usage:");
+      expect(core.harness.calls).toEqual([]);
+      expect(core.runtime.calls).toEqual([]);
+    },
+  );
+
+  test("keeps CLI authentication and session context and propagates a shell stream failure", async () => {
     const core = new TestCoreClient();
     const failure = new Error("shell failed");
+    let closed = 0;
     core.harness.setShellSession({
       runtimeSessionId: SESSION_ID,
       kicked: false,
       exitCode: null,
       send: async () => {},
       resize: async () => {},
-      close: async () => {},
+      close: async () => {
+        closed += 1;
+      },
       async *[Symbol.asyncIterator]() {
         yield { type: "stdout", data: new TextEncoder().encode("partial harness output") };
         throw failure;
@@ -178,71 +186,45 @@ describe("harness shell navigation", () => {
         authorizerConfiguration: { customJWTAuthorizer: { discoveryUrl: "https://idp.example" } },
       },
     } as GetHarnessResponse);
-    core.harness.setListEndpointsResponse({
-      endpoints: [
-        {
-          harnessId: ID,
-          harnessName: "MyPDXHarness",
-          arn: `${ARN}/endpoint/prod`,
-          endpointName: "prod",
-          liveVersion: "1",
-          status: "READY",
-          createdAt: new Date("2026-10-06T00:00:00Z"),
-          updatedAt: new Date("2026-10-06T00:00:00Z"),
-        },
-      ],
-    });
-    const { streams, stdin } = ttyTestIO();
+    const streams = testIO({ isTTY: true });
     const root = createRootHandler(core, {
       io: streams.io,
       logger: createSilentLogger(),
       globalConfigAccessor: new TestGlobalConfigAccessor(),
     });
-    let settled = false;
-    const rendering = root
-      .route([
-        "node",
-        "agentcore",
-        "harness",
-        "shell",
-        "--id",
-        ID,
-        "--session-id",
-        SESSION_ID,
-        "--bearer-token",
-        "token",
-        "--region",
-        "us-west-2",
-      ])
-      .finally(() => {
-        settled = true;
-      });
-    void rendering.catch(() => {});
-    try {
-      await waitFor(() => streams.stdout().includes("prod"));
-      stdin.write("\r");
-      await waitFor(() => streams.stdout().includes("Error: shell failed"));
-      expect(
-        core.harness.calls.find((call) => call.method === "openHarnessShell")?.args[0],
-      ).toMatchObject({
-        harnessArn: ARN,
-        runtimeSessionId: SESSION_ID,
-        bearerToken: "token",
-        qualifier: "prod",
-      });
-      expect(core.runtime.calls).toEqual([]);
-      stdin.write("\x03");
-      await expect(rendering).rejects.toMatchObject({
-        message: failure.message,
-        cause: failure,
-        exitCode: 1,
-      });
-    } finally {
-      while (!settled) {
-        stdin.write("\x03");
-        await tick();
-      }
-      await rendering.catch(() => {});
-    }
+    const running = root.route([
+      "node",
+      "agentcore",
+      "harness",
+      "exec",
+      "-it",
+      "--id",
+      ID,
+      "--qualifier",
+      "prod",
+      "--session-id",
+      SESSION_ID,
+      "--bearer-token",
+      "token",
+      "--region",
+      "us-west-2",
+    ]);
+
+    await expect(running).rejects.toBe(failure);
+    expect(
+      core.harness.calls.find((call) => call.method === "openHarnessShell")?.args[0],
+    ).toMatchObject({
+      harnessArn: ARN,
+      runtimeSessionId: SESSION_ID,
+      bearerToken: "token",
+      qualifier: "prod",
+    });
+    expect(core.runtime.calls).toEqual([]);
+    expect(core.harness.calls.map((call) => call.method)).toEqual([
+      "getHarness",
+      "openHarnessShell",
+    ]);
+    expect(streams.stdout()).toContain("partial harness output");
+    expect(closed).toBe(1);
   });
 });

@@ -7,19 +7,28 @@ import { JsonKey } from "../../keys.tsx";
 import { JsonRendererKey, renderTuiAt } from "../../../tui";
 import { InputValidationError } from "../../../errors";
 import { applyExecEvent, finishExec, newExecItem } from "../invoke/transcript.tsx";
+import { runHarnessShell } from "../shell/operation";
+import { resolveRuntimeShellBearerToken } from "../../runtime/shell/request";
 
 export const createExecHarnessHandler = (core: Core, io: AppIO) =>
   createHandler({
     name: "exec",
-    description: "run a shell command in a harness",
+    description: "run a command or open an interactive shell (-it) in a harness",
     flags: [
       flag("id", "the ID of the harness", z.string().min(1).max(48)),
+      flag("interactive", "open an interactive shell (requires --tty)", z.boolean(), {
+        short: "i",
+      }),
+      flag("tty", "attach the terminal (requires --interactive)", z.boolean(), { short: "t" }),
       flag("command", "the shell command to run", z.string().optional()),
       flag(
         "session-id",
-        "the Runtime session ID to run in (33-100 characters)",
-        z.string().min(33).max(100).optional(),
+        "the Runtime session ID (33-100 characters; up to 256 with -it)",
+        z.string().min(33).max(256).optional(),
       ),
+      flag("bearer-token", "the CUSTOM_JWT bearer token for -it", z.string().optional(), {
+        sensitive: true,
+      }),
       flag(
         "qualifier",
         "the harness endpoint qualifier to run in (default DEFAULT)",
@@ -32,6 +41,41 @@ export const createExecHarnessHandler = (core: Core, io: AppIO) =>
       ),
     ],
     handle: async (ctx, flags) => {
+      if (flags.interactive !== flags.tty) {
+        throw new InputValidationError("--interactive and --tty must be used together (-it)");
+      }
+      if (flags.interactive) {
+        if (ctx.require(JsonKey)) {
+          throw new InputValidationError("--json cannot be used with harness exec -it");
+        }
+        for (const option of ["command", "timeout"] as const) {
+          if (flags[option] !== undefined) {
+            throw new InputValidationError(`--${option} cannot be used with harness exec -it`);
+          }
+        }
+        if (flags.qualifier === "") {
+          throw new InputValidationError("--qualifier must not be empty");
+        }
+        await runHarnessShell({
+          ctx,
+          core,
+          io,
+          harnessId: flags.id,
+          qualifier: flags.qualifier ?? "DEFAULT",
+          launchContext: {
+            harnessId: flags.id,
+            runtimeSessionId: flags["session-id"],
+            bearerToken: await resolveRuntimeShellBearerToken(flags["bearer-token"], io.stdin),
+          },
+        });
+        return;
+      }
+      if (flags["bearer-token"] !== undefined) {
+        throw new InputValidationError("--bearer-token requires harness exec -it");
+      }
+      if (flags["session-id"] !== undefined && flags["session-id"].length > 100) {
+        throw new InputValidationError("--session-id must be at most 100 characters without -it");
+      }
       // Without a command, open the interactive exec screen at this harness —
       // resuming the given session and targeting the given qualifier when
       // passed. The one-shot CLI run below needs --command (and is the only

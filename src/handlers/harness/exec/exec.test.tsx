@@ -120,6 +120,41 @@ describe("harness exec", () => {
     await expectError(run(["harness", "exec", "--command", "ls"]), /--id/, InputValidationError);
   });
 
+  test.each(
+    [
+      ["-i"],
+      ["-t"],
+      ["--interactive"],
+      ["--tty"],
+      ["-it", "--command", "ls"],
+      ["-it", "--timeout", "60"],
+      ["-it", "--json"],
+      ["-it", "--qualifier", ""],
+      ["-it", "--session-id", "s".repeat(257)],
+      ["--command", "ls", "--session-id", "s".repeat(101)],
+      ["--bearer-token", "token"],
+    ].map((args) => ({ args })),
+  )("rejects incompatible exec options before calling Core: $args", async ({ args }) => {
+    let core: TestCoreClient | undefined;
+    await expect(
+      run(["harness", "exec", "--id", "MyHarness-abc123", ...args], (value) => {
+        core = value;
+      }),
+    ).rejects.toMatchObject({ exitCode: 2 });
+    expect(core!.harness.calls).toEqual([]);
+    expect(core!.runtime.calls).toEqual([]);
+  });
+
+  test("the standalone shell command is not registered", async () => {
+    let core: TestCoreClient | undefined;
+    await expect(
+      run(["harness", "shell", "--json"], (value) => {
+        core = value;
+      }),
+    ).rejects.toThrow("unknown command 'shell'");
+    expect(core!.harness.calls).toEqual([]);
+  });
+
   // Without --command (and outside JSON mode) the handler opens the interactive
   // exec screen instead — that path is covered by the screen tests, since the
   // test IO streams cannot host an Ink render.
