@@ -13,20 +13,19 @@ import { resolveRuntimeShellBearerToken } from "../../runtime/shell/request";
 export const createExecHarnessHandler = (core: Core, io: AppIO) =>
   createHandler({
     name: "exec",
-    description: "run a command or open an interactive shell (-it) in a harness",
+    description: "run a command or open an interactive shell (-i) in a harness",
     flags: [
       flag("id", "the ID of the harness", z.string().min(1).max(48)),
-      flag("interactive", "open an interactive shell (requires --tty)", z.boolean(), {
+      flag("interactive", "open an interactive shell", z.boolean(), {
         short: "i",
       }),
-      flag("tty", "attach the terminal (requires --interactive)", z.boolean(), { short: "t" }),
       flag("command", "the shell command to run", z.string().optional()),
       flag(
         "session-id",
-        "the Runtime session ID (33-100 characters; up to 256 with -it)",
+        "the Runtime session ID (33-100 characters; up to 256 with -i)",
         z.string().min(33).max(256).optional(),
       ),
-      flag("bearer-token", "the CUSTOM_JWT bearer token for -it", z.string().optional(), {
+      flag("bearer-token", "the CUSTOM_JWT bearer token for -i", z.string().optional(), {
         sensitive: true,
       }),
       flag(
@@ -41,16 +40,13 @@ export const createExecHarnessHandler = (core: Core, io: AppIO) =>
       ),
     ],
     handle: async (ctx, flags) => {
-      if (flags.interactive !== flags.tty) {
-        throw new InputValidationError("--interactive and --tty must be used together (-it)");
-      }
       if (flags.interactive) {
         if (ctx.require(JsonKey)) {
-          throw new InputValidationError("--json cannot be used with harness exec -it");
+          throw new InputValidationError("--json cannot be used with harness exec -i");
         }
         for (const option of ["command", "timeout"] as const) {
           if (flags[option] !== undefined) {
-            throw new InputValidationError(`--${option} cannot be used with harness exec -it`);
+            throw new InputValidationError(`--${option} cannot be used with harness exec -i`);
           }
         }
         if (flags.qualifier === "") {
@@ -71,10 +67,10 @@ export const createExecHarnessHandler = (core: Core, io: AppIO) =>
         return;
       }
       if (flags["bearer-token"] !== undefined) {
-        throw new InputValidationError("--bearer-token requires harness exec -it");
+        throw new InputValidationError("--bearer-token requires harness exec -i");
       }
       if (flags["session-id"] !== undefined && flags["session-id"].length > 100) {
-        throw new InputValidationError("--session-id must be at most 100 characters without -it");
+        throw new InputValidationError("--session-id must be at most 100 characters without -i");
       }
       // Without a command, open the interactive exec screen at this harness —
       // resuming the given session and targeting the given qualifier when

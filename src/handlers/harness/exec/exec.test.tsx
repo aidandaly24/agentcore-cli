@@ -122,15 +122,11 @@ describe("harness exec", () => {
 
   test.each(
     [
-      ["-i"],
-      ["-t"],
-      ["--interactive"],
-      ["--tty"],
-      ["-it", "--command", "ls"],
-      ["-it", "--timeout", "60"],
-      ["-it", "--json"],
-      ["-it", "--qualifier", ""],
-      ["-it", "--session-id", "s".repeat(257)],
+      ["-i", "--command", "ls"],
+      ["-i", "--timeout", "60"],
+      ["-i", "--json"],
+      ["-i", "--qualifier", ""],
+      ["-i", "--session-id", "s".repeat(257)],
       ["--command", "ls", "--session-id", "s".repeat(101)],
       ["--bearer-token", "token"],
     ].map((args) => ({ args })),
@@ -141,6 +137,18 @@ describe("harness exec", () => {
         core = value;
       }),
     ).rejects.toMatchObject({ exitCode: 2 });
+    expect(core!.harness.calls).toEqual([]);
+    expect(core!.runtime.calls).toEqual([]);
+  });
+
+  test.each(["-t", "--tty", "-it"])("rejects the retired terminal flag %s", async (option) => {
+    let core: TestCoreClient | undefined;
+
+    await expect(
+      run(["harness", "exec", "--id", "MyHarness-abc123", option], (value) => {
+        core = value;
+      }),
+    ).rejects.toThrow("unknown option");
     expect(core!.harness.calls).toEqual([]);
     expect(core!.runtime.calls).toEqual([]);
   });
