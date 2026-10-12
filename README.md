@@ -85,24 +85,6 @@ up from the current directory.
 Use `--mode browser` for Agent Inspector, `--skip-deploy` to reuse deployed harnesses,
 and `--agent <name>` to choose an agent in mixed projects.
 
-## Local Secrets
-
-The CLI encrypts API keys, OAuth client secrets, and payment secrets it writes to
-`agentcore/.env.local` using AES-256-GCM. It decrypts them when running agents locally or
-provisioning credentials on deploy. Identifiers such as API-key IDs remain readable.
-Existing plaintext secrets remain readable and are encrypted on the next file update.
-
-The encryption key is stored in the OS keychain when the optional native keyring package
-is available. Otherwise, including standalone installations without that package, the CLI
-uses `~/.agentcore/secrets.key`, created with owner-only permissions on POSIX systems.
-Set `AGENTCORE_DISABLE_KEYCHAIN=1` to use the keyfile and `AGENTCORE_CONFIG_DIR` to change
-its directory.
-
-Copying `.env.local` alone does not copy its encryption key. On another machine, re-add
-the credentials or securely restore the original key. Losing that key makes its encrypted
-values unreadable. This protects a copied project file, not a compromised user account
-that can access both the file and its key.
-
 ## Commands
 
 | Command                                                          | Purpose                                                                  |
