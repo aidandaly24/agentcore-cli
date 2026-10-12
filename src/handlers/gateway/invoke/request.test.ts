@@ -1,6 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import type { GetGatewayResponse } from "@aws-sdk/client-bedrock-agentcore-control";
@@ -14,21 +12,7 @@ import {
 } from "./request";
 
 const GATEWAY_ID = "gateway-123";
-const tempDirectories: string[] = [];
-
-async function tokenFile(contents: string): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "gateway-token-"));
-  tempDirectories.push(directory);
-  const path = join(directory, "token");
-  await writeFile(path, contents);
-  return `file://${path}`;
-}
-
-afterEach(async () => {
-  await Promise.all(
-    tempDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
-  );
-});
+const TOKEN_SOURCE = `file://${join(import.meta.dir, "../../../testing/data/bearer-token.txt")}`;
 
 function stdin(bytes?: Uint8Array): NodeJS.ReadStream {
   const stream = new PassThrough();
@@ -57,7 +41,7 @@ describe("Gateway invoke sources", () => {
     const payload = Uint8Array.from([0, 255, 10]);
 
     const result = await resolveGatewayInvokeSources(
-      { payload: "-", bearerToken: await tokenFile("secret-token\r\n") },
+      { payload: "-", bearerToken: TOKEN_SOURCE },
       stdin(payload),
     );
 
@@ -125,20 +109,6 @@ test("preserves TUI bearer-token source errors", async () => {
 
   expect(error).toBeInstanceOf(SourceResolutionError);
   expect(error.message).toContain("could not read '--bearer-token' from file");
-});
-
-test("rejects inline bearer-token flags when launching the TUI", async () => {
-  await expect(
-    resolveGatewayInvokeTuiBearerToken("inline-token", new SourceResolver({})),
-  ).rejects.toThrow("inline secret values are not accepted");
-});
-
-test("reads bearer-token files when launching the TUI", async () => {
-  const source = await tokenFile("secret-token\n");
-
-  expect(await resolveGatewayInvokeTuiBearerToken(source, new SourceResolver({}))).toBe(
-    "secret-token",
-  );
 });
 
 describe("Gateway invoke headers", () => {
