@@ -1,13 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { FileWriteError, ProjectStateError } from "../errors";
 import { ENC_PREFIX, decryptSecret, encryptSecret } from "../secrets/cipher";
 import { isSensitiveKey } from "../secrets/sensitiveKeys";
+import { loadKeyring } from "./keyring";
 
-const require = createRequire(import.meta.url);
 const KEY_BYTES = 32;
 const KEYCHAIN_SERVICE = "aws-agentcore";
 const KEYCHAIN_ACCOUNT = "env-local-secret-key";
@@ -25,17 +24,14 @@ type LocalSecretsConfig = {
 function defaultKeychain(): KeychainEntry | null {
   if (process.env.AGENTCORE_DISABLE_KEYCHAIN === "1") return null;
   try {
-    // Loading the optional native binding must not prevent file-only installations from starting.
-    const { Entry } = require("@napi-rs/keyring") as {
-      Entry: new (service: string, account: string) => KeychainEntry;
-    };
+    const { Entry } = loadKeyring();
     return new Entry(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT);
   } catch {
     return null;
   }
 }
 
-/** Machine-local key storage shared by all project environment-file reads and writes. */
+/** Machine-local key storage shared by project environment-file reads and writes. */
 export class LocalSecrets {
   private key?: Buffer;
   private readonly directory: string;
@@ -61,28 +57,36 @@ export class LocalSecrets {
 
   async decrypt(env: Record<string, string>): Promise<Record<string, string>> {
     if (!Object.values(env).some((value) => value.startsWith(ENC_PREFIX))) return env;
-    const keys = this.candidateKeys();
-    return Object.fromEntries(
-      Object.entries(env).map(([name, value]) => [
-        name,
-        value.startsWith(ENC_PREFIX) ? decryptSecret(value, keys) : value,
-      ]),
-    );
+    const keys: Buffer[] = [];
+    const decode = () =>
+      Object.fromEntries(
+        Object.entries(env).map(([name, value]) => [
+          name,
+          value.startsWith(ENC_PREFIX) ? decryptSecret(value, keys) : value,
+        ]),
+      );
+    for (const key of this.candidateKeys()) {
+      keys.push(key);
+      try {
+        return decode();
+      } catch (error) {
+        if (!(error instanceof ProjectStateError)) throw error;
+      }
+    }
+    return decode();
   }
 
   private encryptionKey(): Buffer {
     if (this.key) return this.key;
-    const keychainKey = this.keychainKey(true);
-    if (keychainKey) return (this.key = keychainKey);
-
     const path = join(this.directory, "secrets.key");
     try {
       let key = this.readKeyfile(path);
       if (!key) {
+        const stored = this.keychainKey(true);
+        if (stored) return (this.key = stored);
         mkdirSync(this.directory, { recursive: true, mode: 0o700 });
         key = randomBytes(KEY_BYTES);
         try {
-          // Exclusive creation preserves another process's key instead of orphaning its secrets.
           writeFileSync(path, key, { mode: 0o600, flag: "wx" });
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
@@ -101,39 +105,31 @@ export class LocalSecrets {
     }
   }
 
-  private candidateKeys(): Buffer[] {
-    const keys: Buffer[] = [];
-    const keychainKey = this.keychainKey(false);
-    if (keychainKey) keys.push(keychainKey);
+  private *candidateKeys(): Generator<Buffer> {
+    let fileKey: Buffer | undefined;
     try {
-      const key = this.readKeyfile(join(this.directory, "secrets.key"));
-      if (key?.length === KEY_BYTES && !keys.some((candidate) => candidate.equals(key))) {
-        keys.push(key);
-      }
+      fileKey = this.readKeyfile(join(this.directory, "secrets.key"));
     } catch {
-      // Reads never create or replace key material; decryption reports unavailable keys.
+      fileKey = undefined;
     }
-    return keys;
+    if (fileKey?.length === KEY_BYTES) yield fileKey;
+    const stored = this.keychainKey(false);
+    if (stored && (fileKey === undefined || !stored.equals(fileKey))) yield stored;
   }
 
   private keychainKey(create: boolean): Buffer | null {
     try {
       const entry = this.keychain();
       if (!entry) return null;
-      let password: string | null = null;
-      try {
-        password = entry.getPassword();
-      } catch {
-        // Some native stores report an absent entry by throwing.
-      }
-      if (password) {
+      const password = entry.getPassword();
+      if (password !== null) {
         const key = Buffer.from(password, "base64");
         return key.length === KEY_BYTES ? key : null;
       }
       if (!create) return null;
       entry.setPassword(randomBytes(KEY_BYTES).toString("base64"));
       const persisted = entry.getPassword();
-      if (!persisted) return null;
+      if (persisted === null) return null;
       const key = Buffer.from(persisted, "base64");
       return key.length === KEY_BYTES ? key : null;
     } catch {

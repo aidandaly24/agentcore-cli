@@ -24,9 +24,7 @@ export function decryptSecret(token: string, keys: readonly Buffer[]): string {
           decipher.update(raw.subarray(IV_BYTES + TAG_BYTES)),
           decipher.final(),
         ]).toString("utf8");
-      } catch {
-        // Keychain and keyfile keys can differ; authentication chooses the right one.
-      }
+      } catch {}
     }
   }
   throw new ProjectStateError(

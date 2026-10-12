@@ -34,6 +34,17 @@ test("creates and reuses the 32-byte owner-only fallback key", async () => {
   });
   await new LocalSecrets(config).encrypt({ MODEL_API_KEY: "next-value" });
   expect(await readFile(path)).toEqual(key);
+  let keychainReads = 0;
+  const available = new LocalSecrets({
+    configDirectory,
+    keychain: () => {
+      keychainReads++;
+      return { getPassword: () => randomBytes(32).toString("base64"), setPassword: () => {} };
+    },
+  });
+  const next = await available.encrypt({ MODEL_API_KEY: "file-preferred" });
+  expect(await available.decrypt(next)).toEqual({ MODEL_API_KEY: "file-preferred" });
+  expect(keychainReads).toBe(0);
   if (process.platform !== "win32") expect((await stat(path)).mode & 0o777).toBe(0o600);
 });
 
@@ -127,4 +138,35 @@ test("missing and corrupt keys fail without replacing key material or leaking a 
   await expect(secrets.encrypt({ MODEL_API_KEY: "private-value" })).rejects.toThrow(/is corrupt/);
   await expect(secrets.decrypt({ MODEL_API_KEY: token })).rejects.toThrow(/Could not decrypt/);
   expect(await readFile(path)).toEqual(corrupt);
+});
+
+test("a keychain read failure never replaces an existing key", async () => {
+  const configDirectory = await directory(),
+    original = randomBytes(32);
+  let password = original.toString("base64"),
+    denied = true,
+    writes = 0;
+  const config = {
+    configDirectory,
+    keychain: () => ({
+      getPassword: () => {
+        if (denied) throw new Error("access denied");
+        return password;
+      },
+      setPassword: (value: string) => {
+        writes++;
+        password = value;
+      },
+    }),
+  };
+  const encrypted = await new LocalSecrets(config).encrypt({ NEW_API_KEY: "new-value" });
+  expect(writes).toBe(0);
+  expect(password).toBe(original.toString("base64"));
+  denied = false;
+  expect(
+    await new LocalSecrets(config).decrypt({
+      ...encrypted,
+      OLD_API_KEY: encryptSecret("old-value", original),
+    }),
+  ).toEqual({ NEW_API_KEY: "new-value", OLD_API_KEY: "old-value" });
 });
