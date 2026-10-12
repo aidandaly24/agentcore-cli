@@ -10,7 +10,6 @@ export interface Flag<N extends string = string, T = unknown> {
   name: N;
   description: string;
   schema: z.ZodType<T>;
-  short?: string;
   // help is optional long-form documentation rendered in the command's
   // "Parameter details" help section (see flags.tsx/formatParameterDetails).
   // Its first line is the type annotation shown next to the flag name; the
@@ -37,13 +36,12 @@ export function flag<N extends string, T>(
   name: N,
   description: string,
   schema: z.ZodType<T>,
-  options?: { short?: string; help?: string; group?: string; sensitive?: boolean },
+  options?: { help?: string; group?: string; sensitive?: boolean },
 ): Flag<N, T> {
   return {
     name,
     description,
     schema,
-    short: options?.short,
     help: options?.help,
     group: options?.group,
     sensitive: options?.sensitive,

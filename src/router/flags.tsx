@@ -24,7 +24,7 @@ export function toOption(flag: Flag): Option {
 
   const description =
     info.required && !info.boolean ? `${flag.description} (required)` : flag.description;
-  const option = new Option(flag.short ? `-${flag.short}, ${token}` : token, description);
+  const option = new Option(token, description);
   if (info.hasDefault) {
     option.default(info.defaultValue);
   } else if (info.boolean) {

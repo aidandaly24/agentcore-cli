@@ -360,35 +360,6 @@ test("boolean flags default to false when omitted", async () => {
   expect(seen).toEqual({ verbose: false });
 });
 
-test.each([["-it"], ["-ti"], ["-i", "-t"], ["--interactive", "--tty"]].map((args) => ({ args })))(
-  "short aliases preserve flag names and support combined booleans: $args",
-  async ({ args }) => {
-    let seen: { interactive: boolean; tty: boolean; count: number } | undefined;
-    const root = new Router("app").handler(
-      createHandler({
-        name: "exec",
-        description: "",
-        flags: [
-          flag("interactive", "interactive", z.boolean(), { short: "i" }),
-          flag("tty", "terminal", z.boolean(), { short: "t" }),
-          flag("count", "count", z.number().int(), { short: "n" }),
-        ],
-        handle: async (_ctx, flags) => {
-          seen = flags;
-        },
-      }),
-    );
-
-    await root.route(["node", "app", "exec", ...args, "-n", "3"]);
-
-    expect(seen).toEqual({ interactive: true, tty: true, count: 3 });
-    const command = compile(root, ValueContext.EmptyContext()).commands[0]!;
-    expect(command.helpInformation()).toContain("-i, --interactive");
-    expect(command.helpInformation()).toContain("-t, --tty");
-    expect(command.helpInformation()).toContain("-n, --count <count>");
-  },
-);
-
 test("a boolean flag defaulting to true is declared as its --no- negation", async () => {
   const seen: { traces: boolean }[] = [];
 
