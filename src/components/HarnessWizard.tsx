@@ -180,8 +180,8 @@ function toModelConfiguration(values: HarnessFormValues): CreateHarnessInput["mo
       return {
         liteLlmModelConfig: {
           modelId: liteLlmGatewayModelId(model.modelId),
-          apiKeyArn: model.apiKeyArn || undefined,
-          apiBase: model.apiBase || undefined,
+          apiKeyArn: model.apiKeyArn.trim() || undefined,
+          apiBase: model.apiBase.trim() || undefined,
         },
       };
   }
