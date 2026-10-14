@@ -56,7 +56,39 @@ describe.each([
     };
     await expect(
       run(["harness", command, ...flags, "--model", JSON.stringify(model)], core),
-    ).rejects.toThrow("enter a LiteLLM gateway API-key credential provider ARN or key file");
+    ).rejects.toThrow("enter a LiteLLM gateway API-key credential provider ARN");
+    expect(core.harness.calls).toEqual([]);
+  });
+
+  test.each([undefined, "arn:gateway-key"])(
+    "rejects project credential names before any Core call with ARN %j",
+    async (apiKeyArn) => {
+      const core = new TestCoreClient();
+      const model = {
+        liteLlmModelConfig: {
+          modelId: "my-model",
+          apiBase: "https://gateway.example.com/v1",
+          apiKeyArn,
+          apiKeyCredentialName: "GatewayKey",
+        },
+      };
+      await expect(
+        run(["harness", command, ...flags, "--model", JSON.stringify(model)], core),
+      ).rejects.toThrow(
+        "apiKeyCredentialName is only supported in projects; use apiKeyArn for the Harness API",
+      );
+      expect(core.harness.calls).toEqual([]);
+    },
+  );
+
+  test("reports missing URL and API credential together before any Core call", async () => {
+    const core = new TestCoreClient();
+    const model = { liteLlmModelConfig: { modelId: "my-model" } };
+    const outcome = run(["harness", command, ...flags, "--model", JSON.stringify(model)], core);
+    await expect(outcome).rejects.toThrow("enter the LiteLLM gateway API base URL");
+    await expect(outcome).rejects.toThrow(
+      "enter a LiteLLM gateway API-key credential provider ARN",
+    );
     expect(core.harness.calls).toEqual([]);
   });
 
@@ -82,4 +114,24 @@ describe.each([
       });
     },
   );
+
+  test("trims a raw JSON gateway credential before sending it to Core", async () => {
+    const core = new TestCoreClient();
+    const model = {
+      liteLlmModelConfig: {
+        modelId: " my-model ",
+        apiBase: " https://gateway.example.com/v1 ",
+        apiKeyArn: " arn:gateway-key ",
+      },
+    };
+    await run(["harness", command, ...flags, "--model", JSON.stringify(model)], core);
+    const call = core.harness.calls.find((call) => call.method === method)!;
+    expect((call.args[0] as { model: unknown }).model).toEqual({
+      liteLlmModelConfig: {
+        modelId: "litellm_proxy/my-model",
+        apiBase: "https://gateway.example.com/v1",
+        apiKeyArn: "arn:gateway-key",
+      },
+    });
+  });
 });

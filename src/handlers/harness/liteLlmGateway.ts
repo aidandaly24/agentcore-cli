@@ -27,36 +27,65 @@ export const liteLlmGatewayUrlSchema = z
   .url("enter the LiteLLM gateway as an http(s) URL")
   .regex(/^https?:\/\//, "enter the LiteLLM gateway as an http(s) URL");
 
+const gatewayModelSchema = z.object({
+  modelId: liteLlmGatewayModelIdSchema.prefault(""),
+  apiBase: liteLlmGatewayUrlSchema.prefault(""),
+  apiKeyArn: z.string().trim().optional(),
+  apiKeyCredentialName: z.string().trim().optional(),
+});
+
+const projectGatewayModelSchema = gatewayModelSchema.superRefine((model, ctx) => {
+  if (!model.apiKeyArn && !model.apiKeyCredentialName) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["apiKeyArn"],
+      message: "enter a LiteLLM gateway API-key credential provider ARN or key file",
+    });
+  }
+});
+
+const standaloneGatewayModelSchema = gatewayModelSchema.superRefine((model, ctx) => {
+  if (model.apiKeyCredentialName !== undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["apiKeyCredentialName"],
+      message:
+        "apiKeyCredentialName is only supported in projects; use apiKeyArn for the Harness API",
+    });
+  }
+  if (!model.apiKeyArn) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["apiKeyArn"],
+      message: "enter a LiteLLM gateway API-key credential provider ARN",
+    });
+  }
+});
+
+type GatewayModelInput = {
+  modelId?: string;
+  apiBase?: string;
+  apiKeyArn?: string;
+  apiKeyCredentialName?: string;
+  additionalParams?: unknown;
+};
+
+type ParsedGatewayModel<T> = Omit<T, "modelId" | "apiBase" | "apiKeyArn" | "apiKeyCredentialName"> &
+  z.infer<typeof gatewayModelSchema>;
+
 export function liteLlmGatewayModelId(modelId: string): string {
   const alias = modelId.trim();
   if (alias === "") return "";
   return alias.startsWith(PROXY_PREFIX) ? alias : `${PROXY_PREFIX}${alias}`;
 }
 
-export function toLiteLlmGatewayModel<
-  T extends {
-    modelId?: string;
-    apiBase?: string;
-    apiKeyArn?: string;
-    apiKeyCredentialName?: string;
-    additionalParams?: unknown;
-  },
->(model: T): Omit<T, "modelId" | "apiBase"> & { modelId: string; apiBase: string } {
-  const result = z
-    .object({
-      modelId: liteLlmGatewayModelIdSchema,
-      apiBase: liteLlmGatewayUrlSchema,
-      apiKeyArn: z.string().trim().optional(),
-      apiKeyCredentialName: z.string().trim().optional(),
-    })
-    .safeParse(model);
+function parseGatewayModel<T extends GatewayModelInput>(
+  model: T,
+  schema: typeof gatewayModelSchema,
+): ParsedGatewayModel<T> {
+  const result = schema.safeParse(model);
   if (!result.success) {
     throw new InputValidationError(z.prettifyError(result.error), { cause: result.error });
-  }
-  if (!result.data.apiKeyArn && !result.data.apiKeyCredentialName) {
-    throw new InputValidationError(
-      "enter a LiteLLM gateway API-key credential provider ARN or key file",
-    );
   }
   // Strands merges additionalParams over the request, including its model route.
   const params = model.additionalParams;
@@ -71,14 +100,23 @@ export function toLiteLlmGatewayModel<
   }
   return {
     ...model,
+    ...result.data,
     modelId: liteLlmGatewayModelId(result.data.modelId),
-    apiBase: result.data.apiBase,
   };
+}
+
+export function toLiteLlmGatewayModel<T extends GatewayModelInput>(
+  model: T,
+): ParsedGatewayModel<T> {
+  return parseGatewayModel(model, projectGatewayModelSchema);
 }
 
 export function toHarnessGatewayModel(
   model: HarnessModelConfiguration | undefined,
 ): HarnessModelConfiguration | undefined {
   if (!model?.liteLlmModelConfig) return model;
-  return { ...model, liteLlmModelConfig: toLiteLlmGatewayModel(model.liteLlmModelConfig) };
+  return {
+    ...model,
+    liteLlmModelConfig: parseGatewayModel(model.liteLlmModelConfig, standaloneGatewayModelSchema),
+  };
 }

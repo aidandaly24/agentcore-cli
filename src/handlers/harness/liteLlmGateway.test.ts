@@ -83,6 +83,51 @@ describe("LiteLLM gateway authoring", () => {
     });
   });
 
+  test.each(["apiKeyArn", "apiKeyCredentialName"] as const)(
+    "returns the parsed %s without mutating the input",
+    (credentialField) => {
+      const input = {
+        modelId: " my-model ",
+        apiBase: " https://gateway.example.com/v1 ",
+        [credentialField]: " GatewayCredential ",
+        maxTokens: 123,
+      };
+      expect(toLiteLlmGatewayModel(input)).toEqual({
+        ...input,
+        modelId: "litellm_proxy/my-model",
+        apiBase: "https://gateway.example.com/v1",
+        [credentialField]: "GatewayCredential",
+      });
+      expect(input[credentialField]).toBe(" GatewayCredential ");
+    },
+  );
+
+  test.each([undefined, "", " "])(
+    "reports both a missing URL and project credential: %j",
+    (apiBase) => {
+      const parse = () => toLiteLlmGatewayModel({ modelId: "my-model", apiBase });
+      expect(parse).toThrow("enter the LiteLLM gateway API base URL");
+      expect(parse).toThrow("enter a LiteLLM gateway API-key credential provider ARN or key file");
+    },
+  );
+
+  test.each([undefined, "arn:gateway-key"])(
+    "rejects project credential names in standalone API models with ARN %j",
+    (apiKeyArn) => {
+      const model = {
+        liteLlmModelConfig: {
+          modelId: "my-model",
+          apiBase: "https://gateway.example.com/v1",
+          apiKeyArn,
+          apiKeyCredentialName: "GatewayKey",
+        },
+      };
+      expect(() => toHarnessGatewayModel(model)).toThrow(
+        "apiKeyCredentialName is only supported in projects; use apiKeyArn for the Harness API",
+      );
+    },
+  );
+
   test.each([
     "model",
     "api_base",
