@@ -230,11 +230,11 @@ describe("harness update wizard", () => {
     await waitForText(r.lastFrame, "Gateway API base URL");
     expect(r.lastFrame()).not.toContain("upstream-model");
     expect(r.lastFrame()).not.toContain("arn:upstream-key");
-    await r.write("my-model");
+    await r.write(" my-model ");
     await r.press("return");
-    await r.write("arn:gateway-key");
+    await r.write(" arn:gateway-key ");
     await r.press("return");
-    await r.write("https://gateway.example.com/v1");
+    await r.write(" https://gateway.example.com/v1 ");
     await r.press("return");
     await waitForText(r.lastFrame, "● managed");
     await r.press("return");
@@ -243,6 +243,9 @@ describe("harness update wizard", () => {
     await waitForText(r.lastFrame, "type or paste the agent's instructions");
     await r.write("\x04");
     await waitForText(r.lastFrame, "sent to UpdateHarness");
+    expect(r.lastFrame()).toContain('"modelId": "litellm_proxy/my-model"');
+    expect(r.lastFrame()).toContain('"apiKeyArn": "arn:gateway-key"');
+    expect(r.lastFrame()).toContain('"apiBase": "https://gateway.example.com/v1"');
     await r.press("return");
 
     await waitFor(() => core.harness.calls.some((call) => call.method === "updateHarness"));

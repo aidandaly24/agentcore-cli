@@ -254,16 +254,16 @@ describe("harness create wizard", () => {
       expect(r.lastFrame()).not.toContain(HARNESS_DEFAULT_MODEL_IDS.lite_llm);
       await r.press("return");
       await waitForText(r.lastFrame, "enter the model alias configured in your LiteLLM gateway");
-      await r.write(modelId);
+      await r.write(` ${modelId} `);
       await r.press("return"); // api key arn
       await r.press("return");
       await waitForText(r.lastFrame, "enter a gateway API-key credential provider ARN");
-      await r.write("arn:gateway-key");
+      await r.write(" arn:gateway-key ");
       await r.press("return"); // api base url
       await r.press("return");
       await waitForText(r.lastFrame, "enter the LiteLLM gateway API base URL");
       expect(core.harness.calls.some((c) => c.method === "createHarness")).toBe(false);
-      await r.write("https://gateway.example.com/v1");
+      await r.write(" https://gateway.example.com/v1 ");
       await r.press("return");
 
       await waitForText(r.lastFrame, "how should the harness remember conversations?");
@@ -273,6 +273,9 @@ describe("harness create wizard", () => {
       await waitForText(r.lastFrame, "type or paste the agent's instructions");
       await r.write("\x04");
       await waitForText(r.lastFrame, "sent to CreateHarness");
+      expect(r.lastFrame()).toContain('"modelId": "litellm_proxy/my-model"');
+      expect(r.lastFrame()).toContain('"apiKeyArn": "arn:gateway-key"');
+      expect(r.lastFrame()).toContain('"apiBase": "https://gateway.example.com/v1"');
       await r.press("return");
 
       await waitFor(() => core.harness.calls.some((c) => c.method === "createHarness"));
